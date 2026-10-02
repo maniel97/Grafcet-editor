@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Download, Plus, Trash2, WandSparkles, X } from 'lucide-react'
+import { Download, Pencil, Plus, Trash2, WandSparkles, X } from 'lucide-react'
 import { SCHEMES, VARIABLE_TYPES, duplicatedAddresses, typeInfo } from '../lib/addressing'
 import { STEP_PREFIXES, resolveStepPrefix, setPreferredStepPrefix, stepVar } from '../lib/stepNames'
 
@@ -12,6 +12,59 @@ const stepSort = (a, b) =>
 
 // Tabla de variables: dirección de PLC de cada etapa y de cada variable del grafcet.
 // Es la base para la futura simulación y la traducción a ladder.
+
+// Nombre de una variable: doble clic (o el lápiz) para renombrarla en todo el diagrama.
+function VariableName({ name, onRename }) {
+  const [draft, setDraft] = useState(null)
+  const [error, setError] = useState(null)
+  const finish = (save) => {
+    if (save && draft !== null) {
+      const problem = onRename?.(name, draft)
+      if (problem) return setError(problem)
+    }
+    setDraft(null)
+    setError(null)
+  }
+  if (draft === null)
+    return (
+      <span className="group flex items-center gap-1" onDoubleClick={() => setDraft(name)}>
+        {name}
+        <button
+          type="button"
+          onClick={() => setDraft(name)}
+          title="Renombrar en todo el diagrama"
+          aria-label={`Renombrar ${name}`}
+          className="rounded p-0.5 text-slate-400 opacity-0 hover:bg-slate-100 group-hover:opacity-100 focus:opacity-100"
+        >
+          <Pencil size={12} />
+        </button>
+      </span>
+    )
+  return (
+    <span className="block">
+      <input
+        autoFocus
+        aria-label="Nuevo nombre de la variable"
+        className={`w-full rounded border px-1 py-0.5 font-mono text-sm ${error ? 'border-red-400' : 'border-blue-500'}`}
+        value={draft}
+        onChange={(e) => {
+          setDraft(e.target.value)
+          setError(null)
+        }}
+        onBlur={() => finish(false)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') finish(true)
+          if (e.key === 'Escape') {
+            e.stopPropagation()
+            e.preventDefault()
+            finish(false)
+          }
+        }}
+      />
+      {error && <span className="block text-xs text-red-600">{error}</span>}
+    </span>
+  )
+}
 export default function VariablesDialog({
   plc,
   stepNodes,
@@ -23,6 +76,7 @@ export default function VariablesDialog({
   tableShown,
   onToggleTable,
   onAddVariable,
+  onRenameVariable,
   onClose,
 }) {
   const dialogRef = useRef(null)
@@ -230,7 +284,9 @@ export default function VariablesDialog({
                     const type = entry.type ?? found.type
                     return (
                       <tr key={name} className="border-b border-slate-100">
-                        <td className="px-2 font-mono text-sm">{name}</td>
+                        <td className="px-2 font-mono text-sm">
+                          <VariableName name={name} onRename={onRenameVariable} />
+                        </td>
                         <td>
                           <select
                             className={cellInput}

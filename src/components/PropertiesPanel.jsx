@@ -95,14 +95,22 @@ function ActionRow({ action, onChange, onRemove }) {
   )
 }
 
-function StepFields({ data, onChange }) {
+function StepFields({ data, onChange, onCommitLabel }) {
   const actions = (data.actions ?? []).map(normalizeAction)
   const setActions = (next) => onChange({ actions: next })
 
   return (
     <>
       <Field label="Número / nombre">
-        <input className={inputClass} value={data.label ?? ''} onChange={(e) => onChange({ label: e.target.value })} autoFocus />
+        {/* Al terminar de editar el número se actualizan las referencias a la etapa (X5, 5s/X5). */}
+        <input
+          className={inputClass}
+          value={data.label ?? ''}
+          onChange={(e) => onChange({ label: e.target.value })}
+          onBlur={onCommitLabel}
+          onKeyDown={(e) => e.key === 'Enter' && onCommitLabel?.()}
+          autoFocus
+        />
       </Field>
 
       <div className="space-y-1">
@@ -208,7 +216,7 @@ function TransitionFields({ data, onChange, previousSteps }) {
   )
 }
 
-export default function PropertiesPanel({ node, onChange, onClose, previousSteps = [] }) {
+export default function PropertiesPanel({ node, onChange, onCommitLabel, onClose, previousSteps = [] }) {
   if (!node) return null
   const isStep = node.type === 'step'
 
@@ -222,7 +230,7 @@ export default function PropertiesPanel({ node, onChange, onClose, previousSteps
       </div>
       <div className="space-y-4 overflow-y-auto p-4">
         {isStep ? (
-          <StepFields key={node.id} data={node.data} onChange={onChange} />
+          <StepFields key={node.id} data={node.data} onChange={onChange} onCommitLabel={onCommitLabel} />
         ) : (
           <TransitionFields key={node.id} data={node.data} onChange={onChange} previousSteps={previousSteps} />
         )}

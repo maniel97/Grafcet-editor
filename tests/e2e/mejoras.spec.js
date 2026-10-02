@@ -458,3 +458,46 @@ test('modo oscuro: la opción elegida de los selectores del ladder se lee', asyn
   for (const c of contrasts) expect(c).toBeGreaterThan(4.5)
   expectNoErrors(errors)
 })
+
+test('buscar (Ctrl+F), renombrar una variable y renumerar una etapa con sus referencias', async ({ page }) => {
+  const errors = await openEditor(page)
+  const transitions = page.locator('.react-flow__node-transition')
+  // Una receptividad que se refiere a la etapa 1.
+  await transitions.nth(1).dblclick()
+  await page.getByPlaceholder('p. ej. a · b, ↑c, 5s/X2').fill('Paro + 2s/X1')
+  await page.keyboard.press('Escape')
+
+  // Buscar.
+  await page.locator('.react-flow__pane').click({ position: { x: 700, y: 600 } })
+  await page.keyboard.press('Control+f')
+  await page.getByLabel('Buscar en el diagrama').fill('paro')
+  await expect(page.getByRole('search')).toContainText('1 de 1')
+  await page.keyboard.press('Enter')
+  await expect(transitions.nth(1)).toHaveClass(/selected/)
+  await page.keyboard.press('Escape')
+  await expect(page.getByRole('search')).toHaveCount(0)
+
+  // Renombrar Marcha -> Inicio desde la tabla de variables.
+  await page.getByTitle(/Tabla de variables: direcciones/).click()
+  const dialog = page.getByRole('dialog', { name: 'Tabla de variables' })
+  await dialog.getByRole('tab', { name: /Variables/ }).click()
+  await dialog.getByLabel('Renombrar Marcha').click()
+  await dialog.getByLabel('Nuevo nombre de la variable').fill('Paro')
+  await page.keyboard.press('Enter')
+  await expect(dialog).toContainText('Ya existe una variable «Paro»')
+  await dialog.getByLabel('Nuevo nombre de la variable').fill('Inicio')
+  await page.keyboard.press('Enter')
+  await expect(dialog.getByLabel('Renombrar Inicio')).toHaveCount(1)
+  await dialog.getByTitle('Cerrar (Esc)').click()
+  await expect(transitions.nth(0)).toContainText('Inicio')
+  await page.keyboard.press('Control+z')
+  await expect(transitions.nth(0)).toContainText('Marcha')
+
+  // Renumerar la etapa 1 a 7: «2s/X1» pasa a «2s/X7».
+  await page.locator('.react-flow__node-step').nth(1).dblclick()
+  const label = page.locator('aside.side-panel').getByRole('textbox').first()
+  await label.fill('7')
+  await page.keyboard.press('Enter')
+  await expect(transitions.nth(1)).toContainText('2s/X7')
+  expectNoErrors(errors)
+})

@@ -4,7 +4,7 @@ import { ARROWS } from './keyboardNav'
 // Atajos de teclado globales del editor. Se ignoran mientras se escribe en un campo de texto
 // o con un diálogo modal abierto, para no interferir con la edición.
 // handlers: { undo, redo, copy, cut, paste, duplicate, selectAll, save, open, help, escape,
-//             move(dx, dy), navigate(dir), edit }
+//             move(dx, dy), navigate(dir), edit, find }
 export function useEditorShortcuts(handlers) {
   const ref = useRef(handlers)
   useEffect(() => {
@@ -35,6 +35,7 @@ export function useEditorShortcuts(handlers) {
         if (key === 'a') return run(h.selectAll)
         if (key === 's') return run(h.save)
         if (key === 'o') return run(h.open)
+        if (key === 'f') return run(h.find)
         return
       }
       // Flechas e Intro solo sobre el lienzo (o sin foco): en botones y menús hacen lo suyo
@@ -66,6 +67,7 @@ export const SHORTCUTS = [
   ['Ctrl+A', 'Seleccionar todo'],
   ['Supr · Retroceso', 'Eliminar la selección'],
   ['Ctrl+S · Ctrl+O', 'Guardar · abrir proyecto (.json)'],
+  ['Ctrl+F', 'Buscar en el diagrama (Intro: siguiente)'],
   ['Mayús + arrastrar', 'Seleccionar varios con un recuadro'],
   ['Doble clic · Intro', 'Editar etapa o transición (Intro: la seleccionada)'],
   ['Alt + flechas', 'Ir a la etapa o transición siguiente, anterior o de la rama vecina'],

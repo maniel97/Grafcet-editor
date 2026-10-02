@@ -35,7 +35,9 @@ import { useImageExport } from '../hooks/useImageExport'
 import { useTouchGestures } from '../hooks/useTouchGestures'
 import { fileName, setProjectName } from '../lib/fileNames'
 import { neighbor } from '../lib/keyboardNav'
-import { FRAME_SIZE, frameAround, membersOf, nextFrameName } from '../lib/frames'
+import { FRAME_SIZE, frameAround, frameOf, membersOf, nextFrameName } from '../lib/frames'
+import { isValidName, renameVariable, renumberStep } from '../lib/rename'
+import SearchBar from './SearchBar'
 
 // Partes que no hacen falta al abrir el editor: se descargan la primera vez que se usan, para que
 // la carga inicial sea más ligera (importa sobre todo publicado en internet).
@@ -95,6 +97,7 @@ export default function GrafcetCanvas() {
   const [helpOpen, setHelpOpen] = useState(false)
   const [verifyOpen, setVerifyOpen] = useState(false)
   const [ladderOpen, setLadderOpen] = useState(false)
+  const [searchOpen, setSearchOpen] = useState(false)
   const [exportFormat, setExportFormat] = useState(null) // diálogo de exportación abierto en ese formato
   // Modo simulación: la edición queda bloqueada y el lienzo muestra la evolución.
   const [simulating, setSimulating] = useState(false)
@@ -253,6 +256,48 @@ export default function GrafcetCanvas() {
     [takeSnapshot, screenToFlowPosition, setNodes],
   )
 
+  // Renumerar una etapa: al terminar de editar su número (o al cerrar el panel) se actualizan
+  // las referencias a ella (X5, 5s/X5, F/G2{5}). Se compara con el número que tenía al empezar.
+  const labelAtStart = useRef(new Map())
+  const commitRenumber = useCallback(
+    (id) => {
+      const node = id && getNode(id)
+      if (node?.type !== 'step' || !labelAtStart.current.has(id)) return
+      const from = String(labelAtStart.current.get(id) ?? '').trim()
+      const to = String(node.data.label ?? '').trim()
+      labelAtStart.current.set(id, to)
+      if (!from || !to || from === to) return
+      takeSnapshot()
+      const frames = getNodes().filter((n) => n.type === 'frame')
+      const grafcetOf = (n) => frameOf(n, frames, 'grafcet')?.data.name?.toUpperCase() ?? null
+      setNodes((nds) => renumberStep(nds, id, from, to, grafcetOf))
+    },
+    [getNode, getNodes, setNodes, takeSnapshot],
+  )
+  const previousEditing = useRef(null)
+  useEffect(() => {
+    if (previousEditing.current && previousEditing.current !== editingId) commitRenumber(previousEditing.current)
+    previousEditing.current = editingId
+    const node = editingId && getNode(editingId)
+    if (node?.type === 'step') labelAtStart.current.set(editingId, node.data.label)
+  }, [editingId, commitRenumber, getNode])
+
+  // Renombrar una variable en todo el diagrama (desde la tabla de variables). Devuelve un error o null.
+  const renameVar = useCallback(
+    (from, to) => {
+      to = to.trim()
+      if (to === from) return null
+      if (!isValidName(to)) return 'Nombre no válido: letras, cifras y _ (sin empezar por cifra ni espacios).'
+      if (symbols.has(to)) return `Ya existe una variable «${to}».`
+      takeSnapshot()
+      const result = renameVariable(getNodes(), plcRef.current, from, to)
+      setNodes(result.nodes)
+      setPlc(result.plc)
+      return null
+    },
+    [symbols, takeSnapshot, getNodes, setNodes, setPlc, plcRef],
+  )
+
   // Encierra unos nodos en un marco nuevo (grafcet parcial o expansión de macroetapa).
   const frameAroundNodes = useCallback(
     (nodeIds, kind) => {
@@ -398,6 +443,7 @@ export default function GrafcetCanvas() {
     save,
     open: () => fileInputRef.current?.click(),
     help: () => setHelpOpen(true),
+    find: () => setSearchOpen(true),
     move: (dx, dy) => {
       if (readOnly || !getNodes().some((n) => n.selected)) return
       // Una ráfaga de pulsaciones seguidas es un solo paso de deshacer.
@@ -492,6 +538,7 @@ export default function GrafcetCanvas() {
               tableShown={tableShown}
               onToggleTable={() => toggleTable()}
               onAddVariable={(type) => plcTable.addVariable(type, { reveal: false })}
+              onRenameVariable={renameVar}
               onClose={() => setVariablesOpen(false)}
             />
           </Suspense>
@@ -557,6 +604,16 @@ export default function GrafcetCanvas() {
                 initialSteps={initialSteps}
                 onPick={finishLoop}
                 onCancel={() => setLoopSourceId(null)}
+              />
+            )}
+            {searchOpen && (
+              <SearchBar
+                nodes={nodes}
+                onFocus={(id) => {
+                  setNodes((nds) => nds.map((n) => (n.selected === (n.id === id) ? n : { ...n, selected: n.id === id })))
+                  focusNode(id)
+                }}
+                onClose={() => setSearchOpen(false)}
               />
             )}
             <ReactFlow
@@ -631,6 +688,7 @@ export default function GrafcetCanvas() {
               <PropertiesPanel
                 node={editingNode}
                 onChange={editNode}
+                onCommitLabel={() => commitRenumber(editingId)}
                 onClose={() => setEditingId(null)}
                 previousSteps={previousSteps}
               />
