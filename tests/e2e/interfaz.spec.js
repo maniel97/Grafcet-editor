@@ -52,6 +52,30 @@ test('encuadre: todo lo dibujado visible al cargar y con el botón', async ({ pa
   expectNoErrors(errors)
 })
 
+test('al conectar, solo se marcan en verde los destinos válidos según la norma', async ({ page }) => {
+  const errors = await openEditor(page)
+  // Etapa nueva y libre: desde su salida solo se puede ir a entradas de transiciones.
+  await page.getByRole('button', { name: 'Etapa', exact: true }).click()
+  const newStep = page.locator('.react-flow__node-step').last()
+  await newStep.hover()
+  const source = newStep.locator('.grafcet-handle.source')
+  const box = await source.boundingBox()
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(box.x + 80, box.y + 120, { steps: 5 })
+
+  const candidates = page.locator('.grafcet-handle.is-candidate')
+  await expect(candidates.first()).toBeVisible()
+  const kinds = await candidates.evaluateAll((els) =>
+    els.map((el) => `${el.closest('.react-flow__node').classList.contains('react-flow__node-transition') ? 'transición' : 'etapa'}:${el.classList.contains('target') ? 'entrada' : 'salida'}`),
+  )
+  expect(new Set(kinds)).toEqual(new Set(['transición:entrada']))
+
+  await page.mouse.up()
+  await expect(candidates).toHaveCount(0)
+  expectNoErrors(errors)
+})
+
 test('bloqueo de edición: impide editar y se puede quitar', async ({ page }) => {
   const errors = await openEditor(page, 'encuadre-y-tabla.json')
   const nodeCount = () => page.locator('.react-flow__node').count()

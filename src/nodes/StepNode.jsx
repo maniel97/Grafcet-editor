@@ -1,5 +1,4 @@
-import { useCallback } from 'react'
-import { Position, useStore } from '@xyflow/react'
+import { Position, useNodeConnections } from '@xyflow/react'
 import QuickConnectButton, { AddActionButton } from './QuickConnectButton'
 import GrafcetHandle from './GrafcetHandle'
 import ActionBox from './ActionBox'
@@ -19,7 +18,8 @@ export default function StepNode({ id, data, selected }) {
   const actions = data.actions ?? []
   // Si ya tiene transición de salida, el "+" queda en gris: las alternativas en O se añaden
   // desde la propia transición (clic derecho > Añadir alternativa en O).
-  const hasTransition = useStore(useCallback((s) => s.edges.some((e) => e.source === id), [id]))
+  const hasTransition = useNodeConnections({ handleType: 'source' }).length > 0
+  const hasIncoming = useNodeConnections({ handleType: 'target' }).length > 0
   // Dirección de PLC de la etapa (solo con "Mostrar direcciones" activado en la tabla de variables).
   const { plcView, sim } = useEditor()
   const address = plcView?.stepAddress(id)
@@ -30,17 +30,22 @@ export default function StepNode({ id, data, selected }) {
   return (
     <div className={`flex items-center ${highlight}`}>
       {/* Centrado bajo el cuadrado de la etapa (56px de ancho), no bajo el nodo entero con sus acciones. */}
-      <QuickConnectButton
-        nodeId={id}
-        centerX={28}
-        disabled={hasTransition}
-        title={
-          hasTransition
-            ? 'Ya tiene transición. Para una alternativa en O: clic derecho en la transición'
-            : 'Añadir transición'
-        }
-      />
-      <AddActionButton nodeId={id} />
+      {/* Los botones flotantes solo existen en el nodo seleccionado (son los únicos visibles). */}
+      {selected && (
+        <>
+          <QuickConnectButton
+            nodeId={id}
+            centerX={28}
+            disabled={hasTransition}
+            title={
+              hasTransition
+                ? 'Ya tiene transición. Para una alternativa en O: clic derecho en la transición'
+                : 'Añadir transición'
+            }
+          />
+          <AddActionButton nodeId={id} />
+        </>
+      )}
       <div
         className={`diagram-step-label relative flex h-[56px] w-[56px] shrink-0 items-center justify-center border-2 font-semibold transition-colors ${border} ${
           active ? 'bg-green-200' : 'bg-white'
@@ -65,8 +70,8 @@ export default function StepNode({ id, data, selected }) {
         </span>
         <IssueBadge nodeId={id} />
         {/* Los handles van dentro del cuadrado para quedar centrados en la etapa, no en todo el nodo. */}
-        <GrafcetHandle type="target" position={Position.Top} />
-        <GrafcetHandle type="source" position={Position.Bottom} />
+        <GrafcetHandle type="target" position={Position.Top} connected={hasIncoming} />
+        <GrafcetHandle type="source" position={Position.Bottom} connected={hasTransition} />
       </div>
 
       {actions.length > 0 && (

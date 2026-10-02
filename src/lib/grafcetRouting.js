@@ -20,67 +20,83 @@ function box(node, labelSpace) {
   const { x, y } = node.internals.positionAbsolute
   const width = node.measured?.width ?? 56
   const height = node.measured?.height ?? 56
-  return { x, y, width, height, right: x + width + (node.type === 'transition' ? labelSpace : 0) }
+  return { id: node.id, x, y, width, height, right: x + width + (node.type === 'transition' ? labelSpace : 0) }
+}
+
+// Índice compartido por todos los enlaces de un mismo estado del lienzo: cajas de los nodos,
+// enlaces hacia abajo por nodo y bucles. Cada enlace calcula su ruta en cada cambio del lienzo
+// (al arrastrar, en cada movimiento); con el índice, el recorrido de todos los nodos y enlaces
+// se hace una vez por cambio y no una vez por enlace.
+let cache = { nodes: null, edges: null, labelSpace: null, index: null }
+
+function routingIndex(state) {
+  const labelSpace = transitionLabelSpace()
+  if (cache.nodes === state.nodes && cache.edges === state.edges && cache.labelSpace === labelSpace) return cache.index
+  const { nodeLookup, edgeLookup } = state
+  // Solo etapas y transiciones son obstáculos (no la tabla de variables del lienzo).
+  const boxes = []
+  for (const n of nodeLookup.values()) if (n.type === 'step' || n.type === 'transition') boxes.push(box(n, labelSpace))
+  const yOf = (id) => nodeLookup.get(id)?.internals.positionAbsolute.y
+  const forwardOut = new Map()
+  const forwardIn = new Map()
+  const loops = []
+  for (const e of edgeLookup.values()) {
+    const ys = yOf(e.source)
+    const yt = yOf(e.target)
+    if (ys === undefined || yt === undefined) continue
+    if (yt > ys) {
+      forwardOut.set(e.source, (forwardOut.get(e.source) ?? 0) + 1)
+      forwardIn.set(e.target, (forwardIn.get(e.target) ?? 0) + 1)
+    } else if (yt < ys) loops.push({ id: e.id, top: yt, bottom: ys })
+  }
+  const index = { boxes, forwardOut, forwardIn, loops }
+  cache = { nodes: state.nodes, edges: state.edges, labelSpace, index }
+  return index
 }
 
 // Decide el tipo de trazado de un enlace a partir del estado del lienzo.
 // Devuelve un objeto pequeño y comparable para no re-renderizar el enlace sin necesidad.
 export function computeRoute(state, { id, source, target, sourceX, sourceY, targetY }) {
-  const { nodeLookup, edgeLookup } = state
+  const { nodeLookup } = state
   const src = nodeLookup.get(source)
   const tgt = nodeLookup.get(target)
   if (!src || !tgt) return { kind: 'down', bendAtSource: false, laneX: 0 }
+  const index = routingIndex(state)
 
   const top = Math.min(sourceY, targetY) - STUB
   const bottom = Math.max(sourceY, targetY) + STUB
-  const labelSpace = transitionLabelSpace()
-  const inSpan = [...nodeLookup.values()]
-    // Solo etapas y transiciones son obstáculos (no la tabla de variables del lienzo).
-    .filter((n) => n.id !== source && n.id !== target && (n.type === 'step' || n.type === 'transition'))
-    .map((n) => box(n, labelSpace))
-    .filter((b) => b.y < bottom && b.y + b.height > top)
+  const inSpan = index.boxes.filter((b) => b.id !== source && b.id !== target && b.y < bottom && b.y + b.height > top)
 
   if (targetY < sourceY) {
     // Bucle: carril a la izquierda de todo lo que hay en su recorrido vertical. Los bucles
     // anidados dentro de este (p. ej. volver a 1 dentro de volver a 0) van más al interior.
-    const spanOf = (e) => {
-      const s = nodeLookup.get(e.source)
-      const t = nodeLookup.get(e.target)
-      return s && t ? [t.internals.positionAbsolute.y, s.internals.positionAbsolute.y] : null
-    }
-    const [myTop, myBottom] = spanOf({ source, target })
+    const myTop = tgt.internals.positionAbsolute.y
+    const myBottom = src.internals.positionAbsolute.y
     let depth = 0
-    for (const e of edgeLookup.values()) {
-      if (e.id === id) continue
-      const span = spanOf(e)
-      if (!span || span[0] >= span[1]) continue // solo cuentan otros bucles
-      const inside = span[0] >= myTop && span[1] <= myBottom
-      if (inside && (span[0] !== myTop || span[1] !== myBottom)) depth++
+    for (const loop of index.loops) {
+      if (loop.id === id) continue
+      const inside = loop.top >= myTop && loop.bottom <= myBottom
+      if (inside && (loop.top !== myTop || loop.bottom !== myBottom)) depth++
     }
-    const minX = Math.min(sourceX, src.internals.positionAbsolute.x, tgt.internals.positionAbsolute.x, ...inSpan.map((b) => b.x))
+    let minX = Math.min(sourceX, src.internals.positionAbsolute.x, tgt.internals.positionAbsolute.x)
+    for (const b of inSpan) minX = Math.min(minX, b.x)
     return { kind: 'loop', bendAtSource: false, laneX: minX - LANE_GAP - depth * LANE_STEP }
   }
 
   // Ramificaciones en Y: una transición con varias etapas de salida (divergencia) o varias
   // etapas que llegan a una misma transición (convergencia) se unen por una doble línea.
-  const yOf = (nodeId) => nodeLookup.get(nodeId)?.internals.positionAbsolute.y
-  const isForward = (e) => yOf(e.target) > yOf(e.source)
-  const countEdges = (match) => {
-    let n = 0
-    for (const e of edgeLookup.values()) if (match(e) && isForward(e)) n++
-    return n
-  }
-  if (src.type === 'transition' && tgt.type === 'step' && countEdges((e) => e.source === source) >= 2) {
+  if (src.type === 'transition' && tgt.type === 'step' && (index.forwardOut.get(source) ?? 0) >= 2) {
     return { kind: 'andDiv', bendAtSource: true, laneX: 0 }
   }
-  if (src.type === 'step' && tgt.type === 'transition' && countEdges((e) => e.target === target) >= 2) {
+  if (src.type === 'step' && tgt.type === 'transition' && (index.forwardIn.get(target) ?? 0) >= 2) {
     return { kind: 'andConv', bendAtSource: false, laneX: 0 }
   }
 
   // Salto hacia abajo: si hay nodos en la vertical del origen, rodea por la derecha.
   const blocked = inSpan.some((b) => b.x <= sourceX && sourceX <= b.x + b.width)
   if (blocked) {
-    const maxRight = Math.max(src.internals.positionAbsolute.x + 56, ...inSpan.map((b) => b.right))
+    let maxRight = src.internals.positionAbsolute.x + 56
+    for (const b of inSpan) maxRight = Math.max(maxRight, b.right)
     return { kind: 'skip', bendAtSource: false, laneX: maxRight + LANE_GAP }
   }
 

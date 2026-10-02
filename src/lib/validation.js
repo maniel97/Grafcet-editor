@@ -15,8 +15,17 @@ export function validateGrafcet(nodes, edges) {
   const byId = new Map(nodes.map((n) => [n.id, n]))
   const steps = nodes.filter((n) => n.type === 'step')
   const transitions = nodes.filter((n) => n.type === 'transition')
-  const incoming = (id) => edges.filter((e) => e.target === id && byId.has(e.source))
-  const outgoing = (id) => edges.filter((e) => e.source === id && byId.has(e.target))
+  // Índices de enlaces por nodo: buscarlos filtrando todos los enlaces para cada nodo sería
+  // cuadrático y se nota en diagramas grandes (la verificación se repite al editar).
+  const incomingOf = new Map()
+  const outgoingOf = new Map()
+  for (const e of edges) {
+    if (!byId.has(e.source) || !byId.has(e.target)) continue
+    incomingOf.set(e.target, [...(incomingOf.get(e.target) ?? []), e])
+    outgoingOf.set(e.source, [...(outgoingOf.get(e.source) ?? []), e])
+  }
+  const incoming = (id) => incomingOf.get(id) ?? []
+  const outgoing = (id) => outgoingOf.get(id) ?? []
   const y = (id) => byId.get(id).position.y
 
   // Situación inicial: sin etapa inicial el grafcet no puede arrancar.

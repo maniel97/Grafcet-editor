@@ -9,11 +9,13 @@ const SIZE = {
 }
 // La receptividad se dibuja fuera de la caja de la transición: se reserva hueco para ella,
 // proporcional al tamaño del texto del diagrama (140px con la letra por defecto de 14px).
-export function transitionLabelSpace() {
-  if (typeof document === 'undefined') return 140
-  const size = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--diagram-font-size'))
-  return Math.round(140 * ((size || 14) / 14))
+// El tamaño lo comunica la configuración (lib/settings.js) al aplicarse: así no hay que leer
+// estilos del navegador, que es caro y se haría en cada enlace al arrastrar.
+let diagramFontSize = 14
+export function setDiagramFontSize(px) {
+  diagramFontSize = Number(px) || 14
 }
+export const transitionLabelSpace = () => Math.round(140 * (diagramFontSize / 14))
 const MARGIN = 20
 
 // Distancia vertical (de borde superior a borde superior) al encadenar nodos.

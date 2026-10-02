@@ -1,5 +1,5 @@
 import { useCallback } from 'react'
-import { Position, useStore } from '@xyflow/react'
+import { Position, useNodeConnections, useStore } from '@xyflow/react'
 import GrafcetHandle from './GrafcetHandle'
 import IssueBadge from './IssueBadge'
 import QuickConnectButton, { LoopButton } from './QuickConnectButton'
@@ -20,38 +20,51 @@ export default function TransitionNode({ id, data, selected }) {
   const barColor =
     simState === 'ready' ? 'bg-green-600' : simState === 'enabled' ? 'bg-amber-500' : selected ? 'bg-blue-500' : 'bg-slate-900'
   // Salida actual (null | 'loop' | 'step'): decide qué botones flotantes están disponibles.
+  // Solo mira sus propios enlaces de salida (no todos los del diagrama en cada cambio).
+  const outgoing = useNodeConnections({ handleType: 'source' })
+  const hasIncoming = useNodeConnections({ handleType: 'target' }).length > 0
   const output = useStore(
     useCallback(
-      (s) => transitionOutput(id, s.edges, (nodeId) => s.nodeLookup.get(nodeId)?.internals.positionAbsolute.y ?? Infinity),
-      [id],
+      (s) =>
+        transitionOutput(
+          id,
+          outgoing.map((c) => ({ source: id, target: c.target })),
+          (nodeId) => s.nodeLookup.get(nodeId)?.internals.positionAbsolute.y ?? Infinity,
+        ),
+      [id, outgoing],
     ),
   )
 
   return (
     <div className={`relative flex h-[24px] w-[56px] items-center justify-center ${highlight}`}>
       {/* Con bucle, una etapa debajo se activaría a la vez que la del bucle (divergencia en Y implícita). */}
-      <QuickConnectButton
-        nodeId={id}
-        disabled={output === 'loop'}
-        title={
-          output === 'loop'
-            ? `Esta transición ya vuelve atrás con un bucle. ${ALTERNATIVE_HINT}`
-            : output === 'step'
-              ? 'Añadir etapa en paralelo (rama en Y)'
-              : 'Añadir etapa'
-        }
-      />
-      <LoopButton
-        nodeId={id}
-        disabled={output !== null}
-        title={
-          output === 'loop'
-            ? 'Esta transición ya tiene un bucle'
-            : output === 'step'
-              ? `Esta transición ya continúa hacia abajo. ${ALTERNATIVE_HINT}`
-              : 'Bucle: volver a una etapa anterior'
-        }
-      />
+      {/* Los botones flotantes solo existen en la transición seleccionada. */}
+      {selected && (
+        <>
+          <QuickConnectButton
+            nodeId={id}
+            disabled={output === 'loop'}
+            title={
+              output === 'loop'
+                ? `Esta transición ya vuelve atrás con un bucle. ${ALTERNATIVE_HINT}`
+                : output === 'step'
+                  ? 'Añadir etapa en paralelo (rama en Y)'
+                  : 'Añadir etapa'
+            }
+          />
+          <LoopButton
+            nodeId={id}
+            disabled={output !== null}
+            title={
+              output === 'loop'
+                ? 'Esta transición ya tiene un bucle'
+                : output === 'step'
+                  ? `Esta transición ya continúa hacia abajo. ${ALTERNATIVE_HINT}`
+                  : 'Bucle: volver a una etapa anterior'
+            }
+          />
+        </>
+      )}
       <div className={`w-full transition-all ${barColor} ${simState ? 'h-[4px]' : 'h-[2px]'}`} />
       <div className="absolute left-1/2 top-0 h-full w-[2px] -translate-x-1/2 bg-slate-900" />
       {data.condition && (
@@ -67,8 +80,8 @@ export default function TransitionNode({ id, data, selected }) {
         </span>
       )}
       <IssueBadge nodeId={id} />
-      <GrafcetHandle type="target" position={Position.Top} />
-      <GrafcetHandle type="source" position={Position.Bottom} />
+      <GrafcetHandle type="target" position={Position.Top} connected={hasIncoming} />
+      <GrafcetHandle type="source" position={Position.Bottom} connected={outgoing.length > 0} />
     </div>
   )
 }

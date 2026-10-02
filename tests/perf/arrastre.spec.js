@@ -56,6 +56,13 @@ test(`arrastrar una etapa en un grafcet de ${STEPS} etapas`, async ({ page }) =>
     return { script: m.ScriptDuration, task: m.TaskDuration, layout: m.LayoutDuration, style: m.RecalcStyleDuration }
   }
 
+  // PERF_PROFILE=1: perfil de CPU del primer arrastre; muestra las funciones que más tiempo gastan.
+  if (process.env.PERF_PROFILE) {
+    await cdp.send('Profiler.enable')
+    await cdp.send('Profiler.setSamplingInterval', { interval: 100 })
+    await cdp.send('Profiler.start')
+  }
+
   const runs = []
   for (let run = 0; run < 3; run++) {
     const box = await page.locator('.react-flow__node[data-id="s4"]').boundingBox()
@@ -77,6 +84,19 @@ test(`arrastrar una etapa en un grafcet de ${STEPS} etapas`, async ({ page }) =>
     const d = (k) => Math.round((c1[k] - c0[k]) * 1000)
     runs.push({ ms, task: d('task'), script: d('script'), layout: d('layout') + d('style'), longTotal: Math.round(long.reduce((a, b) => a + b, 0)), longCount: long.length })
     await page.waitForTimeout(300)
+    if (run === 0 && process.env.PERF_PROFILE) {
+      const { profile } = await cdp.send('Profiler.stop')
+      const self = new Map()
+      const total = profile.samples.length
+      const byId = new Map(profile.nodes.map((n) => [n.id, n]))
+      for (const id of profile.samples) {
+        const f = byId.get(id).callFrame
+        const key = `${f.functionName || '(anónima)'} ${f.url.split('/').pop()}:${f.lineNumber + 1}`
+        self.set(key, (self.get(key) ?? 0) + 1)
+      }
+      console.log('PERFIL (tiempo propio, % de muestras):')
+      for (const [k, v] of [...self].sort((a, b) => b[1] - a[1]).slice(0, 18)) console.log(`  ${((v / total) * 100).toFixed(1)}%  ${k}`)
+    }
   }
   const zoom = await page.evaluate(() => document.querySelector('.react-flow__viewport').style.transform)
   console.log(`  (vista: ${zoom})`)

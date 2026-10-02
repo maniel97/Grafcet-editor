@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { setDiagramFontSize } from './layout'
 
 // Fuentes instaladas en local (@fontsource): funcionan sin conexión y se incluyen en las exportaciones.
 import '@fontsource/inter/400.css'
@@ -49,6 +50,7 @@ function apply({ fontId, uiScale, diagramFontSize }) {
   const font = FONTS.find((f) => f.id === fontId) ?? FONTS[0]
   root.style.setProperty('--app-font', font.stack)
   root.style.setProperty('--diagram-font-size', `${diagramFontSize}px`)
+  setDiagramFontSize(diagramFontSize)
   root.style.fontSize = `${uiScale}%`
 }
 

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ReactFlow,
   Background,
@@ -43,6 +43,7 @@ import {
   plcToCsv,
 } from '../lib/addressing'
 import { projectVariables } from '../lib/symbols'
+import { diagramContentKey } from '../lib/contentKey'
 import VariablesDialog from './VariablesDialog'
 import { nextStepLabel, nextTransitionLabel, findFreePosition } from '../lib/layout'
 import { useHistory } from '../lib/history'
@@ -140,8 +141,12 @@ export default function GrafcetCanvas() {
 
   // Variables detectadas en el diagrama y etapas, para la tabla de variables.
   // Incluye las variables añadidas a mano en la tabla aunque aún no se usen en el diagrama.
-  const symbols = useMemo(() => projectVariables(nodes, plc.variables), [nodes, plc.variables])
-  const stepNodes = useMemo(() => nodes.filter((n) => n.type === 'step'), [nodes])
+  // Solo dependen del contenido, no de las posiciones: no cambian al arrastrar (ver contentKey.js).
+  const contentKey = diagramContentKey(nodes)
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- se recalcula solo al cambiar el contenido
+  const contentNodes = useMemo(() => nodes, [contentKey])
+  const symbols = useMemo(() => projectVariables(contentNodes, plc.variables), [contentNodes, plc.variables])
+  const stepNodes = useMemo(() => contentNodes.filter((n) => n.type === 'step'), [contentNodes])
   const plcIssues = useMemo(() => validatePlc(plc, stepNodes, symbols), [plc, stepNodes, symbols])
 
   const changePlc = useCallback(
@@ -171,6 +176,10 @@ export default function GrafcetCanvas() {
     },
     [takeSnapshot, setNodes],
   )
+
+  // Conexión que se está arrastrando ({ nodeId, handleType }) o null: los conectores la usan para
+  // marcarse como destino válido. Solo cambia al empezar y al terminar la conexión.
+  const [connecting, setConnecting] = useState(null)
 
   // Nodos resaltados al pasar el ratón por una fila de la tabla del lienzo.
   const [highlight, setHighlight] = useState(null)
@@ -225,7 +234,17 @@ export default function GrafcetCanvas() {
   }, [plc, stepNodes])
 
   // Verificación de conformidad en vivo; los nodos solo se marcan con el panel abierto.
-  const issues = useMemo(() => [...validateGrafcet(nodes, edges), ...plcIssues], [nodes, edges, plcIssues])
+  // Con prioridad baja (no frena el arrastre) y solo cambia si cambia el resultado: así los nodos
+  // no se vuelven a dibujar por moverse si los problemas siguen siendo los mismos.
+  const deferredNodes = useDeferredValue(nodes)
+  const deferredEdges = useDeferredValue(edges)
+  const freshIssues = useMemo(
+    () => [...validateGrafcet(deferredNodes, deferredEdges), ...plcIssues],
+    [deferredNodes, deferredEdges, plcIssues],
+  )
+  const issuesKey = JSON.stringify(freshIssues)
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- se recalcula solo si cambian los problemas
+  const issues = useMemo(() => freshIssues, [issuesKey])
   const issueCounts = useMemo(
     () => ({
       errors: issues.filter((i) => i.severity === 'error').length,
@@ -299,9 +318,10 @@ export default function GrafcetCanvas() {
       toggleTable,
       simulating,
       readOnly,
+      connecting,
       sim: simulating ? simulation.view : null,
     }),
-    [takeSnapshot, markedIssues, plcView, plcTable, highlight, toggleTable, simulating, readOnly, simulation.view],
+    [takeSnapshot, markedIssues, plcView, plcTable, highlight, toggleTable, simulating, readOnly, connecting, simulation.view],
   )
 
   // Menú contextual (clic derecho): { x, y, kind: 'node' | 'selection' | 'pane', nodeIds, flowPosition }
@@ -613,6 +633,8 @@ export default function GrafcetCanvas() {
               onEdgesChange={onEdgesChange}
               onConnect={onConnect}
               isValidConnection={isValidConnection}
+              onConnectStart={(_, { nodeId, handleType }) => setConnecting({ nodeId, handleType })}
+              onConnectEnd={() => setConnecting(null)}
               onNodeDragStart={() => takeSnapshot()}
               onSelectionDragStart={() => takeSnapshot()}
               onBeforeDelete={async () => {
