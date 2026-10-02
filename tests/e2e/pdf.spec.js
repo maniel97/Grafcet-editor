@@ -14,7 +14,7 @@ test('PDF: elegir tamaño y orientación, vista previa y página guardada coinci
   await page.getByRole('button', { name: /Exportar/ }).click()
   await page.getByRole('menuitem', { name: /PDF/ }).click()
 
-  const dialog = page.getByRole('dialog', { name: 'Exportar a PDF' })
+  const dialog = page.getByRole('dialog', { name: 'Exportar', exact: true })
   const preview = dialog.getByLabel('Vista previa de la página')
   await expect(preview).toBeVisible() // la imagen ya está preparada
   await expect(dialog.getByRole('img', { name: /Diagrama tal como quedará/ })).toBeVisible()
@@ -44,7 +44,7 @@ test('PDF: elegir tamaño y orientación, vista previa y página guardada coinci
   // Recuerda las opciones al volver a abrirlo.
   await page.getByRole('button', { name: /Exportar/ }).click()
   await page.getByRole('menuitem', { name: /PDF/ }).click()
-  await expect(page.getByRole('dialog', { name: 'Exportar a PDF' }).getByLabel('A3', { exact: true })).toBeChecked()
+  await expect(page.getByRole('dialog', { name: 'Exportar', exact: true }).getByLabel('A3', { exact: true })).toBeChecked()
   await expect(page.getByLabel('Vista previa de la página')).toHaveAttribute('data-page', 'a3-landscape')
   expectNoErrors(errors)
 })
@@ -54,7 +54,7 @@ test('PDF: sin pie de página y la selección no aparece en la captura', async (
   await page.locator('.react-flow__node[data-id="s1"]').click() // seleccionada (azul)
   await page.getByRole('button', { name: /Exportar/ }).click()
   await page.getByRole('menuitem', { name: /PDF/ }).click()
-  const dialog = page.getByRole('dialog', { name: 'Exportar a PDF' })
+  const dialog = page.getByRole('dialog', { name: 'Exportar', exact: true })
   await expect(dialog.getByLabel('Vista previa de la página')).toBeVisible()
   // Mientras se captura se quita la selección, y se restaura después.
   await expect(page.locator('.react-flow__node[data-id="s1"].selected')).toHaveCount(1)
@@ -68,7 +68,7 @@ test('PDF: sin pie de página y la selección no aparece en la captura', async (
 test('PDF vectorial (por defecto): texto real sin imagen; desmarcado, imagen', async ({ page }, testInfo) => {
   const errors = await openEditor(page, 'ladder-completo.json')
   const save = async (name) => {
-    const dialog = page.getByRole('dialog', { name: 'Exportar a PDF' })
+    const dialog = page.getByRole('dialog', { name: 'Exportar', exact: true })
     const file = await download(page, () => dialog.getByRole('button', { name: 'Guardar PDF' }).click())
     const path = testInfo.outputPath(name)
     await file.saveAs(path)

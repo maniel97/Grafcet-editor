@@ -5,7 +5,9 @@ import ScenarioControls from './ScenarioControls'
 import { chronogramCsv } from '../lib/sim/scenario'
 import { withMacros } from '../lib/sim/engine'
 import { downloadFile } from '../lib/projectFile'
-import { fileName } from '../lib/fileNames'
+import { fileName, getProjectName } from '../lib/fileNames'
+import { svgMarkupSource } from '../lib/svgExport'
+import ExportDialog from './ExportDialog'
 
 const SPEEDS = [0.25, 0.5, 1, 2, 5, 10]
 
@@ -76,12 +78,18 @@ function InputRow({ variable, value, onChange, hotkey }) {
 }
 
 // Cronograma completo (desde t = 0) como SVG independiente. react-dom/server se carga solo al exportar.
-async function exportChronogramSvg(samples, signals, now) {
-  const { renderToStaticMarkup } = await import('react-dom/server')
-  const span = Math.max(now, 1)
-  const width = Math.round(Math.min(4000, Math.max(600, 72 + span * 40)))
-  const svg = renderToStaticMarkup(<Chronogram samples={samples} signals={signals} now={span} window={span} width={width} standalone />)
-  downloadFile(svg, fileName('svg', 'cronograma'), 'image/svg+xml')
+// Fuente de exportación del cronograma completo (desde t = 0), con los datos de este momento.
+// react-dom/server se carga solo al exportar.
+function chronogramSource(samples, signals, now) {
+  return svgMarkupSource(
+    async () => {
+      const { renderToStaticMarkup } = await import('react-dom/server')
+      const span = Math.max(now, 1)
+      const width = Math.round(Math.min(4000, Math.max(600, 72 + span * 40)))
+      return renderToStaticMarkup(<Chronogram samples={samples} signals={signals} now={span} window={span} width={width} standalone />)
+    },
+    { kind: 'cronograma', title: `${getProjectName().trim() || 'Grafcet'} · cronograma de la simulación`, name: (ext) => fileName(ext, 'cronograma') },
+  )
 }
 
 const fmtTime = (t) => (t < 60 ? `${t.toFixed(1)} s` : `${Math.floor(t / 60)} min ${(t % 60).toFixed(1)} s`)
@@ -91,6 +99,7 @@ export default function SimulationPanel({ simulation, scenarios = [], onScenario
   const { compiled, sim, playing, setPlaying, speed, setSpeed, setInput, step, advance, reset } = simulation
 
   const inputs = useMemo(() => compiled?.variables.filter((v) => v.type === 'input') ?? [], [compiled])
+  const [chronoExport, setChronoExport] = useState(null)
 
   // Teclas 1–9: cambian las primeras entradas (fuera de los campos de texto).
   useEffect(() => {
@@ -306,10 +315,11 @@ export default function SimulationPanel({ simulation, scenarios = [], onScenario
             <span className="text-slate-400">Exportar todo:</span>
             <button
               type="button"
-              onClick={() => exportChronogramSvg(sim.samples, signals, state.time)}
+              onClick={() => setChronoExport(chronogramSource(sim.samples, signals, state.time))}
+              title="PNG, SVG o PDF, con vista previa"
               className="rounded border border-slate-300 px-1.5 py-0.5 text-slate-600 hover:bg-slate-100"
             >
-              SVG
+              Imagen o PDF…
             </button>
             <button
               type="button"
@@ -334,6 +344,9 @@ export default function SimulationPanel({ simulation, scenarios = [], onScenario
           </ol>
         </Section>
       </div>
+      {chronoExport && (
+        <ExportDialog source={chronoExport} initialFormat="pdf" fileName={(ext) => fileName(ext, 'cronograma')} onClose={() => setChronoExport(null)} />
+      )}
     </aside>
   )
 }

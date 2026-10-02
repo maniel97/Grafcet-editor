@@ -258,6 +258,113 @@ export function captureScene(viewportEl, viewport, bounds, margin, skip) {
   return items
 }
 
+// Texto tal como lo dibuja el SVG por defecto: sin saltos de línea, tabuladores como espacios,
+// sin espacios al principio ni al final y sin espacios repetidos.
+export const svgRenderedText = (text) => text.replace(/[\r\n]/g, '').replace(/\t/g, ' ').trim().replace(/ {2,}/g, ' ')
+
+// Escena de un dibujo SVG (ladder, cronograma) en sus propias unidades: trazos y texto. El texto
+// SVG se mide carácter a carácter con getExtentOfChar. El SVG tiene que estar en el documento.
+export function captureSvgScene(svg) {
+  const items = []
+  const root = svg.getScreenCTM()?.inverse()
+  if (!root) return items
+  const toLocal = (x, y) => {
+    const p = new DOMPoint(x, y).matrixTransform(root)
+    return [p.x, p.y]
+  }
+  const walk = (el) => {
+    const tag = el.tagName.toLowerCase()
+    if (['defs', 'marker', 'title', 'style'].includes(tag)) return
+    if (tag === 'svg' || tag === 'g' || tag === 'a') {
+      for (const child of el.children) walk(child)
+      return
+    }
+    const style = getComputedStyle(el)
+    if (style.display === 'none' || style.visibility === 'hidden') return
+    if (tag === 'text') {
+      const n = el.getNumberOfChars()
+      if (!n) return
+      // El SVG junta los espacios al dibujar (sin xml:space="preserve"): las posiciones de
+      // getExtentOfChar corresponden al texto ya juntado.
+      const collapsed = svgRenderedText(el.textContent)
+      const text = collapsed.length === n ? collapsed : el.textContent
+      const ctm = el.getScreenCTM()
+      const scale = ctm ? Math.hypot(ctm.a, ctm.b) / Math.hypot(svg.getScreenCTM().a, svg.getScreenCTM().b) : 1
+      const chars = []
+      let top = Infinity
+      let bottom = -Infinity
+      for (let i = 0; i < n && i < text.length; i++) {
+        const box = el.getExtentOfChar(i)
+        // De las coordenadas del texto a las del SVG raíz.
+        const m = ctm && root ? root.multiply(ctm) : new DOMMatrix()
+        const a = new DOMPoint(box.x, box.y).matrixTransform(m)
+        const b = new DOMPoint(box.x + box.width, box.y + box.height).matrixTransform(m)
+        chars.push({ ch: text[i], left: a.x, right: b.x })
+        top = Math.min(top, a.y)
+        bottom = Math.max(bottom, b.y)
+      }
+      const fill = toRgb(style.fill) ?? [0, 0, 0]
+      for (const run of splitRuns(chars)) {
+        items.push({
+          t: 'text',
+          ...run,
+          top,
+          bottom,
+          size: parseFloat(style.fontSize) * scale,
+          color: fill,
+          bold: Number(style.fontWeight) >= 600,
+          mono: /mono|consolas|courier/i.test(style.fontFamily),
+          overline: false,
+        })
+      }
+      return
+    }
+    const stroke = style.stroke !== 'none' ? toRgb(style.stroke) : null
+    const fill = style.fill !== 'none' ? toRgb(style.fill) : null
+    if (!stroke && !fill) return
+    const subpaths = shapeSubpaths(el)
+    const ctm = el.getScreenCTM()
+    if (!subpaths || !ctm) return
+    const map = ([x, y]) => toLocal(ctm.a * x + ctm.c * y + ctm.e, ctm.b * x + ctm.d * y + ctm.f)
+    const unit = Math.hypot(ctm.a, ctm.b) / Math.hypot(svg.getScreenCTM().a, svg.getScreenCTM().b)
+    // Rectángulos redondeados (rx): se dibujan como caja.
+    const rx = tag === 'rect' ? Number(el.getAttribute('rx') ?? 0) : 0
+    if (rx && fill && !stroke) {
+      const [[x, y], , [x2, y2]] = subpaths[0].points.map(map)
+      items.push({ t: 'fill', x, y, w: x2 - x, h: y2 - y, radius: rx * unit, color: fill })
+      return
+    }
+    items.push({
+      t: 'path',
+      subpaths: subpaths.map((sp) => ({ points: sp.points.map(map), closed: sp.closed })),
+      stroke,
+      fill,
+      width: (parseFloat(style.strokeWidth) || 1) * unit,
+    })
+  }
+  walk(svg)
+  return items
+}
+
+// Franja vertical que ocupa un elemento de la escena (para repartirla en páginas).
+export function itemSpan(it) {
+  switch (it.t) {
+    case 'fill':
+    case 'box':
+      return [it.y, it.y + it.h]
+    case 'line':
+      return [Math.min(it.y1, it.y2), Math.max(it.y1, it.y2)]
+    case 'text':
+      return [it.top, it.bottom]
+    case 'path': {
+      const ys = it.subpaths.flatMap((s) => s.points.map((p) => p[1]))
+      return [Math.min(...ys), Math.max(...ys)]
+    }
+    default:
+      return [-Infinity, Infinity]
+  }
+}
+
 // --- Dibujo ----------------------------------------------------------------------------------
 // layout: { x, y, scale } de pdfLayout (mm); las medidas de la escena son px a escala 1:1.
 export function drawScene(pdf, items, layout) {

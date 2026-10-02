@@ -272,7 +272,7 @@ const LadderDiagram = forwardRef(function LadderDiagram({ ladder, mode = 'both' 
   }
 
   return (
-    <svg ref={ref} xmlns="http://www.w3.org/2000/svg" width={width} height={y + MARGIN} viewBox={`0 0 ${width} ${y + MARGIN}`}>
+    <svg ref={ref} data-ladder-svg xmlns="http://www.w3.org/2000/svg" width={width} height={y + MARGIN} viewBox={`0 0 ${width} ${y + MARGIN}`}>
       <rect width="100%" height="100%" fill="white" />
       {blocks}
     </svg>

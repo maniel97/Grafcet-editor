@@ -9,6 +9,8 @@ export function setProjectName(name) {
   projectName = String(name ?? '')
 }
 
+export const getProjectName = () => projectName
+
 // "Taladradora nº 2 (versión B)" -> "taladradora-n-2-version-b"
 export function slugify(text) {
   return String(text)

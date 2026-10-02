@@ -36,3 +36,11 @@ export async function download(page, action) {
 }
 
 export const expectNoErrors = (errors) => expect(errors, errors.join('\n')).toEqual([])
+
+// Guarda desde el diálogo de exportación (con vista previa) en el formato elegido.
+export async function saveFromDialog(page, format) {
+  const dialog = page.getByRole('dialog', { name: 'Exportar', exact: true })
+  await dialog.getByRole('radio', { name: format.toUpperCase(), exact: true }).click()
+  await expect(dialog.getByRole('button', { name: `Guardar ${format.toUpperCase()}` })).toBeEnabled()
+  return download(page, () => dialog.getByRole('button', { name: `Guardar ${format.toUpperCase()}` }).click())
+}

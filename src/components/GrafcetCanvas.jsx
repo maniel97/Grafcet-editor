@@ -33,7 +33,7 @@ import { useClipboard } from '../hooks/useClipboard'
 import { useCanvasContextMenu } from '../hooks/useCanvasContextMenu'
 import { useImageExport } from '../hooks/useImageExport'
 import { useTouchGestures } from '../hooks/useTouchGestures'
-import { setProjectName } from '../lib/fileNames'
+import { fileName, setProjectName } from '../lib/fileNames'
 import { neighbor } from '../lib/keyboardNav'
 import { FRAME_SIZE, frameAround, membersOf, nextFrameName } from '../lib/frames'
 
@@ -44,7 +44,7 @@ const HelpDialog = lazy(() => import('./HelpDialog'))
 const SimulationPanel = lazy(() => import('./SimulationPanel'))
 const LadderView = lazy(() => import('./LadderView'))
 const VariablesDialog = lazy(() => import('./VariablesDialog'))
-const PdfExportDialog = lazy(() => import('./PdfExportDialog'))
+const ExportDialog = lazy(() => import('./ExportDialog'))
 const ProjectsDialog = lazy(() => import('./ProjectsDialog'))
 
 // Mientras se descarga una parte diferida (normalmente un instante).
@@ -95,7 +95,7 @@ export default function GrafcetCanvas() {
   const [helpOpen, setHelpOpen] = useState(false)
   const [verifyOpen, setVerifyOpen] = useState(false)
   const [ladderOpen, setLadderOpen] = useState(false)
-  const [pdfOpen, setPdfOpen] = useState(false)
+  const [exportFormat, setExportFormat] = useState(null) // diálogo de exportación abierto en ese formato
   // Modo simulación: la edición queda bloqueada y el lienzo muestra la evolución.
   const [simulating, setSimulating] = useState(false)
   // Bloqueo de edición (candado de los controles): solo mirar, desplazar y hacer zoom.
@@ -140,7 +140,7 @@ export default function GrafcetCanvas() {
   const { menu, setMenu, closeMenu, onNodeContextMenu, onSelectionContextMenu, onPaneContextMenu, onEdgeContextMenu } =
     useCanvasContextMenu()
   const clearHighlight = useCallback(() => setHighlight(null), [setHighlight])
-  const { exportImage, capturePdfImage } = useImageExport(clearHighlight)
+  const exportSource = useImageExport(clearHighlight, projectName.trim() || 'Grafcet (IEC 60848)')
   // Pantallas táctiles: pulsación larga = menú contextual; doble toque = editar.
   const { isDoubleTap } = useTouchGestures(wrapperRef)
 
@@ -152,7 +152,7 @@ export default function GrafcetCanvas() {
     else setEditingId(node.id)
   }
   // PNG y SVG se descargan directamente; PDF abre el diálogo con opciones y vista previa.
-  const onExport = useCallback((format) => (format === 'pdf' ? setPdfOpen(true) : exportImage(format)), [exportImage])
+  const onExport = useCallback((format) => setExportFormat(format), [])
 
   const editingNode = nodes.find((n) => n.id === editingId)
   const selectedStep = nodes.find((n) => n.selected && n.type === 'step')
@@ -434,7 +434,7 @@ export default function GrafcetCanvas() {
 
   const loopSource = loopSourceId ? nodes.find((n) => n.id === loopSourceId) : null
   const initialSteps = nodes.filter((n) => n.type === 'step' && n.data.initial)
-  const modalOpen = settingsOpen || helpOpen || variablesOpen || ladderOpen || pdfOpen || !!projectsTab || !!menu
+  const modalOpen = settingsOpen || helpOpen || variablesOpen || ladderOpen || !!exportFormat || !!projectsTab || !!menu
   // En solo lectura el clic derecho no abre menús de edición (ni el del navegador).
   const blockMenu = (handler) => (readOnly ? (e) => e.preventDefault() : handler)
 
@@ -527,9 +527,9 @@ export default function GrafcetCanvas() {
             />
           </Suspense>
         )}
-        {pdfOpen && (
+        {exportFormat && (
           <Suspense fallback={<Loading />}>
-            <PdfExportDialog capture={capturePdfImage} projectName={projectName} onClose={() => setPdfOpen(false)} />
+            <ExportDialog source={exportSource} initialFormat={exportFormat} fileName={(ext) => fileName(ext)} onClose={() => setExportFormat(null)} />
           </Suspense>
         )}
         {helpOpen && (

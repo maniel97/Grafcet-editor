@@ -1,12 +1,12 @@
-import { useCallback } from 'react'
+import { useCallback, useMemo } from 'react'
 import { useReactFlow } from '@xyflow/react'
-import { capturePdf, exportDiagram } from '../lib/exportImage'
+import { capturePdf, download, renderDiagram } from '../lib/exportImage'
+import { fileName } from '../lib/fileNames'
 
 // Exportación del diagrama sin la selección (se dibuja en azul) ni el resaltado de la tabla:
 // se quitan, se captura y se restaura la selección.
-// - exportImage('png' | 'svg'): descarga directa.
-// - capturePdfImage(): imagen a alta resolución y escena vectorial para el diálogo de PDF.
-export function useImageExport(clearHighlight) {
+// Devuelve la fuente de exportación del grafcet para el diálogo de exportación.
+export function useImageExport(clearHighlight, title) {
   const { getNodes, getEdges, setNodes, setEdges, getViewport } = useReactFlow()
 
   const withCleanCanvas = useCallback(
@@ -33,19 +33,21 @@ export function useImageExport(clearHighlight) {
     [getNodes, getEdges, setNodes, setEdges, getViewport, clearHighlight],
   )
 
-  const exportImage = useCallback(
-    async (format) => {
-      try {
-        await withCleanCanvas((viewport) => exportDiagram(format, viewport))
-      } catch (err) {
-        alert(`No se pudo exportar: ${err.message}`)
-      }
-    },
-    [withCleanCanvas],
+  // Fuente para el diálogo de exportación (components/ExportDialog.jsx): captura a 3x (vista
+  // previa e impresión) con su escena vectorial, y guardado del PNG o del SVG.
+  const source = useMemo(
+    () => ({
+      kind: 'grafcet',
+      title,
+      capture: () => withCleanCanvas((viewport) => capturePdf(viewport)),
+      save: (format, options) =>
+        withCleanCanvas(async (viewport) => {
+          const image = await renderDiagram(format, viewport, format === 'png' ? (options.pngScale ?? 2) : 1)
+          if (image) download(image.dataUrl, fileName(format))
+        }),
+    }),
+    [withCleanCanvas, title],
   )
 
-  // 3x: resolución de impresión.
-  const capturePdfImage = useCallback(() => withCleanCanvas((viewport) => capturePdf(viewport)), [withCleanCanvas])
-
-  return { exportImage, capturePdfImage }
+  return source
 }

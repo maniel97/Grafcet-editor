@@ -3,9 +3,10 @@ import { AlertTriangle, Check, Copy, Download, FileCode, FileText, Image, X } fr
 import LadderDiagram from './LadderDiagram'
 import { generateLadder } from '../lib/ladder/generate'
 import { toAWL, toStructuredText } from '../lib/ladder/exportText'
-import { exportLadderPdf, exportLadderPng, exportLadderSvg } from '../lib/ladder/exportLadder'
+import { svgSource } from '../lib/svgExport'
+import ExportDialog from './ExportDialog'
 import { downloadFile } from '../lib/projectFile'
-import { fileName } from '../lib/fileNames'
+import { fileName, getProjectName } from '../lib/fileNames'
 
 const TABS = [
   { id: 'ladder', label: 'Ladder (LD)' },
@@ -61,6 +62,15 @@ export default function LadderView({ nodes, edges, plc, grafcetErrors, onClose }
   const [mnemonic, setMnemonic] = useState('de')
   const [copied, setCopied] = useState(false)
   const svgRef = useRef(null)
+  const [exportFormat, setExportFormat] = useState(null)
+  // El SVG se lee al exportar (no al dibujar): por eso se pasa una función que lo busca.
+  const [exportSource] = useState(() =>
+    svgSource(() => document.querySelector('[data-ladder-svg]'), {
+      kind: 'ladder',
+      title: `${getProjectName().trim() || 'Grafcet'} · ladder (método SET/RESET)`,
+      name: (ext) => fileName(ext, 'ladder'),
+    }),
+  )
 
   const ladder = useMemo(() => generateLadder(nodes, edges, plc), [nodes, edges, plc])
   const st = useMemo(() => toStructuredText(ladder, plc), [ladder, plc])
@@ -68,7 +78,8 @@ export default function LadderView({ nodes, edges, plc, grafcetErrors, onClose }
   const awl = useMemo(() => toAWL(ladder, { mnemonic, useAddresses: mode !== 'symbol' }), [ladder, mnemonic, mode])
 
   useEffect(() => {
-    const onKeyDown = (e) => e.key === 'Escape' && onClose()
+    // Con el diálogo de exportación abierto, Esc solo cierra el diálogo.
+    const onKeyDown = (e) => e.key === 'Escape' && !document.querySelector('dialog[open]') && onClose()
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [onClose])
@@ -80,14 +91,6 @@ export default function LadderView({ nodes, edges, plc, grafcetErrors, onClose }
   const firstCycleAddress = ladder.resolver.address({ kind: 'first' })
 
   const text = { st, scl, awl }[tab] ?? ''
-  // Las exportaciones pueden fallar (memoria, módulo que no carga...): siempre se avisa.
-  const safely = (fn) => async () => {
-    try {
-      await fn(svgRef.current)
-    } catch (err) {
-      alert(`No se pudo exportar: ${err.message}`)
-    }
-  }
   const copy = async () => {
     await navigator.clipboard.writeText(text)
     setCopied(true)
@@ -128,13 +131,13 @@ export default function LadderView({ nodes, edges, plc, grafcetErrors, onClose }
           )}
           {tab === 'ladder' ? (
             <>
-              <ActionButton icon={FileCode} onClick={safely(exportLadderSvg)} title="Descargar el esquema en SVG">
+              <ActionButton icon={FileCode} onClick={() => setExportFormat('svg')} title="Exportar el esquema en SVG (con vista previa)">
                 SVG
               </ActionButton>
-              <ActionButton icon={Image} onClick={safely(exportLadderPng)} title="Descargar el esquema en PNG">
+              <ActionButton icon={Image} onClick={() => setExportFormat('png')} title="Exportar el esquema en PNG (con vista previa)">
                 PNG
               </ActionButton>
-              <ActionButton icon={FileText} onClick={safely(exportLadderPdf)} title="PDF A4 paginado entre segmentos">
+              <ActionButton icon={FileText} onClick={() => setExportFormat('pdf')} title="Exportar a PDF: páginas cortadas entre segmentos (con vista previa)">
                 PDF
               </ActionButton>
             </>
@@ -197,6 +200,14 @@ export default function LadderView({ nodes, edges, plc, grafcetErrors, onClose }
           </pre>
         )}
       </div>
+      {exportFormat && (
+        <ExportDialog
+          source={exportSource}
+          initialFormat={exportFormat}
+          fileName={(ext) => fileName(ext, 'ladder')}
+          onClose={() => setExportFormat(null)}
+        />
+      )}
     </div>
   )
 }

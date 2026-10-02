@@ -21,3 +21,11 @@ describe('PDF vectorial: piezas puras', () => {
     ])
   })
 })
+
+describe('texto SVG', async () => {
+  const { svgRenderedText } = await import('../../src/lib/vectorPdf')
+  it('junta los espacios como el SVG (si no, se pierden los últimos caracteres)', () => {
+    expect(svgRenderedText('Tr1: X0 · «Marcha»  →  X1')).toBe('Tr1: X0 · «Marcha» → X1')
+    expect(svgRenderedText('  a\n\tb  ')).toBe('a b')
+  })
+})

@@ -1,5 +1,6 @@
+import { readFileSync } from 'node:fs'
 import { expect, test } from '@playwright/test'
-import { download, expectNoErrors, openEditor } from './helpers'
+import { download, expectNoErrors, openEditor, saveFromDialog } from './helpers'
 
 test('paso a ladder: esquema, exportaciones, ST y AWL', async ({ page }) => {
   const errors = await openEditor(page, 'ladder-completo.json')
@@ -18,9 +19,24 @@ test('paso a ladder: esquema, exportaciones, ST y AWL', async ({ page }) => {
   await expect(svg.getByText('TON', { exact: true })).toHaveCount(1)
   await expect(svg.getByText('MW100').first()).toBeVisible()
 
-  expect((await download(page, () => page.getByTitle('Descargar el esquema en SVG').click())).suggestedFilename()).toBe('ladder-completo-ladder.svg')
-  expect((await download(page, () => page.getByTitle('Descargar el esquema en PNG').click())).suggestedFilename()).toBe('ladder-completo-ladder.png')
-  expect((await download(page, () => page.getByTitle(/PDF A4 paginado/).click())).suggestedFilename()).toBe('ladder-completo-ladder.pdf')
+  await page.getByTitle(/Exportar el esquema en SVG/).click()
+  expect((await saveFromDialog(page, 'svg')).suggestedFilename()).toBe('ladder-completo-ladder.svg')
+  await page.getByTitle(/Exportar el esquema en PNG/).click()
+  expect((await saveFromDialog(page, 'png')).suggestedFilename()).toBe('ladder-completo-ladder.png')
+  await page.getByTitle(/Exportar a PDF/).click()
+  // El mismo diálogo de PDF que el grafcet, con páginas cortadas entre segmentos.
+  await expect(page.getByLabel('Vista previa de la página')).toBeVisible()
+  await expect(page.getByLabel('Páginas')).toContainText('Página 1 de 3')
+  await page.getByLabel('Página siguiente').click()
+  await expect(page.getByLabel('Páginas')).toContainText('Página 2 de 3')
+  const pdf = await saveFromDialog(page, 'pdf')
+  expect(pdf.suggestedFilename()).toBe('ladder-completo-ladder.pdf')
+  // Tres páginas, vectorial (texto real, sin imagen) y sin perder caracteres del final.
+  const bytes = readFileSync(await pdf.path(), 'latin1')
+  expect(bytes).toMatch(/\/Count 3\b/)
+  expect(bytes).not.toContain('/Subtype /Image')
+  expect(bytes).toContain('desactiva las demás)')
+  await expect(page.getByRole('dialog', { name: 'Ladder generado' })).toBeVisible() // Esc/guardar no cierra el ladder
 
   await page.getByRole('tab', { name: /Texto estructurado/ }).click()
   await expect(page.locator('pre')).toContainText('Tr1 := X0 AND RT_Marcha.Q AND NOT Paro AND NOT Emergencia;')

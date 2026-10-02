@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { expect, test } from '@playwright/test'
-import { download, expectNoErrors, openEditor } from './helpers'
+import { download, expectNoErrors, openEditor, saveFromDialog } from './helpers'
 
 // Carga un proyecto desde un objeto (sin archivo en disco).
 export async function loadProject(page, project) {
@@ -210,7 +210,8 @@ test('nombre del proyecto: archivos, ejemplos, pie del PDF y autoguardado', asyn
   const saved = await download(page, () => page.getByTitle(/Guardar proyecto/).click())
   expect(saved.suggestedFilename()).toBe('prensa-hidraulica.json')
   await page.getByRole('button', { name: /Exportar/ }).click()
-  const png = await download(page, () => page.getByRole('menuitem', { name: /PNG/ }).click())
+  await page.getByRole('menuitem', { name: /PNG/ }).click()
+  const png = await saveFromDialog(page, 'png')
   expect(png.suggestedFilename()).toBe('prensa-hidraulica.png')
 
   // Pie del PDF propuesto con el nombre.
@@ -347,10 +348,11 @@ test('escenarios: grabar, guardar en el proyecto, reproducir y exportar el crono
 
   const csv = await download(page, () => panel.getByRole('button', { name: 'CSV', exact: true }).click())
   expect(csv.suggestedFilename()).toBe('cronograma.csv')
-  const svg = await download(page, () => panel.getByRole('button', { name: 'SVG', exact: true }).click())
+  await panel.getByRole('button', { name: 'Imagen o PDF…' }).click()
+  const svg = await saveFromDialog(page, 'svg')
   expect(svg.suggestedFilename()).toBe('cronograma.svg')
   const svgText = readFileSync(await svg.path(), 'utf8')
-  expect(svgText).toMatch(/^<svg xmlns="http:\/\/www.w3.org\/2000\/svg"/)
+  expect(svgText).toMatch(/^<\?xml[^>]*>\s*<svg[^>]*xmlns="http:\/\/www.w3.org\/2000\/svg"/)
   expect(svgText).toContain('>Marcha<')
   expect(readFileSync(await csv.path(), 'utf8')).toContain('t (s);X0;X1;Marcha;Paro;Motor M1')
   expectNoErrors(errors)

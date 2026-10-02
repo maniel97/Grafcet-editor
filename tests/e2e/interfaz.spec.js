@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { download, expectNoErrors, openEditor } from './helpers'
+import { expectNoErrors, openEditor, saveFromDialog } from './helpers'
 
 // ¿Queda todo lo dibujado dentro del área visible del lienzo? Devuelve el peor desborde o null.
 const overflow = (page) =>
@@ -32,13 +32,16 @@ for (const width of [1500, 1280, 1100]) {
     await expect(menu).toHaveCount(0)
     await exportBtn.click()
     await page.keyboard.press('ArrowDown')
-    expect((await download(page, () => page.keyboard.press('Enter'))).suggestedFilename()).toBe('grafcet.svg')
+    await page.keyboard.press('Enter') // SVG: abre el diálogo con vista previa
+    await expect(page.getByLabel('Vista previa de la imagen')).toBeVisible()
+    expect((await saveFromDialog(page, 'svg')).suggestedFilename()).toBe('grafcet.svg')
     await exportBtn.click()
-    expect((await download(page, () => menu.getByRole('menuitem', { name: /PNG/ }).click())).suggestedFilename()).toBe('grafcet.png')
+    await menu.getByRole('menuitem', { name: /PNG/ }).click()
+    expect((await saveFromDialog(page, 'png')).suggestedFilename()).toBe('grafcet.png')
     // PDF abre su diálogo (probado aparte en pdf.spec.js).
     await exportBtn.click()
     await menu.getByRole('menuitem', { name: /PDF/ }).click()
-    await expect(page.getByRole('dialog', { name: 'Exportar a PDF' })).toBeVisible()
+    await expect(page.getByRole('dialog', { name: 'Exportar', exact: true })).toBeVisible()
     await page.keyboard.press('Escape')
     expectNoErrors(errors)
   })
