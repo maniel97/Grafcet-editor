@@ -230,3 +230,20 @@ test('nombre del proyecto: archivos, ejemplos, pie del PDF y autoguardado', asyn
   await expect(page.getByLabel('Nombre del proyecto')).toHaveValue('Semáforo')
   expectNoErrors(errors)
 })
+
+test('móvil (390 px): sin desplazamiento de página y paneles abajo', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  const errors = await openEditor(page)
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390)
+  await expect(page.locator('.react-flow__minimap')).toBeHidden()
+  await expect(page.getByLabel('Nombre del proyecto')).toBeVisible()
+
+  await page.locator('.react-flow__node-step').first().dblclick()
+  const panel = page.locator('aside.side-panel')
+  await expect(panel).toBeVisible()
+  const box = await panel.boundingBox()
+  expect(box.width).toBeGreaterThan(380)
+  expect(box.y + box.height).toBeGreaterThan(840)
+  expect(box.height).toBeLessThanOrEqual(844 * 0.55 + 1)
+  expectNoErrors(errors)
+})

@@ -212,7 +212,7 @@ export default function PropertiesPanel({ node, onChange, onClose, previousSteps
   const isStep = node.type === 'step'
 
   return (
-    <aside className="flex w-72 shrink-0 flex-col border-l border-slate-200 bg-white">
+    <aside className="side-panel flex w-72 shrink-0 flex-col border-l border-slate-200 bg-white">
       <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
         <h2 className="text-sm font-semibold">{isStep ? 'Etapa' : 'Transición'}</h2>
         <button type="button" onClick={onClose} title="Cerrar" className="rounded-md p-1 text-slate-500 hover:bg-slate-100">

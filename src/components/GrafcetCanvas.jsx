@@ -48,7 +48,7 @@ const ProjectsDialog = lazy(() => import('./ProjectsDialog'))
 // Mientras se descarga una parte diferida (normalmente un instante).
 function Loading({ panel }) {
   return panel ? (
-    <aside className="flex w-80 shrink-0 items-center justify-center border-l border-slate-200 bg-white text-sm text-slate-400">
+    <aside className="side-panel flex w-80 shrink-0 items-center justify-center border-l border-slate-200 bg-white text-sm text-slate-400">
       Cargando…
     </aside>
   ) : null

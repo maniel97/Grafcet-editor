@@ -120,7 +120,7 @@ export default function SimulationPanel({ simulation, onFocusNode, onClose }) {
   ]
 
   return (
-    <aside className="flex w-80 shrink-0 flex-col border-l border-slate-200 bg-white">
+    <aside className="side-panel flex w-80 shrink-0 flex-col border-l border-slate-200 bg-white">
       <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
         <h2 className="flex items-center gap-2 text-sm font-semibold">
           <span className={`h-2 w-2 rounded-full ${playing ? 'animate-pulse bg-green-500' : 'bg-amber-500'}`} />

@@ -94,7 +94,7 @@ export default function Toolbar({
   const locked = readOnly
   return (
     <header className="flex items-center gap-0.5 overflow-x-auto border-b border-slate-200 bg-white px-3 py-2 shadow-sm">
-      <h1 className="mr-2 shrink-0 text-base font-bold tracking-tight">Grafcet Editor</h1>
+      <h1 className="mr-2 hidden shrink-0 text-base font-bold tracking-tight sm:block">Grafcet Editor</h1>
       {/* Nombre del proyecto: da nombre a los archivos guardados y exportados. */}
       <input
         value={projectName}

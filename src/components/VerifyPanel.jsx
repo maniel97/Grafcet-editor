@@ -7,7 +7,7 @@ export default function VerifyPanel({ issues, onFocus, onClose }) {
   const warnings = issues.filter((i) => i.severity === 'warning')
 
   return (
-    <aside className="flex w-80 shrink-0 flex-col border-l border-slate-200 bg-white">
+    <aside className="side-panel flex w-80 shrink-0 flex-col border-l border-slate-200 bg-white">
       <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
         <h2 className="text-sm font-semibold">Verificación IEC 60848</h2>
         <button type="button" onClick={onClose} title="Cerrar" className="rounded-md p-1 text-slate-500 hover:bg-slate-100">
