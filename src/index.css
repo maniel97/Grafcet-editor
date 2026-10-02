@@ -270,3 +270,8 @@ body {
 :root[data-theme="dark"] .side-panel {
   border-color: oklch(37.2% 0.044 257.287);
 }
+/* Fondos gris oscuro con texto blanco (opción elegida de un selector): al invertirse la escala
+   de grises el fondo pasa a claro, así que el texto pasa a oscuro. */
+:root[data-theme="dark"] :is(.bg-slate-600, .bg-slate-700, .bg-slate-800, .bg-slate-900).text-white:not(.react-flow *) {
+  color: oklch(20.8% 0.042 265.755); /* slate-900 original: la variable está invertida aquí */
+}

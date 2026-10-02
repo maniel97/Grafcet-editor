@@ -427,3 +427,32 @@ test('referencias de enlace: cortar un bucle largo, verlo con origen y destino, 
   await expect(labels).toHaveCount(2)
   expectNoErrors(errors)
 })
+
+test('modo oscuro: la opción elegida de los selectores del ladder se lee', async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('grafcet-editor:settings', JSON.stringify({ theme: 'dark' })))
+  const errors = await openEditor(page)
+  await page.getByTitle(/Paso a ladder/).click()
+  await page.getByRole('tab', { name: /AWL/ }).click()
+  // Contraste entre el texto y el fondo de cada opción elegida (luminancia relativa WCAG).
+  const contrasts = await page.locator('[role="radio"][aria-checked="true"]').evaluateAll((els) => {
+    const canvas = document.createElement('canvas').getContext('2d', { willReadFrequently: true })
+    const rgb = (css) => {
+      canvas.clearRect(0, 0, 1, 1)
+      canvas.fillStyle = css
+      canvas.fillRect(0, 0, 1, 1)
+      return [...canvas.getImageData(0, 0, 1, 1).data.slice(0, 3)]
+    }
+    const lum = (c) => {
+      const [r, g, b] = c.map((v) => ((v /= 255) <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4))
+      return 0.2126 * r + 0.7152 * g + 0.0722 * b
+    }
+    return els.map((el) => {
+      const s = getComputedStyle(el)
+      const [a, b] = [lum(rgb(s.color)), lum(rgb(s.backgroundColor))].sort((x, y) => y - x)
+      return (a + 0.05) / (b + 0.05)
+    })
+  })
+  expect(contrasts.length).toBe(2)
+  for (const c of contrasts) expect(c).toBeGreaterThan(4.5)
+  expectNoErrors(errors)
+})
