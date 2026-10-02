@@ -6,7 +6,7 @@ import { NOTE_SIZE } from './notes'
 
 const step = (id, label, x, y, actions = [], extra = {}) => ({ id, type: 'step', position: { x, y }, data: { label, actions, ...extra } })
 const trans = (id, condition, x, y) => ({ id, type: 'transition', position: { x, y }, data: { condition } })
-const note = (id, x, y, text, size = {}) => ({ id, type: 'note', position: { x, y }, data: { text, color: 'yellow' }, ...NOTE_SIZE, ...size })
+const note = (id, x, y, text, size = {}) => ({ id, type: 'note', position: { x, y }, data: { text, color: 'yellow' }, ...NOTE_SIZE, height: 150, ...size })
 const links = (pairs) => pairs.map(([source, target]) => ({ id: `${source}-${target}`, source, target, type: 'grafcet' }))
 
 // Secuencia lineal en columna que vuelve al principio: [etapa, transición, etapa, transición...].
@@ -88,12 +88,13 @@ export const EXAMPLES = [
     id: 'mezcladora',
     title: 'Mezcladora',
     description: 'Divergencia en O (producción o limpieza) y en Y (llenado simultáneo de dos depósitos).',
+    // La rama de limpieza va a la izquierda: su bucle vuelve por la izquierda sin cruzar las demás.
     tags: ['Divergencia en O', 'Divergencia en Y', 'Temporización'],
     build() {
       const nodes = [
         step('s0', '0', 200, 0, [], { initial: true }),
         trans('t1', 'Marcha', 200, 100),
-        trans('t7', 'Limpieza', 680, 100),
+        trans('t7', 'Limpieza', -40, 100),
         step('s1', '1', 200, 170, ['Llenar_A']),
         step('s2', '2', 440, 170, ['Llenar_B']),
         trans('t2', 'Nivel_A', 200, 270),
@@ -105,14 +106,14 @@ export const EXAMPLES = [
         trans('t5', '30s/X5', 200, 610),
         step('s6', '6', 200, 680, ['Vaciar']),
         trans('t6', 'Vacio', 200, 780),
-        step('s7', '7', 680, 170, ['Lavar']),
-        trans('t8', 'Fin_lavado', 680, 270),
+        step('s7', '7', -40, 170, ['Lavar']),
+        trans('t8', 'Fin_lavado', -40, 270),
         note(
           'nota',
-          920,
+          720,
           0,
           'Mezcladora\n\nEn 0 se elige (divergencia en O): Marcha para producir o Limpieza para lavar.\n\nAl producir, A y B se llenan a la vez (divergencia en Y) y se mezcla cuando ambos están llenos (convergencia en Y).',
-          { width: 260, height: 190 },
+          { width: 300, height: 250 },
         ),
       ]
       const edges = links([

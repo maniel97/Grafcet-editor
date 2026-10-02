@@ -92,8 +92,10 @@ export function computeRoute(state, { id, source, target, sourceX, sourceY, targ
     return { kind: 'andConv', bendAtSource: false, laneX: 0 }
   }
 
-  // Salto hacia abajo: si hay nodos en la vertical del origen, rodea por la derecha.
-  const blocked = inSpan.some((b) => b.x <= sourceX && sourceX <= b.x + b.width)
+  // Salto hacia abajo: si hay nodos en la vertical del origen ENTRE origen y destino, rodea por la
+  // derecha. Los que están a la altura del destino no cuentan: son ramas hermanas de una
+  // divergencia (p. ej. otra transición alternativa bajo la misma etapa), no obstáculos.
+  const blocked = inSpan.some((b) => b.x <= sourceX && sourceX <= b.x + b.width && b.y + b.height > sourceY && b.y < targetY)
   if (blocked) {
     let maxRight = src.internals.positionAbsolute.x + 56
     for (const b of inSpan) maxRight = Math.max(maxRight, b.right)

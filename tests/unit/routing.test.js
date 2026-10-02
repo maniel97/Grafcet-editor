@@ -83,6 +83,18 @@ describe('trazado de enlaces', () => {
     expect(and.b.path).toContain('M 212 144 H 484 M 212 149 H 484')
   })
 
+  it('divergencia en O con una transición hermana justo debajo: no es un salto, no se desvía', () => {
+    const or = routes(
+      [internal('s0', 'step', 200, 0), internal('t1', 'transition', 200, 100), internal('t7', 'transition', 680, 100)],
+      [
+        ['a', 's0', 't1'],
+        ['b', 's0', 't7'],
+      ],
+    )
+    expect(or.b.route.kind).toBe('down')
+    expect(or.b.path).toBe('M 228 56 V 76 H 708 V 100')
+  })
+
   it('divergencia en O: dobla justo debajo de la etapa', () => {
     const or = routes([internal('s1', 'step', 200, 210), internal('t2', 'transition', 440, 310)], [['d', 's1', 't2']])
     expect(or.d.path).toBe('M 228 266 V 286 H 468 V 310')
