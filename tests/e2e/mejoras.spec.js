@@ -501,3 +501,38 @@ test('buscar (Ctrl+F), renombrar una variable y renumerar una etapa con sus refe
   await expect(transitions.nth(1)).toContainText('2s/X7')
   expectNoErrors(errors)
 })
+
+test('autocompletado en receptividades y aviso de erratas', async ({ page }) => {
+  const errors = await openEditor(page)
+  await page.locator('.react-flow__node-transition').nth(1).dblclick() // «Paro»
+  const input = page.getByPlaceholder('p. ej. a · b, ↑c, 5s/X2')
+  await input.fill('')
+  await input.pressSequentially('Paro · Ma')
+  const list = page.getByRole('listbox', { name: 'Sugerencias' })
+  await expect(list.getByRole('option').first()).toContainText('Marcha')
+  await page.keyboard.press('Enter')
+  await expect(input).toHaveValue('Paro · Marcha')
+  await expect(list).toHaveCount(0)
+  // Errata: aviso con corrección de un clic.
+  await input.fill('Marha')
+  await expect(page.getByText('«Marha» es una variable nueva. ¿Querías decir')).toBeVisible()
+  await page.getByRole('button', { name: 'Marcha', exact: true }).click()
+  await expect(input).toHaveValue('Marcha')
+  // Esc cierra la lista sin cerrar el panel.
+  await input.fill('')
+  await input.pressSequentially('X')
+  await expect(list).toBeVisible()
+  await page.keyboard.press('Escape')
+  await expect(list).toHaveCount(0)
+  await expect(input).toBeVisible()
+  // Acciones: el texto entero se completa con las salidas, también las de la misma etapa.
+  await page.locator('.react-flow__node-step').nth(1).dblclick()
+  await page.locator('aside.side-panel').getByRole('button', { name: /Añadir acción$/ }).click()
+  const action = page.getByLabel('Texto de la acción').last()
+  await action.fill('')
+  await action.pressSequentially('Moto')
+  await expect(list.getByRole('option').first()).toContainText('Motor M1')
+  await page.keyboard.press('Tab')
+  await expect(action).toHaveValue('Motor M1')
+  expectNoErrors(errors)
+})

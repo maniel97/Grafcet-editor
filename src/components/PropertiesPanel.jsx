@@ -1,6 +1,7 @@
 import { useRef } from 'react'
 import { Plus, Trash2, X } from 'lucide-react'
 import { ACTION_KINDS, ACTION_PRESETS, actionKind, normalizeAction } from '../lib/actions'
+import AutocompleteInput from './AutocompleteInput'
 
 const inputClass =
   'w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500'
@@ -47,18 +48,23 @@ function Field({ label, children }) {
 
 const kindMarker = { 'stored-on': '↑ ', 'stored-off': '↓ ', event: '⚡ ', conditional: '? ' }
 
-function ActionRow({ action, onChange, onRemove }) {
+function ActionRow({ action, onChange, onRemove, vocabulary, otherTexts }) {
   const kind = actionKind(action.kind)
   return (
     <div className="space-y-1 rounded-md border border-slate-200 p-2">
       <div className="flex gap-1">
-        <input
-          className={inputClass}
-          value={action.text}
-          placeholder="p. ej. Motor ON, A:=1, F/G2{3}"
-          aria-label="Texto de la acción"
-          onChange={(e) => onChange({ text: e.target.value })}
-        />
+        <div className="min-w-0 flex-1">
+          <AutocompleteInput
+            mode="action"
+            vocabulary={vocabulary}
+            otherTexts={[...otherTexts, action.condition ?? '']}
+            className={inputClass}
+            value={action.text}
+            placeholder="p. ej. Motor ON, A:=1, F/G2{3}"
+            aria-label="Texto de la acción"
+            onChange={(text) => onChange({ text })}
+          />
+        </div>
         <button
           type="button"
           title="Eliminar acción"
@@ -82,11 +88,13 @@ function ActionRow({ action, onChange, onRemove }) {
         ))}
       </select>
       {kind.needsCondition && (
-        <input
+        <AutocompleteInput
+          vocabulary={vocabulary}
+          otherTexts={[...otherTexts, action.text]}
           className={inputClass}
           value={action.condition}
           placeholder={kind.placeholder}
-          onChange={(e) => onChange({ condition: e.target.value })}
+          onChange={(condition) => onChange({ condition })}
           aria-label="Condición de la acción"
         />
       )}
@@ -95,7 +103,7 @@ function ActionRow({ action, onChange, onRemove }) {
   )
 }
 
-function StepFields({ data, onChange, onCommitLabel }) {
+function StepFields({ data, onChange, onCommitLabel, vocabulary }) {
   const actions = (data.actions ?? []).map(normalizeAction)
   const setActions = (next) => onChange({ actions: next })
 
@@ -139,6 +147,9 @@ function StepFields({ data, onChange, onCommitLabel }) {
         {actions.map((action, i) => (
           <ActionRow
             key={i}
+            vocabulary={vocabulary}
+            // Textos de las demás acciones de la etapa: lo que aparece en ellas no es una errata.
+            otherTexts={actions.filter((_, j) => j !== i).flatMap((a) => [a.text, a.condition ?? ''])}
             action={action}
             onChange={(patch) => setActions(actions.map((a, j) => (j === i ? { ...a, ...patch } : a)))}
             onRemove={() => setActions(actions.filter((_, j) => j !== i))}
@@ -162,7 +173,7 @@ function StepFields({ data, onChange, onCommitLabel }) {
   )
 }
 
-function TransitionFields({ data, onChange, previousSteps }) {
+function TransitionFields({ data, onChange, previousSteps, vocabulary }) {
   const inputRef = useRef(null)
   const condition = data.condition ?? ''
 
@@ -185,12 +196,13 @@ function TransitionFields({ data, onChange, previousSteps }) {
   return (
     <>
       <Field label="Receptividad / condición">
-        <input
-          ref={inputRef}
+        <AutocompleteInput
+          inputRef={inputRef}
+          vocabulary={vocabulary}
           className={inputClass}
           value={condition}
           placeholder="p. ej. a · b, ↑c, 5s/X2"
-          onChange={(e) => onChange({ condition: e.target.value })}
+          onChange={(c) => onChange({ condition: c })}
           autoFocus
         />
       </Field>
@@ -216,7 +228,7 @@ function TransitionFields({ data, onChange, previousSteps }) {
   )
 }
 
-export default function PropertiesPanel({ node, onChange, onCommitLabel, onClose, previousSteps = [] }) {
+export default function PropertiesPanel({ node, onChange, onCommitLabel, onClose, previousSteps = [], vocabulary = [] }) {
   if (!node) return null
   const isStep = node.type === 'step'
 
@@ -230,9 +242,9 @@ export default function PropertiesPanel({ node, onChange, onCommitLabel, onClose
       </div>
       <div className="space-y-4 overflow-y-auto p-4">
         {isStep ? (
-          <StepFields key={node.id} data={node.data} onChange={onChange} onCommitLabel={onCommitLabel} />
+          <StepFields key={node.id} data={node.data} onChange={onChange} onCommitLabel={onCommitLabel} vocabulary={vocabulary} />
         ) : (
-          <TransitionFields key={node.id} data={node.data} onChange={onChange} previousSteps={previousSteps} />
+          <TransitionFields key={node.id} data={node.data} onChange={onChange} previousSteps={previousSteps} vocabulary={vocabulary} />
         )}
       </div>
     </aside>

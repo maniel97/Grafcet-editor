@@ -171,6 +171,19 @@ export default function GrafcetCanvas() {
 
   const focusNode = useCallback((id) => fitView({ nodes: [{ id }], duration: 400, maxZoom: 1.5, padding: 0.6 }), [fitView])
 
+  // Vocabulario para autocompletar en el panel: variables y etapas (X3). `here`: la variable solo
+  // aparece en el elemento que se edita (puede ser lo que se está escribiendo ahora mismo).
+  const vocabulary = useMemo(() => {
+    if (!editingId) return []
+    const vars = [...symbols].map(([name, found]) => ({
+      name,
+      type: plc.variables[name]?.type ?? found.type,
+      here: ![...found.uses].some((id) => id !== editingId) && !plc.variables[name],
+    }))
+    const steps = nodes.filter((n) => n.type === 'step' && n.data.label).map((n) => ({ name: `X${n.data.label}`, type: 'step' }))
+    return [...vars, ...steps]
+  }, [editingId, symbols, plc.variables, nodes])
+
   // Etapas inmediatamente anteriores a la transición en edición (para sugerir "5s/Xn").
   const previousSteps = useMemo(() => {
     if (editingNode?.type !== 'transition') return []
@@ -689,6 +702,7 @@ export default function GrafcetCanvas() {
                 node={editingNode}
                 onChange={editNode}
                 onCommitLabel={() => commitRenumber(editingId)}
+                vocabulary={vocabulary}
                 onClose={() => setEditingId(null)}
                 previousSteps={previousSteps}
               />
