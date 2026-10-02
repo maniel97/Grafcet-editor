@@ -23,6 +23,22 @@ npm run test:perf  # rendimiento al arrastrar (PERF_STEPS=120 por defecto; versi
 Las pruebas de navegador usan un Chromium ya instalado (Brave, Chrome o Edge; o
 `PW_BROWSER_PATH`) y arrancan su propio servidor.
 
+## Publicar en internet (gratis)
+
+La aplicación es 100 % estática (todo se ejecuta en el navegador), así que basta un hosting de
+archivos. Se compila con rutas relativas: funciona en la raíz de un dominio o en una subcarpeta.
+
+**GitHub Pages** (ya configurado en `.github/workflows/pages.yml`):
+
+1. Crea un repositorio en GitHub (puede ser público o privado con plan que lo permita) y sube el
+   proyecto: `git remote add origin https://github.com/<usuario>/<repositorio>.git` y
+   `git push -u origin main`.
+2. En el repositorio: *Settings → Pages → Source: GitHub Actions*.
+3. Cada envío a `main` pasa las pruebas unitarias, compila y publica en
+   `https://<usuario>.github.io/<repositorio>/`.
+
+**Alternativas**: Netlify o Cloudflare Pages (arrastrar la carpeta `dist/` tras `npm run build`).
+
 ## Funciones (hito `hito-editor-v1`)
 
 - **Elementos IEC 60848**: etapas (inicial, macroetapa), transiciones con receptividad (negación
