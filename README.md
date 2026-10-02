@@ -41,10 +41,20 @@ Panel con marcha / pausa / paso a paso / +1 s / reinicio y velocidad, entradas c
 o pulsador (teclas 1–9), salidas, marcas, temporizaciones, etapas activas, cronograma y
 registro de franqueos. El motor (`src/lib/sim/`) es puro y no depende de la interfaz.
 
-## Siguientes pasos previstos
+## Paso a ladder
 
-- Traducción a ladder (LD), a partir de `buildPlcModel` en `src/lib/plcModel.js` y del
-  compilador del simulador (`src/lib/sim/engine.js`).
+Botón **Ladder**: traduce el grafcet por el método de una marca por etapa con SET/RESET, en
+secciones ordenadas para que el ciclo del autómata respete la norma (todas las condiciones de
+franqueo antes de evolucionar; desactivación antes que activación):
+
+1. Inicialización (primer ciclo) · 2. Auxiliares (flancos de expresiones compuestas) ·
+3. Condiciones de franqueo (`Tr_n`) · 4. Desactivación · 5. Activación · 6. Temporizaciones
+(`TON`) · 7. Acciones memorizadas · 8. Salidas.
+
+Las negaciones de grupo se convierten en contactos simples (De Morgan); las variables numéricas
+(`C:=C+1`, `N >= 3`) usan palabras (`MW100`). Exporta el esquema (SVG, PNG, PDF A4 paginado
+entre segmentos) y el programa en **Texto Estructurado** (IEC 61131-3) y **AWL** de S7-300/400
+(nemotécnica alemana o inglesa, con direcciones o símbolos). Código en `src/lib/ladder/`.
 
 ## Estructura
 

@@ -21,6 +21,10 @@ const NOTATION = [
     'Simulación',
     'Botón Simular. Etapa activa: verde con punto. Transición validada: ámbar; franqueable: verde. Acción emitida: verde. Entradas con interruptor, pulsador o teclas 1–9; «Paso» franquea de uno en uno para ver la evolución fugaz.',
   ],
+  [
+    'Paso a ladder',
+    'Botón Ladder: una marca por etapa con SET/RESET (inicialización, condiciones de franqueo, desactivación, activación, temporizaciones, acciones memorizadas y salidas). Exporta el esquema (SVG, PNG, PDF) y el programa en texto estructurado (ST) y AWL de S7.',
+  ],
   ['Receptividades', '!a = a negada (raya encima) · ↑a / ↓a = flancos · a · b = Y · a + b = O · 5s/X2 = 5 s tras activarse la etapa 2.'],
 ]
 

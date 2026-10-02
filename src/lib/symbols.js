@@ -16,6 +16,10 @@ const STEP_VARIABLE = /^X[\p{N}]/u
 // Clave estable de un temporizador: "5s/X2".
 export const timerKey = (value, unit, step) => `${value.replace(',', '.')}${unit.toLowerCase()}/X${step}`
 
+// Variables comparadas ("N >= 3", "5 < Nivel"): son numéricas (palabra, no bit).
+const COMPARED =
+  /(?<![\p{L}\p{N}_.])([\p{L}_][\p{L}\p{N}_.]*)\s*(?:>=|<=|<>|!=|==|=|>|<)|(?:>=|<=|<>|!=|==|=|>|<)\s*([\p{L}_][\p{L}\p{N}_.]*)/gu
+
 // Símbolos de una expresión booleana (receptividad o condición de acción).
 export function parseExpression(text) {
   const timers = []
@@ -24,7 +28,8 @@ export function parseExpression(text) {
     return ' '
   })
   const inputs = (rest.match(IDENTIFIER) ?? []).filter((id) => !KEYWORDS.has(id.toUpperCase()) && !STEP_VARIABLE.test(id))
-  return { inputs: [...new Set(inputs)], timers }
+  const numeric = new Set([...rest.matchAll(COMPARED)].map((m) => m[1] ?? m[2]).filter((id) => !STEP_VARIABLE.test(id)))
+  return { inputs: [...new Set(inputs)], timers, numeric }
 }
 
 // La misma expresión con cada símbolo sustituido por su dirección (lo que no tiene dirección
@@ -45,23 +50,28 @@ export function actionSymbol(action) {
   const { text } = normalizeAction(action)
   const trimmed = text.trim()
   if (!trimmed) return null
-  const assignment = /^([\p{L}_][\p{L}\p{N}_.]*)\s*:=/u.exec(trimmed)
-  return assignment ? { symbol: assignment[1], type: 'memory' } : { symbol: trimmed, type: 'output' }
+  const assignment = /^([\p{L}_][\p{L}\p{N}_.]*)\s*:=\s*(.*)$/u.exec(trimmed)
+  if (!assignment) return { symbol: trimmed, type: 'output' }
+  // "A:=1" / "A:=0" es un bit; "C:=C+1", "N:=5" es un valor numérico (palabra).
+  return { symbol: assignment[1], type: 'memory', numeric: !/^[01]$/.test(assignment[2].trim()) }
 }
 
-// Recorre el diagrama y devuelve Map símbolo -> { type, uses: Set<nodeId>, preset?, step? }
+// Recorre el diagrama y devuelve Map símbolo -> { type, uses: Set<nodeId>, numeric?, preset?, step? }
 // El orden del Map es el de aparición (de arriba abajo), útil para asignar direcciones.
 export function extractSymbols(nodes) {
   const found = new Map()
   const add = (symbol, type, nodeId, extra = {}) => {
     const entry = found.get(symbol) ?? { type, uses: new Set(), ...extra }
+    // Lo que escribe una acción no es una entrada aunque antes se haya leído en una receptividad.
+    if (entry.type === 'input' && (type === 'memory' || type === 'output')) entry.type = type
+    if (extra.numeric) entry.numeric = true
     entry.uses.add(nodeId)
     found.set(symbol, entry)
   }
   const addExpression = (text, nodeId) => {
-    const { inputs, timers } = parseExpression(text)
+    const { inputs, timers, numeric } = parseExpression(text)
     for (const t of timers) add(t.key, 'timer', nodeId, { preset: t.preset, step: t.step })
-    for (const id of inputs) add(id, 'input', nodeId)
+    for (const id of inputs) add(id, 'input', nodeId, numeric.has(id) ? { numeric: true } : {})
   }
 
   const ordered = [...nodes].sort((a, b) => a.position.y - b.position.y || a.position.x - b.position.x)
@@ -71,7 +81,7 @@ export function extractSymbols(nodes) {
     for (const raw of n.data.actions ?? []) {
       const action = normalizeAction(raw)
       const target = actionSymbol(action)
-      if (target) add(target.symbol, target.type, n.id)
+      if (target) add(target.symbol, target.type, n.id, target.numeric ? { numeric: true } : {})
       if (action.kind === 'conditional' || action.kind === 'event') addExpression(action.condition, n.id)
     }
   }

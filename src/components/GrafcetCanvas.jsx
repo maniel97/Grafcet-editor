@@ -22,6 +22,7 @@ import HelpDialog from './HelpDialog'
 import GrafcetContextMenu from './GrafcetContextMenu'
 import GhostPreview from './GhostPreview'
 import SimulationPanel from './SimulationPanel'
+import LadderView from './LadderView'
 import { useSimulation } from '../lib/sim/useSimulation'
 import { useSettings } from '../lib/settings'
 import { nodeTypes, VARIABLES_TABLE_ID } from '../nodes'
@@ -78,6 +79,7 @@ export default function GrafcetCanvas() {
   const [verifyOpen, setVerifyOpen] = useState(false)
   // Modo simulación: la edición queda bloqueada y el lienzo muestra la evolución.
   const [simulating, setSimulating] = useState(false)
+  const [ladderOpen, setLadderOpen] = useState(false)
   const simulation = useSimulation(nodes, edges, plc, simulating)
   const { settings, update: updateSettings, reset: resetSettings } = useSettings()
   const {
@@ -468,7 +470,7 @@ export default function GrafcetCanvas() {
 
   const loopSource = loopSourceId ? nodes.find((n) => n.id === loopSourceId) : null
   const initialSteps = nodes.filter((n) => n.type === 'step' && n.data.initial)
-  const modalOpen = settingsOpen || helpOpen || variablesOpen || !!menu
+  const modalOpen = settingsOpen || helpOpen || variablesOpen || ladderOpen || !!menu
   // En simulación el clic derecho no abre menús de edición (ni el del navegador).
   const blockMenu = (handler) => (simulating ? (e) => e.preventDefault() : handler)
 
@@ -495,7 +497,17 @@ export default function GrafcetCanvas() {
           onOpenVariables={() => setVariablesOpen(true)}
           simulating={simulating}
           onToggleSimulation={() => (simulating ? setSimulating(false) : startSimulation())}
+          onOpenLadder={() => setLadderOpen(true)}
         />
+        {ladderOpen && (
+          <LadderView
+            nodes={nodes}
+            edges={edges}
+            plc={plc}
+            grafcetErrors={issueCounts.errors}
+            onClose={() => setLadderOpen(false)}
+          />
+        )}
         {variablesOpen && (
           <VariablesDialog
             plc={plc}

@@ -17,6 +17,7 @@ import {
   FileText,
   Play,
   CircleStop,
+  Cpu,
 } from 'lucide-react'
 
 // `primary`: el texto se ve desde pantallas medianas; el resto solo en pantallas anchas (2xl),
@@ -75,6 +76,7 @@ export default function Toolbar({
   onOpenVariables,
   simulating,
   onToggleSimulation,
+  onOpenLadder,
 }) {
   // Durante la simulación se bloquea todo lo que modifica el diagrama.
   const locked = simulating
@@ -123,6 +125,13 @@ export default function Toolbar({
         title={simulating ? 'Detener la simulación y volver a editar' : 'Simular el grafcet (IEC 60848)'}
         onClick={onToggleSimulation}
         active={simulating}
+        primary
+      />
+      <ToolButton
+        icon={Cpu}
+        label="Ladder"
+        title="Paso a ladder (LD), texto estructurado y AWL"
+        onClick={onOpenLadder}
         primary
       />
       <ToolButton

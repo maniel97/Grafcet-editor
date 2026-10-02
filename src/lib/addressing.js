@@ -26,6 +26,11 @@ export const SCHEMES = [
 
 // Primer byte de marcas para variables de usuario: deja las primeras para las etapas.
 const MEMORY_START_BYTE = 10
+// Palabras (variables numéricas: contadores en marcas, comparaciones...). Zona aparte de los bits
+// para que no se solapen: MW100 en adelante; IW/QW desde 64 (zona analógica habitual en S7-300).
+const WORD_START_BYTE = { I: 64, Q: 64, M: 100 }
+
+export const formatWord = (area, byte, scheme) => (scheme === 'iec' ? `%${area}W${byte}` : `${area}W${byte}`)
 
 export function formatBit(area, index, scheme) {
   const byte = Math.floor(index / 8)
@@ -33,14 +38,34 @@ export function formatBit(area, index, scheme) {
   return scheme === 'iec' ? `%${area}X${byte}.${bit}` : `${area}${byte}.${bit}`
 }
 
-// Interpreta una dirección: { area, index } para bits (I/Q/M), { area, number } para T/C.
+// Interpreta una dirección: { area, index } para bits (I/Q/M), { area, word } para palabras
+// (IW/QW/MW) y { area, number } para T/C.
 export function parseAddress(address) {
   const a = String(address ?? '').trim().toUpperCase()
   let m = /^%?([IQM])X?(\d+)\.([0-7])$/.exec(a)
   if (m) return { area: m[1], index: Number(m[2]) * 8 + Number(m[3]) }
+  m = /^%?([IQM])W(\d+)$/.exec(a)
+  if (m) return { area: m[1], word: Number(m[2]) }
   m = /^%?([TC])(\d+)$/.exec(a)
   if (m) return { area: m[1], number: Number(m[2]) }
   return null
+}
+
+// Reparte direcciones libres. `used`: Set de direcciones ocupadas (en mayúsculas).
+function makeAllocator(scheme, used) {
+  const cursors = { bit: { I: 0, Q: 0, M: MEMORY_START_BYTE * 8 }, word: { ...WORD_START_BYTE }, num: { T: 1, C: 1 } }
+  return {
+    cursors,
+    next(area, numeric) {
+      const kind = ['T', 'C'].includes(area) ? 'num' : numeric ? 'word' : 'bit'
+      const make = (i) => (kind === 'bit' ? formatBit(area, i, scheme) : kind === 'word' ? formatWord(area, i, scheme) : `${area}${i}`)
+      let i = cursors[kind][area]
+      while (used.has(make(i).toUpperCase())) i += kind === 'word' ? 2 : 1
+      used.add(make(i).toUpperCase())
+      cursors[kind][area] = i + (kind === 'word' ? 2 : 1)
+      return make(i)
+    },
+  }
 }
 
 const stepOrder = (a, b) => {
@@ -65,39 +90,22 @@ export function autoAssign(plc, stepNodes, symbols, { overwrite = false } = {}) 
   for (const s of stepNodes) if (keep(steps[s.id])) remember(steps[s.id].address)
   for (const [name] of symbols) if (keep(variables[name])) remember(variables[name].address)
 
-  const next = (area, start, isBit) => {
-    for (let i = start; ; i++) {
-      const address = isBit ? formatBit(area, i, scheme) : `${area}${i}`
-      if (!used.has(address.toUpperCase())) {
-        used.add(address.toUpperCase())
-        return { address, after: i + 1 }
-      }
-    }
-  }
-  const cursors = { I: 0, Q: 0, M: MEMORY_START_BYTE * 8, T: 1, C: 1 }
+  const allocator = makeAllocator(scheme, used)
 
   // Etapas: marcas consecutivas desde M0.0 en orden de número de etapa.
-  let stepCursor = 0
+  allocator.cursors.bit.M = 0
   for (const s of [...stepNodes].sort(stepOrder)) {
     if (keep(steps[s.id])) continue
-    const { address, after } = next('M', stepCursor, true)
-    stepCursor = after
-    steps[s.id] = { ...steps[s.id], address }
+    steps[s.id] = { ...steps[s.id], address: allocator.next('M') }
   }
   // Las marcas de usuario empiezan detrás de las etapas (y nunca antes de M10.0).
-  cursors.M = Math.max(cursors.M, Math.ceil(stepCursor / 8) * 8)
+  allocator.cursors.bit.M = Math.max(MEMORY_START_BYTE * 8, Math.ceil(allocator.cursors.bit.M / 8) * 8)
 
   for (const [name, found] of symbols) {
     const current = variables[name] ?? {}
     const type = current.type ?? found.type
     const entry = { ...current, type, ...(found.preset && !current.preset ? { preset: found.preset } : {}) }
-    if (!keep(current)) {
-      const area = typeInfo(type).area
-      const isBit = ['I', 'Q', 'M'].includes(area)
-      const { address, after } = next(area, cursors[area], isBit)
-      cursors[area] = after
-      entry.address = address
-    }
+    if (!keep(current)) entry.address = allocator.next(typeInfo(type).area, found.numeric)
     variables[name] = entry
   }
 
@@ -132,15 +140,10 @@ export function duplicatedAddresses(plc, stepNodes, symbols) {
 export function changeVariableType(plc, name, type, stepNodes, symbols) {
   const entry = { ...plc.variables[name], type }
   const area = typeInfo(type).area
+  const numeric = !!symbols.get(name)?.numeric
   const parsed = parseAddress(entry.address)
-  if (!parsed || parsed.area !== area) {
-    const used = usedAddresses(plc, stepNodes, symbols, name)
-    const isBit = ['I', 'Q', 'M'].includes(area)
-    let i = { I: 0, Q: 0, M: MEMORY_START_BYTE * 8, T: 1, C: 1 }[area]
-    const make = (n) => (isBit ? formatBit(area, n, plc.scheme) : `${area}${n}`)
-    while (used.has(make(i).toUpperCase())) i++
-    entry.address = make(i)
-  }
+  const fits = parsed && parsed.area === area && (['T', 'C'].includes(area) || (parsed.word !== undefined) === numeric)
+  if (!fits) entry.address = makeAllocator(plc.scheme, usedAddresses(plc, stepNodes, symbols, name)).next(area, numeric)
   return { ...plc, variables: { ...plc.variables, [name]: entry } }
 }
 
