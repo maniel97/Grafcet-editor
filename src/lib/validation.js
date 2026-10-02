@@ -6,6 +6,7 @@
 import { frameOf, macroName, membersOf } from './frames'
 import { parseForcing } from './forcing'
 import { normalizeAction } from './actions'
+import { checkExclusive, describeExample, exclusiveFix } from './exclusivity'
 
 const stepName = (n) => `Etapa ${n.data.label?.trim() || '(sin número)'}`
 const transitionName = (n) => `Transición «${n.data.condition?.trim() || 'sin receptividad'}»`
@@ -160,6 +161,33 @@ export function validateGrafcet(nodes, edges) {
       )
     } else if (loops.length > 1) {
       add('error', `${transitionName(t)} tiene varios bucles: activaría todas esas etapas a la vez.`, [t.id])
+    }
+  }
+
+  // Divergencias en O: las receptividades de una elección deben ser excluyentes; si no, se
+  // franquearían varias transiciones a la vez y se activarían varias ramas.
+  for (const s of steps) {
+    const options = outgoing(s.id)
+      .map((e) => byId.get(e.target))
+      .filter((t) => t?.type === 'transition' && t.data.condition?.trim())
+    for (let i = 0; i < options.length; i++) {
+      for (let j = i + 1; j < options.length; j++) {
+        const [a, b] = [options[i], options[j]].sort((x, y) => x.position.x - y.position.x)
+        const ca = a.data.condition.trim()
+        const cb = b.data.condition.trim()
+        const result = checkExclusive(ca, cb)
+        if (result.exclusive === false) {
+          add(
+            'warning',
+            `Divergencia en O desde la ${stepName(s).toLowerCase()}: «${ca}» y «${cb}» pueden cumplirse a la vez (p. ej. con ${describeExample(
+              result.example,
+            )}) y se activarían las dos ramas. Hazlas excluyentes, p. ej. «${exclusiveFix(ca, cb)}».`,
+            [s.id, a.id, b.id],
+          )
+        } else if (result.exclusive === null && result.reason === 'size') {
+          add('warning', `Divergencia en O desde la ${stepName(s).toLowerCase()}: no se ha podido comprobar si «${ca}» y «${cb}» son excluyentes (demasiadas variables).`, [s.id, a.id, b.id])
+        }
+      }
     }
   }
 

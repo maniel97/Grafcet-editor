@@ -95,7 +95,8 @@ export const EXAMPLES = [
       const nodes = [
         step('s0', '0', 200, 0, [], { initial: true }),
         trans('t1', 'Marcha', 200, 100),
-        trans('t7', 'Limpieza', -40, 100),
+        // Elección excluyente (IEC 60848): la limpieza solo si no se pide producir a la vez.
+        trans('t7', 'Limpieza · !Marcha', -40, 100),
         step('s1', '1', 200, 170, ['Llenar_A']),
         step('s2', '2', 440, 170, ['Llenar_B']),
         trans('t2', 'Nivel_A', 200, 270),
