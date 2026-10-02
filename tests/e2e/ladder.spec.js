@@ -80,3 +80,28 @@ test('visor del ladder: centrado y ajustado al ancho en pantallas grandes, con z
   expect(Number(await svg.getAttribute('width'))).toBe(natural)
   expectNoErrors(errors)
 })
+
+test('STL S7-200 (Micro/WIN): pestaña, archivo .awl en ANSI y tabla de símbolos', async ({ page, context }) => {
+  await context.grantPermissions(['clipboard-read', 'clipboard-write'])
+  const errors = await openEditor(page, 'ladder-completo.json')
+  await page.getByTitle(/Paso a ladder/).click()
+  await page.getByRole('tab', { name: /STL S7-200/ }).click()
+  const pre = page.locator('pre')
+  await expect(pre).toContainText('ORGANIZATION_BLOCK MAIN:OB1')
+  await expect(pre).toContainText('LD     SM0.1')
+  await expect(page.getByLabel('Instrucciones para Micro/WIN')).toContainText('Archivo → Importar')
+  // El fichero de ejemplo usa direcciones de S7-300: se aconseja el formato S7-200.
+  await expect(page.getByLabel('Instrucciones para Micro/WIN')).toContainText('S7-200 / Micro/WIN')
+
+  const file = await download(page, () => page.getByRole('button', { name: '.awl' }).click())
+  expect(file.suggestedFilename()).toBe('ladder-completo-s7-200.awl')
+  const bytes = readFileSync(await file.path())
+  expect(bytes.includes(Buffer.from('Inicializaci\xf3n', 'latin1'))).toBe(true) // ANSI, no UTF-8
+  expect(bytes.includes(Buffer.from('Inicialización', 'utf8'))).toBe(false)
+
+  await page.getByRole('button', { name: 'Símbolos' }).click()
+  const table = await page.evaluate(() => navigator.clipboard.readText())
+  expect(table.split('\r\n')[0]).toMatch(/^X0\t\S+\t/)
+  expect(table).toContain('Marcha\t')
+  expectNoErrors(errors)
+})

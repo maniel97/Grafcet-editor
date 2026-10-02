@@ -1,9 +1,11 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { AlertTriangle, Check, Copy, Download, FileCode, FileText, Image, X } from 'lucide-react'
+import { AlertTriangle, Check, Copy, Download, FileCode, FileText, Image, Table2, X } from 'lucide-react'
 import LadderDiagram from './LadderDiagram'
 import LadderZoom from './LadderZoom'
 import { generateLadder } from '../lib/ladder/generate'
 import { toAWL, toStructuredText } from '../lib/ladder/exportText'
+import { encodeAnsi, s7200Symbols, toS7200 } from '../lib/ladder/exportS7200'
+import { projectVariables } from '../lib/symbols'
 import { svgSource } from '../lib/svgExport'
 import ExportDialog from './ExportDialog'
 import { downloadFile } from '../lib/projectFile'
@@ -14,9 +16,10 @@ const TABS = [
   { id: 'st', label: 'Texto estructurado (ST)' },
   { id: 'scl', label: 'SCL (TIA Portal)' },
   { id: 'awl', label: 'AWL / STL (S7)' },
+  { id: 's7200', label: 'STL S7-200 (Micro/WIN)' },
 ]
 // Texto de cada pestaña: extensión del archivo descargado.
-const EXT = { st: 'st', scl: 'scl', awl: 'awl' }
+const EXT = { st: 'st', scl: 'scl', awl: 'awl', s7200: 'awl' }
 const MODES = [
   { id: 'both', label: 'Símbolo y dirección' },
   { id: 'symbol', label: 'Símbolos' },
@@ -82,6 +85,19 @@ export default function LadderView({ nodes, edges, plc, grafcetErrors, exportPro
   const st = useMemo(() => toStructuredText(ladder, plc), [ladder, plc])
   const scl = useMemo(() => toStructuredText(ladder, plc, { dialect: 'tia' }), [ladder, plc])
   const awl = useMemo(() => toAWL(ladder, { mnemonic, useAddresses: mode !== 'symbol' }), [ladder, mnemonic, mode])
+  // STEP 7-Micro/WIN (S7-200): programa STL importable y tabla de símbolos para pegar.
+  const s7200 = useMemo(() => (tab === 's7200' ? toS7200(ladder, plc, { title: getProjectName().trim() }) : null), [tab, ladder, plc])
+  const s7200Table = useMemo(() => {
+    if (!s7200) return ''
+    const stepNodes = nodes.filter((n) => n.type === 'step')
+    return s7200Symbols(ladder, plc, stepNodes, projectVariables(nodes, plc.variables), s7200.addressOf)
+  }, [s7200, ladder, plc, nodes])
+  const [tableCopied, setTableCopied] = useState(false)
+  const copyTable = async () => {
+    await navigator.clipboard.writeText(s7200Table)
+    setTableCopied(true)
+    setTimeout(() => setTableCopied(false), 1500)
+  }
 
   useEffect(() => {
     // Con el diálogo de exportación abierto, Esc solo cierra el diálogo.
@@ -96,7 +112,7 @@ export default function LadderView({ nodes, edges, plc, grafcetErrors, exportPro
   )
   const firstCycleAddress = ladder.resolver.address({ kind: 'first' })
 
-  const text = { st, scl, awl }[tab] ?? ''
+  const text = { st, scl, awl, s7200: s7200?.text }[tab] ?? ''
   const copy = async () => {
     await navigator.clipboard.writeText(text)
     setCopied(true)
@@ -154,11 +170,21 @@ export default function LadderView({ nodes, edges, plc, grafcetErrors, exportPro
               </ActionButton>
               <ActionButton
                 icon={Download}
-                onClick={() => downloadFile(text, fileName(EXT[tab]), 'text/plain;charset=utf-8')}
-                title="Descargar como archivo de texto"
+                onClick={() =>
+                  tab === 's7200'
+                    ? // Micro/WIN lee los archivos en ANSI (Windows-1252), no en UTF-8.
+                      downloadFile(encodeAnsi(text), fileName('awl', 's7-200'), 'text/plain;charset=windows-1252')
+                    : downloadFile(text, fileName(EXT[tab]), 'text/plain;charset=utf-8')
+                }
+                title={tab === 's7200' ? 'Descargar para importar en Micro/WIN (Archivo > Importar)' : 'Descargar como archivo de texto'}
               >
                 .{EXT[tab]}
               </ActionButton>
+              {tab === 's7200' && (
+                <ActionButton icon={tableCopied ? Check : Table2} onClick={copyTable} title="Copiar la tabla de símbolos para pegarla en la de Micro/WIN">
+                  {tableCopied ? 'Copiada' : 'Símbolos'}
+                </ActionButton>
+              )}
             </>
           )}
           <button type="button" onClick={onClose} title="Cerrar (Esc)" className="rounded-md p-1.5 text-slate-500 hover:bg-slate-100">
@@ -167,7 +193,26 @@ export default function LadderView({ nodes, edges, plc, grafcetErrors, exportPro
         </div>
       </header>
 
-      {(grafcetErrors > 0 || ladder.warnings.length > 0 || missingAddresses || !firstCycleAddress) && (
+      {tab === 's7200' && s7200 && (
+        <div className="space-y-1 border-b border-blue-200 bg-blue-50 px-4 py-2 text-xs text-blue-900" aria-label="Instrucciones para Micro/WIN">
+          <p>
+            <strong>STEP 7-Micro/WIN:</strong> descarga el <code>.awl</code> e impórtalo con <em>Archivo → Importar</em> (se ve en KOP o
+            AWL). Para los nombres, pulsa <em>Símbolos</em> y pégalos en la tabla de símbolos (columna Símbolo). Primer ciclo: SM0.1.
+          </p>
+          {plc.scheme !== 's7200' && (
+            <p>
+              Consejo: en <em>Variables</em>, elige el formato de direcciones «S7-200 / Micro/WIN» (etapas en memoria V, temporizadores
+              desde T37): las marcas M del S7-200 solo llegan a M31.7.
+            </p>
+          )}
+          {s7200.warnings.map((w, i) => (
+            <p key={i} className="flex items-center gap-1 text-amber-800">
+              <AlertTriangle size={14} className="shrink-0" /> {w}
+            </p>
+          ))}
+        </div>
+      )}
+      {(grafcetErrors > 0 || ladder.warnings.length > 0 || missingAddresses || !firstCycleAddress) && tab !== 's7200' && (
         <div className="space-y-1 border-b border-amber-200 bg-amber-50 px-4 py-2 text-xs text-amber-900">
           {grafcetErrors > 0 && (
             <p className="flex items-center gap-1">

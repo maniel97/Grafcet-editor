@@ -243,11 +243,13 @@ export function generateLadder(nodes, edges, plc) {
 // direcciones libres a partir de M20.0 (o tras la última marca usada).
 function makeResolver(plc, compiled, sections, P) {
   const stepIdByLabel = new Map(compiled.steps.map((s) => [String(s.label), s.id]))
+  // Zona de las marcas internas: M (V en S7-200, cuya zona M es muy pequeña).
+  const area = plc.scheme === 's7200' ? 'V' : 'M'
   let maxM = AUX_START_BYTE * 8 - 1
   const remember = (address) => {
     const p = parseAddress(address)
     // Solo cuentan los bits: las palabras (MW100...) están en otra zona.
-    if (p?.area === 'M' && p.index !== undefined) maxM = Math.max(maxM, p.index)
+    if (p?.area === area && p.index !== undefined) maxM = Math.max(maxM, p.index)
   }
   Object.values(plc.steps).forEach((e) => remember(e.address))
   Object.values(plc.variables).forEach((e) => remember(e.address))
@@ -255,7 +257,7 @@ function makeResolver(plc, compiled, sections, P) {
   const internal = new Map()
   let next = Math.ceil((maxM + 1) / 8) * 8
   const allocate = (name) => {
-    if (!internal.has(name)) internal.set(name, formatBit('M', next++, plc.scheme))
+    if (!internal.has(name)) internal.set(name, formatBit(area, next++, plc.scheme))
     return internal.get(name)
   }
   // Orden estable: Tr, Aux y marcas de flanco en el orden en que aparecen.
@@ -283,7 +285,8 @@ function makeResolver(plc, compiled, sections, P) {
       if (op.kind === 'step') return plc.steps[stepIdByLabel.get(String(op.label))]?.address ?? ''
       if (op.kind === 'timer') return timerAddress(op.key)
       if (op.kind === 'trans' || op.kind === 'aux') return internal.get(op.name) ?? ''
-      if (op.kind === 'first') return plc.variables[FIRST_CYCLE]?.address ?? ''
+      // S7-200: la marca de sistema SM0.1 vale 1 solo en el primer ciclo.
+      if (op.kind === 'first') return plc.variables[FIRST_CYCLE]?.address || (plc.scheme === 's7200' ? 'SM0.1' : '')
       if (op.kind === 'var') return plc.variables[op.name]?.address ?? ''
       return ''
     },

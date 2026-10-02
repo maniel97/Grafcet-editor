@@ -24,7 +24,13 @@ export const typeInfo = (id) => VARIABLE_TYPES.find((t) => t.id === id) ?? VARIA
 export const SCHEMES = [
   { id: 'siemens', label: 'Siemens (I0.0, Q0.0, M0.0, T1)' },
   { id: 'iec', label: 'IEC 61131-3 (%IX0.0, %QX0.0, %MX0.0)' },
+  { id: 's7200', label: 'S7-200 / Micro/WIN (I0.0, Q0.0, V0.0, VW, T37)' },
 ]
+
+// S7-200: solo 32 bytes de marcas (M0.0–M31.7), así que las etapas van en memoria V (V0.0…), las
+// marcas internas del ladder detrás (lib/ladder/generate.js) y las palabras en VW100…; los
+// temporizadores de 100 ms empiezan en T37.
+export const S7200 = { stepArea: 'V', wordArea: 'V', wordStart: 100, timerStart: 37, internalStartByte: 20 }
 
 // Primer byte de marcas para variables de usuario: deja las primeras para las etapas.
 const MEMORY_START_BYTE = 10
@@ -44,9 +50,9 @@ export function formatBit(area, index, scheme) {
 // (IW/QW/MW) y { area, number } para T/C.
 export function parseAddress(address) {
   const a = String(address ?? '').trim().toUpperCase()
-  let m = /^%?([IQM])X?(\d+)\.([0-7])$/.exec(a)
+  let m = /^%?(SM|[IQMV])X?(\d+)\.([0-7])$/.exec(a)
   if (m) return { area: m[1], index: Number(m[2]) * 8 + Number(m[3]) }
-  m = /^%?([IQM])W(\d+)$/.exec(a)
+  m = /^%?([IQMV])W(\d+)$/.exec(a)
   if (m) return { area: m[1], word: Number(m[2]) }
   m = /^%?([TC])(\d+)$/.exec(a)
   if (m) return { area: m[1], number: Number(m[2]) }
@@ -55,10 +61,17 @@ export function parseAddress(address) {
 
 // Reparte direcciones libres. `used`: Set de direcciones ocupadas (en mayúsculas).
 function makeAllocator(scheme, used) {
-  const cursors = { bit: { I: 0, Q: 0, M: MEMORY_START_BYTE * 8 }, word: { ...WORD_START_BYTE }, num: { T: 1, C: 1 } }
+  const s7200 = scheme === 's7200'
+  const cursors = {
+    bit: { I: 0, Q: 0, M: s7200 ? 0 : MEMORY_START_BYTE * 8, V: 0 },
+    word: { ...WORD_START_BYTE, V: S7200.wordStart },
+    num: { T: s7200 ? S7200.timerStart : 1, C: s7200 ? 0 : 1 },
+  }
   return {
     cursors,
     next(area, numeric) {
+      // S7-200: las palabras de marcas van en VW (la zona M es muy pequeña).
+      if (s7200 && numeric && area === 'M') area = S7200.wordArea
       const kind = ['T', 'C'].includes(area) ? 'num' : numeric ? 'word' : 'bit'
       const make = (i) => (kind === 'bit' ? formatBit(area, i, scheme) : kind === 'word' ? formatWord(area, i, scheme) : `${area}${i}`)
       let i = cursors[kind][area]
@@ -94,14 +107,16 @@ export function autoAssign(plc, stepNodes, symbols, { overwrite = false } = {}) 
 
   const allocator = makeAllocator(scheme, used)
 
-  // Etapas: marcas consecutivas desde M0.0 en orden de número de etapa.
-  allocator.cursors.bit.M = 0
+  // Etapas: marcas consecutivas desde M0.0 (en S7-200, V0.0) en orden de número de etapa.
+  const stepArea = scheme === 's7200' ? S7200.stepArea : 'M'
+  allocator.cursors.bit[stepArea] = 0
   for (const s of [...stepNodes].sort(stepOrder)) {
     if (keep(steps[s.id])) continue
-    steps[s.id] = { ...steps[s.id], address: allocator.next('M') }
+    steps[s.id] = { ...steps[s.id], address: allocator.next(stepArea) }
   }
-  // Las marcas de usuario empiezan detrás de las etapas (y nunca antes de M10.0).
-  allocator.cursors.bit.M = Math.max(MEMORY_START_BYTE * 8, Math.ceil(allocator.cursors.bit.M / 8) * 8)
+  // Las marcas de usuario empiezan detrás de las etapas (y nunca antes de M10.0); en S7-200 las
+  // etapas no están en M y las marcas empiezan en M0.0.
+  if (stepArea === 'M') allocator.cursors.bit.M = Math.max(MEMORY_START_BYTE * 8, Math.ceil(allocator.cursors.bit.M / 8) * 8)
 
   for (const [name, found] of symbols) {
     const current = variables[name] ?? {}
