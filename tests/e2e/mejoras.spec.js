@@ -397,3 +397,33 @@ test('marcos: encerrar la selección, renombrar, mover con el contenido y forzad
   await expect(page.getByText('F/G9{…} se refiere a un grafcet parcial que no existe', { exact: false })).toBeVisible()
   expectNoErrors(errors)
 })
+
+test('referencias de enlace: cortar un bucle largo, verlo con origen y destino, y unirlo', async ({ page }) => {
+  const errors = await openEditor(page)
+  await page.getByTitle('Abrir un proyecto, un ejemplo o un trabajo anterior').click()
+  await page.getByRole('menuitem', { name: /Ejemplos/ }).click()
+  await page.getByRole('button', { name: /Taladradora/ }).click()
+  const loop = page.locator('[data-testid="rf__edge-t4-s0"]')
+  const openMenu = async () => {
+    const box = await loop.locator('.react-flow__edge-interaction').boundingBox()
+    // Tramo vertical del bucle, a la izquierda (la zona sensible mide 16 px de ancho).
+    await page.mouse.click(box.x + 8, box.y + box.height / 2, { button: 'right' })
+  }
+  await openMenu()
+  await page.getByRole('menuitem', { name: 'Cortar con referencias' }).click()
+  const labels = page.locator('[data-ref-label]')
+  await expect(labels).toHaveCount(2)
+  await expect(labels.nth(0)).toHaveText('a la etapa 0')
+  await expect(labels.nth(1)).toHaveText('de «Fc_arriba»')
+  // Sigue siendo el mismo enlace: el diagrama es conforme y la simulación cierra el ciclo.
+  await expect(page.getByTitle('Verificar conformidad con IEC 60848')).toContainText('✓')
+
+  // Cortado, el enlace son dos tramos cortos: clic derecho en el de origen, junto a su texto.
+  const lb = await labels.nth(0).boundingBox()
+  await page.mouse.click(lb.x - 10, lb.y + 2, { button: 'right' })
+  await page.getByRole('menuitem', { name: 'Unir (quitar referencias)' }).click()
+  await expect(labels).toHaveCount(0)
+  await page.keyboard.press('Control+z')
+  await expect(labels).toHaveCount(2)
+  expectNoErrors(errors)
+})

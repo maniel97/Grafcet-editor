@@ -21,6 +21,7 @@ import {
   Trash2,
   SquareDashed,
   Group,
+  Scissors,
 } from 'lucide-react'
 import ContextMenu from './ContextMenu'
 import { useQuickConnect } from '../lib/useQuickConnect'
@@ -35,7 +36,7 @@ import { FRAME_KINDS } from '../lib/frames'
 // Menú contextual del lienzo: las opciones dependen de lo que se pulse con el botón derecho.
 // menu: { x, y, kind: 'node' | 'selection' | 'pane', nodeIds, flowPosition }
 export default function GrafcetContextMenu({ menu, onClose, onEdit, onAddNodeAt, onFrameAround }) {
-  const { getNode, getEdges, updateNodeData } = useReactFlow()
+  const { getNode, getEdges, updateNodeData, setEdges, deleteElements } = useReactFlow()
   const quickConnect = useQuickConnect()
   const { arrange, addBranch, predecessorsOf, addAlternative, converge, toggleInitial, toggleMacro, addAction, remove } =
     useStructureActions()
@@ -44,7 +45,25 @@ export default function GrafcetContextMenu({ menu, onClose, onEdit, onAddNodeAt,
   let title
   let items = []
 
-  if (menu.kind === 'pane') {
+  if (menu.kind === 'edge') {
+    const edge = getEdges().find((e) => e.id === menu.edgeId)
+    if (!edge) return null
+    const cut = !!edge.data?.reference
+    title = 'Enlace'
+    items = [
+      {
+        label: cut ? 'Unir (quitar referencias)' : 'Cortar con referencias',
+        hint: cut ? undefined : 'enlaces largos',
+        icon: Scissors,
+        onSelect: () => {
+          takeSnapshot()
+          setEdges((eds) => eds.map((e) => (e.id === edge.id ? { ...e, data: { ...e.data, reference: !cut } } : e)))
+        },
+      },
+      'separator',
+      { label: 'Eliminar enlace', icon: Trash2, danger: true, onSelect: () => deleteElements({ edges: [{ id: edge.id }] }) },
+    ]
+  } else if (menu.kind === 'pane') {
     const at = menu.flowPosition
     title = 'Lienzo'
     items = [

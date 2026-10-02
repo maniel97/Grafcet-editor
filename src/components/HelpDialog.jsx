@@ -33,6 +33,10 @@ const NOTATION = [
     'Selecciona etapas y, con el botón derecho, «Encerrar en un grafcet parcial» (marco G1, G2...). Una acción F/G2{3} fuerza G2 a tener solo la etapa 3 activa mientras dure la etapa; F/G2{} lo vacía, F/G2{*} lo congela y F/G2{INIT} lo reinicia. El grafcet forzado no evoluciona.',
   ],
   [
+    'Referencias de enlace',
+    'Clic derecho sobre un enlace largo > «Cortar con referencias»: se dibuja como una flecha bajo el origen («a la etapa 0») y un tramo sobre el destino («de …»). Sigue siendo el mismo enlace para la simulación y el ladder.',
+  ],
+  [
     'Macroetapas',
     'Convierte una etapa en macroetapa (M1) y dibuja su expansión en un marco «M1» con una etapa de entrada E1 y una de salida S1. Activar M1 activa E1, y la transición siguiente a M1 solo se franquea con S1 activa.',
   ],

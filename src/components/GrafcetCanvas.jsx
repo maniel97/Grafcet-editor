@@ -137,7 +137,8 @@ export default function GrafcetCanvas() {
     usePlcTable({ nodes, plc, setPlc, plcRef, takeSnapshot, onOpenDialog: openVariables })
   const { issues, issueCounts, markedIssues } = useVerification({ nodes, edges, plcIssues, verifyOpen })
   const { copy, paste, duplicate } = useClipboard(takeSnapshot)
-  const { menu, setMenu, closeMenu, onNodeContextMenu, onSelectionContextMenu, onPaneContextMenu } = useCanvasContextMenu()
+  const { menu, setMenu, closeMenu, onNodeContextMenu, onSelectionContextMenu, onPaneContextMenu, onEdgeContextMenu } =
+    useCanvasContextMenu()
   const clearHighlight = useCallback(() => setHighlight(null), [setHighlight])
   const { exportImage, capturePdfImage } = useImageExport(clearHighlight)
   // Pantallas táctiles: pulsación larga = menú contextual; doble toque = editar.
@@ -580,6 +581,7 @@ export default function GrafcetCanvas() {
               onNodeContextMenu={blockMenu(onNodeContextMenu)}
               onSelectionContextMenu={blockMenu(onSelectionContextMenu)}
               onPaneContextMenu={blockMenu(onPaneContextMenu)}
+              onEdgeContextMenu={blockMenu(onEdgeContextMenu)}
               onMoveStart={closeMenu}
               nodesDraggable={!readOnly}
               nodesConnectable={!readOnly}

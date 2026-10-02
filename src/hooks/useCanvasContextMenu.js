@@ -2,7 +2,7 @@ import { useCallback, useState } from 'react'
 import { useReactFlow } from '@xyflow/react'
 
 // Estado del menú contextual (clic derecho) y sus manejadores para React Flow.
-// menu: { x, y, kind: 'node' | 'selection' | 'pane', nodeIds, flowPosition } o null.
+// menu: { x, y, kind: 'node' | 'selection' | 'pane' | 'edge', nodeIds, edgeId, flowPosition } o null.
 export function useCanvasContextMenu() {
   const { getNodes, setNodes, screenToFlowPosition } = useReactFlow()
   const [menu, setMenu] = useState(null)
@@ -37,5 +37,10 @@ export function useCanvasContextMenu() {
     [screenToFlowPosition],
   )
 
-  return { menu, setMenu, closeMenu, onNodeContextMenu, onSelectionContextMenu, onPaneContextMenu }
+  const onEdgeContextMenu = useCallback((e, edge) => {
+    e.preventDefault()
+    setMenu({ x: e.clientX, y: e.clientY, kind: 'edge', edgeId: edge.id })
+  }, [])
+
+  return { menu, setMenu, closeMenu, onNodeContextMenu, onSelectionContextMenu, onPaneContextMenu, onEdgeContextMenu }
 }

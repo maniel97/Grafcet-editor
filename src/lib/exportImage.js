@@ -24,7 +24,7 @@ export function drawnBounds(viewportEl, viewport) {
   let maxY = -Infinity
 
   const elements = viewportEl.querySelectorAll(
-    '.react-flow__node, .react-flow__node *, .react-flow__edge path:not(.react-flow__edge-interaction)',
+    '.react-flow__node, .react-flow__node *, .react-flow__edge path:not(.react-flow__edge-interaction), [data-ref-label]',
   )
   for (const el of elements) {
     if (el.closest(EDITOR_ONLY_SELECTOR)) continue

@@ -43,7 +43,8 @@ function routingIndex(state) {
   for (const e of edgeLookup.values()) {
     const ys = yOf(e.source)
     const yt = yOf(e.target)
-    if (ys === undefined || yt === undefined) continue
+    // Los enlaces cortados con referencias no ocupan carril.
+    if (ys === undefined || yt === undefined || e.data?.reference) continue
     if (yt > ys) {
       forwardOut.set(e.source, (forwardOut.get(e.source) ?? 0) + 1)
       forwardIn.set(e.target, (forwardIn.get(e.target) ?? 0) + 1)
