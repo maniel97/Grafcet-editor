@@ -1,0 +1,23 @@
+{
+  "format": "grafcet-editor",
+  "version": 1,
+  "nodes": [
+    { "id": "s0", "type": "step", "position": { "x": 200, "y": 0 }, "data": { "label": "0", "initial": true, "actions": [] } },
+    { "id": "t1", "type": "transition", "position": { "x": 200, "y": 100 }, "data": { "condition": "↑Marcha · !(Paro + Emergencia)" } },
+    { "id": "s1", "type": "step", "position": { "x": 200, "y": 170 }, "data": { "label": "1", "actions": ["Motor", { "text": "N:=N+1", "kind": "stored-on" }, { "text": "Luz", "kind": "conditional", "condition": "Sensor" }] } },
+    { "id": "t2", "type": "transition", "position": { "x": 200, "y": 270 }, "data": { "condition": "3s/X1" } },
+    { "id": "s2", "type": "step", "position": { "x": 200, "y": 340 }, "data": { "label": "2", "actions": ["Motor", "Valvula"] } },
+    { "id": "s3", "type": "step", "position": { "x": 440, "y": 340 }, "data": { "label": "3", "actions": [] } },
+    { "id": "t3", "type": "transition", "position": { "x": 200, "y": 470 }, "data": { "condition": "↑(a · b) + N >= 3" } }
+  ],
+  "edges": [
+    { "id": "e1", "source": "s0", "target": "t1" },
+    { "id": "e2", "source": "t1", "target": "s1" },
+    { "id": "e3", "source": "s1", "target": "t2" },
+    { "id": "e4", "source": "t2", "target": "s2" },
+    { "id": "e5", "source": "t2", "target": "s3" },
+    { "id": "e6", "source": "s2", "target": "t3" },
+    { "id": "e7", "source": "s3", "target": "t3" },
+    { "id": "e8", "source": "t3", "target": "s0" }
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "format": "grafcet-editor",
+  "version": 1,
+  "nodes": [
+    { "id": "s0", "type": "step", "position": { "x": 200, "y": 0 }, "data": { "label": "0", "initial": true, "actions": [] } },
+    { "id": "t1", "type": "transition", "position": { "x": 200, "y": 100 }, "data": { "condition": "Marcha · !Paro · Presostato_de_seguridad_OK · Puerta_cerrada" } },
+    { "id": "s1", "type": "step", "position": { "x": 200, "y": 170 }, "data": { "label": "1", "actions": ["Motor", "Ventilador del cuadro"] } },
+    { "id": "t2", "type": "transition", "position": { "x": 200, "y": 270 }, "data": { "condition": "Paro" } },
+    { "id": "variables-table", "type": "variables", "position": { "x": 900, "y": 0 }, "data": { "showComments": true }, "deletable": false }
+  ],
+  "edges": [
+    { "id": "a", "source": "s0", "target": "t1" },
+    { "id": "b", "source": "t1", "target": "s1" },
+    { "id": "c", "source": "s1", "target": "t2" },
+    { "id": "d", "source": "t2", "target": "s0" }
+  ]
+}

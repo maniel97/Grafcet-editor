@@ -1,0 +1,23 @@
+{
+  "format": "grafcet-editor",
+  "version": 1,
+  "nodes": [
+    { "id": "s0", "type": "step", "position": { "x": 200, "y": 0 }, "data": { "label": "0", "initial": true, "actions": [] } },
+    { "id": "t1", "type": "transition", "position": { "x": 200, "y": 100 }, "data": { "condition": "↑Marcha" } },
+    { "id": "s1", "type": "step", "position": { "x": 200, "y": 170 }, "data": { "label": "1", "actions": [{ "text": "Bomba", "kind": "continuous" }, { "text": "N:=N+1", "kind": "stored-on" }] } },
+    { "id": "t2", "type": "transition", "position": { "x": 200, "y": 270 }, "data": { "condition": "3s/X1" } },
+    { "id": "s2", "type": "step", "position": { "x": 200, "y": 340 }, "data": { "label": "2", "actions": [{ "text": "Luz", "kind": "continuous" }] } },
+    { "id": "s3", "type": "step", "position": { "x": 440, "y": 340 }, "data": { "label": "3", "actions": [{ "text": "Sirena", "kind": "continuous" }] } },
+    { "id": "t3", "type": "transition", "position": { "x": 200, "y": 470 }, "data": { "condition": "Paro" } }
+  ],
+  "edges": [
+    { "id": "a", "source": "s0", "target": "t1" },
+    { "id": "b", "source": "t1", "target": "s1" },
+    { "id": "c", "source": "s1", "target": "t2" },
+    { "id": "d", "source": "t2", "target": "s2" },
+    { "id": "e", "source": "t2", "target": "s3" },
+    { "id": "f", "source": "s2", "target": "t3" },
+    { "id": "g", "source": "s3", "target": "t3" },
+    { "id": "h", "source": "t3", "target": "s0" }
+  ]
+}
