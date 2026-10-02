@@ -8,6 +8,8 @@ import {
   Table2,
   WandSparkles,
   Merge,
+  AlignVerticalSpaceAround,
+  AlignHorizontalJustifyCenter,
   Pencil,
   Plus,
   RectangleHorizontal,
@@ -30,7 +32,7 @@ import { VARIABLE_TYPES } from '../lib/addressing'
 export default function GrafcetContextMenu({ menu, onClose, onEdit, onAddNodeAt }) {
   const { getNode, getEdges } = useReactFlow()
   const quickConnect = useQuickConnect()
-  const { addBranch, predecessorsOf, addAlternative, converge, toggleInitial, toggleMacro, addAction, remove } =
+  const { arrange, addBranch, predecessorsOf, addAlternative, converge, toggleInitial, toggleMacro, addAction, remove } =
     useStructureActions()
   const { startLoop, plcTable, toggleTable } = useEditor()
 
@@ -66,6 +68,13 @@ export default function GrafcetContextMenu({ menu, onClose, onEdit, onAddNodeAt 
         icon: Merge,
         onSelect: () => converge(transitions.map((n) => n.id), 'transition'),
       })
+    if (steps.length + transitions.length >= 2) {
+      if (items.length) items.push('separator')
+      items.push(
+        { label: 'Alinear en columna', icon: AlignHorizontalJustifyCenter, onSelect: () => arrange(menu.nodeIds, 'column') },
+        { label: 'Espaciar la secuencia', hint: 'distancia estándar', icon: AlignVerticalSpaceAround, onSelect: () => arrange(menu.nodeIds, 'space') },
+      )
+    }
     if (items.length) items.push('separator')
     items.push({ label: 'Eliminar selección', icon: Trash2, danger: true, onSelect: () => remove(menu.nodeIds) })
   } else {

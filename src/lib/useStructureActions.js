@@ -4,6 +4,7 @@ import { findFreePosition, nextStepLabel, nextTransitionLabel, yBelow } from './
 import { useEditor } from './editorContext'
 import { defaultEdgeOptions } from './initialDiagram'
 import { normalizeAction } from './actions'
+import { alignColumn, spaceSequence } from './align'
 
 const link = (source, target) => ({ ...defaultEdgeOptions, id: `e-${source}-${target}`, source, target })
 
@@ -145,9 +146,22 @@ export function useStructureActions() {
   )
 
   // El borrado pasa por onBeforeDelete, que ya guarda la instantánea para deshacer.
+  // Ordenar la selección (lib/align.js): un solo paso de deshacer.
+  const arrange = useCallback(
+    (nodeIds, how) => {
+      const ids = new Set(nodeIds)
+      const moves = (how === 'column' ? alignColumn : spaceSequence)(getNodes().filter((n) => ids.has(n.id)))
+      if (!moves.size) return
+      takeSnapshot()
+      setNodes((nds) => nds.map((n) => (moves.has(n.id) ? { ...n, position: moves.get(n.id) } : n)))
+    },
+    [getNodes, takeSnapshot, setNodes],
+  )
+
   const remove = useCallback((nodeIds) => deleteElements({ nodes: nodeIds.map((id) => ({ id })) }), [deleteElements])
 
   return {
+    arrange,
     addBranch,
     branchesOf,
     predecessorsOf,
