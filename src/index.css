@@ -79,6 +79,14 @@ body,
   opacity: 0.75;
 }
 
+/* Solo lectura (simulando o con la edición bloqueada): sin conectores, no se puede conectar.
+   visibility (no display: none) para que React Flow siga midiendo su posición: los enlaces se
+   dibujan a partir de ella. */
+.read-only .grafcet-handle {
+  visibility: hidden;
+  pointer-events: none;
+}
+
 /* Herramienta Bucle activa: las etapas son los destinos seleccionables. */
 .loop-picking .react-flow__node-step {
   cursor: crosshair;

@@ -3,10 +3,10 @@ import {
   ReactFlow,
   Background,
   BackgroundVariant,
-  Controls,
   MiniMap,
   addEdge,
   getNodesBounds,
+  useNodesInitialized,
   useNodesState,
   useEdgesState,
   useReactFlow,
@@ -21,6 +21,8 @@ import SettingsDialog from './SettingsDialog'
 import HelpDialog from './HelpDialog'
 import GrafcetContextMenu from './GrafcetContextMenu'
 import GhostPreview from './GhostPreview'
+import CanvasControls from './CanvasControls'
+import { Lock } from 'lucide-react'
 import SimulationPanel from './SimulationPanel'
 import LadderView from './LadderView'
 import { useSimulation } from '../lib/sim/useSimulation'
@@ -28,7 +30,7 @@ import { useSettings } from '../lib/settings'
 import { nodeTypes, VARIABLES_TABLE_ID } from '../nodes'
 import { edgeTypes } from '../edges'
 import { initialNodes, initialEdges, defaultEdgeOptions } from '../lib/initialDiagram'
-import { exportDiagram, exportPdf } from '../lib/exportImage'
+import { exportDiagram, exportPdf, drawnBounds } from '../lib/exportImage'
 import { saveProject, loadProject, downloadFile } from '../lib/projectFile'
 import {
   EMPTY_PLC,
@@ -79,6 +81,10 @@ export default function GrafcetCanvas() {
   const [verifyOpen, setVerifyOpen] = useState(false)
   // Modo simulación: la edición queda bloqueada y el lienzo muestra la evolución.
   const [simulating, setSimulating] = useState(false)
+  // Bloqueo de edición (candado de los controles): solo mirar, desplazar y hacer zoom.
+  const [editLocked, setEditLocked] = useState(false)
+  // Solo lectura: al simular o con la edición bloqueada.
+  const readOnly = simulating || editLocked
   const [ladderOpen, setLadderOpen] = useState(false)
   const simulation = useSimulation(nodes, edges, plc, simulating)
   const { settings, update: updateSettings, reset: resetSettings } = useSettings()
@@ -96,6 +102,36 @@ export default function GrafcetCanvas() {
   } = useReactFlow()
   const { takeSnapshot, undo, redo, canUndo, canRedo } = useHistory({ get: () => plcRef.current, set: setPlc })
   const wrapperRef = useRef(null)
+
+  // Encuadra todo lo dibujado (no solo las cajas de los nodos: también receptividades, bucles,
+  // saltos y la tabla), con margen. Sustituye al encuadre de React Flow, que lo recortaba.
+  const fitDrawn = useCallback(
+    (duration = 300) => {
+      const wrapper = wrapperRef.current
+      const viewportEl = wrapper?.querySelector('.react-flow__viewport')
+      const bounds = viewportEl && drawnBounds(viewportEl, getViewport())
+      if (!bounds) return
+      const { width, height } = wrapper.getBoundingClientRect()
+      const pad = 48
+      const w = bounds.maxX - bounds.minX
+      const h = bounds.maxY - bounds.minY
+      const zoom = Math.min(1.5, Math.max(0.1, Math.min((width - pad * 2) / w, (height - pad * 2) / h)))
+      setViewport(
+        { x: (width - w * zoom) / 2 - bounds.minX * zoom, y: (height - h * zoom) / 2 - bounds.minY * zoom, zoom },
+        { duration },
+      )
+    },
+    [getViewport, setViewport],
+  )
+
+  // Encuadre inicial, en cuanto React Flow ha medido los nodos.
+  const nodesInitialized = useNodesInitialized()
+  const didInitialFit = useRef(false)
+  useEffect(() => {
+    if (!nodesInitialized || didInitialFit.current) return
+    didInitialFit.current = true
+    requestAnimationFrame(() => fitDrawn(0))
+  }, [nodesInitialized, fitDrawn])
   const fileInputRef = useRef(null)
   const clipboardRef = useRef(null)
 
@@ -262,9 +298,10 @@ export default function GrafcetCanvas() {
       setHighlight,
       toggleTable,
       simulating,
+      readOnly,
       sim: simulating ? simulation.view : null,
     }),
-    [takeSnapshot, markedIssues, plcView, plcTable, highlight, toggleTable, simulating, simulation.view],
+    [takeSnapshot, markedIssues, plcView, plcTable, highlight, toggleTable, simulating, readOnly, simulation.view],
   )
 
   // Menú contextual (clic derecho): { x, y, kind: 'node' | 'selection' | 'pane', nodeIds, flowPosition }
@@ -411,12 +448,12 @@ export default function GrafcetCanvas() {
         setPlc(project.plc)
         setEditingId(null)
         if (project.viewport) setViewport(project.viewport)
-        else requestAnimationFrame(() => fitView())
+        else requestAnimationFrame(() => requestAnimationFrame(() => fitDrawn(0)))
       } catch (err) {
         alert(err.message)
       }
     },
-    [takeSnapshot, setNodes, setEdges, setViewport, fitView],
+    [takeSnapshot, setNodes, setEdges, setViewport, fitDrawn],
   )
 
   const clear = useCallback(() => {
@@ -445,19 +482,19 @@ export default function GrafcetCanvas() {
     [fitView],
   )
 
-  // Durante la simulación los atajos de edición no hacen nada.
+  // En solo lectura (simulando o con la edición bloqueada) los atajos de edición no hacen nada.
   useEditorShortcuts({
-    undo: () => !simulating && undo(),
-    redo: () => !simulating && redo(),
+    undo: () => !readOnly && undo(),
+    redo: () => !readOnly && redo(),
     copy,
-    cut: () => !simulating && copy() && deleteElements({ nodes: selectedIds() }),
-    paste: () => !simulating && paste(),
+    cut: () => !readOnly && copy() && deleteElements({ nodes: selectedIds() }),
+    paste: () => !readOnly && paste(),
     duplicate: () => {
-      if (simulating) return
+      if (readOnly) return
       const clip = copySelection(getNodes(), getEdges())
       if (clip) insertClip(clip)
     },
-    selectAll: () => !simulating && setNodes((nds) => nds.map((n) => ({ ...n, selected: true }))),
+    selectAll: () => !readOnly && setNodes((nds) => nds.map((n) => ({ ...n, selected: true }))),
     save,
     open: () => fileInputRef.current?.click(),
     help: () => setHelpOpen(true),
@@ -471,8 +508,8 @@ export default function GrafcetCanvas() {
   const loopSource = loopSourceId ? nodes.find((n) => n.id === loopSourceId) : null
   const initialSteps = nodes.filter((n) => n.type === 'step' && n.data.initial)
   const modalOpen = settingsOpen || helpOpen || variablesOpen || ladderOpen || !!menu
-  // En simulación el clic derecho no abre menús de edición (ni el del navegador).
-  const blockMenu = (handler) => (simulating ? (e) => e.preventDefault() : handler)
+  // En solo lectura el clic derecho no abre menús de edición (ni el del navegador).
+  const blockMenu = (handler) => (readOnly ? (e) => e.preventDefault() : handler)
 
   return (
     <EditorProvider value={editorApi}>
@@ -496,6 +533,7 @@ export default function GrafcetCanvas() {
           onHelp={() => setHelpOpen(true)}
           onOpenVariables={() => setVariablesOpen(true)}
           simulating={simulating}
+          readOnly={readOnly}
           onToggleSimulation={() => (simulating ? setSimulating(false) : startSimulation())}
           onOpenLadder={() => setLadderOpen(true)}
         />
@@ -544,7 +582,19 @@ export default function GrafcetCanvas() {
         )}
         {helpOpen && <HelpDialog onClose={() => setHelpOpen(false)} />}
         <div className="flex min-h-0 flex-1">
-          <div ref={wrapperRef} className={`relative flex-1 ${loopSource ? 'loop-picking' : ''}`}>
+          <div ref={wrapperRef} className={`relative flex-1 ${loopSource ? 'loop-picking' : ''} ${readOnly ? 'read-only' : ''}`}>
+            {editLocked && !simulating && (
+              <div className="absolute left-1/2 top-3 z-10 flex -translate-x-1/2 items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-sm text-amber-900 shadow">
+                <Lock size={14} /> Edición bloqueada: solo puedes desplazarte y hacer zoom
+                <button
+                  type="button"
+                  onClick={() => setEditLocked(false)}
+                  className="rounded-md border border-amber-300 bg-white px-2 py-0.5 text-xs font-medium hover:bg-amber-100"
+                >
+                  Desbloquear
+                </button>
+              </div>
+            )}
             {loopSource && (
               <LoopPickerBanner
                 source={loopSource}
@@ -573,12 +623,12 @@ export default function GrafcetCanvas() {
               onSelectionContextMenu={blockMenu(onSelectionContextMenu)}
               onPaneContextMenu={blockMenu(onPaneContextMenu)}
               onMoveStart={closeMenu}
-              nodesDraggable={!simulating}
-              nodesConnectable={!simulating}
-              elementsSelectable={!simulating}
+              nodesDraggable={!readOnly}
+              nodesConnectable={!readOnly}
+              elementsSelectable={!readOnly}
               onNodeClick={(_, node) => loopSource && node.type === 'step' && finishLoop(node.id)}
               onNodeDoubleClick={(_, node) => {
-                if (loopSource || simulating) return
+                if (loopSource || readOnly) return
                 if (node.type === 'variables') setVariablesOpen(true)
                 else setEditingId(node.id)
               }}
@@ -590,12 +640,16 @@ export default function GrafcetCanvas() {
               snapToGrid
               snapGrid={[10, 10]}
               // Con un diálogo o menú abierto, Supr/Retroceso no deben borrar nodos del lienzo de fondo.
-              deleteKeyCode={modalOpen || simulating ? null : ['Delete', 'Backspace']}
-              fitView
+              deleteKeyCode={modalOpen || readOnly ? null : ['Delete', 'Backspace']}
             >
               <Background variant={BackgroundVariant.Dots} gap={20} size={1} />
-              <Controls />
-              <MiniMap pannable zoomable />
+              <CanvasControls
+                onFitView={fitDrawn}
+                locked={readOnly}
+                onToggleLock={() => setEditLocked((l) => !l)}
+                lockDisabled={simulating}
+              />
+              <MiniMap pannable zoomable ariaLabel="Minimapa" />
               <GhostPreview preview={preview} />
             </ReactFlow>
             {menu && (

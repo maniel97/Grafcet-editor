@@ -13,7 +13,7 @@ const isExportable = (el) => !el.classList || !EDITOR_ONLY.some((c) => el.classL
 // Rectángulo (en coordenadas del lienzo) de todo lo dibujado: no solo las cajas de los nodos,
 // también lo que sobresale de ellas (receptividades a la derecha, condiciones sobre las
 // acciones, direcciones) y los enlaces que salen por los lados (bucles, saltos).
-function drawnBounds(viewportEl, viewport) {
+export function drawnBounds(viewportEl, viewport) {
   const origin = viewportEl.parentElement.getBoundingClientRect()
   const { x: vx, y: vy, zoom } = viewport
   let minX = Infinity

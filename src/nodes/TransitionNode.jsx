@@ -60,7 +60,8 @@ export default function TransitionNode({ id, data, selected }) {
             simState === 'ready' ? 'font-semibold text-green-700' : simState === 'enabled' ? 'text-amber-700' : ''
           }`}
         >
-          <ConditionText text={data.condition} />
+          {/* Un solo bloque en línea: si no, cada trozo de la receptividad ocuparía su propia fila. */}
+          <ConditionText className="whitespace-nowrap" text={data.condition} />
           {/* Con "Mostrar direcciones": la receptividad con cada símbolo sustituido por su dirección. */}
           {plcView && <ConditionText className="plc-address" text={addressExpression(data.condition, plcView.lookup)} />}
         </span>

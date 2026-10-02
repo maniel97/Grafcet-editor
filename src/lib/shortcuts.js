@@ -56,6 +56,7 @@ export const SHORTCUTS = [
   ['Doble clic', 'Editar etapa o transición'],
   ['Clic derecho', 'Menú contextual (ramificaciones, convergencias…)'],
   ['Esc', 'Cancelar / deseleccionar'],
+  ['Controles (abajo izq.)', 'Acercar · alejar · encuadrar todo · candado para bloquear la edición'],
   ['1 … 9 (simulando)', 'Cambiar las entradas 1 a 9'],
   ['? · F1', 'Esta ayuda'],
 ]

@@ -8,8 +8,15 @@ const DRAG_MIME = 'application/x-grafcet-variable'
 // Celda que se edita al hacer clic: Intro o salir del campo confirma, Esc cancela.
 // `autoEdit` la abre en edición al aparecer (variable recién añadida). Si `onCommit` devuelve
 // false (p. ej. nombre repetido), el valor no se acepta.
-function EditableCell({ value, placeholder, onCommit, className = '', invalid, autoEdit, title = 'Clic para editar' }) {
-  const [draft, setDraft] = useState(autoEdit ? (value ?? '') : null)
+function EditableCell({ value, placeholder, onCommit, className = '', invalid, autoEdit, title = 'Clic para editar', readOnly }) {
+  const [draft, setDraft] = useState(autoEdit && !readOnly ? (value ?? '') : null)
+  if (readOnly) {
+    return (
+      <span className={`block truncate px-1 ${invalid ? 'bg-red-50 text-red-700' : ''} ${value ? '' : 'text-slate-300'} ${className}`}>
+        {value || placeholder}
+      </span>
+    )
+  }
   if (draft !== null) {
     const commit = () => {
       if (draft !== (value ?? '')) onCommit(draft)
@@ -66,7 +73,8 @@ function HeaderButton({ icon: Icon, title, onClick, active }) {
 // salidas, marcas, temporizadores, contadores). Se edita en el sitio y se reorganiza sola:
 // arrastrar una variable a otra sección cambia su tipo.
 export default function VariablesTableNode({ id, data, selected }) {
-  const { plcTable, setHighlight } = useEditor()
+  // En solo lectura (simulando o con la edición bloqueada) la tabla se ve pero no se edita.
+  const { plcTable, setHighlight, readOnly } = useEditor()
   const [dragging, setDragging] = useState(null) // nombre de la variable que se arrastra
   const [dropTarget, setDropTarget] = useState(null)
   if (!plcTable) return null
@@ -138,10 +146,14 @@ export default function VariablesTableNode({ id, data, selected }) {
     >
       <div className="flex items-center gap-1 border-b-2 border-slate-900 bg-slate-100 px-2 py-1">
         <span className="flex-1 font-semibold">Tabla de variables</span>
-        <HeaderButton icon={WandSparkles} title="Rellenar direcciones vacías" onClick={autoFill} />
-        <HeaderButton icon={MessageSquare} title="Mostrar u ocultar comentarios" onClick={() => toggleComments(id)} active={showComments} />
-        <HeaderButton icon={Maximize2} title="Abrir la tabla completa" onClick={openDialog} />
-        <HeaderButton icon={EyeOff} title="Ocultar del lienzo" onClick={hideTable} />
+        {!readOnly && (
+          <>
+            <HeaderButton icon={WandSparkles} title="Rellenar direcciones vacías" onClick={autoFill} />
+            <HeaderButton icon={MessageSquare} title="Mostrar u ocultar comentarios" onClick={() => toggleComments(id)} active={showComments} />
+            <HeaderButton icon={Maximize2} title="Abrir la tabla completa" onClick={openDialog} />
+            <HeaderButton icon={EyeOff} title="Ocultar del lienzo" onClick={hideTable} />
+          </>
+        )}
       </div>
 
       {visible.length === 0 && (
@@ -172,7 +184,7 @@ export default function VariablesTableNode({ id, data, selected }) {
           {section.rows.map((row) => (
             <div
               key={row.key}
-              draggable={row.draggable}
+              draggable={row.draggable && !readOnly}
               onDragStart={(e) => {
                 e.dataTransfer.setData(DRAG_MIME, row.name)
                 e.dataTransfer.effectAllowed = 'move'
@@ -186,7 +198,7 @@ export default function VariablesTableNode({ id, data, selected }) {
               className={`nodrag group grid ${cols} items-center gap-x-1 border-b border-slate-100 px-1 py-px last:border-b-0 hover:bg-amber-50`}
             >
               <span className="flex min-w-0 items-center gap-0.5 font-mono">
-                {row.draggable && (
+                {row.draggable && !readOnly && (
                   <GripVertical
                     size={12}
                     className="editor-only shrink-0 cursor-grab text-slate-300 group-hover:text-slate-500"
@@ -195,6 +207,7 @@ export default function VariablesTableNode({ id, data, selected }) {
                 )}
                 {row.unused ? (
                   <EditableCell
+                    readOnly={readOnly}
                     value={row.name}
                     autoEdit={row.name === lastAdded}
                     title="Sin uso en el diagrama todavía. Clic para renombrar"
@@ -207,7 +220,7 @@ export default function VariablesTableNode({ id, data, selected }) {
                   </span>
                 )}
                 {row.extra && <span className="shrink-0 text-[0.85em] text-slate-400">({row.extra})</span>}
-                {row.unused && (
+                {row.unused && !readOnly && (
                   <button
                     type="button"
                     title="Quitar de la tabla"
@@ -220,13 +233,14 @@ export default function VariablesTableNode({ id, data, selected }) {
                 )}
               </span>
               <EditableCell
+                readOnly={readOnly}
                 value={row.address}
                 placeholder="—"
                 className="font-mono"
                 invalid={isDup(row.address)}
                 onCommit={row.setAddress}
               />
-              {showComments && <EditableCell value={row.comment} placeholder="comentario" onCommit={row.setComment} />}
+              {showComments && <EditableCell readOnly={readOnly} value={row.comment} placeholder="comentario" onCommit={row.setComment} />}
             </div>
           ))}
         </section>

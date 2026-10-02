@@ -77,11 +77,12 @@ export default function Toolbar({
   onHelp,
   onOpenVariables,
   simulating,
+  readOnly,
   onToggleSimulation,
   onOpenLadder,
 }) {
-  // Durante la simulación se bloquea todo lo que modifica el diagrama.
-  const locked = simulating
+  // En solo lectura (simulando o con la edición bloqueada) se desactiva lo que modifica el diagrama.
+  const locked = readOnly
   return (
     <header className="flex items-center gap-0.5 overflow-x-auto border-b border-slate-200 bg-white px-3 py-2 shadow-sm">
       <h1 className="mr-3 shrink-0 text-base font-bold tracking-tight">Grafcet Editor</h1>
