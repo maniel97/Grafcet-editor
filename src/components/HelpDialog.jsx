@@ -17,6 +17,10 @@ const NOTATION = [
     'Tabla de variables en el lienzo',
     'Clic en una dirección o comentario para editarlo; arrastra una variable a otra sección para cambiar su tipo; al pasar por una fila se resaltan los nodos que la usan.',
   ],
+  [
+    'Simulación',
+    'Botón Simular. Etapa activa: verde con punto. Transición validada: ámbar; franqueable: verde. Acción emitida: verde. Entradas con interruptor, pulsador o teclas 1–9; «Paso» franquea de uno en uno para ver la evolución fugaz.',
+  ],
   ['Receptividades', '!a = a negada (raya encima) · ↑a / ↓a = flancos · a · b = Y · a + b = O · 5s/X2 = 5 s tras activarse la etapa 2.'],
 ]
 

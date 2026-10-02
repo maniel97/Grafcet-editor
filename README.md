@@ -29,13 +29,22 @@ npm run build    # versión de producción en dist/
 - **Accesibilidad**: tipo de letra (incluidas Atkinson Hyperlegible y OpenDyslexic) y tamaño de
   interfaz y diagrama.
 
+## Simulador
+
+Botón **Simular**: ejecuta el grafcet en el navegador según las reglas de evolución de
+IEC 60848 (validación, franqueo simultáneo, prioridad de la activación, evolución fugaz hasta
+situación estable; acciones continuas solo en situación estable, memorizadas también en la
+fugaz). Interpreta `·` `+` `!` `↑` `↓`, `Xn`, temporizaciones `5s/X2`, comparaciones y
+asignaciones `A:=1`, `C:=C+1`.
+
+Panel con marcha / pausa / paso a paso / +1 s / reinicio y velocidad, entradas con interruptor
+o pulsador (teclas 1–9), salidas, marcas, temporizaciones, etapas activas, cronograma y
+registro de franqueos. El motor (`src/lib/sim/`) es puro y no depende de la interfaz.
+
 ## Siguientes pasos previstos
 
-- Simulador del grafcet.
-- Traducción a ladder (LD).
-
-Ambos parten de `buildPlcModel` en `src/lib/plcModel.js`, que reúne diagrama y tabla de
-variables en un modelo independiente del dibujo.
+- Traducción a ladder (LD), a partir de `buildPlcModel` en `src/lib/plcModel.js` y del
+  compilador del simulador (`src/lib/sim/engine.js`).
 
 ## Estructura
 

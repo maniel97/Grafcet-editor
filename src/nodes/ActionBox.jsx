@@ -18,19 +18,22 @@ function StoredArrow({ up, color }) {
 // - continua: solo la caja
 // - condicionada / al evento: trazo vertical encima con la condición
 // - memorizada en la activación / desactivación: flecha ↑ / ↓ encima
-export default function ActionBox({ action, borderClass, color, first }) {
+export default function ActionBox({ action, borderClass, color, first, stepActive }) {
   const { text, kind, condition } = normalizeAction(action)
   const hasCondition = (kind === 'conditional' || kind === 'event') && condition
   // Dirección de la variable que gobierna la acción (con "Mostrar direcciones" activado).
-  const { plcView } = useEditor()
-  const symbol = plcView && actionSymbol(action)?.symbol
-  const address = symbol && plcView.lookup.symbol(symbol)
+  const { plcView, sim } = useEditor()
+  const symbol = actionSymbol(action)?.symbol
+  const address = plcView && symbol && plcView.lookup.symbol(symbol)
+  // Simulación: acción continua o condicionada que se está emitiendo ahora mismo.
+  const emitting =
+    !!sim && stepActive && (kind === 'continuous' || kind === 'conditional') && !!symbol && Number(sim.values[symbol]) !== 0
 
   return (
     <div
-      className={`diagram-text relative flex h-[56px] min-w-[96px] items-center justify-center border-2 bg-white px-[12px] whitespace-nowrap ${borderClass} ${
+      className={`diagram-text relative flex h-[56px] min-w-[96px] items-center justify-center border-2 px-[12px] whitespace-nowrap transition-colors ${borderClass} ${
         first ? '' : '-ml-[2px]'
-      }`}
+      } ${emitting ? 'bg-green-200 font-semibold' : 'bg-white'}`}
     >
       {kind === 'stored-on' && <StoredArrow up color={color} />}
       {kind === 'stored-off' && <StoredArrow up={false} color={color} />}

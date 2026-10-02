@@ -17,7 +17,7 @@ const zoomSelector = (s) => s.transform[2]
 // `preview` (ver GhostPreview) se muestra en el lienzo mientras el ratón está encima.
 function FloatingButton({ position, title, onClick, centerX, disabled = false, preview, icon: Icon = Plus }) {
   const zoom = useStore(zoomSelector)
-  const { setPreview } = useEditor()
+  const { setPreview, simulating } = useEditor()
   const showingPreview = useRef(false)
   const anchored = centerX !== undefined
 
@@ -29,6 +29,9 @@ function FloatingButton({ position, title, onClick, centerX, disabled = false, p
 
   // El botón desaparece al deseleccionar el nodo sin que llegue un mouseleave: limpia la vista previa.
   useEffect(() => hidePreview, [hidePreview])
+
+  // En simulación no se edita: sin botones flotantes.
+  if (simulating) return null
 
   return (
     // offset 16: deja hueco con el conector de 14px, que sobresale 7px del borde del nodo.

@@ -21,9 +21,11 @@ export default function StepNode({ id, data, selected }) {
   // desde la propia transición (clic derecho > Añadir alternativa en O).
   const hasTransition = useStore(useCallback((s) => s.edges.some((e) => e.source === id), [id]))
   // Dirección de PLC de la etapa (solo con "Mostrar direcciones" activado en la tabla de variables).
-  const { plcView } = useEditor()
+  const { plcView, sim } = useEditor()
   const address = plcView?.stepAddress(id)
   const highlight = useHighlightClass(id)
+  // Simulación: etapa activa (fondo verde y marca de actividad, el punto de la norma).
+  const active = !!sim?.active.has(id)
 
   return (
     <div className={`flex items-center ${highlight}`}>
@@ -40,8 +42,16 @@ export default function StepNode({ id, data, selected }) {
       />
       <AddActionButton nodeId={id} />
       <div
-        className={`diagram-step-label relative flex h-[56px] w-[56px] shrink-0 items-center justify-center border-2 bg-white font-semibold ${border}`}
+        className={`diagram-step-label relative flex h-[56px] w-[56px] shrink-0 items-center justify-center border-2 font-semibold transition-colors ${border} ${
+          active ? 'bg-green-200' : 'bg-white'
+        }`}
       >
+        {active && (
+          <span
+            aria-label="Etapa activa"
+            className="pointer-events-none absolute right-[6px] top-[6px] h-[9px] w-[9px] rounded-full bg-slate-900"
+          />
+        )}
         {data.initial && <div className={`pointer-events-none absolute inset-[4px] border-2 ${border}`} />}
         {data.macro && !data.initial && (
           <>
@@ -64,7 +74,7 @@ export default function StepNode({ id, data, selected }) {
           <div className="h-[2px] w-[20px]" style={{ background: color }} />
           <div className="flex">
             {actions.map((action, i) => (
-              <ActionBox key={i} action={action} borderClass={border} color={color} first={i === 0} />
+              <ActionBox key={i} action={action} borderClass={border} color={color} first={i === 0} stepActive={active} />
             ))}
           </div>
         </>

@@ -15,9 +15,13 @@ import {
   CircleHelp,
   Table2,
   FileText,
+  Play,
+  CircleStop,
 } from 'lucide-react'
 
-function ToolButton({ icon: Icon, label, onClick, disabled, title, active, badge }) {
+// `primary`: el texto se ve desde pantallas medianas; el resto solo en pantallas anchas (2xl),
+// para que la barra quepa entera. El nombre siempre está en el tooltip.
+function ToolButton({ icon: Icon, label, onClick, disabled, title, active, badge, primary }) {
   return (
     <button
       type="button"
@@ -25,12 +29,12 @@ function ToolButton({ icon: Icon, label, onClick, disabled, title, active, badge
       disabled={disabled}
       title={title ?? label}
       aria-pressed={active}
-      className={`relative flex shrink-0 items-center gap-2 rounded-md px-2.5 py-2 text-sm text-slate-700 hover:bg-slate-100 active:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent ${
+      className={`relative flex shrink-0 items-center gap-2 rounded-md py-2 pl-2.5 text-sm text-slate-700 hover:bg-slate-100 active:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent ${
         active ? 'bg-slate-100' : ''
-      }`}
+      } ${badge ? 'pr-5' : 'pr-2.5'}`}
     >
       <Icon size={18} />
-      <span className="hidden xl:inline">{label}</span>
+      <span className={`hidden ${primary ? 'lg:inline' : '2xl:inline'}`}>{label}</span>
       {badge}
     </button>
   )
@@ -69,31 +73,35 @@ export default function Toolbar({
   issueCounts,
   onHelp,
   onOpenVariables,
+  simulating,
+  onToggleSimulation,
 }) {
+  // Durante la simulación se bloquea todo lo que modifica el diagrama.
+  const locked = simulating
   return (
     <header className="flex items-center gap-0.5 overflow-x-auto border-b border-slate-200 bg-white px-3 py-2 shadow-sm">
       <h1 className="mr-3 shrink-0 text-base font-bold tracking-tight">Grafcet Editor</h1>
 
-      <ToolButton icon={Undo2} label="Deshacer" title="Deshacer (Ctrl+Z)" onClick={onUndo} disabled={!canUndo} />
-      <ToolButton icon={Redo2} label="Rehacer" title="Rehacer (Ctrl+Shift+Z)" onClick={onRedo} disabled={!canRedo} />
+      <ToolButton icon={Undo2} label="Deshacer" title="Deshacer (Ctrl+Z)" onClick={onUndo} disabled={locked || !canUndo} />
+      <ToolButton icon={Redo2} label="Rehacer" title="Rehacer (Ctrl+Shift+Z)" onClick={onRedo} disabled={locked || !canRedo} />
 
       <Separator />
 
-      <ToolButton icon={SquareStack} label="Etapa inicial" onClick={() => onAdd('step', { initial: true })} />
-      <ToolButton icon={Square} label="Etapa" onClick={() => onAdd('step')} />
-      <ToolButton icon={Minus} label="Transición" onClick={() => onAdd('transition')} />
+      <ToolButton icon={SquareStack} label="Etapa inicial" disabled={locked} onClick={() => onAdd('step', { initial: true })} />
+      <ToolButton icon={Square} label="Etapa" disabled={locked} onClick={() => onAdd('step')} />
+      <ToolButton icon={Minus} label="Transición" disabled={locked} onClick={() => onAdd('transition')} />
       <ToolButton
         icon={RectangleHorizontal}
         label="Acción"
         onClick={onAddAction}
-        disabled={!canAddAction}
+        disabled={locked || !canAddAction}
         title={canAddAction ? 'Añadir acción a la etapa seleccionada' : 'Selecciona una etapa para añadirle una acción'}
       />
 
       <Separator />
 
       <ToolButton icon={Save} label="Guardar" title="Guardar proyecto .json (Ctrl+S)" onClick={onSave} />
-      <ToolButton icon={FolderOpen} label="Abrir" title="Abrir proyecto .json (Ctrl+O)" onClick={onOpen} />
+      <ToolButton icon={FolderOpen} label="Abrir" title="Abrir proyecto .json (Ctrl+O)" onClick={onOpen} disabled={locked} />
 
       <Separator />
 
@@ -110,16 +118,26 @@ export default function Toolbar({
         onClick={onOpenVariables}
       />
       <ToolButton
+        icon={simulating ? CircleStop : Play}
+        label={simulating ? 'Detener' : 'Simular'}
+        title={simulating ? 'Detener la simulación y volver a editar' : 'Simular el grafcet (IEC 60848)'}
+        onClick={onToggleSimulation}
+        active={simulating}
+        primary
+      />
+      <ToolButton
         icon={ShieldCheck}
+        disabled={locked}
         label="Verificar"
         title="Verificar conformidad con IEC 60848"
         onClick={onToggleVerify}
         active={verifyOpen}
+        primary
         badge={<VerifyBadge {...issueCounts} />}
       />
 
       <div className="ml-auto" />
-      <ToolButton icon={Trash2} label="Limpiar" title="Vaciar el lienzo (se puede deshacer)" onClick={onClear} />
+      <ToolButton icon={Trash2} label="Limpiar" title="Vaciar el lienzo (se puede deshacer)" onClick={onClear} disabled={locked} />
       <ToolButton icon={Settings} label="Opciones" title="Opciones de letra y tamaño" onClick={onOpenSettings} />
       <ToolButton icon={CircleHelp} label="Ayuda" title="Atajos y notación (?)" onClick={onHelp} />
     </header>

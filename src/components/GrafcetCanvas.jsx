@@ -21,6 +21,8 @@ import SettingsDialog from './SettingsDialog'
 import HelpDialog from './HelpDialog'
 import GrafcetContextMenu from './GrafcetContextMenu'
 import GhostPreview from './GhostPreview'
+import SimulationPanel from './SimulationPanel'
+import { useSimulation } from '../lib/sim/useSimulation'
 import { useSettings } from '../lib/settings'
 import { nodeTypes, VARIABLES_TABLE_ID } from '../nodes'
 import { edgeTypes } from '../edges'
@@ -74,6 +76,9 @@ export default function GrafcetCanvas() {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [helpOpen, setHelpOpen] = useState(false)
   const [verifyOpen, setVerifyOpen] = useState(false)
+  // Modo simulación: la edición queda bloqueada y el lienzo muestra la evolución.
+  const [simulating, setSimulating] = useState(false)
+  const simulation = useSimulation(nodes, edges, plc, simulating)
   const { settings, update: updateSettings, reset: resetSettings } = useSettings()
   const {
     screenToFlowPosition,
@@ -254,8 +259,10 @@ export default function GrafcetCanvas() {
       highlightIds: highlight,
       setHighlight,
       toggleTable,
+      simulating,
+      sim: simulating ? simulation.view : null,
     }),
-    [takeSnapshot, markedIssues, plcView, plcTable, highlight, toggleTable],
+    [takeSnapshot, markedIssues, plcView, plcTable, highlight, toggleTable, simulating, simulation.view],
   )
 
   // Menú contextual (clic derecho): { x, y, kind: 'node' | 'selection' | 'pane', nodeIds, flowPosition }
@@ -420,17 +427,35 @@ export default function GrafcetCanvas() {
 
   const selectedIds = () => getNodes().filter((n) => n.selected).map((n) => ({ id: n.id }))
 
+  // Entrar en simulación: se cierran paneles y menús de edición y se arranca en marcha.
+  const startSimulation = useCallback(() => {
+    setEditingId(null)
+    setLoopSourceId(null)
+    setMenu(null)
+    setPreview(null)
+    setNodes((nds) => (nds.some((n) => n.selected) ? nds.map((n) => ({ ...n, selected: false })) : nds))
+    setSimulating(true)
+    simulation.setPlaying(true)
+  }, [setNodes, simulation])
+
+  const focusNode = useCallback(
+    (id) => fitView({ nodes: [{ id }], duration: 400, maxZoom: 1.5, padding: 0.6 }),
+    [fitView],
+  )
+
+  // Durante la simulación los atajos de edición no hacen nada.
   useEditorShortcuts({
-    undo,
-    redo,
+    undo: () => !simulating && undo(),
+    redo: () => !simulating && redo(),
     copy,
-    cut: () => copy() && deleteElements({ nodes: selectedIds() }),
-    paste,
+    cut: () => !simulating && copy() && deleteElements({ nodes: selectedIds() }),
+    paste: () => !simulating && paste(),
     duplicate: () => {
+      if (simulating) return
       const clip = copySelection(getNodes(), getEdges())
       if (clip) insertClip(clip)
     },
-    selectAll: () => setNodes((nds) => nds.map((n) => ({ ...n, selected: true }))),
+    selectAll: () => !simulating && setNodes((nds) => nds.map((n) => ({ ...n, selected: true }))),
     save,
     open: () => fileInputRef.current?.click(),
     help: () => setHelpOpen(true),
@@ -444,6 +469,8 @@ export default function GrafcetCanvas() {
   const loopSource = loopSourceId ? nodes.find((n) => n.id === loopSourceId) : null
   const initialSteps = nodes.filter((n) => n.type === 'step' && n.data.initial)
   const modalOpen = settingsOpen || helpOpen || variablesOpen || !!menu
+  // En simulación el clic derecho no abre menús de edición (ni el del navegador).
+  const blockMenu = (handler) => (simulating ? (e) => e.preventDefault() : handler)
 
   return (
     <EditorProvider value={editorApi}>
@@ -466,6 +493,8 @@ export default function GrafcetCanvas() {
           issueCounts={issueCounts}
           onHelp={() => setHelpOpen(true)}
           onOpenVariables={() => setVariablesOpen(true)}
+          simulating={simulating}
+          onToggleSimulation={() => (simulating ? setSimulating(false) : startSimulation())}
         />
         {variablesOpen && (
           <VariablesDialog
@@ -528,13 +557,16 @@ export default function GrafcetCanvas() {
                 takeSnapshot()
                 return true
               }}
-              onNodeContextMenu={onNodeContextMenu}
-              onSelectionContextMenu={onSelectionContextMenu}
-              onPaneContextMenu={onPaneContextMenu}
+              onNodeContextMenu={blockMenu(onNodeContextMenu)}
+              onSelectionContextMenu={blockMenu(onSelectionContextMenu)}
+              onPaneContextMenu={blockMenu(onPaneContextMenu)}
               onMoveStart={closeMenu}
+              nodesDraggable={!simulating}
+              nodesConnectable={!simulating}
+              elementsSelectable={!simulating}
               onNodeClick={(_, node) => loopSource && node.type === 'step' && finishLoop(node.id)}
               onNodeDoubleClick={(_, node) => {
-                if (loopSource) return
+                if (loopSource || simulating) return
                 if (node.type === 'variables') setVariablesOpen(true)
                 else setEditingId(node.id)
               }}
@@ -546,7 +578,7 @@ export default function GrafcetCanvas() {
               snapToGrid
               snapGrid={[10, 10]}
               // Con un diálogo o menú abierto, Supr/Retroceso no deben borrar nodos del lienzo de fondo.
-              deleteKeyCode={modalOpen ? null : ['Delete', 'Backspace']}
+              deleteKeyCode={modalOpen || simulating ? null : ['Delete', 'Backspace']}
               fitView
             >
               <Background variant={BackgroundVariant.Dots} gap={20} size={1} />
@@ -558,13 +590,19 @@ export default function GrafcetCanvas() {
               <GrafcetContextMenu menu={menu} onClose={closeMenu} onEdit={setEditingId} onAddNodeAt={addNode} />
             )}
           </div>
-          <PropertiesPanel
-            node={editingNode}
-            onChange={editNode}
-            onClose={() => setEditingId(null)}
-            previousSteps={previousSteps}
-          />
-          {verifyOpen && <VerifyPanel issues={issues} onFocus={focusIssue} onClose={() => setVerifyOpen(false)} />}
+          {simulating ? (
+            <SimulationPanel simulation={simulation} onFocusNode={focusNode} onClose={() => setSimulating(false)} />
+          ) : (
+            <>
+              <PropertiesPanel
+                node={editingNode}
+                onChange={editNode}
+                onClose={() => setEditingId(null)}
+                previousSteps={previousSteps}
+              />
+              {verifyOpen && <VerifyPanel issues={issues} onFocus={focusIssue} onClose={() => setVerifyOpen(false)} />}
+            </>
+          )}
         </div>
       </div>
     </EditorProvider>

@@ -13,8 +13,12 @@ const ALTERNATIVE_HINT = 'Para «volver O seguir»: clic derecho en la transici�
 
 // Transición Grafcet: barra horizontal con su receptividad a la derecha.
 export default function TransitionNode({ id, data, selected }) {
-  const { plcView } = useEditor()
+  const { plcView, sim } = useEditor()
   const highlight = useHighlightClass(id)
+  // Simulación: validada (etapas anteriores activas) -> ámbar; además receptividad verdadera -> verde.
+  const simState = sim?.ready.has(id) ? 'ready' : sim?.enabled.has(id) ? 'enabled' : null
+  const barColor =
+    simState === 'ready' ? 'bg-green-600' : simState === 'enabled' ? 'bg-amber-500' : selected ? 'bg-blue-500' : 'bg-slate-900'
   // Salida actual (null | 'loop' | 'step'): decide qué botones flotantes están disponibles.
   const output = useStore(
     useCallback(
@@ -48,10 +52,14 @@ export default function TransitionNode({ id, data, selected }) {
               : 'Bucle: volver a una etapa anterior'
         }
       />
-      <div className={`h-[2px] w-full ${selected ? 'bg-blue-500' : 'bg-slate-900'}`} />
+      <div className={`w-full transition-all ${barColor} ${simState ? 'h-[4px]' : 'h-[2px]'}`} />
       <div className="absolute left-1/2 top-0 h-full w-[2px] -translate-x-1/2 bg-slate-900" />
       {data.condition && (
-        <span className="diagram-text absolute left-full ml-[8px] flex flex-col whitespace-nowrap leading-tight">
+        <span
+          className={`diagram-text absolute left-full ml-[8px] flex flex-col whitespace-nowrap leading-tight ${
+            simState === 'ready' ? 'font-semibold text-green-700' : simState === 'enabled' ? 'text-amber-700' : ''
+          }`}
+        >
           <ConditionText text={data.condition} />
           {/* Con "Mostrar direcciones": la receptividad con cada símbolo sustituido por su dirección. */}
           {plcView && <ConditionText className="plc-address" text={addressExpression(data.condition, plcView.lookup)} />}
