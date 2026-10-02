@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { AlertTriangle, ChevronLeft, ChevronRight, Download, X } from 'lucide-react'
 import { DEFAULT_PDF_OPTIONS, ORIENTATIONS, PAGE_MARGIN, PAGE_OPTIONS, exportLayout } from '../lib/pdfLayout'
 import { savePdf } from '../lib/exportImage'
+import { TITLE_BLOCK_FIELDS, titleBlockCells, titleBlockOrigin, titleBlockValues } from '../lib/titleBlock'
 
 const STORAGE_KEY = 'grafcet-editor:pdf-options'
 const PREVIEW = { width: 440, height: 440 } // área de la vista previa (px)
@@ -52,7 +53,7 @@ function Choice({ legend, name, value, options, onChange }) {
 //   kind, title, capture() -> { dataUrl, width, height, scene?, blocks? }, save(format, options)
 // La vista previa del PDF y el archivo usan la misma maquetación (lib/pdfLayout.js: exportLayout)
 // y la misma captura, así que lo que se ve es lo que se guarda.
-export default function ExportDialog({ source, initialFormat = 'pdf', fileName, onClose }) {
+export default function ExportDialog({ source, initialFormat = 'pdf', fileName, titleBlock = {}, onTitleBlockChange, projectName = '', onClose }) {
   const dialogRef = useRef(null)
   const [format, setFormat] = useState(initialFormat)
   const [image, setImage] = useState(undefined) // undefined: preparando; null: nada que exportar
@@ -94,7 +95,7 @@ export default function ExportDialog({ source, initialFormat = 'pdf', fileName, 
     })
   }
 
-  const pdfOptions = { ...options, title }
+  const pdfOptions = { ...options, title, titleBlockData: titleBlock, projectName }
   const layout = useMemo(() => (image ? exportLayout(image, { ...options, title }) : null), [image, options, title])
   const page = layout?.pages[Math.min(pageIndex, layout.pages.length - 1)]
 
@@ -180,6 +181,30 @@ export default function ExportDialog({ source, initialFormat = 'pdf', fileName, 
                 </label>
               </fieldset>
               <fieldset className="space-y-1">
+                <legend className="text-xs font-medium uppercase tracking-wide text-slate-500">Cajetín</legend>
+                <label className="flex items-center gap-2 px-1 text-sm">
+                  <input type="checkbox" checked={!!options.titleBlock} onChange={(e) => update({ titleBlock: e.target.checked })} />
+                  Incluir cajetín
+                </label>
+                {options.titleBlock && (
+                  <div className="space-y-1">
+                    {TITLE_BLOCK_FIELDS.map((f) => (
+                      <input
+                        key={f.id}
+                        className="w-full rounded-md border border-slate-300 px-2 py-1 text-sm focus:border-blue-500 focus:outline-none"
+                        value={titleBlock[f.id] ?? ''}
+                        placeholder={f.id === 'project' ? projectName || f.label : f.id === 'date' ? today : f.label}
+                        aria-label={`Cajetín: ${f.label}`}
+                        title={f.label}
+                        onChange={(e) => onTitleBlockChange?.({ ...titleBlock, [f.id]: e.target.value })}
+                      />
+                    ))}
+                    <p className="text-xs text-slate-500">Se guarda con el proyecto. La hoja se numera sola.</p>
+                  </div>
+                )}
+              </fieldset>
+              {!options.titleBlock && (
+              <fieldset className="space-y-1">
                 <legend className="text-xs font-medium uppercase tracking-wide text-slate-500">Pie de página</legend>
                 <label className="flex items-center gap-2 px-1 text-sm">
                   <input type="checkbox" checked={options.footer} onChange={(e) => update({ footer: e.target.checked })} />
@@ -195,6 +220,7 @@ export default function ExportDialog({ source, initialFormat = 'pdf', fileName, 
                   />
                 )}
               </fieldset>
+              )}
             </>
           )}
         </div>
@@ -236,7 +262,14 @@ export default function ExportDialog({ source, initialFormat = 'pdf', fileName, 
                   className="pointer-events-none absolute border border-dashed border-slate-200"
                   style={{ left: PAGE_MARGIN * k, top: PAGE_MARGIN * k, right: PAGE_MARGIN * k, bottom: PAGE_MARGIN * k }}
                 />
-                {options.footer && (
+                {options.titleBlock && (
+                  <TitleBlockPreview
+                    k={k}
+                    origin={titleBlockOrigin(layout.pageW, layout.pageH, PAGE_MARGIN)}
+                    cells={titleBlockCells(titleBlockValues(titleBlock, { projectName, today, page: pageIndex + 1, pages: layout.pages.length }))}
+                  />
+                )}
+                {options.footer && !options.titleBlock && (
                   <span
                     className="absolute truncate text-slate-500"
                     style={{ left: PAGE_MARGIN * k, bottom: (PAGE_MARGIN / 2 - 1) * k, fontSize: Math.max(6, 2.9 * k), right: PAGE_MARGIN * k }}
@@ -308,5 +341,27 @@ export default function ExportDialog({ source, initialFormat = 'pdf', fileName, 
         </button>
       </div>
     </dialog>
+  )
+}
+
+// Cajetín en la vista previa: las mismas celdas (mm) que el PDF, escaladas a la página.
+function TitleBlockPreview({ k, origin, cells }) {
+  return (
+    <div aria-label="Cajetín" className="absolute border-2 border-slate-900" style={{ left: origin.x * k, top: origin.y * k, width: 120 * k, height: 22 * k }}>
+      {cells.map((c) => (
+        <div
+          key={c.label}
+          className="absolute overflow-hidden border border-slate-700 bg-white leading-none"
+          style={{ left: c.x * k, top: c.y * k, width: c.w * k, height: c.h * k, padding: 1.2 * k }}
+        >
+          <div className="text-slate-500" style={{ fontSize: Math.max(4, 1.9 * k) }}>
+            {c.label}
+          </div>
+          <div className={`truncate text-slate-900 ${c.strong ? 'font-bold' : ''}`} style={{ fontSize: Math.max(5, (c.strong ? 3.2 : 2.8) * k), marginTop: 1.2 * k }}>
+            {c.value}
+          </div>
+        </div>
+      ))}
+    </div>
   )
 }

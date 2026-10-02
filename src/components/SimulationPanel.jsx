@@ -95,7 +95,7 @@ function chronogramSource(samples, signals, now) {
 const fmtTime = (t) => (t < 60 ? `${t.toFixed(1)} s` : `${Math.floor(t / 60)} min ${(t % 60).toFixed(1)} s`)
 
 // Panel de control de la simulación.
-export default function SimulationPanel({ simulation, scenarios = [], onScenariosChange, onFocusNode, onClose }) {
+export default function SimulationPanel({ simulation, scenarios = [], onScenariosChange, exportProps, onFocusNode, onClose }) {
   const { compiled, sim, playing, setPlaying, speed, setSpeed, setInput, step, advance, reset } = simulation
 
   const inputs = useMemo(() => compiled?.variables.filter((v) => v.type === 'input') ?? [], [compiled])
@@ -345,7 +345,13 @@ export default function SimulationPanel({ simulation, scenarios = [], onScenario
         </Section>
       </div>
       {chronoExport && (
-        <ExportDialog source={chronoExport} initialFormat="pdf" fileName={(ext) => fileName(ext, 'cronograma')} onClose={() => setChronoExport(null)} />
+        <ExportDialog
+          source={chronoExport}
+          initialFormat="pdf"
+          fileName={(ext) => fileName(ext, 'cronograma')}
+          {...exportProps}
+          onClose={() => setChronoExport(null)}
+        />
       )}
     </aside>
   )

@@ -91,3 +91,33 @@ test('PDF vectorial (por defecto): texto real sin imagen; desmarcado, imagen', a
   expect(raster).not.toContain('Emergencia')
   expectNoErrors(errors)
 })
+
+test('cajetín opcional: desactivado por defecto, datos en el proyecto y en cada página', async ({ page }, testInfo) => {
+  const errors = await openEditor(page)
+  const openPdf = async () => {
+    await page.getByRole('button', { name: /Exportar/ }).click()
+    await page.getByRole('menuitem', { name: /PDF/ }).click()
+    return page.getByRole('dialog', { name: 'Exportar', exact: true })
+  }
+  let dialog = await openPdf()
+  await expect(dialog.getByLabel('Incluir cajetín')).not.toBeChecked()
+  await expect(dialog.getByLabel('Cajetín', { exact: true })).toHaveCount(0)
+  await dialog.getByLabel('Incluir cajetín').check()
+  await dialog.getByLabel('Cajetín: Autor').fill('M. Montes')
+  await dialog.getByLabel('Cajetín: Nº de plano').fill('GR-007')
+  await expect(dialog.getByLabel('Cajetín', { exact: true })).toContainText('GR-007')
+  await expect(dialog.getByLabel('Título del pie de página')).toHaveCount(0) // sustituye al pie
+  const file = await download(page, () => dialog.getByRole('button', { name: 'Guardar PDF' }).click())
+  const path = testInfo.outputPath('cajetin.pdf')
+  await file.saveAs(path)
+  const bytes = readFileSync(path, 'latin1')
+  expect(bytes).toContain('(GR-007)')
+  expect(bytes).toContain('(1 de 1)')
+
+  // Los datos se guardan con el proyecto.
+  await page.waitForTimeout(800)
+  await page.reload()
+  dialog = await openPdf()
+  await expect(dialog.getByLabel('Cajetín: Nº de plano')).toHaveValue('GR-007')
+  expectNoErrors(errors)
+})

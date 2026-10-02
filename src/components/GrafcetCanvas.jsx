@@ -156,6 +156,13 @@ export default function GrafcetCanvas() {
   }
   // PNG y SVG se descargan directamente; PDF abre el diálogo con opciones y vista previa.
   const onExport = useCallback((format) => setExportFormat(format), [])
+  // Cajetín del PDF: sus datos van en el proyecto (lib/titleBlock.js); lo comparten los diálogos
+  // de exportación del grafcet, del ladder y del cronograma.
+  const titleBlockProps = {
+    titleBlock: plc.titleBlock ?? {},
+    onTitleBlockChange: (titleBlock) => setPlc((p) => ({ ...p, titleBlock })),
+    projectName,
+  }
 
   const editingNode = nodes.find((n) => n.id === editingId)
   const selectedStep = nodes.find((n) => n.selected && n.type === 'step')
@@ -534,6 +541,7 @@ export default function GrafcetCanvas() {
               edges={edges}
               plc={plc}
               grafcetErrors={issueCounts.errors}
+              exportProps={titleBlockProps}
               onClose={() => setLadderOpen(false)}
             />
           </Suspense>
@@ -589,7 +597,13 @@ export default function GrafcetCanvas() {
         )}
         {exportFormat && (
           <Suspense fallback={<Loading />}>
-            <ExportDialog source={exportSource} initialFormat={exportFormat} fileName={(ext) => fileName(ext)} onClose={() => setExportFormat(null)} />
+            <ExportDialog
+              source={exportSource}
+              initialFormat={exportFormat}
+              fileName={(ext) => fileName(ext)}
+              {...titleBlockProps}
+              onClose={() => setExportFormat(null)}
+            />
           </Suspense>
         )}
         {helpOpen && (
@@ -692,6 +706,7 @@ export default function GrafcetCanvas() {
                 simulation={simulation}
                 scenarios={plc.scenarios}
                 onScenariosChange={(update) => setPlc((p) => ({ ...p, scenarios: update(p.scenarios ?? []) }))}
+                exportProps={titleBlockProps}
                 onFocusNode={focusNode}
                 onClose={() => setSimulating(false)}
               />

@@ -57,7 +57,7 @@ function ActionButton({ icon: Icon, children, onClick, title }) {
 
 // Traducción del grafcet a ladder, con su texto equivalente en ST y AWL. Se regenera al abrirla,
 // así que siempre corresponde al diagrama y a la tabla de variables actuales.
-export default function LadderView({ nodes, edges, plc, grafcetErrors, onClose }) {
+export default function LadderView({ nodes, edges, plc, grafcetErrors, exportProps, onClose }) {
   const [tab, setTab] = useState('ladder')
   const [mode, setMode] = useState('both')
   const [mnemonic, setMnemonic] = useState('de')
@@ -211,6 +211,7 @@ export default function LadderView({ nodes, edges, plc, grafcetErrors, onClose }
           source={exportSource}
           initialFormat={exportFormat}
           fileName={(ext) => fileName(ext, 'ladder')}
+          {...exportProps}
           onClose={() => setExportFormat(null)}
         />
       )}

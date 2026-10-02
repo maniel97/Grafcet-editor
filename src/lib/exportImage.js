@@ -1,6 +1,7 @@
 import { DEFAULT_PDF_OPTIONS, PAGE_MARGIN, exportLayout } from './pdfLayout'
 import { fileName } from './fileNames'
 import { captureScene, drawScene, itemSpan, pdfSafe } from './vectorPdf'
+import { titleBlockCells, titleBlockOrigin, titleBlockValues } from './titleBlock'
 
 const PX_TO_MM = 25.4 / 96
 
@@ -124,7 +125,10 @@ export async function savePdf(image, options = DEFAULT_PDF_OPTIONS, name = fileN
       pdf.addImage(image.dataUrl, 'PNG', layout.x, y, layout.w, image.height * k, 'dibujo', 'FAST')
     }
     if (many) pdf.restoreGraphicsState()
-    if (options.footer) {
+    if (options.titleBlock) {
+      const values = titleBlockValues(options.titleBlockData, { projectName: options.projectName, today: date, page: i + 1, pages: layout.pages.length })
+      drawTitleBlock(pdf, titleBlockOrigin(layout.pageW, layout.pageH, PAGE_MARGIN), titleBlockCells(values))
+    } else if (options.footer) {
       pdf.setFont('helvetica', 'normal')
       pdf.setFontSize(8)
       pdf.setTextColor(120)
@@ -133,4 +137,30 @@ export async function savePdf(image, options = DEFAULT_PDF_OPTIONS, name = fileN
     }
   })
   pdf.save(name)
+}
+
+// Cajetín: marco, celdas con su rótulo pequeño y su valor (recortado si no cabe).
+function drawTitleBlock(pdf, origin, cells) {
+  pdf.setDrawColor(15, 23, 42)
+  pdf.setLineDashPattern([], 0)
+  for (const c of cells) {
+    pdf.setLineWidth(0.25)
+    pdf.rect(origin.x + c.x, origin.y + c.y, c.w, c.h, 'S')
+    pdf.setFont('helvetica', 'normal')
+    pdf.setFontSize(5.5)
+    pdf.setTextColor(100, 116, 139)
+    pdf.text(pdfSafe(c.label), origin.x + c.x + 1.2, origin.y + c.y + 2.6)
+    pdf.setFont('helvetica', c.strong ? 'bold' : 'normal')
+    pdf.setFontSize(c.strong ? 9 : 8)
+    pdf.setTextColor(15, 23, 42)
+    let text = pdfSafe(c.value ?? '')
+    const room = c.w - 2.4
+    while (text.length > 1 && pdf.getTextWidth(text) > room) text = `${text.slice(0, -2)}…`
+    pdf.text(text, origin.x + c.x + 1.2, origin.y + c.y + c.h - 2)
+  }
+  // Marco exterior más grueso.
+  const right = Math.max(...cells.map((c) => c.x + c.w))
+  const bottom = Math.max(...cells.map((c) => c.y + c.h))
+  pdf.setLineWidth(0.5)
+  pdf.rect(origin.x, origin.y, right, bottom, 'S')
 }

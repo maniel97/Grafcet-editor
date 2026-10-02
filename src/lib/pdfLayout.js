@@ -1,3 +1,5 @@
+import { TITLE_BLOCK } from './titleBlock'
+
 // Maquetación de la exportación a PDF: dónde y a qué escala va el diagrama en la página.
 // Es una función pura que usan por igual la vista previa y el PDF, así que lo que se ve en la
 // vista previa es exactamente lo que se guarda.
@@ -20,10 +22,12 @@ export const ORIENTATIONS = [
   { id: 'landscape', label: 'Apaisada' },
 ]
 
-export const DEFAULT_PDF_OPTIONS = { page: 'auto', orientation: 'auto', footer: true, vector: true, title: 'Grafcet (IEC 60848)' }
+export const DEFAULT_PDF_OPTIONS = { page: 'auto', orientation: 'auto', footer: true, vector: true, titleBlock: false, title: 'Grafcet (IEC 60848)' }
 
 export const PAGE_MARGIN = 12 // mm
 export const FOOTER_SPACE = 8 // mm reservados al pie de página
+// Con cajetín, el pie sencillo no se dibuja y se reserva su altura (lib/titleBlock.js).
+const reservedBottom = (options) => (options.titleBlock ? TITLE_BLOCK.height + TITLE_BLOCK.gap : options.footer ? FOOTER_SPACE : 0)
 const PX_TO_MM = 25.4 / 96
 // En "Automático" se usa A4 salvo que el diagrama tuviera que reducirse por debajo de esto.
 const MIN_READABLE_SCALE = 0.7
@@ -36,7 +40,7 @@ export const SMALL_SCALE = 0.5
 export function pdfLayout(image, options = DEFAULT_PDF_OPTIONS) {
   const naturalW = image.width * PX_TO_MM
   const naturalH = image.height * PX_TO_MM
-  const footer = options.footer ? FOOTER_SPACE : 0
+  const footer = reservedBottom(options)
 
   const fit = (page, orientation) => {
     const landscape = orientation === 'landscape'
@@ -102,7 +106,7 @@ export function exportLayout(image, options = DEFAULT_PDF_OPTIONS) {
   const landscape = orientation === 'landscape'
   const pageW = landscape ? page.height : page.width
   const pageH = landscape ? page.width : page.height
-  const footer = options.footer ? FOOTER_SPACE : 0
+  const footer = reservedBottom(options)
   const naturalW = image.width * PX_TO_MM
   const scale = Math.min(1, (pageW - PAGE_MARGIN * 2) / naturalW)
   const mmPerPx = scale * PX_TO_MM
