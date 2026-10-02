@@ -92,3 +92,36 @@ test('notas: crear, escribir, editar, color, copiar y no afectan a la verificaci
   await expect(page.locator('.react-flow__node-note')).toHaveCount(1)
   expectNoErrors(errors)
 })
+
+test('ejemplos y trabajos anteriores: abrir un ejemplo y recuperar lo que había', async ({ page }) => {
+  const errors = await openEditor(page) // diagrama de ejemplo inicial, con «Motor M1»
+  const openMenu = async (item) => {
+    await page.getByTitle('Abrir un proyecto, un ejemplo o un trabajo anterior').click()
+    await page.getByRole('menu', { name: 'Abrir' }).getByRole('menuitem', { name: item }).click()
+  }
+
+  await openMenu(/Ejemplos/)
+  const dialog = page.getByRole('dialog', { name: 'Abrir' })
+  await expect(dialog.getByRole('button', { name: /Mezcladora/ })).toBeVisible()
+  await dialog.getByRole('button', { name: /Mezcladora/ }).click()
+  await expect(dialog).toHaveCount(0)
+  await expect(page.locator('.react-flow__node-step')).toHaveCount(8)
+  await expect(page.locator('.react-flow__node-note')).toContainText('Mezcladora')
+  // El ejemplo es conforme: Verificar en verde.
+  await expect(page.getByTitle('Verificar conformidad con IEC 60848')).toContainText('✓')
+
+  // Lo que había (el diagrama inicial) se ha guardado como trabajo anterior.
+  await openMenu(/Trabajos anteriores/)
+  const entry = dialog.getByRole('listitem').first()
+  await expect(entry).toContainText('2 etapas · 2 transiciones')
+  await expect(entry).toContainText('Antes de abrir el ejemplo «Mezcladora»')
+  await entry.getByRole('button', { name: 'Recuperar' }).click()
+  await expect(page.locator('.react-flow__node-step')).toHaveCount(2)
+  await expect(page.getByText('Motor M1')).toBeVisible()
+
+  // Y la mezcladora queda a su vez como trabajo anterior.
+  await openMenu(/Trabajos anteriores/)
+  await expect(dialog.getByRole('listitem').first()).toContainText('8 etapas · 8 transiciones')
+  await page.keyboard.press('Escape')
+  expectNoErrors(errors)
+})

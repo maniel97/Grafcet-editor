@@ -16,7 +16,8 @@ import { edgeTypes } from '../edges'
 import { useSimulation } from '../lib/sim/useSimulation'
 import { useSettings } from '../lib/settings'
 import { initialNodes, initialEdges, defaultEdgeOptions } from '../lib/initialDiagram'
-import { saveProject, loadProject } from '../lib/projectFile'
+import { saveProject, loadProject, normalizeProject } from '../lib/projectFile'
+import { pushRecent } from '../lib/recent'
 import { EMPTY_PLC } from '../lib/addressing'
 import { nextStepLabel, nextTransitionLabel, findFreePosition } from '../lib/layout'
 import { useHistory } from '../lib/history'
@@ -40,6 +41,7 @@ const SimulationPanel = lazy(() => import('./SimulationPanel'))
 const LadderView = lazy(() => import('./LadderView'))
 const VariablesDialog = lazy(() => import('./VariablesDialog'))
 const PdfExportDialog = lazy(() => import('./PdfExportDialog'))
+const ProjectsDialog = lazy(() => import('./ProjectsDialog'))
 
 // Mientras se descarga una parte diferida (normalmente un instante).
 function Loading({ panel }) {
@@ -235,31 +237,57 @@ export default function GrafcetCanvas() {
 
   const clear = useCallback(() => {
     if (!nodes.length && !edges.length) return
+    pushRecent({ nodes: getNodes(), edges: getEdges(), plc: plcRef.current }, 'Antes de limpiar el lienzo')
     takeSnapshot()
     setNodes([])
     setEdges([])
     setEditingId(null)
-  }, [nodes.length, edges.length, takeSnapshot, setNodes, setEdges])
+  }, [nodes.length, edges.length, getNodes, getEdges, takeSnapshot, setNodes, setEdges])
 
   // --- Archivos ----------------------------------------------------------------------------------
   const save = useCallback(() => saveProject({ ...toObject(), plc }), [toObject, plc])
 
+  // Sustituye el diagrama (abrir archivo, ejemplo o trabajo anterior). Lo que había se guarda
+  // antes como trabajo anterior (lib/recent.js) y además se puede deshacer con Ctrl+Z.
+  const replaceProject = useCallback(
+    (project, reason) => {
+      pushRecent({ nodes: getNodes(), edges: getEdges(), plc: plcRef.current }, reason)
+      takeSnapshot()
+      setNodes(project.nodes)
+      setEdges(project.edges)
+      setPlc(project.plc ?? EMPTY_PLC)
+      setEditingId(null)
+      if (project.viewport) setViewport(project.viewport)
+      else requestAnimationFrame(() => requestAnimationFrame(() => fitDrawn(0)))
+    },
+    [getNodes, getEdges, takeSnapshot, setNodes, setEdges, setViewport, fitDrawn],
+  )
+
   const load = useCallback(
     async (file) => {
       try {
-        const project = await loadProject(file)
-        takeSnapshot()
-        setNodes(project.nodes)
-        setEdges(project.edges)
-        setPlc(project.plc)
-        setEditingId(null)
-        if (project.viewport) setViewport(project.viewport)
-        else requestAnimationFrame(() => requestAnimationFrame(() => fitDrawn(0)))
+        replaceProject(await loadProject(file), `Antes de abrir «${file.name}»`)
       } catch (err) {
         alert(err.message)
       }
     },
-    [takeSnapshot, setNodes, setEdges, setViewport, fitDrawn],
+    [replaceProject],
+  )
+
+  const [projectsTab, setProjectsTab] = useState(null) // 'examples' | 'recent' | null
+  const openExample = useCallback(
+    (example) => {
+      replaceProject(normalizeProject(example.build()), `Antes de abrir el ejemplo «${example.title}»`)
+      setProjectsTab(null)
+    },
+    [replaceProject],
+  )
+  const restoreRecent = useCallback(
+    (entry) => {
+      replaceProject(normalizeProject(entry.project), 'Antes de recuperar un trabajo anterior')
+      setProjectsTab(null)
+    },
+    [replaceProject],
   )
 
   // --- Simulación --------------------------------------------------------------------------------
@@ -297,7 +325,7 @@ export default function GrafcetCanvas() {
 
   const loopSource = loopSourceId ? nodes.find((n) => n.id === loopSourceId) : null
   const initialSteps = nodes.filter((n) => n.type === 'step' && n.data.initial)
-  const modalOpen = settingsOpen || helpOpen || variablesOpen || ladderOpen || pdfOpen || !!menu
+  const modalOpen = settingsOpen || helpOpen || variablesOpen || ladderOpen || pdfOpen || !!projectsTab || !!menu
   // En solo lectura el clic derecho no abre menús de edición (ni el del navegador).
   const blockMenu = (handler) => (readOnly ? (e) => e.preventDefault() : handler)
 
@@ -315,6 +343,8 @@ export default function GrafcetCanvas() {
           onExport={onExport}
           onSave={save}
           onOpen={() => fileInputRef.current?.click()}
+          onOpenExamples={() => setProjectsTab('examples')}
+          onOpenRecent={() => setProjectsTab('recent')}
           onClear={clear}
           onOpenSettings={() => setSettingsOpen(true)}
           onToggleVerify={() => setVerifyOpen((v) => !v)}
@@ -373,6 +403,16 @@ export default function GrafcetCanvas() {
               onChange={updateSettings}
               onReset={resetSettings}
               onClose={() => setSettingsOpen(false)}
+            />
+          </Suspense>
+        )}
+        {projectsTab && (
+          <Suspense fallback={<Loading />}>
+            <ProjectsDialog
+              initialTab={projectsTab}
+              onOpenExample={openExample}
+              onRestore={restoreRecent}
+              onClose={() => setProjectsTab(null)}
             />
           </Suspense>
         )}

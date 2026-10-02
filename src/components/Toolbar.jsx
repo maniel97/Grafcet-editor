@@ -1,5 +1,6 @@
 import InitialStepIcon from './InitialStepIcon'
 import ExportMenu from './ExportMenu'
+import ToolbarDropdown from './ToolbarDropdown'
 import {
   Square,
   Minus,
@@ -17,6 +18,9 @@ import {
   CircleStop,
   Cpu,
   StickyNote,
+  FileJson,
+  BookOpen,
+  History,
 } from 'lucide-react'
 
 // `primary`: el texto se ve desde 1280 px; el resto solo en pantallas anchas (2xl),
@@ -70,6 +74,8 @@ export default function Toolbar({
   onExport,
   onSave,
   onOpen,
+  onOpenExamples,
+  onOpenRecent,
   onClear,
   onOpenSettings,
   onToggleVerify,
@@ -108,7 +114,19 @@ export default function Toolbar({
       <Separator />
 
       <ToolButton icon={Save} label="Guardar" title="Guardar proyecto .json (Ctrl+S)" onClick={onSave} />
-      <ToolButton icon={FolderOpen} label="Abrir" title="Abrir proyecto .json (Ctrl+O)" onClick={onOpen} disabled={locked} />
+      <ToolbarDropdown
+        icon={FolderOpen}
+        label="Abrir"
+        title="Abrir un proyecto, un ejemplo o un trabajo anterior"
+        menuLabel="Abrir"
+        labelClass={labelClass(false)}
+        disabled={locked}
+        items={[
+          { id: 'file', label: 'Abrir archivo…', hint: 'Proyecto .json guardado (Ctrl+O)', icon: FileJson, onSelect: onOpen },
+          { id: 'examples', label: 'Ejemplos…', hint: 'Grafcets típicos listos para usar', icon: BookOpen, onSelect: onOpenExamples },
+          { id: 'recent', label: 'Trabajos anteriores…', hint: 'Recuperar lo que había antes de abrir o limpiar', icon: History, onSelect: onOpenRecent },
+        ]}
+      />
 
       <Separator />
 
