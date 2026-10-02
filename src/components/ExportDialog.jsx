@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { AlertTriangle, ChevronLeft, ChevronRight, Download, X } from 'lucide-react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { AlertTriangle, ChevronLeft, ChevronRight, Download, Maximize2, Minus, Plus, X } from 'lucide-react'
 import { DEFAULT_PDF_OPTIONS, ORIENTATIONS, PAGE_MARGIN, PAGE_OPTIONS, exportLayout } from '../lib/pdfLayout'
 import { savePdf } from '../lib/exportImage'
 import { TITLE_BLOCK_FIELDS, titleBlockCells, titleBlockOrigin, titleBlockValues } from '../lib/titleBlock'
@@ -7,6 +7,8 @@ import { TITLE_BLOCK_FIELDS, titleBlockCells, titleBlockOrigin, titleBlockValues
 const STORAGE_KEY = 'grafcet-editor:pdf-options'
 const PREVIEW = { width: 440, height: 440 } // área de la vista previa (px)
 const PX_TO_MM = 25.4 / 96
+// Zoom de la vista previa (1 = ajustada al recuadro).
+const ZOOMS = [1, 1.5, 2, 3, 4, 6]
 
 const FORMATS = [
   { id: 'png', label: 'PNG', help: 'Imagen para documentos y webs' },
@@ -60,6 +62,44 @@ export default function ExportDialog({ source, initialFormat = 'pdf', fileName, 
   const [options, setOptions] = useState(readOptions)
   const [title, setTitle] = useState(source.title ?? DEFAULT_PDF_OPTIONS.title)
   const [pageIndex, setPageIndex] = useState(0)
+  const [zoom, setZoomValue] = useState(1)
+  const previewRef = useRef(null)
+  const keepCenter = useRef(null)
+  // Cambia el zoom conservando el punto que se está mirando (el centro del recuadro).
+  const setZoom = (next) => {
+    const el = previewRef.current
+    if (el) {
+      keepCenter.current = {
+        x: (el.scrollLeft + el.clientWidth / 2) / Math.max(1, el.scrollWidth),
+        y: (el.scrollTop + el.clientHeight / 2) / Math.max(1, el.scrollHeight),
+      }
+    }
+    setZoomValue(next)
+  }
+  const stepZoom = (dir) => {
+    const next = dir > 0 ? ZOOMS.find((z) => z > zoom + 0.01) : [...ZOOMS].reverse().find((z) => z < zoom - 0.01)
+    if (next) setZoom(next)
+  }
+  useLayoutEffect(() => {
+    const el = previewRef.current
+    const c = keepCenter.current
+    if (!el || !c) return
+    el.scrollLeft = c.x * el.scrollWidth - el.clientWidth / 2
+    el.scrollTop = c.y * el.scrollHeight - el.clientHeight / 2
+    keepCenter.current = null
+  }, [zoom])
+  // Ctrl + rueda sobre la vista previa: zoom (no el de toda la página).
+  useEffect(() => {
+    const el = previewRef.current
+    if (!el) return
+    const onWheel = (e) => {
+      if (!e.ctrlKey) return
+      e.preventDefault()
+      stepZoom(e.deltaY < 0 ? 1 : -1)
+    }
+    el.addEventListener('wheel', onWheel, { passive: false })
+    return () => el.removeEventListener('wheel', onWheel)
+  })
   const [saving, setSaving] = useState(false)
   const [today] = useState(() => new Date().toLocaleDateString('es-ES'))
 
@@ -112,7 +152,10 @@ export default function ExportDialog({ source, initialFormat = 'pdf', fileName, 
   }
 
   // Escala de la vista previa de la página: mm -> px de pantalla.
-  const k = layout ? Math.min(PREVIEW.width / layout.pageW, PREVIEW.height / layout.pageH) : 1
+  // ×zoom: con zoom la vista previa se redibuja a escala (nítida) y se recorre con las barras.
+  const k = layout ? Math.min(PREVIEW.width / layout.pageW, PREVIEW.height / layout.pageH) * zoom : 1
+  // Imagen (PNG/SVG): ajustada al ancho (y al alto si no es muy alargada).
+  const imageFit = image ? Math.min(PREVIEW.width / image.width, image.height > image.width * 2 ? Infinity : PREVIEW.height / image.height) : 1
   const orientationLabel = layout?.orientation === 'landscape' ? 'apaisado' : 'vertical'
   const pngSize = image && `${Math.round(image.width * options.pngScale)} × ${Math.round(image.height * options.pngScale)} px`
 
@@ -136,7 +179,10 @@ export default function ExportDialog({ source, initialFormat = 'pdf', fileName, 
               role="radio"
               aria-checked={format === f.id}
               title={f.help}
-              onClick={() => setFormat(f.id)}
+              onClick={() => {
+                setFormat(f.id)
+                setZoomValue(1)
+              }}
               className={`rounded px-3 py-1 ${format === f.id ? 'bg-blue-600 text-white' : 'text-slate-600 hover:bg-slate-100'}`}
             >
               {f.label}
@@ -227,25 +273,28 @@ export default function ExportDialog({ source, initialFormat = 'pdf', fileName, 
 
         <div className="flex min-w-0 flex-1 flex-col items-center gap-2">
           <div
-            className="flex items-center justify-center overflow-auto rounded-lg bg-slate-100 p-3"
+            ref={previewRef}
+            className={`flex overflow-auto rounded-lg bg-slate-100 p-3 ${zoom > 1 ? 'cursor-zoom-out' : 'cursor-zoom-in'}`}
             style={{ width: PREVIEW.width + 24, height: PREVIEW.height + 24 }}
+            onDoubleClick={() => setZoom(zoom > 1 ? 1 : 2.5)}
+            title="Doble clic o Ctrl + rueda para ampliar"
           >
-            {image === undefined && <p className="text-sm text-slate-500">Preparando la vista previa…</p>}
-            {image === null && <p className="text-sm text-slate-500">No hay nada que exportar.</p>}
+            {image === undefined && <p className="m-auto text-sm text-slate-500">Preparando la vista previa…</p>}
+            {image === null && <p className="m-auto text-sm text-slate-500">No hay nada que exportar.</p>}
             {image && format !== 'pdf' && (
               <img
                 src={image.dataUrl}
                 alt="Dibujo tal como se exportará"
                 aria-label="Vista previa de la imagen"
-                className="paper m-auto max-w-full bg-white shadow-md"
-                style={{ maxHeight: image.height > image.width * 2 ? 'none' : '100%' }}
+                className="paper m-auto max-w-none shrink-0 bg-white shadow-md"
+                style={{ width: image.width * imageFit * zoom }}
               />
             )}
             {layout && page && format === 'pdf' && (
               <div
                 aria-label="Vista previa de la página"
                 data-page={`${layout.page.id}-${layout.orientation}`}
-                className="paper relative shrink-0 bg-white shadow-md"
+                className="paper relative m-auto shrink-0 bg-white shadow-md"
                 style={{ width: layout.pageW * k, height: layout.pageH * k }}
               >
                 {/* Franja del dibujo que va en esta página. */}
@@ -283,6 +332,22 @@ export default function ExportDialog({ source, initialFormat = 'pdf', fileName, 
             )}
           </div>
 
+          {image && (
+            <div className="flex items-center gap-0.5 rounded-md border border-slate-200 p-0.5 text-xs" role="group" aria-label="Zoom de la vista previa">
+              <button type="button" onClick={() => stepZoom(-1)} disabled={zoom <= ZOOMS[0]} aria-label="Alejar la vista previa" className="rounded p-1 hover:bg-slate-100 disabled:opacity-30">
+                <Minus size={14} />
+              </button>
+              <button type="button" onClick={() => setZoom(1)} title="Ajustar" aria-label="Zoom de la vista previa: ajustar" className={`min-w-12 rounded px-1.5 py-1 tabular-nums hover:bg-slate-100 ${zoom === 1 ? 'font-semibold text-blue-700' : ''}`}>
+                {Math.round(zoom * 100)} %
+              </button>
+              <button type="button" onClick={() => stepZoom(1)} disabled={zoom >= ZOOMS.at(-1)} aria-label="Ampliar la vista previa" className="rounded p-1 hover:bg-slate-100 disabled:opacity-30">
+                <Plus size={14} />
+              </button>
+              <button type="button" onClick={() => setZoom(1)} aria-label="Ajustar la vista previa" title="Ajustar" className="rounded p-1 hover:bg-slate-100">
+                <Maximize2 size={14} />
+              </button>
+            </div>
+          )}
           {format === 'pdf' && layout && layout.pages.length > 1 && (
             <div className="flex items-center gap-2 text-sm" aria-label="Páginas">
               <button

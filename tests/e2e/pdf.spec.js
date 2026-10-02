@@ -121,3 +121,25 @@ test('cajetín opcional: desactivado por defecto, datos en el proyecto y en cada
   await expect(dialog.getByLabel('Cajetín: Nº de plano')).toHaveValue('GR-007')
   expectNoErrors(errors)
 })
+
+test('zoom en la vista previa de exportación', async ({ page }) => {
+  const errors = await openEditor(page)
+  await page.getByRole('button', { name: /Exportar/ }).click()
+  await page.getByRole('menuitem', { name: /PDF/ }).click()
+  const dialog = page.getByRole('dialog', { name: 'Exportar', exact: true })
+  const preview = dialog.getByLabel('Vista previa de la página')
+  const width = async () => (await preview.boundingBox()).width
+  const fit = await width()
+  await dialog.getByLabel('Ampliar la vista previa').click()
+  await dialog.getByLabel('Ampliar la vista previa').click()
+  await expect(dialog.getByLabel('Zoom de la vista previa: ajustar')).toHaveText('200 %')
+  expect(await width()).toBeCloseTo(fit * 2, 0)
+  await dialog.getByLabel('Ajustar la vista previa').click()
+  expect(await width()).toBeCloseTo(fit, 0)
+  // Doble clic: ampliar y volver.
+  await preview.dblclick()
+  await expect(dialog.getByLabel('Zoom de la vista previa: ajustar')).toHaveText('250 %')
+  await preview.dblclick()
+  await expect(dialog.getByLabel('Zoom de la vista previa: ajustar')).toHaveText('100 %')
+  expectNoErrors(errors)
+})
