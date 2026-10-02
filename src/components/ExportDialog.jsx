@@ -237,7 +237,7 @@ export default function ExportDialog({ source, initialFormat = 'pdf', fileName, 
                 src={image.dataUrl}
                 alt="Dibujo tal como se exportará"
                 aria-label="Vista previa de la imagen"
-                className="m-auto max-w-full bg-white shadow-md"
+                className="paper m-auto max-w-full bg-white shadow-md"
                 style={{ maxHeight: image.height > image.width * 2 ? 'none' : '100%' }}
               />
             )}
@@ -245,7 +245,7 @@ export default function ExportDialog({ source, initialFormat = 'pdf', fileName, 
               <div
                 aria-label="Vista previa de la página"
                 data-page={`${layout.page.id}-${layout.orientation}`}
-                className="relative shrink-0 bg-white shadow-md"
+                className="paper relative shrink-0 bg-white shadow-md"
                 style={{ width: layout.pageW * k, height: layout.pageH * k }}
               >
                 {/* Franja del dibujo que va en esta página. */}

@@ -536,3 +536,20 @@ test('autocompletado en receptividades y aviso de erratas', async ({ page }) => 
   await expect(action).toHaveValue('Motor M1')
   expectNoErrors(errors)
 })
+
+test('modo oscuro: el papel de la vista previa de exportación y su cajetín siguen en blanco y negro', async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('grafcet-editor:settings', JSON.stringify({ theme: 'dark' })))
+  const errors = await openEditor(page)
+  await page.getByRole('button', { name: /Exportar/ }).click()
+  await page.getByRole('menuitem', { name: /PDF/ }).click()
+  const dialog = page.getByRole('dialog', { name: 'Exportar', exact: true })
+  await dialog.getByLabel('Incluir cajetín').check()
+  const css = (loc, prop) => loc.evaluate((el, p) => getComputedStyle(el)[p], prop)
+  expect(await css(dialog.getByLabel('Vista previa de la página'), 'backgroundColor')).toBe('rgb(255, 255, 255)')
+  const block = dialog.getByLabel('Cajetín', { exact: true })
+  expect(await css(block, 'borderTopColor')).not.toMatch(/rgb\(2[0-9]{2}, 2[0-9]{2}/) // borde oscuro, no claro
+  expect(await css(block.locator('div').first(), 'backgroundColor')).toBe('rgb(255, 255, 255)')
+  await dialog.getByRole('radio', { name: 'PNG', exact: true }).click()
+  expect(await css(dialog.getByLabel('Vista previa de la imagen'), 'backgroundColor')).toBe('rgb(255, 255, 255)')
+  expectNoErrors(errors)
+})

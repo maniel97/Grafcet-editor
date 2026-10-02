@@ -104,7 +104,7 @@ export default function LadderZoom({ naturalWidth, children }) {
       </div>
       <div ref={scrollRef} className="min-h-0 flex-1 overflow-auto p-4 pt-2">
         <div
-          className="ladder-zoom mx-auto rounded-lg border border-slate-200 bg-white shadow-sm"
+          className="paper ladder-zoom mx-auto rounded-lg border border-slate-200 bg-white shadow-sm"
           style={{ width: naturalWidth * scale + 2 }}
         >
           {children}

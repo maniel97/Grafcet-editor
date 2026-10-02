@@ -195,7 +195,9 @@ body {
   --color-green-100: oklch(39.3% 0.095 152.535);
   --color-green-200: oklch(44.8% 0.119 151.328);
 }
-:root[data-theme="dark"] .react-flow {
+/* Papel (hoja del lienzo, páginas y vistas previas de exportación, esquema ladder): siempre claro. */
+:root[data-theme="dark"] .react-flow,
+:root[data-theme="dark"] .paper {
   color-scheme: light;
   /* La hoja: mismo fondo y tinta que en el tema claro (el lienzo es transparente). */
   background: #f8fafc;
@@ -226,38 +228,38 @@ body {
   --color-green-100: oklch(96.2% 0.044 156.743);
   --color-green-200: oklch(92.5% 0.084 155.995);
 }
-:root[data-theme="dark"] .text-blue-600:not(.react-flow *) {
+:root[data-theme="dark"] .text-blue-600:not(.react-flow *):not(.paper):not(.paper *) {
   color: oklch(70.7% 0.165 254.624);
 }
-:root[data-theme="dark"] .text-blue-700:not(.react-flow *) {
+:root[data-theme="dark"] .text-blue-700:not(.react-flow *):not(.paper):not(.paper *) {
   color: oklch(80.9% 0.105 251.813);
 }
-:root[data-theme="dark"] .text-red-600:not(.react-flow *) {
+:root[data-theme="dark"] .text-red-600:not(.react-flow *):not(.paper):not(.paper *) {
   color: oklch(70.4% 0.191 22.216);
 }
-:root[data-theme="dark"] .text-red-700:not(.react-flow *) {
+:root[data-theme="dark"] .text-red-700:not(.react-flow *):not(.paper):not(.paper *) {
   color: oklch(80.8% 0.114 19.571);
 }
-:root[data-theme="dark"] .text-amber-600:not(.react-flow *) {
+:root[data-theme="dark"] .text-amber-600:not(.react-flow *):not(.paper):not(.paper *) {
   color: oklch(82.8% 0.189 84.429);
 }
-:root[data-theme="dark"] .text-amber-700:not(.react-flow *) {
+:root[data-theme="dark"] .text-amber-700:not(.react-flow *):not(.paper):not(.paper *) {
   color: oklch(87.9% 0.169 91.605);
 }
-:root[data-theme="dark"] .text-amber-800:not(.react-flow *) {
+:root[data-theme="dark"] .text-amber-800:not(.react-flow *):not(.paper):not(.paper *) {
   color: oklch(92.4% 0.12 95.746);
 }
-:root[data-theme="dark"] .text-amber-900:not(.react-flow *) {
+:root[data-theme="dark"] .text-amber-900:not(.react-flow *):not(.paper):not(.paper *) {
   color: oklch(92.4% 0.12 95.746);
 }
-:root[data-theme="dark"] .text-green-700:not(.react-flow *) {
+:root[data-theme="dark"] .text-green-700:not(.react-flow *):not(.paper):not(.paper *) {
   color: oklch(87.1% 0.15 154.449);
 }
-:root[data-theme="dark"] .text-green-800:not(.react-flow *) {
+:root[data-theme="dark"] .text-green-800:not(.react-flow *):not(.paper):not(.paper *) {
   color: oklch(87.1% 0.15 154.449);
 }
-:root[data-theme="dark"] .bg-white:not(.react-flow *),
-:root[data-theme="dark"] .focus\:bg-white:focus:not(.react-flow *) {
+:root[data-theme="dark"] .bg-white:not(.react-flow *):not(.paper):not(.paper *),
+:root[data-theme="dark"] .focus\:bg-white:focus:not(.react-flow *):not(.paper):not(.paper *) {
   background-color: oklch(20.8% 0.042 265.755);
 }
 :root[data-theme="dark"] body {
@@ -272,7 +274,7 @@ body {
 }
 /* Fondos gris oscuro con texto blanco (opción elegida de un selector): al invertirse la escala
    de grises el fondo pasa a claro, así que el texto pasa a oscuro. */
-:root[data-theme="dark"] :is(.bg-slate-600, .bg-slate-700, .bg-slate-800, .bg-slate-900).text-white:not(.react-flow *) {
+:root[data-theme="dark"] :is(.bg-slate-600, .bg-slate-700, .bg-slate-800, .bg-slate-900).text-white:not(.react-flow *):not(.paper):not(.paper *) {
   color: oklch(20.8% 0.042 265.755); /* slate-900 original: la variable está invertida aquí */
 }
 
@@ -282,4 +284,8 @@ body {
   display: block;
   width: 100%;
   height: auto;
+}
+/* El papel es blanco puro (la hoja del lienzo conserva su gris muy claro). */
+:root[data-theme="dark"] .paper {
+  background: #ffffff;
 }
