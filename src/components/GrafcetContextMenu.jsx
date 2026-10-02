@@ -1,3 +1,4 @@
+import InitialStepIcon from './InitialStepIcon'
 import { useReactFlow } from '@xyflow/react'
 import {
   CornerLeftUp,
@@ -13,7 +14,6 @@ import {
   Rows3,
   Split,
   Square,
-  SquareStack,
   Minus,
   Trash2,
 } from 'lucide-react'
@@ -41,7 +41,7 @@ export default function GrafcetContextMenu({ menu, onClose, onEdit, onAddNodeAt 
     const at = menu.flowPosition
     title = 'Lienzo'
     items = [
-      { label: 'Etapa inicial aquí', icon: SquareStack, onSelect: () => onAddNodeAt('step', { initial: true }, at) },
+      { label: 'Etapa inicial aquí', icon: InitialStepIcon, onSelect: () => onAddNodeAt('step', { initial: true }, at) },
       { label: 'Etapa aquí', icon: Square, onSelect: () => onAddNodeAt('step', {}, at) },
       { label: 'Transición aquí', icon: Minus, onSelect: () => onAddNodeAt('transition', {}, at) },
       ...(plcTable && !getNode(VARIABLES_TABLE_ID)
@@ -104,7 +104,7 @@ export default function GrafcetContextMenu({ menu, onClose, onEdit, onAddNodeAt 
         { label: 'Añadir acción', icon: RectangleHorizontal, onSelect: () => addAction(node.id) },
         {
           label: node.data.initial ? 'Quitar etapa inicial' : 'Marcar como inicial',
-          icon: SquareStack,
+          icon: InitialStepIcon,
           onSelect: () => toggleInitial(node.id),
         },
         {

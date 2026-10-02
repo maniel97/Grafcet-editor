@@ -1,7 +1,7 @@
+import InitialStepIcon from './InitialStepIcon'
 import ExportMenu from './ExportMenu'
 import {
   Square,
-  SquareStack,
   Minus,
   RectangleHorizontal,
   Trash2,
@@ -91,7 +91,7 @@ export default function Toolbar({
 
       <Separator />
 
-      <ToolButton icon={SquareStack} label="Etapa inicial" disabled={locked} onClick={() => onAdd('step', { initial: true })} />
+      <ToolButton icon={InitialStepIcon} label="Etapa inicial" disabled={locked} onClick={() => onAdd('step', { initial: true })} />
       <ToolButton icon={Square} label="Etapa" disabled={locked} onClick={() => onAdd('step')} />
       <ToolButton icon={Minus} label="Transición" disabled={locked} onClick={() => onAdd('transition')} />
       <ToolButton
