@@ -37,6 +37,11 @@ archivos. Se compila con rutas relativas: funciona en la raíz de un dominio o e
 3. Cada envío a `main` pasa las pruebas unitarias, compila y publica en
    `https://<usuario>.github.io/<repositorio>/`.
 
+**Instalable y sin conexión (PWA)**: una vez publicada, el navegador ofrece «Instalar» y la
+aplicación funciona sin internet (`public/sw.js` guarda todos sus archivos al instalarse). Cuando
+se publica una versión nueva, avisa con «Hay una versión nueva del editor · Recargar» sin recargar
+por su cuenta. En `npm run dev` no se activa (a propósito); se prueba con `npm run test:pwa`.
+
 **Alternativas**: Netlify o Cloudflare Pages (arrastrar la carpeta `dist/` tras `npm run build`).
 
 ## Funciones (hito `hito-editor-v1`)

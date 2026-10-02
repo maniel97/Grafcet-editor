@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Versión «maskable»: fondo a sangre y dibujo dentro de la zona segura (80 % central). -->
+  <rect width="512" height="512" fill="#2563eb"/>
+  <g fill="none" stroke="#ffffff" stroke-linecap="square" transform="translate(256 256) scale(0.72) translate(-256 -256)">
+    <rect x="156" y="72" width="200" height="200" stroke-width="22"/>
+    <rect x="192" y="108" width="128" height="128" stroke-width="14"/>
+    <line x1="256" y1="272" x2="256" y2="440" stroke-width="22"/>
+    <line x1="168" y1="368" x2="344" y2="368" stroke-width="30"/>
+  </g>
+</svg>
