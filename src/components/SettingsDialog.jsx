@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { RotateCcw, X } from 'lucide-react'
-import { DIAGRAM_FONT, FONTS, UI_SCALES } from '../lib/settings'
+import { DIAGRAM_FONT, FONTS, UI_SCALES, THEMES } from '../lib/settings'
 
 const sectionTitle = 'text-xs font-medium uppercase tracking-wide text-slate-500'
 
@@ -60,6 +60,28 @@ export default function SettingsDialog({ settings, onChange, onReset, onClose })
               )
             })}
           </div>
+        </fieldset>
+
+        <fieldset className="space-y-2">
+          <legend className={sectionTitle}>Tema</legend>
+          <div className="flex flex-wrap gap-1">
+            {THEMES.map((theme) => (
+              <button
+                key={theme.id}
+                type="button"
+                aria-pressed={settings.theme === theme.id}
+                onClick={() => onChange({ theme: theme.id })}
+                className={`rounded-md border px-3 py-1 text-sm ${
+                  settings.theme === theme.id
+                    ? 'border-blue-500 bg-blue-600 text-white'
+                    : 'border-slate-300 text-slate-700 hover:bg-slate-100'
+                }`}
+              >
+                {theme.label}
+              </button>
+            ))}
+          </div>
+          <p className="text-xs text-slate-500">Automático sigue al sistema. La hoja del diagrama sigue blanca, como se exporta.</p>
         </fieldset>
 
         <fieldset className="space-y-2">

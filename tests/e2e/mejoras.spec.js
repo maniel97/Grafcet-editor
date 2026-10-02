@@ -287,3 +287,28 @@ test('teclado: Intro sigue pulsando los botones de la barra', async ({ page }) =
   await expect(page.locator('dialog[open]')).toBeVisible()
   expectNoErrors(errors)
 })
+
+test('modo oscuro: interfaz oscura, hoja blanca y se recuerda', async ({ page }) => {
+  const errors = await openEditor(page)
+  const bg = (sel) => page.locator(sel).first().evaluate((el) => getComputedStyle(el).backgroundColor)
+  await page.getByTitle('Opciones: tema, letra y tamaño').click()
+  await page.getByRole('button', { name: 'Oscuro', exact: true }).click()
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
+  await page.keyboard.press('Escape')
+
+  const luminance = (rgb) => {
+    const m = rgb.match(/[\d.]+/g).map(Number)
+    return rgb.startsWith('oklch') ? m[0] / 100 : (m[0] + m[1] + m[2]) / 765
+  }
+  expect(luminance(await bg('header'))).toBeLessThan(0.3)
+  expect(luminance(await bg('.react-flow'))).toBeGreaterThan(0.9)
+  // Tinta oscura en la hoja (el número de la etapa).
+  expect(luminance(await page.locator('.react-flow__node-step').first().evaluate((el) => getComputedStyle(el).color))).toBeLessThan(0.3)
+
+  await page.reload()
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
+  await page.getByTitle('Opciones: tema, letra y tamaño').click()
+  await page.getByRole('button', { name: 'Claro', exact: true }).click()
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'light')
+  expectNoErrors(errors)
+})

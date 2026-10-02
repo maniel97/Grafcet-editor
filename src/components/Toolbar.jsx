@@ -179,7 +179,7 @@ export default function Toolbar({
 
       <div className="ml-auto" />
       <ToolButton icon={Trash2} label="Limpiar" title="Vaciar el lienzo (se puede deshacer)" onClick={onClear} disabled={locked} />
-      <ToolButton icon={Settings} label="Opciones" title="Opciones de letra y tamaño" onClick={onOpenSettings} />
+      <ToolButton icon={Settings} label="Opciones" title="Opciones: tema, letra y tamaño" onClick={onOpenSettings} />
       <ToolButton icon={CircleHelp} label="Ayuda" title="Atajos y notación (?)" onClick={onHelp} />
     </header>
   )
