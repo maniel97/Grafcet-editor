@@ -4,6 +4,7 @@ import { typeInfo } from './addressing'
 import { resolveStepPrefix, stepVar } from './stepNames'
 import { frameOf, macroName, membersOf } from './frames'
 import { parseForcing } from './forcing'
+import { analogConfig, isAnalog } from './analog'
 
 // Modelo intermedio grafcet + tabla de variables, independiente del dibujo. Es la entrada
 // prevista para el simulador y para la traducción a ladder:
@@ -113,6 +114,8 @@ export function buildPlcModel(nodes, edges, plc) {
       preset: entry.preset ?? found.preset ?? '',
       comment: entry.comment ?? '',
       uses: [...found.uses],
+      // Analógicas: señal y rango físico (lib/analog.js).
+      ...(isAnalog(type) ? { analog: analogConfig(entry) } : {}),
     }
   })
 

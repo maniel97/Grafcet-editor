@@ -121,6 +121,8 @@ export default function SimulationPanel({ simulation, scenarios = [], onScenario
   const { state } = sim
   const values = state.values
   const outputs = compiled.variables.filter((v) => v.type === 'output')
+  const analogInputs = compiled.variables.filter((v) => v.type === 'analogIn')
+  const analogOutputs = compiled.variables.filter((v) => v.type === 'analogOut')
   const memories = compiled.variables.filter((v) => v.type === 'memory' || v.type === 'counter')
   const timers = compiled.variables.filter((v) => v.type === 'timer')
   const shownActive = withMacros(compiled, state.active)
@@ -245,6 +247,35 @@ export default function SimulationPanel({ simulation, scenarios = [], onScenario
           )}
         </Section>
 
+        {analogInputs.length > 0 && (
+          <Section title="Entradas analógicas" count={analogInputs.length}>
+            {analogInputs.map((v) => {
+              const { min, max, unit } = v.analog
+              const value = Number(sim.inputs[v.name] ?? min)
+              return (
+                <label key={v.name} className="block py-1">
+                  <span className="flex justify-between font-mono text-sm">
+                    <span className="truncate">{v.name}</span>
+                    <span className="tabular-nums text-slate-600">
+                      {Number(value.toFixed(2))} {unit}
+                    </span>
+                  </span>
+                  <input
+                    type="range"
+                    min={min}
+                    max={max}
+                    step={(max - min) / 200 || 1}
+                    value={value}
+                    aria-label={`Valor de ${v.name}`}
+                    onChange={(e) => setInput(v.name, Number(e.target.value))}
+                    className="w-full accent-blue-600"
+                  />
+                </label>
+              )
+            })}
+          </Section>
+        )}
+
         <Section title="Salidas" count={outputs.length}>
           {outputs.length === 0 && <p className="text-xs text-slate-400">Sin salidas.</p>}
           {outputs.map((v) => (
@@ -255,6 +286,19 @@ export default function SimulationPanel({ simulation, scenarios = [], onScenario
             </div>
           ))}
         </Section>
+
+        {analogOutputs.length > 0 && (
+          <Section title="Salidas analógicas" count={analogOutputs.length}>
+            {analogOutputs.map((v) => (
+              <div key={v.name} className="flex items-center gap-2 py-0.5 font-mono text-sm">
+                <span className="flex-1 truncate">{v.name}</span>
+                <span className="rounded bg-slate-100 px-1.5 tabular-nums">
+                  {Number(Number(values[v.name] ?? 0).toFixed(2))} {v.analog?.unit}
+                </span>
+              </div>
+            ))}
+          </Section>
+        )}
 
         {memories.length > 0 && (
           <Section title="Marcas y contadores" count={memories.length}>

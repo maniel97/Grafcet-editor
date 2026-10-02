@@ -60,7 +60,7 @@ function makeAddresses(ladder, plc) {
   const { resolver } = ladder
   const used = new Set()
   const assigned = []
-  const cursors = { V: 0, I: 0, Q: 0, M: 0, VW: S7200.wordStart, T: S7200.timerStart }
+  const cursors = { V: 0, I: 0, Q: 0, M: 0, VW: S7200.wordStart, T: S7200.timerStart, AIW: 0, AQW: 0 }
   for (const e of [...Object.values(plc.steps), ...Object.values(plc.variables)]) {
     if (e?.address?.trim()) used.add(e.address.trim().toUpperCase())
   }
@@ -69,8 +69,8 @@ function makeAddresses(ladder, plc) {
     for (;;) {
       const i = cursors[kind]
       const address =
-        kind === 'VW' ? `VW${i}` : kind === 'T' ? `T${i}` : `${kind}${Math.floor(i / 8)}.${i % 8}`
-      cursors[kind] += kind === 'VW' ? 2 : 1
+        kind.endsWith('W') ? `${kind}${i}` : kind === 'T' ? `T${i}` : `${kind}${Math.floor(i / 8)}.${i % 8}`
+      cursors[kind] += kind.endsWith('W') ? 2 : 1
       if (!used.has(address)) {
         used.add(address)
         return address
@@ -96,7 +96,9 @@ function makeAddresses(ladder, plc) {
       else if (op.kind === 'trans' || op.kind === 'aux') address = next('V')
       else {
         const type = plc.variables[op.name]?.type ?? (numeric.has(op.name) ? 'memory' : 'input')
-        address = numeric.has(op.name) ? next('VW') : next({ input: 'I', output: 'Q', memory: 'M', counter: 'VW' }[type] ?? 'M')
+        if (type === 'analogIn') address = next('AIW')
+        else if (type === 'analogOut') address = next('AQW')
+        else address = numeric.has(op.name) ? next('VW') : next({ input: 'I', output: 'Q', memory: 'M', counter: 'VW' }[type] ?? 'M')
       }
       cache.set(key, address)
       assigned.push(`${resolver.name(op)} = ${address}`)

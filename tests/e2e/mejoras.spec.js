@@ -573,3 +573,37 @@ test('tabla del lienzo: títulos de columna alineados con las celdas, también c
   await expect(table.locator('section').first()).toContainText(/Comentario/i)
   expectNoErrors(errors)
 })
+
+test('analógicas: tipo detectado, rango en la tabla, deslizador en la simulación y CPU con analógicas', async ({ page }) => {
+  const errors = await openEditor(page)
+  await page.locator('.react-flow__node-transition').nth(1).dblclick()
+  await page.getByPlaceholder('p. ej. a · b, ↑c, 5s/X2').fill('Temperatura >= 60')
+  await page.keyboard.press('Escape')
+
+  await page.getByTitle(/Tabla de variables: direcciones/).click()
+  const dialog = page.getByRole('dialog', { name: 'Tabla de variables' })
+  await dialog.getByRole('tab', { name: /Variables/ }).click()
+  const row = dialog.getByRole('row', { name: /^Temperatura/ })
+  await expect(row.getByRole('combobox').first()).toHaveValue('analogIn')
+  await row.getByLabel('Señal de Temperatura').selectOption('0-10V')
+  await row.getByLabel('Máximo de Temperatura').fill('120')
+  await row.getByLabel('Unidad de Temperatura').fill('°C')
+  // S7-200: la sugerencia cuenta la entrada analógica.
+  await dialog.getByLabel('Formato de direcciones').selectOption('s7200')
+  await expect(dialog.getByLabel('Configuración S7-200')).toContainText('1 entradas y 0 salidas analógicas')
+  await expect(dialog.getByLabel('Configuración S7-200')).toContainText('CPU 224XP')
+  await dialog.getByTitle('Cerrar (Esc)').click()
+
+  await page.getByRole('button', { name: /Simular/ }).click()
+  await page.getByRole('switch').first().click() // Marcha: a la etapa 1
+  const slider = page.getByLabel('Valor de Temperatura')
+  await expect(slider).toHaveAttribute('max', '120')
+  await slider.evaluate((el) => {
+    const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set
+    set.call(el, '75')
+    el.dispatchEvent(new Event('input', { bubbles: true }))
+  })
+  await expect(page.locator('aside.side-panel')).toContainText('75 °C')
+  await expect(page.locator('aside.side-panel').getByRole('button', { name: 'X0', exact: true })).toBeVisible() // 1 -> 0 con 75 >= 60
+  expectNoErrors(errors)
+})

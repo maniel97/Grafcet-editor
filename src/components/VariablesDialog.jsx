@@ -3,6 +3,7 @@ import { Download, Pencil, Plus, Trash2, WandSparkles, X } from 'lucide-react'
 import { SCHEMES, VARIABLE_TYPES, duplicatedAddresses, typeInfo } from '../lib/addressing'
 import { STEP_PREFIXES, resolveStepPrefix, setPreferredStepPrefix, stepVar } from '../lib/stepNames'
 import S7200Config from './S7200Config'
+import { DEFAULT_ANALOG, SIGNALS, analogConfig, isAnalog } from '../lib/analog'
 
 const cellInput =
   'w-full rounded border border-transparent bg-transparent px-1.5 py-1 text-sm hover:border-slate-300 focus:border-blue-500 focus:bg-white focus:outline-none'
@@ -276,7 +277,7 @@ export default function VariablesDialog({
                     <th className={th}>Símbolo</th>
                     <th className={`${th} w-36`}>Tipo</th>
                     <th className={`${th} w-32`}>Dirección</th>
-                    <th className={`${th} w-24`}>Presel.</th>
+                    <th className={th} title="Preselección (temporizadores y contadores) o señal y rango (analógicas)">Presel. / rango</th>
                     <th className={th}>Comentario</th>
                     <th className={`${th} w-12 text-right`}>Usos</th>
                   </tr>
@@ -311,7 +312,43 @@ export default function VariablesDialog({
                           )}
                         </td>
                         <td>
-                          {type === 'timer' || type === 'counter' ? (
+                          {isAnalog(type) ? (
+                            // Analógicas: señal, rango físico y unidad (lib/analog.js).
+                            <span className="flex items-center gap-1" title="Señal y rango físico: para la simulación y para pasar los umbrales a valor bruto">
+                              <select
+                                aria-label={`Señal de ${name}`}
+                                className={`${cellInput} w-auto`}
+                                value={analogConfig(entry).signal}
+                                onChange={(e) => setVariable(name, { signal: e.target.value }, 'signal')}
+                              >
+                                {SIGNALS.map((sig) => (
+                                  <option key={sig.id} value={sig.id}>
+                                    {sig.label}
+                                  </option>
+                                ))}
+                              </select>
+                              <input
+                                aria-label={`Mínimo de ${name}`}
+                                className={`${cellInput} w-14 font-mono`}
+                                value={entry.min ?? DEFAULT_ANALOG.min}
+                                onChange={(e) => setVariable(name, { min: e.target.value }, 'min')}
+                              />
+                              –
+                              <input
+                                aria-label={`Máximo de ${name}`}
+                                className={`${cellInput} w-14 font-mono`}
+                                value={entry.max ?? DEFAULT_ANALOG.max}
+                                onChange={(e) => setVariable(name, { max: e.target.value }, 'max')}
+                              />
+                              <input
+                                aria-label={`Unidad de ${name}`}
+                                placeholder="ud."
+                                className={`${cellInput} w-12`}
+                                value={entry.unit ?? ''}
+                                onChange={(e) => setVariable(name, { unit: e.target.value }, 'unit')}
+                              />
+                            </span>
+                          ) : type === 'timer' || type === 'counter' ? (
                             <input
                               className={`${cellInput} font-mono`}
                               value={entry.preset ?? found.preset ?? ''}

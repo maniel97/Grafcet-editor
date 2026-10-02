@@ -87,6 +87,8 @@ export function extractSymbols(nodes) {
       if (action.kind === 'conditional' || action.kind === 'event') addExpression(action.condition, n.id)
     }
   }
+  // Una entrada que se compara con números (Temperatura > 60) es, casi seguro, analógica.
+  for (const entry of found.values()) if (entry.type === 'input' && entry.numeric) entry.type = 'analogIn'
   return found
 }
 

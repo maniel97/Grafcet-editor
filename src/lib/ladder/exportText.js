@@ -71,7 +71,8 @@ const timeLiteral = (seconds) => `T#${Math.round(seconds * 1000)}MS`
 
 const TIA_TYPES = { BOOL: 'Bool', INT: 'Int', TON: 'TON_TIME', R_TRIG: 'R_TRIG', F_TRIG: 'F_TRIG' }
 const GROUPS = ['Etapas', 'Transiciones', 'Auxiliares', 'Entradas', 'Salidas', 'Marcas', 'Contadores', 'Temporizadores', 'Flancos']
-const groupOfVar = (plc, name) => ({ input: 'Entradas', output: 'Salidas', counter: 'Contadores' })[plc.variables[name]?.type] ?? 'Marcas'
+const groupOfVar = (plc, name) =>
+  ({ input: 'Entradas', analogIn: 'Entradas', output: 'Salidas', analogOut: 'Salidas', counter: 'Contadores' })[plc.variables[name]?.type] ?? 'Marcas'
 
 // dialect: 'iec' (PROGRAM, por defecto) | 'tia' (FUNCTION_BLOCK para TIA Portal)
 export function toStructuredText(ladder, plc, { dialect = 'iec' } = {}) {

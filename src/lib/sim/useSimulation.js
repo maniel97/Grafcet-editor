@@ -77,7 +77,10 @@ export function useSimulation(nodes, edges, plc, enabled) {
     if (!compiled) return
     const state = initialState(compiled)
     const inputs = {}
-    for (const v of compiled.variables) if (v.type === 'input') inputs[v.name] = 0
+    for (const v of compiled.variables) {
+      if (v.type === 'input') inputs[v.name] = 0
+      if (v.type === 'analogIn') inputs[v.name] = v.analog?.min ?? 0
+    }
     const first = { state, inputs, log: [], samples: [], recording: null, playback: null }
     simRef.current = first
     // Evolución inicial (p. ej. receptividades "1" desde la situación inicial).
@@ -114,7 +117,8 @@ export function useSimulation(nodes, edges, plc, enabled) {
     (name, value) => {
       const current = simRef.current
       if (!current) return
-      const v = value ? 1 : 0
+      // Analógicas: el valor (en unidades físicas); digitales: 0 / 1.
+      const v = typeof value === 'number' ? value : value ? 1 : 0
       const recording = current.recording && recordEvent(current.recording, current.state.time, name, v)
       // Tocar una entrada durante una reproducción la interrumpe: a partir de ahí manda el usuario.
       const next = { ...current, inputs: { ...current.inputs, [name]: v }, recording, playback: null }

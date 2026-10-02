@@ -18,6 +18,8 @@ export const VARIABLE_TYPES = [
   { id: 'memory', label: 'Marca', plural: 'Marcas', area: 'M' },
   { id: 'timer', label: 'Temporizador', plural: 'Temporizadores', area: 'T' },
   { id: 'counter', label: 'Contador', plural: 'Contadores', area: 'C' },
+  { id: 'analogIn', label: 'Entrada analógica', plural: 'Entradas analógicas', area: 'AI' },
+  { id: 'analogOut', label: 'Salida analógica', plural: 'Salidas analógicas', area: 'AQ' },
 ]
 export const typeInfo = (id) => VARIABLE_TYPES.find((t) => t.id === id) ?? VARIABLE_TYPES[0]
 
@@ -54,7 +56,7 @@ export function parseAddress(address) {
   const a = String(address ?? '').trim().toUpperCase()
   let m = /^%?(SM|[IQMV])X?(\d+)\.([0-7])$/.exec(a)
   if (m) return { area: m[1], index: Number(m[2]) * 8 + Number(m[3]) }
-  m = /^%?([IQMV])W(\d+)$/.exec(a)
+  m = /^%?(AI|AQ|[IQMV])W(\d+)$/.exec(a)
   if (m) return { area: m[1], word: Number(m[2]) }
   m = /^%?([TC])(\d+)$/.exec(a)
   if (m) return { area: m[1], number: Number(m[2]) }
@@ -67,7 +69,7 @@ function makeAllocator(scheme, used, available = null) {
   const s7200 = scheme === 's7200'
   const cursors = {
     bit: { I: 0, Q: 0, M: s7200 ? 0 : MEMORY_START_BYTE * 8, V: 0 },
-    word: { ...WORD_START_BYTE, V: S7200.wordStart },
+    word: { ...WORD_START_BYTE, V: S7200.wordStart, AI: 0, AQ: 0 },
     num: { T: s7200 ? S7200.timerStart : 1, C: s7200 ? 0 : 1 },
   }
   return {
@@ -75,6 +77,18 @@ function makeAllocator(scheme, used, available = null) {
     next(area, numeric) {
       // S7-200: las palabras de marcas van en VW (la zona M es muy pequeña).
       if (s7200 && numeric && area === 'M') area = S7200.wordArea
+      // Analógicas: siempre palabras; AIW/AQW en S7-200 e IW/QW en los demás.
+      if (area === 'AI' || area === 'AQ') {
+        numeric = true
+        if (!s7200) area = area === 'AI' ? 'I' : 'Q'
+        else if (available?.[area]) {
+          const free = available[area].find((a) => !used.has(a.toUpperCase()))
+          if (free) {
+            used.add(free.toUpperCase())
+            return free
+          }
+        }
+      }
       // Con la configuración de E/S elegida, solo direcciones que existen en ella.
       const list = !numeric && available?.[area]
       if (list) {
@@ -118,7 +132,7 @@ export function autoAssign(plc, stepNodes, symbols, { overwrite = false } = {}) 
   for (const [name] of symbols) if (keep(variables[name])) remember(variables[name].address)
 
   const io = scheme === 's7200' && plc.s7200?.cpu ? ioMap(plc.s7200) : null
-  const allocator = makeAllocator(scheme, used, io && { I: io.inputs, Q: io.outputs })
+  const allocator = makeAllocator(scheme, used, io && { I: io.inputs, Q: io.outputs, AI: io.analogIn, AQ: io.analogOut })
 
   // Etapas: marcas consecutivas desde M0.0 (en S7-200, V0.0) en orden de número de etapa.
   const stepArea = scheme === 's7200' ? S7200.stepArea : 'M'
@@ -220,7 +234,7 @@ export function validatePlc(plc, stepNodes, symbols) {
   const s7200 = plc.scheme === 's7200'
   // S7-200 con CPU y módulos elegidos: direcciones de E/S que existen.
   const io = s7200 && plc.s7200?.cpu ? ioMap(plc.s7200) : null
-  const exists = io && { I: new Set(io.inputs), Q: new Set(io.outputs) }
+  const exists = io && { I: new Set(io.inputs), Q: new Set(io.outputs), AI: new Set(io.analogIn), AQ: new Set(io.analogOut) }
   const configName = io && io.parts.map((p) => p.label).join(' + ')
   const own = (address, label, nodeIds) => {
     const key = String(address).trim().toUpperCase()
@@ -244,10 +258,16 @@ export function validatePlc(plc, stepNodes, symbols) {
     const nodeIds = [...found.uses]
     const parsed = parseAddress(address)
     const expected = typeInfo(entry.type ?? found.type).area
-    // En S7-200 las marcas numéricas van en memoria V (VW).
-    const okArea = parsed && (parsed.area === expected || (s7200 && expected === 'M' && parsed.area === 'V'))
+    // En S7-200 las marcas numéricas van en memoria V (VW); las analógicas, en AIW/AQW (IW/QW en
+    // los demás autómatas).
+    const okArea =
+      parsed &&
+      (parsed.area === expected ||
+        (s7200 && expected === 'M' && parsed.area === 'V') ||
+        (!s7200 && expected === 'AI' && parsed.area === 'I' && parsed.word !== undefined) ||
+        (!s7200 && expected === 'AQ' && parsed.area === 'Q' && parsed.word !== undefined))
     if (!parsed) issues.push({ severity: 'warning', message: `«${name}»: dirección «${address}» con formato no reconocido.`, nodeIds })
-    else if (exists?.[parsed.area] && parsed.index !== undefined && !exists[parsed.area].has(address.toUpperCase()))
+    else if (exists?.[parsed.area] && (parsed.index !== undefined || ['AI', 'AQ'].includes(parsed.area)) && !exists[parsed.area].has(address.toUpperCase()))
       issues.push({ severity: 'warning', message: `«${name}»: ${address} no existe en la configuración ${configName}.`, nodeIds })
     else if (!okArea)
       issues.push({ severity: 'warning', message: `«${name}» es de tipo ${typeInfo(entry.type ?? found.type).label.toLowerCase()} pero tiene la dirección ${address}.`, nodeIds })
@@ -269,10 +289,13 @@ export function validatePlc(plc, stepNodes, symbols) {
 
   // Más entradas o salidas de las que tiene la configuración elegida.
   if (io) {
-    const count = (type) => [...symbols].filter(([name, found]) => (plc.variables[name]?.type ?? found.type) === type && !found.numeric).length
+    const count = (type) =>
+      [...symbols].filter(([name, found]) => (plc.variables[name]?.type ?? found.type) === type && (!found.numeric || type.startsWith('analog'))).length
     for (const [type, label, list] of [
       ['input', 'entradas digitales', io.inputs],
       ['output', 'salidas digitales', io.outputs],
+      ['analogIn', 'entradas analógicas', io.analogIn],
+      ['analogOut', 'salidas analógicas', io.analogOut],
     ]) {
       const used = count(type)
       if (used > list.length) issues.push({ severity: 'warning', message: `El proyecto usa ${used} ${label} y la configuración ${configName} tiene ${list.length}.`, nodeIds: [] })

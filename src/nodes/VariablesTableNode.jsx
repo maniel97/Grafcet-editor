@@ -3,6 +3,7 @@ import { EyeOff, GripVertical, Maximize2, MessageSquare, Trash2, WandSparkles } 
 import { useEditor } from '../lib/editorContext'
 import { VARIABLE_TYPES, duplicatedAddresses } from '../lib/addressing'
 import { resolveStepPrefix, stepVar } from '../lib/stepNames'
+import { describeRange, isAnalog } from '../lib/analog'
 
 const DRAG_MIME = 'application/x-grafcet-variable'
 
@@ -120,7 +121,7 @@ export default function VariablesTableNode({ id, data, selected }) {
         return {
           key: name,
           name,
-          extra: entry.preset ?? found.preset,
+          extra: isAnalog(typeId) ? describeRange(entry) : (entry.preset ?? found.preset),
           address: entry.address,
           comment: entry.comment,
           uses: [...found.uses],

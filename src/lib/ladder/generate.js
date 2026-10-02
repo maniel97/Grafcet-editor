@@ -21,6 +21,7 @@ import { compile } from '../sim/engine'
 import { parseAddress, formatBit } from '../addressing'
 import { contact, parallel, series, toNetwork, walk } from './network'
 import { resolveStepPrefix, stepVar } from '../stepNames'
+import { describeRange, isAnalog, toRaw } from '../analog'
 
 const FIRST_CYCLE = 'PrimerCiclo'
 const AUX_START_BYTE = 20
@@ -232,11 +233,47 @@ export function generateLadder(nodes, edges, plc) {
   // inicialización, antes de que se usen.
   if (auxRungs.length) sections.splice(1, 0, { id: 'aux', title: 'Auxiliares', rungs: auxRungs })
 
+  scaleAnalog(sections, plc, new Map(compiled.variables.map((v) => [v.name, v.type])), warnings)
+
   const visible = sections.filter((s) => s.rungs.length)
   let n = 0
   for (const s of visible) for (const r of s.rungs) r.number = ++n
 
   return { sections: visible, resolver: makeResolver(plc, compiled, visible, P), warnings, stepPrefix: P }
+}
+
+// Analógicas (lib/analog.js): las comparaciones con constantes y las asignaciones constantes a
+// salidas analógicas se pasan a valor bruto, así el autómata compara y escribe enteros sin
+// cálculos («Temperatura > 60» -> «AIW0 > 22016»). Lo que necesitaría escalar en el PLC (comparar
+// analógicas de distinta escala, calcular con ellas) se avisa.
+function scaleAnalog(sections, plc, typeOf, warnings) {
+  const analog = (op) => op?.kind === 'var' && isAnalog(typeOf.get(op.name) ?? plc.variables[op.name]?.type)
+  const entry = (op) => plc.variables[op.name] ?? {}
+  const visit = (node) => {
+    if (node.type === 'compare') {
+      for (const [v, c, side] of [
+        [node.a, node.b, 'b'],
+        [node.b, node.a, 'a'],
+      ]) {
+        if (analog(v) && c.kind === 'num') node[side] = { kind: 'num', value: toRaw(c.value, entry(v), plc.scheme), physical: c.value }
+      }
+      if (analog(node.a) && analog(node.b) && describeRange(entry(node.a)) !== describeRange(entry(node.b))) {
+        warnings.push({ nodeId: null, message: `${node.a.name} y ${node.b.name} tienen distinta escala: compararlas necesitaría escalar en el autómata.` })
+      }
+    }
+    node.items?.forEach(visit)
+    if (node.item) visit(node.item)
+  }
+  for (const s of sections) {
+    for (const r of s.rungs) {
+      visit(r.network)
+      for (const o of r.outputs) {
+        if (o.type !== 'assign' || !analog(o.operand)) continue
+        if (o.value.op === 'num') o.value = { op: 'num', value: toRaw(o.value.value, entry(o.operand), plc.scheme) }
+        else warnings.push({ nodeId: null, message: `${o.operand.name} := ${o.text}: calcular una salida analógica necesitaría escalar en el autómata (solo se admiten valores constantes).` })
+      }
+    }
+  }
 }
 
 // Nombres y direcciones de los operandos. Las marcas internas (Tr, Aux, flancos) reciben

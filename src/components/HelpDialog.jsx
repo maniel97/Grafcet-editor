@@ -29,6 +29,10 @@ const NOTATION = [
     'Botón Ladder: una marca por etapa con SET/RESET (inicialización, condiciones de franqueo, desactivación, activación, temporizaciones, acciones memorizadas y salidas). Exporta el esquema (SVG, PNG, PDF) y el programa en texto estructurado (ST) y AWL de S7.',
   ],
   [
+    'Analógicas',
+    'Una entrada comparada con números (Temperatura > 60) es analógica. En Variables se elige su señal (4–20 mA o 0–10 V) y su rango físico; la simulación usa un deslizador en esas unidades y el programa del autómata compara con el valor bruto ya calculado (p. ej. AIW0 > 21760).',
+  ],
+  [
     'Grafcets parciales y forzado',
     'Selecciona etapas y, con el botón derecho, «Encerrar en un grafcet parcial» (marco G1, G2...). Una acción F/G2{3} fuerza G2 a tener solo la etapa 3 activa mientras dure la etapa; F/G2{} lo vacía, F/G2{*} lo congela y F/G2{INIT} lo reinicia. El grafcet forzado no evoluciona.',
   ],
