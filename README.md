@@ -11,6 +11,18 @@ npm run dev      # servidor de desarrollo
 npm run build    # versión de producción en dist/
 ```
 
+## Pruebas
+
+```bash
+npm test           # lógica (Vitest): norma, trazado, variables, simulación, ladder… (< 1 s)
+npm run test:e2e   # navegador (Playwright): simulador, ladder, barra, encuadre, bloqueo
+npm run test:all   # ambas: pasarlas antes de unir una rama a main
+npm run test:perf  # rendimiento al arrastrar (PERF_STEPS=120 por defecto; versión de producción)
+```
+
+Las pruebas de navegador usan un Chromium ya instalado (Brave, Chrome o Edge; o
+`PW_BROWSER_PATH`) y arrancan su propio servidor.
+
 ## Funciones (hito `hito-editor-v1`)
 
 - **Elementos IEC 60848**: etapas (inicial, macroetapa), transiciones con receptividad (negación
