@@ -29,6 +29,10 @@ const NOTATION = [
     'Botón Ladder: una marca por etapa con SET/RESET (inicialización, condiciones de franqueo, desactivación, activación, temporizaciones, acciones memorizadas y salidas). Exporta el esquema (SVG, PNG, PDF) y el programa en texto estructurado (ST) y AWL de S7.',
   ],
   [
+    'Escenarios de prueba',
+    'En la simulación, «Grabar escenario» anota los cambios de entradas con su instante; se guardan en el proyecto y se reproducen con un clic (a la velocidad elegida). El cronograma completo se exporta en SVG o CSV.',
+  ],
+  [
     'Variables de etapa',
     'X2 vale 1 con la etapa 2 activa (IEC 60848). En Variables puedes elegir que la tabla, el ladder, el ST, el AWL y la simulación usen E2; en las receptividades se sigue escribiendo X2 y 5s/X2.',
   ],

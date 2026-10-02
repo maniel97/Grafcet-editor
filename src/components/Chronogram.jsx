@@ -2,10 +2,10 @@
 // `window` segundos de simulación. `samples` son cambios: [{ t, values }], escalonados.
 const ROW = 18
 const LABEL_W = 68
-const WIDTH = 280
 const MIN_SPAN = 2 // s: al empezar, la gráfica se estira a lo transcurrido en vez de a toda la ventana
 
-export default function Chronogram({ samples, signals, now, window = 20 }) {
+// standalone: SVG independiente para exportar (fuente y fondo propios, sin clases de Tailwind).
+export default function Chronogram({ samples, signals, now, window = 20, width: WIDTH = 280, standalone = false }) {
   if (!samples.length || !signals.length) return null
   const span = Math.min(window, Math.max(now, MIN_SPAN))
   const start = Math.max(0, now - span)
@@ -15,11 +15,17 @@ export default function Chronogram({ samples, signals, now, window = 20 }) {
 
   // Marcas de tiempo: cada segundo al principio, cada 5 s después.
   const ticks = []
-  const every = span <= 6 ? 1 : 5
+  const every = span <= 6 ? 1 : span <= 60 ? 5 : 30
   for (let t = Math.ceil(start / every) * every; t <= now; t += every) ticks.push(t)
 
   return (
-    <svg width="100%" viewBox={`0 0 ${WIDTH} ${height}`} className="font-mono text-[10px]" role="img" aria-label="Cronograma">
+    <svg
+      {...(standalone
+        ? { xmlns: 'http://www.w3.org/2000/svg', width: WIDTH, height, fontFamily: 'Consolas, monospace', fontSize: 10 }
+        : { width: '100%', className: 'font-mono text-[10px]', role: 'img', 'aria-label': 'Cronograma' })}
+      viewBox={`0 0 ${WIDTH} ${height}`}
+    >
+      {standalone && <rect width="100%" height="100%" fill="white" />}
       {ticks.map((t) => (
         <g key={t}>
           <line x1={x(t)} x2={x(t)} y1={0} y2={height - 12} stroke="#e2e8f0" />

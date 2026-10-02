@@ -1,6 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import { AlertTriangle, ChevronDown, ChevronRight, Pause, Play, RotateCcw, SkipForward, Square, Timer } from 'lucide-react'
 import Chronogram from './Chronogram'
+import ScenarioControls from './ScenarioControls'
+import { chronogramCsv } from '../lib/sim/scenario'
+import { downloadFile } from '../lib/projectFile'
+import { fileName } from '../lib/fileNames'
 
 const SPEEDS = [0.25, 0.5, 1, 2, 5, 10]
 
@@ -70,10 +74,19 @@ function InputRow({ variable, value, onChange, hotkey }) {
   )
 }
 
+// Cronograma completo (desde t = 0) como SVG independiente. react-dom/server se carga solo al exportar.
+async function exportChronogramSvg(samples, signals, now) {
+  const { renderToStaticMarkup } = await import('react-dom/server')
+  const span = Math.max(now, 1)
+  const width = Math.round(Math.min(4000, Math.max(600, 72 + span * 40)))
+  const svg = renderToStaticMarkup(<Chronogram samples={samples} signals={signals} now={span} window={span} width={width} standalone />)
+  downloadFile(svg, fileName('svg', 'cronograma'), 'image/svg+xml')
+}
+
 const fmtTime = (t) => (t < 60 ? `${t.toFixed(1)} s` : `${Math.floor(t / 60)} min ${(t % 60).toFixed(1)} s`)
 
 // Panel de control de la simulación.
-export default function SimulationPanel({ simulation, onFocusNode, onClose }) {
+export default function SimulationPanel({ simulation, scenarios = [], onScenariosChange, onFocusNode, onClose }) {
   const { compiled, sim, playing, setPlaying, speed, setSpeed, setInput, step, advance, reset } = simulation
 
   const inputs = useMemo(() => compiled?.variables.filter((v) => v.type === 'input') ?? [], [compiled])
@@ -281,8 +294,29 @@ export default function SimulationPanel({ simulation, onFocusNode, onClose }) {
           </div>
         </Section>
 
+        <Section title="Escenarios de prueba" count={scenarios.length}>
+          <ScenarioControls simulation={simulation} scenarios={scenarios} onChange={onScenariosChange} />
+        </Section>
+
         <Section title="Cronograma" defaultOpen>
           <Chronogram samples={sim.samples} signals={signals} now={state.time} />
+          <div className="mt-1 flex items-center gap-1 text-xs">
+            <span className="text-slate-400">Exportar todo:</span>
+            <button
+              type="button"
+              onClick={() => exportChronogramSvg(sim.samples, signals, state.time)}
+              className="rounded border border-slate-300 px-1.5 py-0.5 text-slate-600 hover:bg-slate-100"
+            >
+              SVG
+            </button>
+            <button
+              type="button"
+              onClick={() => downloadFile(`﻿${chronogramCsv(sim.samples, signals)}`, fileName('csv', 'cronograma'), 'text/csv;charset=utf-8')}
+              className="rounded border border-slate-300 px-1.5 py-0.5 text-slate-600 hover:bg-slate-100"
+            >
+              CSV
+            </button>
+          </div>
         </Section>
 
         <Section title="Registro de franqueos" count={sim.log.length} defaultOpen={false}>

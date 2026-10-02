@@ -571,7 +571,13 @@ export default function GrafcetCanvas() {
           </div>
           {simulating ? (
             <Suspense fallback={<Loading panel />}>
-              <SimulationPanel simulation={simulation} onFocusNode={focusNode} onClose={() => setSimulating(false)} />
+              <SimulationPanel
+                simulation={simulation}
+                scenarios={plc.scenarios}
+                onScenariosChange={(update) => setPlc((p) => ({ ...p, scenarios: update(p.scenarios ?? []) }))}
+                onFocusNode={focusNode}
+                onClose={() => setSimulating(false)}
+              />
             </Suspense>
           ) : (
             <>

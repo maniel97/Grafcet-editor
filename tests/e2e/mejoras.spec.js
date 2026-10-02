@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { expect, test } from '@playwright/test'
 import { download, expectNoErrors, openEditor } from './helpers'
 
@@ -310,5 +311,47 @@ test('modo oscuro: interfaz oscura, hoja blanca y se recuerda', async ({ page })
   await page.getByTitle('Opciones: tema, letra y tamaño').click()
   await page.getByRole('button', { name: 'Claro', exact: true }).click()
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'light')
+  expectNoErrors(errors)
+})
+
+test('escenarios: grabar, guardar en el proyecto, reproducir y exportar el cronograma', async ({ page }) => {
+  const errors = await openEditor(page)
+  await page.getByRole('button', { name: /Simular/ }).click()
+  const panel = page.locator('aside.side-panel')
+  const marcha = panel.getByRole('switch').nth(0)
+  const paro = panel.getByRole('switch').nth(1)
+
+  await panel.getByRole('button', { name: 'Grabar escenario' }).click()
+  await expect(panel).toContainText('Grabando… 0 cambios')
+  await page.waitForTimeout(300)
+  await marcha.click()
+  await marcha.click()
+  await page.waitForTimeout(300)
+  await paro.click()
+  await paro.click()
+  await page.waitForTimeout(200)
+  await expect(panel).toContainText('Grabando… 4 cambios')
+  await panel.getByRole('button', { name: 'Detener y guardar' }).click()
+  await expect(panel.getByLabel('Nombre del escenario')).toHaveValue('Escenario 1')
+  await panel.getByLabel('Nombre del escenario').fill('Marcha y paro')
+
+  // Se guarda con el proyecto (autoguardado).
+  await page.waitForTimeout(800)
+  await page.reload()
+  await page.getByRole('button', { name: /Simular/ }).click()
+  await page.getByLabel('Velocidad').selectOption('10')
+  await panel.getByRole('button', { name: 'Reproducir Marcha y paro' }).click()
+  await expect(panel.getByRole('heading')).toContainText('en pausa', { timeout: 5000 }) // se para sola al final
+  await panel.getByRole('button', { name: /Registro de franqueos/ }).click()
+  await expect(panel.locator('ol li')).toHaveCount(2)
+
+  const csv = await download(page, () => panel.getByRole('button', { name: 'CSV', exact: true }).click())
+  expect(csv.suggestedFilename()).toBe('cronograma.csv')
+  const svg = await download(page, () => panel.getByRole('button', { name: 'SVG', exact: true }).click())
+  expect(svg.suggestedFilename()).toBe('cronograma.svg')
+  const svgText = readFileSync(await svg.path(), 'utf8')
+  expect(svgText).toMatch(/^<svg xmlns="http:\/\/www.w3.org\/2000\/svg"/)
+  expect(svgText).toContain('>Marcha<')
+  expect(readFileSync(await csv.path(), 'utf8')).toContain('t (s);X0;X1;Marcha;Paro;Motor M1')
   expectNoErrors(errors)
 })
