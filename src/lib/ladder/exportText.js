@@ -16,10 +16,10 @@ const ident = (text) => {
   return /^[A-Za-z_]/.test(clean) ? clean : `_${clean}`
 }
 
-function stName(op) {
+function stName(op, P = 'X') {
   switch (op.kind) {
     case 'step':
-      return ident(`X${op.label}`)
+      return ident(`${P}${op.label}`)
     case 'timer':
       return ident(`TON_${op.key}`)
     case 'num':
@@ -28,27 +28,27 @@ function stName(op) {
       return ident(op.name)
   }
 }
-const edgeInstance = (node) => ident(edgeMemoryName(node).replace(/^FP_/, 'RT_').replace(/^FN_/, 'FT_'))
+const edgeInstance = (node, P) => ident(edgeMemoryName(node, P).replace(/^FP_/, 'RT_').replace(/^FN_/, 'FT_'))
 
-function stExpr(net) {
+function stExpr(net, P) {
   switch (net.type) {
     case 'true':
       return 'TRUE'
     case 'false':
       return 'FALSE'
     case 'contact': {
-      if (net.kind === 'P' || net.kind === 'N') return `${edgeInstance(net)}.Q`
-      const base = net.operand.kind === 'timer' ? `${stName(net.operand)}.Q` : stName(net.operand)
+      if (net.kind === 'P' || net.kind === 'N') return `${edgeInstance(net, P)}.Q`
+      const base = net.operand.kind === 'timer' ? `${stName(net.operand, P)}.Q` : stName(net.operand, P)
       return net.kind === 'NC' ? `NOT ${base}` : base
     }
     case 'not':
-      return `NOT (${stExpr(net.item)})`
+      return `NOT (${stExpr(net.item, P)})`
     case 'compare':
-      return `(${stName(net.a)} ${net.op} ${stName(net.b)})`
+      return `(${stName(net.a, P)} ${net.op} ${stName(net.b, P)})`
     case 'series':
-      return net.items.map((i) => (i.type === 'parallel' ? stExpr(i) : stExpr(i))).join(' AND ')
+      return net.items.map((i) => stExpr(i, P)).join(' AND ')
     case 'parallel':
-      return `(${net.items.map(stExpr).join(' OR ')})`
+      return `(${net.items.map((i) => stExpr(i, P)).join(' OR ')})`
     default:
       return 'FALSE'
   }
@@ -61,6 +61,7 @@ const timeLiteral = (seconds) => `T#${Math.round(seconds * 1000)}MS`
 
 export function toStructuredText(ladder, plc) {
   const { sections, resolver } = ladder
+  const P = ladder.stepPrefix ?? 'X'
   const lines = []
   const decl = new Map() // nombre -> { type, comment, group }
   const declare = (name, type, group, address = '') => {
@@ -73,12 +74,12 @@ export function toStructuredText(ladder, plc) {
   for (const s of sections) {
     for (const r of s.rungs) {
       const visit = (node) => {
-        if (node.type === 'contact' && (node.kind === 'P' || node.kind === 'N')) edges.set(edgeInstance(node), node)
+        if (node.type === 'contact' && (node.kind === 'P' || node.kind === 'N')) edges.set(edgeInstance(node, P), node)
         if (node.type === 'compare') [node.a, node.b].forEach((o) => o.kind === 'var' && numeric.add(o.name))
         const op = node.operand
         if (!op) return
         if (node.type === 'assign') numeric.add(op.name)
-        const name = stName(op)
+        const name = stName(op, P)
         const address = resolver.address(op)
         if (op.kind === 'step') declare(name, 'BOOL', 'Etapas', address)
         else if (op.kind === 'trans') declare(name, 'BOOL', 'Transiciones', address)
@@ -116,7 +117,7 @@ export function toStructuredText(ladder, plc) {
     lines.push('', '(* Detección de flancos (una llamada por ciclo) *)')
     for (const [name, node] of edges) {
       const op = node.operand
-      const source = op.kind === 'timer' ? `${stName(op)}.Q` : stName(op)
+      const source = op.kind === 'timer' ? `${stName(op, P)}.Q` : stName(op, P)
       lines.push(`${name}(CLK := ${source});`)
     }
   }
@@ -125,10 +126,10 @@ export function toStructuredText(ladder, plc) {
     lines.push('', `(* ===== ${s.title} ===== *)`)
     for (const r of s.rungs) {
       lines.push(`(* ${r.number}. ${r.comment} *)`)
-      const expr = stExpr(r.network)
+      const expr = stExpr(r.network, P)
       const actions = []
       for (const o of r.outputs) {
-        const name = stName(o.operand)
+        const name = stName(o.operand, P)
         if (o.type === 'coil') lines.push(`${name} := ${expr};`)
         else if (o.type === 'ton') lines.push(`${name}(IN := ${expr}, PT := ${timeLiteral(o.seconds)});`)
         else if (o.type === 'set') actions.push(`    ${name} := TRUE;`)
@@ -181,7 +182,7 @@ export function toAWL(ladder, { mnemonic = 'de', useAddresses = true } = {}) {
       case 'contact': {
         if (net.kind === 'P' || net.kind === 'N') {
           const mem = resolver.edgeMemory(net)
-          return [`${pos}(`, `${M.A} ${operand(net.operand)}`, `${net.kind === 'P' ? 'FP' : 'FN'} ${mem || `"${edgeMemoryName(net)}"`}`, ')']
+          return [`${pos}(`, `${M.A} ${operand(net.operand)}`, `${net.kind === 'P' ? 'FP' : 'FN'} ${mem || `"${edgeMemoryName(net, ladder.stepPrefix)}"`}`, ')']
         }
         return [`${net.kind === 'NC' ? neg : pos} ${operand(net.operand)}`]
       }

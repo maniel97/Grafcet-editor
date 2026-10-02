@@ -174,3 +174,27 @@ test.describe('pantalla táctil', () => {
     expectNoErrors(errors)
   })
 })
+
+test('variables de etapa E1 en vez de X1: tabla, lienzo, simulación y ladder', async ({ page }) => {
+  const errors = await openEditor(page)
+  await page.getByTitle(/Tabla de variables: direcciones/).click()
+  const dialog = page.getByRole('dialog', { name: 'Tabla de variables' })
+  await expect(dialog.getByRole('cell', { name: /^X0/ })).toBeVisible()
+  await dialog.getByLabel('Nombre de las variables de etapa').selectOption('E')
+  await expect(dialog.getByRole('cell', { name: /^E0/ })).toBeVisible()
+  await dialog.getByLabel('Mostrar la tabla en el lienzo').check()
+  await page.keyboard.press('Escape')
+
+  const table = page.locator('.react-flow__node[data-id="variables-table"]')
+  await expect(table).toContainText('E0')
+  await expect(table).not.toContainText('X0')
+
+  await page.getByRole('button', { name: /Simular/ }).click()
+  await expect(page.locator('aside').getByRole('button', { name: 'E0', exact: true })).toBeVisible() // etapas activas
+  await page.getByRole('button', { name: /Detener/ }).click()
+
+  await page.getByTitle(/Paso a ladder/).click()
+  await expect(page.locator('.inline-block > svg')).toContainText('Primer ciclo: activa E0')
+  await page.keyboard.press('Escape')
+  expectNoErrors(errors)
+})

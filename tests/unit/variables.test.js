@@ -123,3 +123,23 @@ describe('modelo para PLC', () => {
     ])
   })
 })
+
+describe('prefijo de las variables de etapa', () => {
+  const symbols = extractSymbols(nodes)
+  const plc = { ...autoAssign(EMPTY_PLC, steps, symbols), stepPrefix: 'E' }
+
+  it('CSV y modelo para PLC con E', () => {
+    expect(plcToCsv(plc, steps, symbols).split('\r\n')).toContain('E0;Etapa;M0.0;;')
+    expect(buildPlcModel(nodes, edges, plc).steps.map((s) => s.variable)).toEqual(['E0', 'E1', 'E2'])
+  })
+  it('por defecto X (norma)', () => {
+    expect(buildPlcModel(nodes, edges, EMPTY_PLC).steps[0].variable).toBe('X0')
+  })
+  it('error si una variable se llama igual que una variable de etapa', () => {
+    const withE1 = [...nodes, transition('tE', 'E1', 600)]
+    const issues = validatePlc(plc, steps, extractSymbols(withE1))
+    expect(issues.some((i) => i.severity === 'error' && /«E1» se llama igual que la variable de la etapa 1/.test(i.message))).toBe(true)
+    // Con X no hay choque.
+    expect(validatePlc({ ...plc, stepPrefix: 'X' }, steps, extractSymbols(withE1)).some((i) => /se llama igual/.test(i.message))).toBe(false)
+  })
+})

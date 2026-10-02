@@ -9,7 +9,7 @@ const MAX_SAMPLES = 4000
 // Señales binarias que se registran para el cronograma: etapas, entradas y salidas.
 function sampleOf(compiled, state) {
   const sample = {}
-  for (const s of compiled.steps) sample[`X${s.label}`] = state.active.has(s.id) ? 1 : 0
+  for (const s of compiled.steps) sample[s.variable] = state.active.has(s.id) ? 1 : 0
   for (const v of compiled.variables) {
     if (v.type === 'input' || v.type === 'output') sample[v.name] = Number(state.values[v.name]) ? 1 : 0
   }
@@ -40,15 +40,15 @@ export function useSimulation(nodes, edges, plc, enabled) {
       const current = simRef.current
       if (!compiled || !current) return
       const { state, events } = evolve(compiled, current.state, current.inputs, time, options)
-      const label = (id) => compiled.steps.find((s) => s.id === id)?.label
+      const variable = (id) => compiled.steps.find((s) => s.id === id)?.variable
       const log = events.length
         ? [
             ...current.log,
             ...events.map((e) => ({
               time: e.time,
               transitionId: e.transitionId,
-              text: `«${e.condition || '—'}»: ${e.from.map((id) => `X${label(id)}`).join(', ') || '—'} → ${
-                e.to.map((id) => `X${label(id)}`).join(', ') || '—'
+              text: `«${e.condition || '—'}»: ${e.from.map(variable).join(', ') || '—'} → ${
+                e.to.map(variable).join(', ') || '—'
               }`,
             })),
           ].slice(-MAX_LOG)

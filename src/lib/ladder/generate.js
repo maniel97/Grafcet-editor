@@ -16,6 +16,7 @@ import { buildPlcModel } from '../plcModel'
 import { compile } from '../sim/engine'
 import { parseAddress, formatBit } from '../addressing'
 import { contact, parallel, series, toNetwork, walk } from './network'
+import { resolveStepPrefix, stepVar } from '../stepNames'
 
 const FIRST_CYCLE = 'PrimerCiclo'
 const AUX_START_BYTE = 20
@@ -38,6 +39,8 @@ function assignmentOutputs(action) {
 export function generateLadder(nodes, edges, plc) {
   const model = buildPlcModel(nodes, edges, plc)
   const compiled = compile(model)
+  // Nombre de las variables de etapa: X1 (norma) o E1, según la tabla de variables.
+  const P = resolveStepPrefix(plc)
   const position = new Map(nodes.map((n) => [n.id, n.position]))
   const stepById = new Map(compiled.steps.map((s) => [s.id, s]))
   const label = (id) => stepById.get(id)?.label
@@ -78,7 +81,7 @@ export function generateLadder(nodes, edges, plc) {
     title: 'Inicialización',
     rungs: [
       {
-        comment: `Primer ciclo: activa ${initial.map((s) => `X${s.label}`).join(', ') || '— (no hay etapa inicial)'} y desactiva las demás`,
+        comment: `Primer ciclo: activa ${initial.map((s) => stepVar(s.label, P)).join(', ') || '— (no hay etapa inicial)'} y desactiva las demás`,
         network: contact(firstOp),
         outputs: [
           ...initial.map((s) => ({ type: 'set', operand: stepOp(s.label) })),
@@ -92,8 +95,8 @@ export function generateLadder(nodes, edges, plc) {
 
   // 3. Condiciones de franqueo
   const transitionRungs = transitions.map((t) => ({
-    comment: `${trName.get(t.id)}: ${t.from.map((id) => `X${label(id)}`).join(' · ') || '(sin etapa anterior)'} · «${t.condition || '—'}»  →  ${
-      t.to.map((id) => `X${label(id)}`).join(', ') || '—'
+    comment: `${trName.get(t.id)}: ${t.from.map((id) => stepVar(label(id), P)).join(' · ') || '(sin etapa anterior)'} · «${t.condition || '—'}»  →  ${
+      t.to.map((id) => stepVar(label(id), P)).join(', ') || '—'
     }`,
     network: series(...t.from.map((id) => contact(stepOp(label(id)))), safeNetwork(t.ast, t.id)),
     outputs: [{ type: 'coil', operand: transOp(trName.get(t.id)) }],
@@ -109,7 +112,7 @@ export function generateLadder(nodes, edges, plc) {
     rungs: transitions
       .filter((t) => t.from.length)
       .map((t) => ({
-        comment: `${trName.get(t.id)} franqueada: desactiva ${t.from.map((id) => `X${label(id)}`).join(', ')}`,
+        comment: `${trName.get(t.id)} franqueada: desactiva ${t.from.map((id) => stepVar(label(id), P)).join(', ')}`,
         network: contact(transOp(trName.get(t.id))),
         outputs: t.from.map((id) => ({ type: 'reset', operand: stepOp(label(id)) })),
         nodeIds: [t.id],
@@ -121,7 +124,7 @@ export function generateLadder(nodes, edges, plc) {
     rungs: transitions
       .filter((t) => t.to.length)
       .map((t) => ({
-        comment: `${trName.get(t.id)} franqueada: activa ${t.to.map((id) => `X${label(id)}`).join(', ')}`,
+        comment: `${trName.get(t.id)} franqueada: activa ${t.to.map((id) => stepVar(label(id), P)).join(', ')}`,
         network: contact(transOp(trName.get(t.id))),
         outputs: t.to.map((id) => ({ type: 'set', operand: stepOp(label(id)) })),
         nodeIds: [t.id],
@@ -137,12 +140,12 @@ export function generateLadder(nodes, edges, plc) {
     if (step.initial) entering.push(contact(firstOp))
     for (const action of step.actions) {
       if (action.kind === 'stored-on' && entering.length) {
-        storedRungs.push({ comment: `Al activarse X${step.label}: ${action.text}`, network: parallel(...entering), outputs: assignmentOutputs(action), nodeIds: [step.id] })
+        storedRungs.push({ comment: `Al activarse ${stepVar(step.label, P)}: ${action.text}`, network: parallel(...entering), outputs: assignmentOutputs(action), nodeIds: [step.id] })
       } else if (action.kind === 'stored-off' && leaving.length) {
-        storedRungs.push({ comment: `Al desactivarse X${step.label}: ${action.text}`, network: parallel(...leaving), outputs: assignmentOutputs(action), nodeIds: [step.id] })
+        storedRungs.push({ comment: `Al desactivarse ${stepVar(step.label, P)}: ${action.text}`, network: parallel(...leaving), outputs: assignmentOutputs(action), nodeIds: [step.id] })
       } else if (action.kind === 'event') {
         storedRungs.push({
-          comment: `Evento «${action.condition}» con X${step.label}: ${action.text}`,
+          comment: `Evento «${action.condition}» con ${stepVar(step.label, P)}: ${action.text}`,
           network: series(contact(stepOp(step.label)), safeNetwork(action.conditionAst, step.id)),
           outputs: assignmentOutputs(action),
           nodeIds: [step.id],
@@ -157,7 +160,7 @@ export function generateLadder(nodes, edges, plc) {
     }
   }
   const outputRungs = [...outputBranches].map(([symbol, list]) => ({
-    comment: `Salida ${symbol}: ${list.map((l) => `X${label(l.stepId)}`).join(' + ')}`,
+    comment: `Salida ${symbol}: ${list.map((l) => stepVar(label(l.stepId), P)).join(' + ')}`,
     network: parallel(...list.map((l) => l.branch)),
     outputs: [{ type: 'coil', operand: varOp(symbol) }],
     nodeIds: list.map((l) => l.stepId),
@@ -174,7 +177,7 @@ export function generateLadder(nodes, edges, plc) {
     id: 'timers',
     title: 'Temporizaciones',
     rungs: [...timers.values()].map((t) => ({
-      comment: `${t.key}: ${t.seconds} s desde la activación de X${t.step}`,
+      comment: `${t.key}: ${t.seconds} s desde la activación de ${stepVar(t.step, P)}`,
       network: contact(stepOp(t.step)),
       outputs: [{ type: 'ton', operand: { kind: 'timer', key: t.key }, seconds: t.seconds }],
       nodeIds: [],
@@ -190,12 +193,12 @@ export function generateLadder(nodes, edges, plc) {
   let n = 0
   for (const s of visible) for (const r of s.rungs) r.number = ++n
 
-  return { sections: visible, resolver: makeResolver(plc, compiled, visible), warnings }
+  return { sections: visible, resolver: makeResolver(plc, compiled, visible, P), warnings, stepPrefix: P }
 }
 
 // Nombres y direcciones de los operandos. Las marcas internas (Tr, Aux, flancos) reciben
 // direcciones libres a partir de M20.0 (o tras la última marca usada).
-function makeResolver(plc, compiled, sections) {
+function makeResolver(plc, compiled, sections, P) {
   const stepIdByLabel = new Map(compiled.steps.map((s) => [String(s.label), s.id]))
   let maxM = AUX_START_BYTE * 8 - 1
   const remember = (address) => {
@@ -216,7 +219,7 @@ function makeResolver(plc, compiled, sections) {
   for (const s of sections) {
     for (const r of s.rungs) {
       const visit = (node) => {
-        if (node.type === 'contact' && (node.kind === 'P' || node.kind === 'N')) allocate(edgeMemoryName(node))
+        if (node.type === 'contact' && (node.kind === 'P' || node.kind === 'N')) allocate(edgeMemoryName(node, P))
         const op = node.operand
         if (op?.kind === 'trans' || op?.kind === 'aux') allocate(op.name)
       }
@@ -228,7 +231,7 @@ function makeResolver(plc, compiled, sections) {
   const timerAddress = (key) => plc.variables[key]?.address ?? ''
   return {
     name(op) {
-      if (op.kind === 'step') return `X${op.label}`
+      if (op.kind === 'step') return stepVar(op.label, P)
       if (op.kind === 'timer') return timerAddress(op.key) || op.key
       if (op.kind === 'num') return String(op.value)
       return op.name
@@ -241,11 +244,11 @@ function makeResolver(plc, compiled, sections) {
       if (op.kind === 'var') return plc.variables[op.name]?.address ?? ''
       return ''
     },
-    edgeMemory: (node) => internal.get(edgeMemoryName(node)) ?? '',
+    edgeMemory: (node) => internal.get(edgeMemoryName(node, P)) ?? '',
     internal,
     scheme: plc.scheme,
   }
 }
 
-export const edgeMemoryName = (node) =>
-  `${node.kind === 'P' ? 'FP' : 'FN'}_${node.operand.kind === 'step' ? `X${node.operand.label}` : node.operand.name ?? node.operand.key}`
+export const edgeMemoryName = (node, P = 'X') =>
+  `${node.kind === 'P' ? 'FP' : 'FN'}_${node.operand.kind === 'step' ? stepVar(node.operand.label, P) : node.operand.name ?? node.operand.key}`

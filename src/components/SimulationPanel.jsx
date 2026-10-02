@@ -114,7 +114,7 @@ export default function SimulationPanel({ simulation, onFocusNode, onClose }) {
   }
 
   const signals = [
-    ...compiled.steps.map((s) => ({ name: `X${s.label}`, color: '#0f172a' })),
+    ...compiled.steps.map((s) => ({ name: s.variable, color: '#0f172a' })),
     ...inputs.map((v) => ({ name: v.name, color: '#2563eb' })),
     ...outputs.map((v) => ({ name: v.name, color: '#16a34a' })),
   ]
@@ -275,7 +275,7 @@ export default function SimulationPanel({ simulation, onFocusNode, onClose }) {
                 onClick={() => onFocusNode(s.id)}
                 className="rounded-full bg-green-100 px-2 py-0.5 font-mono text-xs text-green-800 hover:bg-green-200"
               >
-                X{s.label}
+                {s.variable}
               </button>
             ))}
           </div>

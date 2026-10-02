@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Download, Plus, Trash2, WandSparkles, X } from 'lucide-react'
 import { SCHEMES, VARIABLE_TYPES, duplicatedAddresses, typeInfo } from '../lib/addressing'
+import { STEP_PREFIXES, resolveStepPrefix, setPreferredStepPrefix, stepVar } from '../lib/stepNames'
 
 const cellInput =
   'w-full rounded border border-transparent bg-transparent px-1.5 py-1 text-sm hover:border-slate-300 focus:border-blue-500 focus:bg-white focus:outline-none'
@@ -26,6 +27,7 @@ export default function VariablesDialog({
 }) {
   const dialogRef = useRef(null)
   const [tab, setTab] = useState('steps')
+  const stepPrefix = resolveStepPrefix(plc)
 
   useEffect(() => {
     if (!dialogRef.current.open) dialogRef.current.showModal()
@@ -89,6 +91,24 @@ export default function VariablesDialog({
             </option>
           ))}
         </select>
+        <label className="flex items-center gap-1 text-slate-600" title="Las receptividades se siguen escribiendo con X (X2, 5s/X2), como manda la norma">
+          Etapas:
+          <select
+            className="rounded-md border border-slate-300 px-2 py-1 text-slate-900"
+            value={stepPrefix}
+            onChange={(e) => {
+              setPreferredStepPrefix(e.target.value)
+              onChange((p) => ({ ...p, stepPrefix: e.target.value }))
+            }}
+            aria-label="Nombre de las variables de etapa"
+          >
+            {STEP_PREFIXES.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.label}
+              </option>
+            ))}
+          </select>
+        </label>
         <button
           type="button"
           onClick={() => onAutoAssign(false)}
@@ -169,7 +189,7 @@ export default function VariablesDialog({
               {[...stepNodes].sort(stepSort).map((s) => (
                 <tr key={s.id} className="border-b border-slate-100">
                   <td className="px-2 font-mono text-sm">
-                    X{s.data.label}
+                    {stepVar(s.data.label, stepPrefix)}
                     {s.data.initial && <span className="ml-1 text-xs text-slate-400">inicial</span>}
                   </td>
                   <td>{addressInput(plc.steps[s.id]?.address, (v) => setStep(s.id, { address: v }, 'address'), 'M0.0')}</td>

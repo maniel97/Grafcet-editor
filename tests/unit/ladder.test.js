@@ -77,3 +77,22 @@ describe('AWL de S7', () => {
     expect(awl).toContain('SD "T1"')
   })
 })
+
+describe('variables de etapa con prefijo E (E1 en vez de X1)', () => {
+  const plcE = { ...plc, stepPrefix: 'E' }
+  const ladderE = generateLadder(nodes, edges, plcE)
+
+  it('ladder: nombres y comentarios con E; las receptividades siguen con X (norma)', () => {
+    expect(ladderE.resolver.name({ kind: 'step', label: '1' })).toBe('E1')
+    const comments = ladderE.sections.flatMap((s) => s.rungs.map((r) => r.comment)).join('\n')
+    expect(comments).toContain('Tr2: E1 · «3s/X1»  →  E2, E3')
+    expect(comments).toContain('Salida Motor: E1 + E2')
+    expect(comments).not.toMatch(/\bX0\b/)
+  })
+  it('ST y AWL con E', () => {
+    const st = toStructuredText(ladderE, plcE)
+    expect(st).toContain('E0 : BOOL;   (* M0.0 *)')
+    expect(st).toContain('Tr1 := E0 AND RT_Marcha.Q')
+    expect(toAWL(ladderE, { mnemonic: 'de', useAddresses: false })).toContain('U "E0"')
+  })
+})

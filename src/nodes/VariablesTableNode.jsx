@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { EyeOff, GripVertical, Maximize2, MessageSquare, Trash2, WandSparkles } from 'lucide-react'
 import { useEditor } from '../lib/editorContext'
 import { VARIABLE_TYPES, duplicatedAddresses } from '../lib/addressing'
+import { resolveStepPrefix, stepVar } from '../lib/stepNames'
 
 const DRAG_MIME = 'application/x-grafcet-variable'
 
@@ -101,7 +102,7 @@ export default function VariablesTableNode({ id, data, selected }) {
     .sort((a, b) => String(a.data.label).localeCompare(String(b.data.label), 'es', { numeric: true }))
     .map((s) => ({
       key: s.id,
-      name: `X${s.data.label}`,
+      name: stepVar(s.data.label, resolveStepPrefix(plc)),
       address: plc.steps[s.id]?.address,
       comment: plc.steps[s.id]?.comment,
       uses: [s.id],

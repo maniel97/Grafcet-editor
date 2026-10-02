@@ -8,6 +8,8 @@
 //   variables: { [symbol]: { type, address, comment, preset? } }
 // }
 
+import { resolveStepPrefix, stepVar } from './stepNames'
+
 export const EMPTY_PLC = { scheme: 'siemens', showAddresses: false, steps: {}, variables: {} }
 
 export const VARIABLE_TYPES = [
@@ -215,6 +217,19 @@ export function validatePlc(plc, stepNodes, symbols) {
     own(address, `«${name}»`, nodeIds)
   }
 
+  // Con E1, E2... como variables de etapa, una variable llamada igual chocaría en el ladder y el ST.
+  const P = resolveStepPrefix(plc)
+  const stepNames = new Map(stepNodes.map((s) => [stepVar(s.data.label, P), s.id]))
+  for (const [name, found] of symbols) {
+    if (stepNames.has(name)) {
+      issues.push({
+        severity: 'error',
+        message: `La variable «${name}» se llama igual que la variable de la etapa ${name.slice(P.length)}: cámbiale el nombre o usa X como prefijo de etapa.`,
+        nodeIds: [...found.uses, stepNames.get(name)],
+      })
+    }
+  }
+
   for (const [address, list] of owners) {
     if (list.length > 1) {
       issues.push({
@@ -232,7 +247,7 @@ export function plcToCsv(plc, stepNodes, symbols) {
   const rows = [['Nombre', 'Tipo', 'Dirección', 'Preselección', 'Comentario']]
   for (const s of [...stepNodes].sort(stepOrder)) {
     const entry = plc.steps[s.id] ?? {}
-    rows.push([`X${s.data.label}`, 'Etapa', entry.address ?? '', '', entry.comment ?? ''])
+    rows.push([stepVar(s.data.label, resolveStepPrefix(plc)), 'Etapa', entry.address ?? '', '', entry.comment ?? ''])
   }
   for (const [name, found] of symbols) {
     const entry = plc.variables[name] ?? {}

@@ -1,6 +1,7 @@
 import { normalizeAction } from './actions'
 import { actionSymbol, parseExpression, projectVariables } from './symbols'
 import { typeInfo } from './addressing'
+import { resolveStepPrefix, stepVar } from './stepNames'
 
 // Modelo intermedio grafcet + tabla de variables, independiente del dibujo. Es la entrada
 // prevista para el simulador y para la traducción a ladder:
@@ -16,6 +17,7 @@ import { typeInfo } from './addressing'
 // En ladder, cada etapa es una marca con SET/RESET según estas reglas.
 export function buildPlcModel(nodes, edges, plc) {
   const symbols = projectVariables(nodes, plc.variables)
+  const P = resolveStepPrefix(plc)
   const byId = new Map(nodes.map((n) => [n.id, n]))
   const stepIdsWhere = (ids) => ids.filter((id) => byId.get(id)?.type === 'step')
 
@@ -26,7 +28,7 @@ export function buildPlcModel(nodes, edges, plc) {
       label: n.data.label,
       initial: !!n.data.initial,
       macro: !!n.data.macro,
-      variable: `X${n.data.label}`,
+      variable: stepVar(n.data.label, P),
       address: plc.steps[n.id]?.address ?? '',
       comment: plc.steps[n.id]?.comment ?? '',
       actions: (n.data.actions ?? []).map((raw) => {
