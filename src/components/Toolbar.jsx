@@ -1,10 +1,9 @@
+import ExportMenu from './ExportMenu'
 import {
   Square,
   SquareStack,
   Minus,
   RectangleHorizontal,
-  Image,
-  FileCode,
   Trash2,
   Save,
   FolderOpen,
@@ -14,28 +13,31 @@ import {
   ShieldCheck,
   CircleHelp,
   Table2,
-  FileText,
   Play,
   CircleStop,
   Cpu,
 } from 'lucide-react'
 
 // `primary`: el texto se ve desde pantallas medianas; el resto solo en pantallas anchas (2xl),
-// para que la barra quepa entera. El nombre siempre está en el tooltip.
-function ToolButton({ icon: Icon, label, onClick, disabled, title, active, badge, primary }) {
+// para que la barra quepa entera. `iconOnly`: nunca muestra texto. El nombre siempre está en el
+// tooltip y en aria-label (lectores de pantalla).
+const labelClass = (primary) => `hidden ${primary ? 'lg:inline' : '2xl:inline'}`
+
+function ToolButton({ icon: Icon, label, onClick, disabled, title, active, badge, primary, iconOnly }) {
   return (
     <button
       type="button"
       onClick={onClick}
       disabled={disabled}
       title={title ?? label}
+      aria-label={iconOnly ? label : undefined}
       aria-pressed={active}
       className={`relative flex shrink-0 items-center gap-2 rounded-md py-2 pl-2.5 text-sm text-slate-700 hover:bg-slate-100 active:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent ${
         active ? 'bg-slate-100' : ''
       } ${badge ? 'pr-5' : 'pr-2.5'}`}
     >
       <Icon size={18} />
-      <span className={`hidden ${primary ? 'lg:inline' : '2xl:inline'}`}>{label}</span>
+      {!iconOnly && <span className={labelClass(primary)}>{label}</span>}
       {badge}
     </button>
   )
@@ -84,8 +86,8 @@ export default function Toolbar({
     <header className="flex items-center gap-0.5 overflow-x-auto border-b border-slate-200 bg-white px-3 py-2 shadow-sm">
       <h1 className="mr-3 shrink-0 text-base font-bold tracking-tight">Grafcet Editor</h1>
 
-      <ToolButton icon={Undo2} label="Deshacer" title="Deshacer (Ctrl+Z)" onClick={onUndo} disabled={locked || !canUndo} />
-      <ToolButton icon={Redo2} label="Rehacer" title="Rehacer (Ctrl+Shift+Z)" onClick={onRedo} disabled={locked || !canRedo} />
+      <ToolButton icon={Undo2} label="Deshacer" title="Deshacer (Ctrl+Z)" onClick={onUndo} disabled={locked || !canUndo} iconOnly />
+      <ToolButton icon={Redo2} label="Rehacer" title="Rehacer (Ctrl+Shift+Z)" onClick={onRedo} disabled={locked || !canRedo} iconOnly />
 
       <Separator />
 
@@ -107,9 +109,7 @@ export default function Toolbar({
 
       <Separator />
 
-      <ToolButton icon={Image} label="PNG" title="Exportar imagen PNG" onClick={() => onExport('png')} />
-      <ToolButton icon={FileCode} label="SVG" title="Exportar imagen SVG" onClick={() => onExport('svg')} />
-      <ToolButton icon={FileText} label="PDF" title="Exportar PDF (A4 o A3 según el tamaño)" onClick={() => onExport('pdf')} />
+      <ExportMenu onExport={onExport} labelClass={labelClass(true)} />
 
       <Separator />
 
