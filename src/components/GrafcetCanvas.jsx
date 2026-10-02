@@ -34,6 +34,7 @@ import { useCanvasContextMenu } from '../hooks/useCanvasContextMenu'
 import { useImageExport } from '../hooks/useImageExport'
 import { useTouchGestures } from '../hooks/useTouchGestures'
 import { setProjectName } from '../lib/fileNames'
+import { neighbor } from '../lib/keyboardNav'
 
 // Partes que no hacen falta al abrir el editor: se descargan la primera vez que se usan, para que
 // la carga inicial sea más ligera (importa sobre todo publicado en internet).
@@ -108,10 +109,23 @@ export default function GrafcetCanvas() {
   const [editingNoteId, setEditingNoteId] = useState(null)
 
   const { settings, update: updateSettings, reset: resetSettings } = useSettings()
-  const { screenToFlowPosition, updateNodeData, toObject, setViewport, fitView, getNode, getNodes, getEdges, deleteElements } =
-    useReactFlow()
+  const {
+    screenToFlowPosition,
+    flowToScreenPosition,
+    updateNodeData,
+    toObject,
+    setViewport,
+    setCenter,
+    getZoom,
+    fitView,
+    getNode,
+    getNodes,
+    getEdges,
+    deleteElements,
+  } = useReactFlow()
   const wrapperRef = useRef(null)
   const fileInputRef = useRef(null)
+  const lastNudgeRef = useRef(0)
 
   // --- Piezas ----------------------------------------------------------------------------------
   const simulation = useSimulation(nodes, edges, plc, simulating)
@@ -339,6 +353,33 @@ export default function GrafcetCanvas() {
     save,
     open: () => fileInputRef.current?.click(),
     help: () => setHelpOpen(true),
+    move: (dx, dy) => {
+      if (readOnly || !getNodes().some((n) => n.selected)) return
+      // Una ráfaga de pulsaciones seguidas es un solo paso de deshacer.
+      const now = Date.now()
+      if (now - lastNudgeRef.current > 800) takeSnapshot()
+      lastNudgeRef.current = now
+      setNodes((nds) => nds.map((n) => (n.selected ? { ...n, position: { x: n.position.x + dx, y: n.position.y + dy } } : n)))
+    },
+    navigate: (dir) => {
+      const all = getNodes()
+      const selected = all.filter((n) => n.selected)
+      const target = neighbor(all, getEdges(), selected.length === 1 ? selected[0] : null, dir)
+      if (!target) return
+      setNodes((nds) => nds.map((n) => (n.selected === (n.id === target.id) ? n : { ...n, selected: n.id === target.id })))
+      // Si queda fuera de la vista, se centra en él.
+      const w = target.measured?.width ?? 0
+      const h = target.measured?.height ?? 0
+      const rect = wrapperRef.current?.getBoundingClientRect()
+      const a = flowToScreenPosition(target.position)
+      const b = flowToScreenPosition({ x: target.position.x + w, y: target.position.y + h })
+      if (rect && (a.x < rect.left || a.y < rect.top || b.x > rect.right || b.y > rect.bottom))
+        setCenter(target.position.x + w / 2, target.position.y + h / 2, { zoom: getZoom(), duration: 200 })
+    },
+    edit: () => {
+      const selected = getNodes().filter((n) => n.selected)
+      if (selected.length === 1) openNodeEditor(selected[0])
+    },
     escape: () => {
       setLoopSourceId(null)
       setEditingId(null)
@@ -509,6 +550,7 @@ export default function GrafcetCanvas() {
               }}
               zoomOnDoubleClick={false}
               snapToGrid
+              disableKeyboardA11y
               snapGrid={[10, 10]}
               // Con un diálogo o menú abierto, Supr/Retroceso no deben borrar nodos del lienzo de fondo.
               deleteKeyCode={modalOpen || readOnly ? null : ['Delete', 'Backspace']}

@@ -1,8 +1,10 @@
 import { useEffect, useRef } from 'react'
+import { ARROWS } from './keyboardNav'
 
 // Atajos de teclado globales del editor. Se ignoran mientras se escribe en un campo de texto
 // o con un diálogo modal abierto, para no interferir con la edición.
-// handlers: { undo, redo, copy, cut, paste, duplicate, selectAll, save, open, help, escape }
+// handlers: { undo, redo, copy, cut, paste, duplicate, selectAll, save, open, help, escape,
+//             move(dx, dy), navigate(dir), edit }
 export function useEditorShortcuts(handlers) {
   const ref = useRef(handlers)
   useEffect(() => {
@@ -35,6 +37,18 @@ export function useEditorShortcuts(handlers) {
         if (key === 'o') return run(h.open)
         return
       }
+      // Flechas e Intro solo sobre el lienzo (o sin foco): en botones y menús hacen lo suyo
+      // (Intro pulsa el botón, las flechas recorren el menú).
+      const onCanvas = t === document.body || (t instanceof Element && !!t.closest('.react-flow'))
+      const canvasKey = onCanvas && !document.querySelector('[role="menu"]')
+      const arrow = canvasKey && ARROWS[e.key]
+      if (arrow) {
+        // Alt + flecha: ir al elemento vecino; flecha: mover la selección (Mayús: de 50 en 50).
+        if (e.altKey) return run(() => h.navigate?.(arrow.dir))
+        const step = e.shiftKey ? 50 : 10
+        return run(() => h.move?.(arrow.dx * step, arrow.dy * step))
+      }
+      if (canvasKey && e.key === 'Enter' && !e.altKey) return run(h.edit)
       if (e.key === '?' || e.key === 'F1') return run(h.help)
       if (e.key === 'Escape') h.escape?.()
     }
@@ -53,7 +67,9 @@ export const SHORTCUTS = [
   ['Supr · Retroceso', 'Eliminar la selección'],
   ['Ctrl+S · Ctrl+O', 'Guardar · abrir proyecto (.json)'],
   ['Mayús + arrastrar', 'Seleccionar varios con un recuadro'],
-  ['Doble clic', 'Editar etapa o transición'],
+  ['Doble clic · Intro', 'Editar etapa o transición (Intro: la seleccionada)'],
+  ['Alt + flechas', 'Ir a la etapa o transición siguiente, anterior o de la rama vecina'],
+  ['Flechas · Mayús + flechas', 'Mover la selección 10 px · 50 px'],
   ['Clic derecho', 'Menú contextual (ramificaciones, convergencias…)'],
   ['Esc', 'Cancelar / deseleccionar'],
   ['Pulsación larga (táctil)', 'Menú contextual (como el clic derecho)'],

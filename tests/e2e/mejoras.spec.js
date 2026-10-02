@@ -247,3 +247,43 @@ test('móvil (390 px): sin desplazamiento de página y paneles abajo', async ({ 
   expect(box.height).toBeLessThanOrEqual(844 * 0.55 + 1)
   expectNoErrors(errors)
 })
+
+test('teclado: Alt + flechas recorre, Intro edita, flechas mueven con un solo deshacer', async ({ page }) => {
+  const errors = await openEditor(page)
+  await page.locator('.react-flow__pane').click({ position: { x: 600, y: 500 } })
+  const selected = () => page.locator('.react-flow__node.selected')
+
+  await page.keyboard.press('Alt+ArrowDown') // sin selección: la etapa inicial
+  await expect(selected()).toHaveCount(1)
+  await expect(selected()).toHaveClass(/react-flow__node-step/)
+  await expect(selected()).toContainText('0')
+  await page.keyboard.press('Alt+ArrowDown')
+  await expect(selected()).toHaveClass(/react-flow__node-transition/)
+  await page.keyboard.press('Alt+ArrowDown')
+  await expect(selected()).toContainText('1')
+  await page.keyboard.press('Alt+ArrowUp')
+  await expect(selected()).toHaveClass(/react-flow__node-transition/)
+  await page.keyboard.press('Alt+ArrowDown')
+
+  // Mover: 3 pulsaciones seguidas = 30 px y un solo Ctrl+Z.
+  const before = await selected().boundingBox()
+  for (let i = 0; i < 3; i++) await page.keyboard.press('ArrowRight')
+  await expect.poll(async () => Math.round((await selected().boundingBox()).x - before.x)).toBeGreaterThan(20)
+  await page.keyboard.press('Control+z')
+  await expect.poll(async () => Math.round((await page.locator('.react-flow__node-step').nth(1).boundingBox()).x - before.x)).toBe(0)
+
+  // Intro abre el panel de la etapa seleccionada.
+  await page.keyboard.press('Alt+ArrowUp')
+  await page.keyboard.press('Alt+ArrowUp')
+  await page.keyboard.press('Enter')
+  await expect(page.getByLabel(/Número \/ nombre/i)).toHaveValue('0')
+  expectNoErrors(errors)
+})
+
+test('teclado: Intro sigue pulsando los botones de la barra', async ({ page }) => {
+  const errors = await openEditor(page)
+  await page.getByTitle('Atajos y notación (?)').focus()
+  await page.keyboard.press('Enter')
+  await expect(page.locator('dialog[open]')).toBeVisible()
+  expectNoErrors(errors)
+})
