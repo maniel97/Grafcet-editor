@@ -1,4 +1,4 @@
-import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
+import { Suspense, lazy, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ReactFlow,
   Background,
@@ -17,14 +17,10 @@ import Toolbar from './Toolbar'
 import PropertiesPanel from './PropertiesPanel'
 import VerifyPanel from './VerifyPanel'
 import LoopPickerBanner from './LoopPickerBanner'
-import SettingsDialog from './SettingsDialog'
-import HelpDialog from './HelpDialog'
 import GrafcetContextMenu from './GrafcetContextMenu'
 import GhostPreview from './GhostPreview'
 import CanvasControls from './CanvasControls'
 import { Lock } from 'lucide-react'
-import SimulationPanel from './SimulationPanel'
-import LadderView from './LadderView'
 import { useSimulation } from '../lib/sim/useSimulation'
 import { useSettings } from '../lib/settings'
 import { nodeTypes, VARIABLES_TABLE_ID } from '../nodes'
@@ -44,7 +40,6 @@ import {
 } from '../lib/addressing'
 import { projectVariables } from '../lib/symbols'
 import { diagramContentKey } from '../lib/contentKey'
-import VariablesDialog from './VariablesDialog'
 import { nextStepLabel, nextTransitionLabel, findFreePosition } from '../lib/layout'
 import { useHistory } from '../lib/history'
 import { EditorProvider } from '../lib/editorContext'
@@ -54,6 +49,23 @@ import { copySelection, prepareClipboard, PASTE_OFFSET } from '../lib/clipboard'
 import { loadAutosave, useAutosave } from '../lib/autosave'
 import { useEditorShortcuts } from '../lib/shortcuts'
 import { normalizeAction } from '../lib/actions'
+
+// Partes que no hacen falta al abrir el editor: se descargan la primera vez que se usan, para que
+// la carga inicial sea más ligera (importa sobre todo publicado en internet).
+const SettingsDialog = lazy(() => import('./SettingsDialog'))
+const HelpDialog = lazy(() => import('./HelpDialog'))
+const SimulationPanel = lazy(() => import('./SimulationPanel'))
+const LadderView = lazy(() => import('./LadderView'))
+const VariablesDialog = lazy(() => import('./VariablesDialog'))
+
+// Mientras se descarga una parte diferida (normalmente un instante).
+function Loading({ panel }) {
+  return panel ? (
+    <aside className="flex w-80 shrink-0 items-center justify-center border-l border-slate-200 bg-white text-sm text-slate-400">
+      Cargando…
+    </aside>
+  ) : null
+}
 
 const defaultData = {
   step: (nodes) => ({ label: nextStepLabel(nodes), actions: [] }),
@@ -558,28 +570,32 @@ export default function GrafcetCanvas() {
           onOpenLadder={() => setLadderOpen(true)}
         />
         {ladderOpen && (
-          <LadderView
-            nodes={nodes}
-            edges={edges}
-            plc={plc}
-            grafcetErrors={issueCounts.errors}
-            onClose={() => setLadderOpen(false)}
-          />
+          <Suspense fallback={<Loading />}>
+            <LadderView
+              nodes={nodes}
+              edges={edges}
+              plc={plc}
+              grafcetErrors={issueCounts.errors}
+              onClose={() => setLadderOpen(false)}
+            />
+          </Suspense>
         )}
         {variablesOpen && (
-          <VariablesDialog
-            plc={plc}
-            stepNodes={stepNodes}
-            symbols={symbols}
-            issues={plcIssues}
-            onChange={changePlc}
-            onAutoAssign={(overwrite) => changePlc((p) => autoAssign(p, stepNodes, symbols, { overwrite }))}
-            onExportCsv={exportCsv}
-            tableShown={tableShown}
-            onToggleTable={() => toggleTable()}
-            onAddVariable={(type) => plcTable.addVariable(type, { reveal: false })}
-            onClose={() => setVariablesOpen(false)}
-          />
+          <Suspense fallback={<Loading />}>
+            <VariablesDialog
+              plc={plc}
+              stepNodes={stepNodes}
+              symbols={symbols}
+              issues={plcIssues}
+              onChange={changePlc}
+              onAutoAssign={(overwrite) => changePlc((p) => autoAssign(p, stepNodes, symbols, { overwrite }))}
+              onExportCsv={exportCsv}
+              tableShown={tableShown}
+              onToggleTable={() => toggleTable()}
+              onAddVariable={(type) => plcTable.addVariable(type, { reveal: false })}
+              onClose={() => setVariablesOpen(false)}
+            />
+          </Suspense>
         )}
         <input
           ref={fileInputRef}
@@ -593,14 +609,20 @@ export default function GrafcetCanvas() {
           }}
         />
         {settingsOpen && (
-          <SettingsDialog
-            settings={settings}
-            onChange={updateSettings}
-            onReset={resetSettings}
-            onClose={() => setSettingsOpen(false)}
-          />
+          <Suspense fallback={<Loading />}>
+            <SettingsDialog
+              settings={settings}
+              onChange={updateSettings}
+              onReset={resetSettings}
+              onClose={() => setSettingsOpen(false)}
+            />
+          </Suspense>
         )}
-        {helpOpen && <HelpDialog onClose={() => setHelpOpen(false)} />}
+        {helpOpen && (
+          <Suspense fallback={<Loading />}>
+            <HelpDialog onClose={() => setHelpOpen(false)} />
+          </Suspense>
+        )}
         <div className="flex min-h-0 flex-1">
           <div ref={wrapperRef} className={`relative flex-1 ${loopSource ? 'loop-picking' : ''} ${readOnly ? 'read-only' : ''}`}>
             {editLocked && !simulating && (
@@ -679,7 +701,9 @@ export default function GrafcetCanvas() {
             )}
           </div>
           {simulating ? (
-            <SimulationPanel simulation={simulation} onFocusNode={focusNode} onClose={() => setSimulating(false)} />
+            <Suspense fallback={<Loading panel />}>
+              <SimulationPanel simulation={simulation} onFocusNode={focusNode} onClose={() => setSimulating(false)} />
+            </Suspense>
           ) : (
             <>
               <PropertiesPanel

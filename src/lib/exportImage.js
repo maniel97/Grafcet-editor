@@ -1,4 +1,3 @@
-import { toPng, toSvg } from 'html-to-image'
 
 // Margen alrededor del dibujo en la imagen exportada (px).
 const MARGIN = 48
@@ -61,6 +60,8 @@ async function renderDiagram(format, viewport, maxPixelRatio) {
     },
   }
 
+  // La librería de captura solo se descarga al exportar por primera vez.
+  const { toPng, toSvg } = await import('html-to-image')
   const dataUrl = format === 'svg' ? await toSvg(viewportEl, options) : await toPng(viewportEl, options)
   return { dataUrl, width, height }
 }
