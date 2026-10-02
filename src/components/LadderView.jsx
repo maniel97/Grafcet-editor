@@ -5,6 +5,7 @@ import { generateLadder } from '../lib/ladder/generate'
 import { toAWL, toStructuredText } from '../lib/ladder/exportText'
 import { exportLadderPdf, exportLadderPng, exportLadderSvg } from '../lib/ladder/exportLadder'
 import { downloadFile } from '../lib/projectFile'
+import { fileName } from '../lib/fileNames'
 
 const TABS = [
   { id: 'ladder', label: 'Ladder (LD)' },
@@ -142,8 +143,8 @@ export default function LadderView({ nodes, edges, plc, grafcetErrors, onClose }
                 icon={Download}
                 onClick={() =>
                   tab === 'st'
-                    ? downloadFile(st, 'grafcet.st', 'text/plain;charset=utf-8')
-                    : downloadFile(awl, 'grafcet.awl', 'text/plain;charset=utf-8')
+                    ? downloadFile(st, fileName('st'), 'text/plain;charset=utf-8')
+                    : downloadFile(awl, fileName('awl'), 'text/plain;charset=utf-8')
                 }
                 title="Descargar como archivo de texto"
               >

@@ -1,4 +1,5 @@
 import { DEFAULT_PDF_OPTIONS, PAGE_MARGIN, pdfLayout } from './pdfLayout'
+import { fileName } from './fileNames'
 
 // Margen alrededor del dibujo en la imagen exportada (px).
 const MARGIN = 48
@@ -77,7 +78,7 @@ function download(href, filename) {
 // PNG o SVG, 100% en el cliente.
 export async function exportDiagram(format, viewport) {
   const image = await renderDiagram(format, viewport, 2)
-  if (image) download(image.dataUrl, `grafcet.${format}`)
+  if (image) download(image.dataUrl, fileName(format))
 }
 
 // PDF de una página, generado en el navegador (jsPDF se carga solo al usarlo), con la imagen ya
@@ -94,5 +95,5 @@ export async function savePdf(image, options = DEFAULT_PDF_OPTIONS) {
     const date = new Date().toLocaleDateString('es-ES')
     pdf.text([options.title?.trim(), date].filter(Boolean).join(' · '), PAGE_MARGIN, layout.pageH - PAGE_MARGIN / 2)
   }
-  pdf.save('grafcet.pdf')
+  pdf.save(fileName('pdf'))
 }

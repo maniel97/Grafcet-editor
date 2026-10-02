@@ -18,9 +18,9 @@ test('paso a ladder: esquema, exportaciones, ST y AWL', async ({ page }) => {
   await expect(svg.getByText('TON', { exact: true })).toHaveCount(1)
   await expect(svg.getByText('MW100').first()).toBeVisible()
 
-  expect((await download(page, () => page.getByTitle('Descargar el esquema en SVG').click())).suggestedFilename()).toBe('ladder.svg')
-  expect((await download(page, () => page.getByTitle('Descargar el esquema en PNG').click())).suggestedFilename()).toBe('ladder.png')
-  expect((await download(page, () => page.getByTitle(/PDF A4 paginado/).click())).suggestedFilename()).toBe('ladder.pdf')
+  expect((await download(page, () => page.getByTitle('Descargar el esquema en SVG').click())).suggestedFilename()).toBe('ladder-completo-ladder.svg')
+  expect((await download(page, () => page.getByTitle('Descargar el esquema en PNG').click())).suggestedFilename()).toBe('ladder-completo-ladder.png')
+  expect((await download(page, () => page.getByTitle(/PDF A4 paginado/).click())).suggestedFilename()).toBe('ladder-completo-ladder.pdf')
 
   await page.getByRole('tab', { name: /Texto estructurado/ }).click()
   await expect(page.locator('pre')).toContainText('Tr1 := X0 AND RT_Marcha.Q AND NOT Paro AND NOT Emergencia;')

@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { expectNoErrors, openEditor } from './helpers'
+import { download, expectNoErrors, openEditor } from './helpers'
 
 // Carga un proyecto desde un objeto (sin archivo en disco).
 export async function loadProject(page, project) {
@@ -196,5 +196,37 @@ test('variables de etapa E1 en vez de X1: tabla, lienzo, simulación y ladder', 
   await page.getByTitle(/Paso a ladder/).click()
   await expect(page.locator('.inline-block > svg')).toContainText('Primer ciclo: activa E0')
   await page.keyboard.press('Escape')
+  expectNoErrors(errors)
+})
+
+test('nombre del proyecto: archivos, ejemplos, pie del PDF y autoguardado', async ({ page }) => {
+  const errors = await openEditor(page)
+  const name = page.getByLabel('Nombre del proyecto')
+  await expect(name).toHaveValue('')
+  await name.fill('Prensa hidráulica')
+  await expect(page).toHaveTitle('Prensa hidráulica · Grafcet Editor')
+
+  const saved = await download(page, () => page.getByTitle(/Guardar proyecto/).click())
+  expect(saved.suggestedFilename()).toBe('prensa-hidraulica.json')
+  await page.getByRole('button', { name: /Exportar/ }).click()
+  const png = await download(page, () => page.getByRole('menuitem', { name: /PNG/ }).click())
+  expect(png.suggestedFilename()).toBe('prensa-hidraulica.png')
+
+  // Pie del PDF propuesto con el nombre.
+  await page.getByRole('button', { name: /Exportar/ }).click()
+  await page.getByRole('menuitem', { name: /PDF/ }).click()
+  await expect(page.getByLabel('Título del pie de página')).toHaveValue('Prensa hidráulica')
+  await page.keyboard.press('Escape')
+
+  // Se conserva al recargar (autoguardado).
+  await page.waitForTimeout(800)
+  await page.reload()
+  await expect(page.getByLabel('Nombre del proyecto')).toHaveValue('Prensa hidráulica')
+
+  // Un ejemplo toma su nombre.
+  await page.getByTitle('Abrir un proyecto, un ejemplo o un trabajo anterior').click()
+  await page.getByRole('menuitem', { name: /Ejemplos/ }).click()
+  await page.getByRole('button', { name: /Semáforo/ }).click()
+  await expect(page.getByLabel('Nombre del proyecto')).toHaveValue('Semáforo')
   expectNoErrors(errors)
 })

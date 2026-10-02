@@ -15,16 +15,16 @@ export function loadAutosave() {
   }
 }
 
-export function useAutosave(nodes, edges, plc) {
+export function useAutosave(nodes, edges, plc, name) {
   useEffect(() => {
     const timer = setTimeout(() => {
       try {
         const strip = (items) => items.map(({ selected: _selected, dragging: _dragging, ...rest }) => rest)
-        localStorage.setItem(STORAGE_KEY, JSON.stringify({ nodes: strip(nodes), edges: strip(edges), plc }))
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({ name, nodes: strip(nodes), edges: strip(edges), plc }))
       } catch {
         // Sin almacenamiento disponible (modo privado, cuota...): se sigue trabajando sin autoguardado.
       }
     }, DELAY_MS)
     return () => clearTimeout(timer)
-  }, [nodes, edges, plc])
+  }, [nodes, edges, plc, name])
 }

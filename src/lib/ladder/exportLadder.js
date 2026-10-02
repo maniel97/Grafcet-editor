@@ -1,13 +1,14 @@
 // Exportación del dibujo ladder (un SVG) a SVG, PNG y PDF multipágina, en el navegador.
 
 import { downloadFile } from '../projectFile'
+import { fileName } from '../fileNames'
 
 export function svgText(svg) {
   return `<?xml version="1.0" encoding="UTF-8"?>\n${new XMLSerializer().serializeToString(svg)}`
 }
 
 export function exportLadderSvg(svg) {
-  downloadFile(svgText(svg), 'ladder.svg', 'image/svg+xml')
+  downloadFile(svgText(svg), fileName('svg', 'ladder'), 'image/svg+xml')
 }
 
 // Rasteriza el SVG en un canvas a `scale` aumentos.
@@ -35,7 +36,7 @@ async function toCanvas(svg, scale) {
 export async function exportLadderPng(svg) {
   const canvas = await toCanvas(svg, 2)
   const a = document.createElement('a')
-  a.download = 'ladder.png'
+  a.download = fileName('png', 'ladder')
   a.href = canvas.toDataURL('image/png')
   a.click()
 }
@@ -88,5 +89,5 @@ export async function exportLadderPdf(svg) {
     pdf.setTextColor(120)
     pdf.text(`Ladder generado desde grafcet (IEC 60848) · ${date} · página ${i + 1} de ${pages.length}`, margin, pageH - margin / 2)
   })
-  pdf.save('ladder.pdf')
+  pdf.save(fileName('pdf', 'ladder'))
 }

@@ -33,10 +33,14 @@ function Choice({ legend, name, value, options, onChange }) {
 // Exportación a PDF con elección de tamaño de página, orientación y pie, y vista previa exacta:
 // la vista previa y el PDF usan la misma maquetación (lib/pdfLayout.js) y la misma imagen.
 // `capture()` devuelve la imagen del diagrama a resolución de impresión (sin selección).
-export default function PdfExportDialog({ capture, onClose }) {
+export default function PdfExportDialog({ capture, projectName, onClose }) {
   const dialogRef = useRef(null)
   const [image, setImage] = useState(undefined) // undefined: preparando; null: nada que exportar
-  const [options, setOptions] = useState(readOptions)
+  // Si el título del pie no se ha personalizado, se propone el nombre del proyecto.
+  const [options, setOptions] = useState(() => {
+    const stored = readOptions()
+    return projectName?.trim() && stored.title === DEFAULT_PDF_OPTIONS.title ? { ...stored, title: projectName.trim() } : stored
+  })
   const [saving, setSaving] = useState(false)
   const [today] = useState(() => new Date().toLocaleDateString('es-ES'))
 

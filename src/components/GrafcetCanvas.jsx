@@ -33,6 +33,7 @@ import { useClipboard } from '../hooks/useClipboard'
 import { useCanvasContextMenu } from '../hooks/useCanvasContextMenu'
 import { useImageExport } from '../hooks/useImageExport'
 import { useTouchGestures } from '../hooks/useTouchGestures'
+import { setProjectName } from '../lib/fileNames'
 
 // Partes que no hacen falta al abrir el editor: se descargan la primera vez que se usan, para que
 // la carga inicial sea más ligera (importa sobre todo publicado en internet).
@@ -71,7 +72,15 @@ export default function GrafcetCanvas() {
   useEffect(() => {
     plcRef.current = plc
   }, [plc])
-  useAutosave(nodes, edges, plc)
+  // Nombre del proyecto: da nombre a los archivos guardados y exportados y al pie del PDF.
+  const [projectName, setProjectNameState] = useState(restored?.name ?? '')
+  const projectNameRef = useRef(projectName)
+  useEffect(() => {
+    projectNameRef.current = projectName
+    setProjectName(projectName)
+    document.title = projectName ? `${projectName} · Grafcet Editor` : 'Grafcet Editor'
+  }, [projectName])
+  useAutosave(nodes, edges, plc, projectName)
   const { takeSnapshot, undo, redo, canUndo, canRedo } = useHistory({ get: () => plcRef.current, set: setPlc })
 
   // --- Estado de la interfaz -----------------------------------------------------------------
@@ -248,7 +257,7 @@ export default function GrafcetCanvas() {
 
   const clear = useCallback(() => {
     if (!nodes.length && !edges.length) return
-    pushRecent({ nodes: getNodes(), edges: getEdges(), plc: plcRef.current }, 'Antes de limpiar el lienzo')
+    pushRecent({ nodes: getNodes(), edges: getEdges(), plc: plcRef.current, name: projectNameRef.current }, 'Antes de limpiar el lienzo')
     takeSnapshot()
     setNodes([])
     setEdges([])
@@ -256,17 +265,18 @@ export default function GrafcetCanvas() {
   }, [nodes.length, edges.length, getNodes, getEdges, takeSnapshot, setNodes, setEdges])
 
   // --- Archivos ----------------------------------------------------------------------------------
-  const save = useCallback(() => saveProject({ ...toObject(), plc }), [toObject, plc])
+  const save = useCallback(() => saveProject({ ...toObject(), plc, name: projectName }), [toObject, plc, projectName])
 
   // Sustituye el diagrama (abrir archivo, ejemplo o trabajo anterior). Lo que había se guarda
   // antes como trabajo anterior (lib/recent.js) y además se puede deshacer con Ctrl+Z.
   const replaceProject = useCallback(
     (project, reason) => {
-      pushRecent({ nodes: getNodes(), edges: getEdges(), plc: plcRef.current }, reason)
+      pushRecent({ nodes: getNodes(), edges: getEdges(), plc: plcRef.current, name: projectNameRef.current }, reason)
       takeSnapshot()
       setNodes(project.nodes)
       setEdges(project.edges)
       setPlc(project.plc ?? EMPTY_PLC)
+      setProjectNameState(project.name ?? '')
       setEditingId(null)
       if (project.viewport) setViewport(project.viewport)
       else requestAnimationFrame(() => requestAnimationFrame(() => fitDrawn(0)))
@@ -277,7 +287,9 @@ export default function GrafcetCanvas() {
   const load = useCallback(
     async (file) => {
       try {
-        replaceProject(await loadProject(file), `Antes de abrir «${file.name}»`)
+        const project = await loadProject(file)
+        // Proyectos guardados sin nombre: el del archivo, sin la extensión.
+        replaceProject({ ...project, name: project.name ?? file.name.replace(/\.json$/i, '') }, `Antes de abrir «${file.name}»`)
       } catch (err) {
         alert(err.message)
       }
@@ -288,7 +300,7 @@ export default function GrafcetCanvas() {
   const [projectsTab, setProjectsTab] = useState(null) // 'examples' | 'recent' | null
   const openExample = useCallback(
     (example) => {
-      replaceProject(normalizeProject(example.build()), `Antes de abrir el ejemplo «${example.title}»`)
+      replaceProject({ ...normalizeProject(example.build()), name: example.title }, `Antes de abrir el ejemplo «${example.title}»`)
       setProjectsTab(null)
     },
     [replaceProject],
@@ -344,6 +356,8 @@ export default function GrafcetCanvas() {
     <EditorProvider value={editorApi}>
       <div className="flex h-full flex-col">
         <Toolbar
+          projectName={projectName}
+          onRenameProject={setProjectNameState}
           onAdd={addNode}
           onAddAction={addAction}
           canAddAction={!!selectedStep}
@@ -429,7 +443,7 @@ export default function GrafcetCanvas() {
         )}
         {pdfOpen && (
           <Suspense fallback={<Loading />}>
-            <PdfExportDialog capture={capturePdfImage} onClose={() => setPdfOpen(false)} />
+            <PdfExportDialog capture={capturePdfImage} projectName={projectName} onClose={() => setPdfOpen(false)} />
           </Suspense>
         )}
         {helpOpen && (

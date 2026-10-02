@@ -13,6 +13,7 @@ import {
 import { projectVariables } from '../lib/symbols'
 import { diagramContentKey } from '../lib/contentKey'
 import { downloadFile } from '../lib/projectFile'
+import { fileName } from '../lib/fileNames'
 
 // Todo lo relativo a la tabla de variables a partir de su estado (`plc`, que vive en el lienzo
 // porque forma parte del historial y del autoguardado):
@@ -111,7 +112,7 @@ export function usePlcTable({ nodes, plc, setPlc, plcRef, takeSnapshot, onOpenDi
 
   const exportCsv = useCallback(
     // BOM inicial para que Excel reconozca UTF-8 (acentos, ñ).
-    () => downloadFile(`﻿${plcToCsv(plc, stepNodes, symbols)}`, 'variables.csv', 'text/csv;charset=utf-8'),
+    () => downloadFile(`﻿${plcToCsv(plc, stepNodes, symbols)}`, fileName('csv', 'variables'), 'text/csv;charset=utf-8'),
     [plc, stepNodes, symbols],
   )
 

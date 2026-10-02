@@ -64,6 +64,8 @@ function VerifyBadge({ errors, warnings }) {
 }
 
 export default function Toolbar({
+  projectName,
+  onRenameProject,
   onAdd,
   onAddAction,
   canAddAction,
@@ -92,7 +94,16 @@ export default function Toolbar({
   const locked = readOnly
   return (
     <header className="flex items-center gap-0.5 overflow-x-auto border-b border-slate-200 bg-white px-3 py-2 shadow-sm">
-      <h1 className="mr-3 shrink-0 text-base font-bold tracking-tight">Grafcet Editor</h1>
+      <h1 className="mr-2 shrink-0 text-base font-bold tracking-tight">Grafcet Editor</h1>
+      {/* Nombre del proyecto: da nombre a los archivos guardados y exportados. */}
+      <input
+        value={projectName}
+        onChange={(e) => onRenameProject(e.target.value)}
+        placeholder="Sin título"
+        aria-label="Nombre del proyecto"
+        title="Nombre del proyecto (se usa al guardar y exportar)"
+        className="mr-2 w-28 shrink-0 rounded-md border border-transparent px-2 py-1 text-sm text-slate-700 placeholder:italic placeholder:text-slate-400 hover:border-slate-300 focus:border-blue-500 focus:outline-none 2xl:w-44"
+      />
 
       <ToolButton icon={Undo2} label="Deshacer" title="Deshacer (Ctrl+Z)" onClick={onUndo} disabled={locked || !canUndo} iconOnly />
       <ToolButton icon={Redo2} label="Rehacer" title="Rehacer (Ctrl+Shift+Z)" onClick={onRedo} disabled={locked || !canRedo} iconOnly />

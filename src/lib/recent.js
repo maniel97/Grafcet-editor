@@ -36,9 +36,9 @@ export function summarize(nodes) {
 }
 
 // Guarda un trabajo. No guarda diagramas vacíos ni repite el último si es idéntico.
-export function pushRecent({ nodes, edges, plc }, reason, storage = globalThis.localStorage) {
+export function pushRecent({ nodes, edges, plc, name }, reason, storage = globalThis.localStorage) {
   if (!nodes.some((n) => n.type === 'step' || n.type === 'transition')) return listRecent(storage)
-  const project = { nodes: strip(nodes), edges: strip(edges), plc }
+  const project = { name, nodes: strip(nodes), edges: strip(edges), plc }
   const list = listRecent(storage)
   if (list[0] && JSON.stringify(list[0].project) === JSON.stringify(project)) return list
   const entry = { id: crypto.randomUUID(), savedAt: new Date().toISOString(), reason, summary: summarize(nodes), project }

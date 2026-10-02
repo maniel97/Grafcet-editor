@@ -1,6 +1,7 @@
 // Guardado y carga de proyectos como .json local, sin servidor.
 
 import { EMPTY_PLC } from './addressing'
+import { fileName } from './fileNames'
 
 const FORMAT = 'grafcet-editor'
 const VERSION = 1
@@ -15,8 +16,8 @@ export function downloadFile(content, filename, type) {
 }
 
 // `plc` es la tabla de variables (lib/addressing.js); viaja dentro del mismo proyecto.
-export function saveProject({ nodes, edges, viewport, plc }, filename = 'grafcet.json') {
-  const project = { format: FORMAT, version: VERSION, savedAt: new Date().toISOString(), nodes, edges, viewport, plc }
+export function saveProject({ nodes, edges, viewport, plc, name }, filename = fileName('json')) {
+  const project = { format: FORMAT, version: VERSION, savedAt: new Date().toISOString(), name, nodes, edges, viewport, plc }
   downloadFile(JSON.stringify(project, null, 2), filename, 'application/json')
 }
 
@@ -41,6 +42,7 @@ export function normalizeProject(project) {
     nodes: nodes.map(normalizeNode),
     edges: edges.map(normalizeEdge),
     viewport: project.viewport,
+    name: typeof project.name === 'string' ? project.name : undefined,
     plc: project.plc ? { ...EMPTY_PLC, ...project.plc } : EMPTY_PLC,
   }
 }
