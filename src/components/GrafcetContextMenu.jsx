@@ -19,6 +19,8 @@ import {
   Square,
   Minus,
   Trash2,
+  SquareDashed,
+  Group,
 } from 'lucide-react'
 import ContextMenu from './ContextMenu'
 import { useQuickConnect } from '../lib/useQuickConnect'
@@ -28,10 +30,11 @@ import { transitionOutput } from '../lib/grafcetRules'
 import { VARIABLES_TABLE_ID } from '../nodes'
 import { VARIABLE_TYPES } from '../lib/addressing'
 import { NOTE_COLORS } from '../lib/notes'
+import { FRAME_KINDS } from '../lib/frames'
 
 // Menú contextual del lienzo: las opciones dependen de lo que se pulse con el botón derecho.
 // menu: { x, y, kind: 'node' | 'selection' | 'pane', nodeIds, flowPosition }
-export default function GrafcetContextMenu({ menu, onClose, onEdit, onAddNodeAt }) {
+export default function GrafcetContextMenu({ menu, onClose, onEdit, onAddNodeAt, onFrameAround }) {
   const { getNode, getEdges, updateNodeData } = useReactFlow()
   const quickConnect = useQuickConnect()
   const { arrange, addBranch, predecessorsOf, addAlternative, converge, toggleInitial, toggleMacro, addAction, remove } =
@@ -49,6 +52,9 @@ export default function GrafcetContextMenu({ menu, onClose, onEdit, onAddNodeAt 
       { label: 'Etapa aquí', icon: Square, onSelect: () => onAddNodeAt('step', {}, at) },
       { label: 'Transición aquí', icon: Minus, onSelect: () => onAddNodeAt('transition', {}, at) },
       { label: 'Nota aquí', icon: StickyNote, onSelect: () => onAddNodeAt('note', {}, at) },
+      'separator',
+      { label: 'Marco de grafcet parcial aquí', hint: 'G1', icon: SquareDashed, onSelect: () => onAddNodeAt('frame', { kind: 'grafcet' }, at) },
+      { label: 'Marco de expansión aquí', hint: 'M1', icon: SquareDashed, onSelect: () => onAddNodeAt('frame', { kind: 'macro' }, at) },
       ...(plcTable && !getNode(VARIABLES_TABLE_ID)
         ? ['separator', { label: 'Tabla de variables aquí', icon: Table2, onSelect: () => toggleTable(at) }]
         : []),
@@ -78,6 +84,13 @@ export default function GrafcetContextMenu({ menu, onClose, onEdit, onAddNodeAt 
         { label: 'Espaciar la secuencia', hint: 'distancia estándar', icon: AlignVerticalSpaceAround, onSelect: () => arrange(menu.nodeIds, 'space') },
       )
     }
+    if (steps.length + transitions.length >= 1) {
+      if (items.length) items.push('separator')
+      items.push(
+        { label: 'Encerrar en un grafcet parcial', hint: 'G…', icon: Group, onSelect: () => onFrameAround(menu.nodeIds, 'grafcet') },
+        { label: 'Encerrar como expansión de macroetapa', hint: 'M…', icon: Group, onSelect: () => onFrameAround(menu.nodeIds, 'macro') },
+      )
+    }
     if (items.length) items.push('separator')
     items.push({ label: 'Eliminar selección', icon: Trash2, danger: true, onSelect: () => remove(menu.nodeIds) })
   } else {
@@ -104,6 +117,29 @@ export default function GrafcetContextMenu({ menu, onClose, onEdit, onAddNodeAt 
             })),
             'separator',
             { label: 'Eliminar', icon: Trash2, danger: true, onSelect: () => remove([node.id]) },
+          ]}
+        />
+      )
+    }
+    if (node.type === 'frame') {
+      const other = node.data.kind === 'macro' ? 'grafcet' : 'macro'
+      return (
+        <ContextMenu
+          x={menu.x}
+          y={menu.y}
+          title={`${FRAME_KINDS[node.data.kind]?.label ?? 'Marco'} ${node.data.name}`}
+          onClose={onClose}
+          items={[
+            {
+              label: `Convertir en ${FRAME_KINDS[other].label.toLowerCase()}`,
+              icon: SquareDashed,
+              onSelect: () => {
+                takeSnapshot()
+                updateNodeData(node.id, { kind: other })
+              },
+            },
+            'separator',
+            { label: 'Eliminar el marco', hint: 'deja su contenido', icon: Trash2, danger: true, onSelect: () => remove([node.id]) },
           ]}
         />
       )

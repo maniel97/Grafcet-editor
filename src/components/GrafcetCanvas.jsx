@@ -35,6 +35,7 @@ import { useImageExport } from '../hooks/useImageExport'
 import { useTouchGestures } from '../hooks/useTouchGestures'
 import { setProjectName } from '../lib/fileNames'
 import { neighbor } from '../lib/keyboardNav'
+import { FRAME_SIZE, frameAround, membersOf, nextFrameName } from '../lib/frames'
 
 // Partes que no hacen falta al abrir el editor: se descargan la primera vez que se usan, para que
 // la carga inicial sea más ligera (importa sobre todo publicado en internet).
@@ -59,6 +60,7 @@ const defaultData = {
   step: (nodes) => ({ label: nextStepLabel(nodes), actions: [] }),
   transition: (nodes) => ({ condition: nextTransitionLabel(nodes) }),
   note: () => ({ text: '', color: 'yellow' }),
+  frame: () => ({ kind: 'grafcet' }),
 }
 
 export default function GrafcetCanvas() {
@@ -236,20 +238,62 @@ export default function GrafcetCanvas() {
       const rect = wrapperRef.current.getBoundingClientRect()
       const position = at ?? screenToFlowPosition({ x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 })
       const id = crypto.randomUUID()
-      setNodes((nds) => [
-        ...nds,
-        {
-          id,
-          type,
-          position: findFreePosition(position, type, nds),
-          data: { ...defaultData[type](nds), ...extra },
-          ...(type === 'note' ? NOTE_SIZE : {}),
-        },
-      ])
+      setNodes((nds) => {
+        const data = { ...defaultData[type](nds), ...extra }
+        // Marco: sin buscar hueco (rodea a otros nodos), con nombre libre y detrás de todo.
+        if (type === 'frame') {
+          return [...nds, { id, type, position, data: { ...data, name: nextFrameName(data.kind, nds) }, ...FRAME_SIZE, zIndex: -1 }]
+        }
+        return [...nds, { id, type, position: findFreePosition(position, type, nds), data, ...(type === 'note' ? NOTE_SIZE : {}) }]
+      })
       // Una nota nueva se abre directamente para escribir.
       if (type === 'note') setEditingNoteId(id)
     },
     [takeSnapshot, screenToFlowPosition, setNodes],
+  )
+
+  // Encierra unos nodos en un marco nuevo (grafcet parcial o expansión de macroetapa).
+  const frameAroundNodes = useCallback(
+    (nodeIds, kind) => {
+      const ids = new Set(nodeIds)
+      const inner = getNodes().filter((n) => ids.has(n.id) && n.type !== 'variables')
+      if (!inner.length) return
+      takeSnapshot()
+      setNodes((nds) => [
+        ...nds.map((n) => (n.selected ? { ...n, selected: false } : n)),
+        { id: crypto.randomUUID(), type: 'frame', ...frameAround(inner), data: { kind, name: nextFrameName(kind, nds) }, zIndex: -1, selected: true },
+      ])
+    },
+    [getNodes, takeSnapshot, setNodes],
+  )
+
+  // Al arrastrar un marco se mueve con su contenido (los marcos no son grupos de React Flow).
+  const frameDragRef = useRef(null)
+  const onNodeDragStart = useCallback(
+    (_, node, dragged) => {
+      takeSnapshot()
+      frameDragRef.current = null
+      if (node.type !== 'frame') return
+      const draggedIds = new Set(dragged.map((n) => n.id))
+      const members = membersOf(node, getNodes()).filter((m) => !draggedIds.has(m.id))
+      frameDragRef.current = { id: node.id, start: { ...node.position }, members: new Map(members.map((m) => [m.id, { ...m.position }])) }
+    },
+    [takeSnapshot, getNodes],
+  )
+  const onNodeDrag = useCallback(
+    (_, node) => {
+      const drag = frameDragRef.current
+      if (!drag || node.id !== drag.id || !drag.members.size) return
+      const dx = node.position.x - drag.start.x
+      const dy = node.position.y - drag.start.y
+      setNodes((nds) =>
+        nds.map((n) => {
+          const p = drag.members.get(n.id)
+          return p ? { ...n, position: { x: p.x + dx, y: p.y + dy } } : n
+        }),
+      )
+    },
+    [setNodes],
   )
 
   // Añade una acción a la etapa seleccionada y abre su panel para editarla.
@@ -526,7 +570,8 @@ export default function GrafcetCanvas() {
               isValidConnection={isValidConnection}
               onConnectStart={(_, { nodeId, handleType }) => setConnecting({ nodeId, handleType })}
               onConnectEnd={() => setConnecting(null)}
-              onNodeDragStart={() => takeSnapshot()}
+              onNodeDragStart={onNodeDragStart}
+              onNodeDrag={onNodeDrag}
               onSelectionDragStart={() => takeSnapshot()}
               onBeforeDelete={async () => {
                 takeSnapshot()
@@ -566,7 +611,7 @@ export default function GrafcetCanvas() {
               <GhostPreview preview={preview} />
             </ReactFlow>
             {menu && (
-              <GrafcetContextMenu menu={menu} onClose={closeMenu} onEdit={setEditingId} onAddNodeAt={addNode} />
+              <GrafcetContextMenu menu={menu} onClose={closeMenu} onEdit={setEditingId} onAddNodeAt={addNode} onFrameAround={frameAroundNodes} />
             )}
           </div>
           {simulating ? (

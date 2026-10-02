@@ -7,6 +7,16 @@ body,
   margin: 0;
 }
 
+/* Marcos (src/nodes/FrameNode.jsx): solo el nombre y los tiradores de tamaño atrapan el ratón;
+   el interior deja pasar los clics a lo que hay dentro. */
+/* (React Flow pone pointer-events: all en el estilo en línea del nodo: solo !important lo anula.) */
+.react-flow__node.react-flow__node-frame {
+  pointer-events: none !important;
+}
+.react-flow__node-frame .react-flow__resize-control {
+  pointer-events: auto;
+}
+
 /* Conectores (src/nodes/GrafcetHandle.jsx). Solo se muestran al pasar por el nodo, al
    seleccionarlo o durante una conexión: en Grafcet una etapa sin enlace de entrada (p. ej. la
    inicial sin bucle) no lleva nada encima. Las exportaciones los excluyen siempre. */

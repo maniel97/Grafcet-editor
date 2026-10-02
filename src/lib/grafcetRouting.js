@@ -47,9 +47,27 @@ function routingIndex(state) {
     if (yt > ys) {
       forwardOut.set(e.source, (forwardOut.get(e.source) ?? 0) + 1)
       forwardIn.set(e.target, (forwardIn.get(e.target) ?? 0) + 1)
-    } else if (yt < ys) loops.push({ id: e.id, top: yt, bottom: ys })
+    } else if (yt < ys) loops.push({ id: e.id, top: yt, bottom: ys, source: e.source })
   }
-  const index = { boxes, forwardOut, forwardIn, loops }
+  // Grafcets conexos: los obstáculos de un enlace son solo los de su mismo grafcet (dos grafcets
+  // independientes uno al lado del otro no se rodean entre sí).
+  const parent = new Map()
+  const find = (x) => {
+    while (parent.has(x) && parent.get(x) !== x) {
+      parent.set(x, parent.get(parent.get(x)) ?? parent.get(x))
+      x = parent.get(x)
+    }
+    return x
+  }
+  for (const e of edgeLookup.values()) {
+    if (!nodeLookup.has(e.source) || !nodeLookup.has(e.target)) continue
+    const a = find(e.source)
+    const b = find(e.target)
+    if (a !== b) parent.set(a, b)
+  }
+  for (const b of boxes) b.group = find(b.id)
+  for (const l of loops) l.group = find(l.source)
+  const index = { boxes, forwardOut, forwardIn, loops, groupOf: find }
   cache = { nodes: state.nodes, edges: state.edges, labelSpace, index }
   return index
 }
@@ -65,7 +83,8 @@ export function computeRoute(state, { id, source, target, sourceX, sourceY, targ
 
   const top = Math.min(sourceY, targetY) - STUB
   const bottom = Math.max(sourceY, targetY) + STUB
-  const inSpan = index.boxes.filter((b) => b.id !== source && b.id !== target && b.y < bottom && b.y + b.height > top)
+  const group = index.groupOf(source)
+  const inSpan = index.boxes.filter((b) => b.group === group && b.id !== source && b.id !== target && b.y < bottom && b.y + b.height > top)
 
   if (targetY < sourceY) {
     // Bucle: carril a la izquierda de todo lo que hay en su recorrido vertical. Los bucles
@@ -74,7 +93,7 @@ export function computeRoute(state, { id, source, target, sourceX, sourceY, targ
     const myBottom = src.internals.positionAbsolute.y
     let depth = 0
     for (const loop of index.loops) {
-      if (loop.id === id) continue
+      if (loop.id === id || loop.group !== group) continue
       const inside = loop.top >= myTop && loop.bottom <= myBottom
       if (inside && (loop.top !== myTop || loop.bottom !== myBottom)) depth++
     }

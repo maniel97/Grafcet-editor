@@ -34,6 +34,9 @@ describe('trazado de enlaces', () => {
   ]
   const r = routes(chain, [
     ['e1', 's0', 't1'],
+    ['e2', 't1', 's1'],
+    ['e3', 's1', 't2'],
+    ['e4', 's2', 't3'],
     ['loop0', 't3', 's0'],
     ['loop1', 't2', 's1'],
     ['skip', 's0', 's2'],
@@ -98,5 +101,27 @@ describe('trazado de enlaces', () => {
   it('divergencia en O: dobla justo debajo de la etapa', () => {
     const or = routes([internal('s1', 'step', 200, 210), internal('t2', 'transition', 440, 310)], [['d', 's1', 't2']])
     expect(or.d.path).toBe('M 228 266 V 286 H 468 V 310')
+  })
+})
+
+describe('grafcets independientes uno al lado del otro', () => {
+  // G1 en x = 0 y G2 en x = 400, cada uno con su bucle: el de G2 no rodea a G1.
+  const g = (p, x) => [
+    internal(`${p}s0`, 'step', x, 40),
+    internal(`${p}t1`, 'transition', x, 140),
+    internal(`${p}s1`, 'step', x, 210),
+    internal(`${p}t2`, 'transition', x, 310),
+  ]
+  const edges = (p) => [
+    [`${p}a`, `${p}s0`, `${p}t1`],
+    [`${p}b`, `${p}t1`, `${p}s1`],
+    [`${p}c`, `${p}s1`, `${p}t2`],
+    [`${p}loop`, `${p}t2`, `${p}s0`],
+  ]
+  const r = routes([...g('A', 0), ...g('B', 400)], [...edges('A'), ...edges('B')])
+
+  it('cada bucle va a la izquierda de su propio grafcet', () => {
+    expect(r.Aloop.route).toMatchObject({ kind: 'loop', laneX: -30 })
+    expect(r.Bloop.route).toMatchObject({ kind: 'loop', laneX: 370 })
   })
 })

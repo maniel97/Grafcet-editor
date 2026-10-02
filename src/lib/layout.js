@@ -69,7 +69,8 @@ const overlaps = (a, b) =>
 // hasta encontrar sitio libre.
 export function findFreePosition(position, type, nodes) {
   const candidate = rectOf({ type, position: { x: snap(position.x), y: snap(position.y) } })
-  const others = nodes.map(rectOf)
+  // Los marcos rodean a otros nodos: no ocupan sitio.
+  const others = nodes.filter((n) => n.type !== 'frame').map(rectOf)
   for (let i = 0; i < 50 && others.some((r) => overlaps(candidate, r)); i++) {
     candidate.x += COLUMN_SHIFT
   }

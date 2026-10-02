@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { buildPlcModel } from '../plcModel'
-import { compile, evolve, initialState, inspect } from './engine'
+import { compile, evolve, initialState, inspect, withMacros } from './engine'
 import { advanceWithEvents, recordEvent } from './scenario'
 
 const TICK_MS = 50
@@ -10,7 +10,8 @@ const MAX_SAMPLES = 4000
 // Señales binarias que se registran para el cronograma: etapas, entradas y salidas.
 function sampleOf(compiled, state) {
   const sample = {}
-  for (const s of compiled.steps) sample[s.variable] = state.active.has(s.id) ? 1 : 0
+  const active = withMacros(compiled, state.active)
+  for (const s of compiled.steps) sample[s.variable] = active.has(s.id) ? 1 : 0
   for (const v of compiled.variables) {
     if (v.type === 'input' || v.type === 'output') sample[v.name] = Number(state.values[v.name]) ? 1 : 0
   }
@@ -54,10 +55,10 @@ export function useSimulation(nodes, edges, plc, enabled) {
             ...current.log,
             ...events.map((e) => ({
               time: e.time,
-              transitionId: e.transitionId,
-              text: `«${e.condition || '—'}»: ${e.from.map(variable).join(', ') || '—'} → ${
-                e.to.map(variable).join(', ') || '—'
-              }`,
+              transitionId: e.transitionId ?? e.stepId,
+              text: `${e.forcing ? `Forzado ${e.forcing} (${variable(e.stepId)})` : `«${e.condition || '—'}»`}: ${
+                e.from.map(variable).join(', ') || '—'
+              } → ${e.to.map(variable).join(', ') || '—'}`,
             })),
           ].slice(-MAX_LOG)
         : current.log
@@ -162,7 +163,7 @@ export function useSimulation(nodes, edges, plc, enabled) {
   const view = useMemo(() => {
     if (!compiled || !sim) return null
     const { enabled: validated, ready } = inspect(compiled, sim.state)
-    return { active: sim.state.active, enabled: validated, ready, values: sim.state.values }
+    return { active: withMacros(compiled, sim.state.active), enabled: validated, ready, values: sim.state.values }
   }, [compiled, sim])
   const viewKey = view
     ? [

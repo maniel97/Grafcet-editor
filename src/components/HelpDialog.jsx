@@ -29,6 +29,14 @@ const NOTATION = [
     'Botón Ladder: una marca por etapa con SET/RESET (inicialización, condiciones de franqueo, desactivación, activación, temporizaciones, acciones memorizadas y salidas). Exporta el esquema (SVG, PNG, PDF) y el programa en texto estructurado (ST) y AWL de S7.',
   ],
   [
+    'Grafcets parciales y forzado',
+    'Selecciona etapas y, con el botón derecho, «Encerrar en un grafcet parcial» (marco G1, G2...). Una acción F/G2{3} fuerza G2 a tener solo la etapa 3 activa mientras dure la etapa; F/G2{} lo vacía, F/G2{*} lo congela y F/G2{INIT} lo reinicia. El grafcet forzado no evoluciona.',
+  ],
+  [
+    'Macroetapas',
+    'Convierte una etapa en macroetapa (M1) y dibuja su expansión en un marco «M1» con una etapa de entrada E1 y una de salida S1. Activar M1 activa E1, y la transición siguiente a M1 solo se franquea con S1 activa.',
+  ],
+  [
     'Escenarios de prueba',
     'En la simulación, «Grabar escenario» anota los cambios de entradas con su instante; se guardan en el proyecto y se reproducen con un clic (a la velocidad elegida). El cronograma completo se exporta en SVG o CSV.',
   ],

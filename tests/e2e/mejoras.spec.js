@@ -355,3 +355,45 @@ test('escenarios: grabar, guardar en el proyecto, reproducir y exportar el crono
   expect(readFileSync(await csv.path(), 'utf8')).toContain('t (s);X0;X1;Marcha;Paro;Motor M1')
   expectNoErrors(errors)
 })
+
+test('marcos: encerrar la selección, renombrar, mover con el contenido y forzados en Verificar', async ({ page }) => {
+  const errors = await openEditor(page)
+  const steps = page.locator('.react-flow__node-step')
+  // Seleccionar todo y encerrarlo en un grafcet parcial.
+  await page.locator('.react-flow__pane').click({ position: { x: 600, y: 500 } })
+  await page.keyboard.press('Control+a')
+  await steps.first().click({ button: 'right' })
+  await page.getByRole('menuitem', { name: 'Encerrar en un grafcet parcial' }).click()
+  const frame = page.locator('.react-flow__node-frame')
+  await expect(frame).toHaveCount(1)
+  await expect(frame).toContainText('G1')
+
+  // Renombrar con doble clic en el nombre.
+  await frame.getByText('G1', { exact: true }).dblclick()
+  await page.getByLabel('Nombre del marco').fill('G7')
+  await page.keyboard.press('Enter')
+  await expect(frame).toContainText('G7')
+
+  // Arrastrar el marco por su nombre mueve también su contenido; un solo Ctrl+Z lo devuelve.
+  const before = await steps.first().boundingBox()
+  const label = await frame.getByText('G7', { exact: true }).boundingBox()
+  await page.mouse.move(label.x + 5, label.y + 5)
+  await page.mouse.down()
+  await page.mouse.move(label.x + 105, label.y + 65, { steps: 8 })
+  await page.mouse.up()
+  const after = await steps.first().boundingBox()
+  expect(Math.round(after.x - before.x)).toBeGreaterThan(80)
+  expect(Math.round(after.y - before.y)).toBeGreaterThan(40)
+  await page.keyboard.press('Control+z')
+  await expect.poll(async () => Math.round((await steps.first().boundingBox()).x - before.x)).toBe(0)
+
+  // Un forzado a un grafcet que no existe es un error de Verificar.
+  await steps.nth(1).dblclick()
+  const panel = page.locator('aside.side-panel')
+  await panel.getByRole('button', { name: /Añadir acción$/ }).click()
+  await panel.getByLabel('Texto de la acción').last().fill('F/G9{1}')
+  await page.keyboard.press('Escape')
+  await page.getByTitle('Verificar conformidad con IEC 60848').click()
+  await expect(page.getByText('F/G9{…} se refiere a un grafcet parcial que no existe', { exact: false })).toBeVisible()
+  expectNoErrors(errors)
+})

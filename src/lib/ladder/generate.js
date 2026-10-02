@@ -8,9 +8,13 @@
 //     hay franqueos en cascada dentro del mismo ciclo (la evolución fugaz sigue en el siguiente).
 //  4. Desactivación (RESET de las etapas anteriores) y 5. Activación (SET de las siguientes):
 //     por ir la activación después, una etapa desactivada y activada a la vez queda activa.
+//     Forzados (F/G2{3}): tras la activación, SET de las etapas indicadas y RESET del resto del
+//     grafcet forzado; además, las transiciones de ese grafcet llevan en serie el contacto
+//     cerrado de la etapa que fuerza, para que no evolucione mientras dura la orden.
 //  6. Temporizaciones: TON por cada "5s/Xn".
 //  7. Acciones memorizadas: en la activación / desactivación (con Tr_n) y al evento.
-//  8. Salidas: acciones continuas y condicionadas, todas las etapas de una salida en paralelo.
+//  8. Salidas: acciones continuas y condicionadas, todas las etapas de una salida en paralelo,
+//     y la marca de cada macroetapa (activa con cualquier etapa de su expansión).
 
 import { buildPlcModel } from '../plcModel'
 import { compile } from '../sim/engine'
@@ -93,12 +97,23 @@ export function generateLadder(nodes, edges, plc) {
   })
   if (!initial.length) warnings.push({ nodeId: null, message: 'No hay etapa inicial: el programa no arrancará.' })
 
+  // Etapas que ordenan un forzado del grafcet de la transición.
+  const forcersOf = (t) => {
+    const grafcets = new Set(t.from.map((id) => compiled.grafcetOf.get(id)).filter(Boolean))
+    return [...new Set(compiled.forcings.filter((f) => grafcets.has(f.grafcet)).map((f) => f.stepId))]
+  }
+
   // 3. Condiciones de franqueo
   const transitionRungs = transitions.map((t) => ({
     comment: `${trName.get(t.id)}: ${t.from.map((id) => stepVar(label(id), P)).join(' · ') || '(sin etapa anterior)'} · «${t.condition || '—'}»  →  ${
       t.to.map((id) => stepVar(label(id), P)).join(', ') || '—'
     }`,
-    network: series(...t.from.map((id) => contact(stepOp(label(id)))), safeNetwork(t.ast, t.id)),
+    network: series(
+      ...t.from.map((id) => contact(stepOp(label(id)))),
+      safeNetwork(t.ast, t.id),
+      // Bloqueo por forzado del grafcet al que pertenece.
+      ...forcersOf(t).map((id) => contact(stepOp(label(id)), 'NC')),
+    ),
     outputs: [{ type: 'coil', operand: transOp(trName.get(t.id)) }],
     nodeIds: [t.id],
     error: !t.ast,
@@ -131,6 +146,28 @@ export function generateLadder(nodes, edges, plc) {
       })),
   })
 
+  // Forzados: después de la activación, para que tengan prioridad sobre la evolución.
+  sections.push({
+    id: 'forcing',
+    title: 'Forzados',
+    rungs: compiled.forcings
+      .filter((f) => f.mode !== 'freeze')
+      .map((f) => {
+        const members = [...compiled.grafcets.get(f.grafcet)]
+        return {
+          comment: `${stepVar(label(f.stepId), P)} ordena ${f.text}: ${
+            f.targets.size ? `activa ${[...f.targets].map((id) => stepVar(label(id), P)).join(', ')}` : 'ninguna etapa activa'
+          }`,
+          network: contact(stepOp(label(f.stepId))),
+          outputs: [
+            ...members.filter((id) => !f.targets.has(id)).map((id) => ({ type: 'reset', operand: stepOp(label(id)) })),
+            ...[...f.targets].map((id) => ({ type: 'set', operand: stepOp(label(id)) })),
+          ],
+          nodeIds: [f.stepId],
+        }
+      }),
+  })
+
   // 7 y 8 se construyen antes que 6 para recoger todas las temporizaciones usadas.
   const storedRungs = []
   const outputBranches = new Map() // símbolo -> [red]
@@ -159,6 +196,12 @@ export function generateLadder(nodes, edges, plc) {
       }
     }
   }
+  const macroRungs = [...compiled.macroMembers].map(([id, members]) => ({
+    comment: `Macroetapa ${stepVar(label(id), P)}: activa con cualquier etapa de su expansión`,
+    network: parallel(...members.map((m) => contact(stepOp(label(m))))),
+    outputs: [{ type: 'coil', operand: stepOp(label(id)) }],
+    nodeIds: [id],
+  }))
   const outputRungs = [...outputBranches].map(([symbol, list]) => ({
     comment: `Salida ${symbol}: ${list.map((l) => stepVar(label(l.stepId), P)).join(' + ')}`,
     network: parallel(...list.map((l) => l.branch)),
@@ -184,7 +227,7 @@ export function generateLadder(nodes, edges, plc) {
     })),
   })
   sections.push({ id: 'stored', title: 'Acciones memorizadas', rungs: storedRungs })
-  sections.push({ id: 'outputs', title: 'Salidas', rungs: outputRungs })
+  sections.push({ id: 'outputs', title: 'Salidas', rungs: [...macroRungs, ...outputRungs] })
   // Los auxiliares pueden surgir en cualquier red (receptividades o acciones): van tras la
   // inicialización, antes de que se usen.
   if (auxRungs.length) sections.splice(1, 0, { id: 'aux', title: 'Auxiliares', rungs: auxRungs })

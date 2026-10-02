@@ -107,3 +107,26 @@ describe('trabajos anteriores', () => {
     expect(list[0].reason).toBe('p7') // el más reciente siempre se conserva
   })
 })
+
+describe('ejemplos de la norma: forzado y macroetapa', () => {
+  it('paro de emergencia: F/G2{} detiene la producción y F/G2{INIT} la reinicia', () => {
+    const sim = simulator(EXAMPLES.find((e) => e.id === 'emergencia'))
+    expect(sim.at(0)).toBe('0,10')
+    expect(sim.at(1, { Marcha: 1 })).toBe('1,10')
+    expect(sim.value('Avanzar')).toBe(1)
+    expect(sim.at(2, { Marcha: 0, Emergencia: 1 })).toBe('11') // G2 vacío
+    expect(sim.value('Avanzar')).toBe(0)
+    expect(sim.at(3, { Emergencia: 1, Fc_delante: 1 })).toBe('11') // G2 forzado: no evoluciona
+    expect(sim.at(4, { Emergencia: 0, Fc_delante: 0, Rearme: 1 })).toBe('0,10') // reinicio por 12 (fugaz)
+  })
+  it('macroetapa: M1 -> E1 ... S1 -> 2', () => {
+    const sim = simulator(EXAMPLES.find((e) => e.id === 'macroetapa'))
+    expect(sim.at(0)).toBe('0')
+    expect(sim.at(1, { Marcha: 1 })).toBe('E1')
+    expect(sim.at(2, { Marcha: 0, Retirar: 1 })).toBe('E1') // falta la salida S1
+    expect(sim.at(3, { Retirar: 0, Nivel: 1 })).toBe('11')
+    expect(sim.at(24, { Nivel: 0 })).toBe('S1')
+    expect(sim.value('Listo')).toBe(1)
+    expect(sim.at(25, { Retirar: 1 })).toBe('2')
+  })
+})

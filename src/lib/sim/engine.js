@@ -10,10 +10,15 @@
 // una situación estable. Las acciones continuas solo se emiten en situación estable; las
 // memorizadas (en la activación / desactivación) se ejecutan aunque la situación sea fugaz.
 //
+// Forzado de grafcets parciales (F/G2{3}): mientras la etapa que lo ordena está activa, el
+// grafcet forzado toma la situación indicada y no evoluciona por sí mismo (el forzado tiene
+// prioridad sobre las reglas de evolución). Macroetapas: ver lib/plcModel.js.
+//
 // Todo es puro: compile() prepara el modelo y evolve() calcula el estado siguiente.
 
 import { normalizeAction } from '../actions'
 import { actionSymbol } from '../symbols'
+import { describeForcing } from '../forcing'
 import { ExpressionError, evaluate, evaluateArithmetic, parseAssignment, parseCondition, truthy } from './expression'
 
 const MAX_ITERATIONS = 100
@@ -62,8 +67,60 @@ export function compile(model) {
     }
   }
 
-  return { steps, transitions, stepByLabel, driven, variables: model.variables, errors }
+  // Grafcets parciales y órdenes de forzado, con las etapas ya resueltas a ids.
+  const grafcets = new Map((model.grafcets ?? []).map((g) => [g.name, new Set(g.steps)]))
+  const grafcetOf = new Map(steps.filter((s) => s.grafcet).map((s) => [s.id, s.grafcet]))
+  const forcings = []
+  for (const s of steps) {
+    for (const f of s.forcings ?? []) {
+      const members = grafcets.get(f.grafcet)
+      // Un grafcet no puede forzarse a sí mismo (lo marca Verificar).
+      if (!members || s.grafcet === f.grafcet) continue
+      const byLabel = new Map([...members].map((id) => [String(steps.find((x) => x.id === id)?.label), id]))
+      const targets =
+        f.mode === 'steps'
+          ? new Set(f.steps.map((l) => byLabel.get(String(l))).filter(Boolean))
+          : f.mode === 'init'
+            ? new Set([...members].filter((id) => steps.find((x) => x.id === id)?.initial))
+            : new Set()
+      forcings.push({ stepId: s.id, grafcet: f.grafcet, mode: f.mode, targets, text: describeForcing(f) })
+    }
+  }
+  // Macroetapas: activas mientras lo esté alguna etapa de su expansión.
+  const macroMembers = new Map((model.macros ?? []).map((m) => [m.stepId, m.members]))
+
+  return { steps, transitions, stepByLabel, driven, variables: model.variables, errors, grafcets, grafcetOf, forcings, macroMembers }
 }
+
+// Etapas activas vistas desde fuera: incluye las macroetapas con alguna etapa activa.
+export function withMacros(compiled, active) {
+  if (!compiled.macroMembers?.size) return active
+  const out = new Set(active)
+  for (const [id, members] of compiled.macroMembers) if (members.some((m) => active.has(m))) out.add(id)
+  return out
+}
+
+// Órdenes de forzado vigentes en una situación: Map grafcet -> orden (la primera, si hay varias).
+function forcingOrders(compiled, active) {
+  const orders = new Map()
+  for (const f of compiled.forcings) if (active.has(f.stepId) && !orders.has(f.grafcet)) orders.set(f.grafcet, f)
+  return orders
+}
+
+// Aplica los forzados (salvo {*}, que solo congela): las etapas del grafcet forzado quedan
+// exactamente las indicadas.
+function applyForcing(compiled, active, orders) {
+  let next = active
+  for (const [name, order] of orders) {
+    if (order.mode === 'freeze') continue
+    const members = compiled.grafcets.get(name)
+    const result = new Set([...next].filter((id) => !members.has(id)))
+    for (const id of order.targets) result.add(id)
+    next = result
+  }
+  return next
+}
+const sameSet = (a, b) => a.size === b.size && [...a].every((x) => b.has(x))
 
 export function initialState(compiled) {
   const active = new Set(compiled.steps.filter((s) => s.initial).map((s) => s.id))
@@ -80,7 +137,11 @@ export function initialState(compiled) {
 }
 
 function makeContext(compiled, values, active, activatedAt, time, prev) {
-  const stepActive = (label) => active.has(compiled.stepByLabel.get(String(label)))
+  const stepActive = (label) => {
+    const id = compiled.stepByLabel.get(String(label))
+    const members = compiled.macroMembers?.get(id)
+    return members ? members.some((m) => active.has(m)) : active.has(id)
+  }
   return {
     value: (name) => values[name] ?? 0,
     step: stepActive,
@@ -117,17 +178,25 @@ export function evolve(compiled, state, inputs, time, { singleStep = false } = {
 
   for (let iteration = 0; ; iteration++) {
     const ctx = makeContext(compiled, values, active, activatedAt, time, prev)
-    const firable = compiled.transitions.filter((t) => t.from.every((id) => active.has(id)) && evalBool(t.ast, ctx))
-    if (!firable.length) break
+    // Las transiciones de un grafcet forzado no se franquean.
+    const forced = forcingOrders(compiled, active)
+    const firable = compiled.transitions.filter(
+      (t) => t.from.every((id) => active.has(id)) && !t.from.some((id) => forced.has(compiled.grafcetOf.get(id))) && evalBool(t.ast, ctx),
+    )
 
     const deactivated = new Set(firable.flatMap((t) => t.from))
     const activated = new Set(firable.flatMap((t) => t.to))
-    const next = new Set([...active].filter((id) => !deactivated.has(id) || activated.has(id)))
-    for (const id of activated) next.add(id)
+    const evolved = new Set([...active].filter((id) => !deactivated.has(id) || activated.has(id)))
+    for (const id of activated) evolved.add(id)
+    // Forzados ordenados por la nueva situación.
+    const orders = forcingOrders(compiled, evolved)
+    const next = applyForcing(compiled, evolved, orders)
+    if (!firable.length && sameSet(next, active)) break
+    for (const id of next) if (!evolved.has(id)) activated.add(id)
 
     for (const step of compiled.steps) {
       const leaves = active.has(step.id) && !next.has(step.id)
-      const enters = activated.has(step.id)
+      const enters = activated.has(step.id) && next.has(step.id)
       if (leaves) {
         activatedAt.delete(step.id)
         for (const a of step.actions) if (a.kind === 'stored-off') runStored(a, values, ctx)
@@ -141,6 +210,14 @@ export function evolve(compiled, state, inputs, time, { singleStep = false } = {
     for (const t of firable) {
       fired.add(t.id)
       events.push({ time, transitionId: t.id, condition: t.condition, from: t.from, to: t.to })
+    }
+    for (const [name, order] of orders) {
+      const members = compiled.grafcets.get(name)
+      const before = [...evolved].filter((id) => members.has(id))
+      const after = [...next].filter((id) => members.has(id))
+      if (order.mode !== 'freeze' && !sameSet(new Set(before), new Set(after))) {
+        events.push({ time, transitionId: null, forcing: order.text, stepId: order.stepId, from: before, to: after })
+      }
     }
     prev = { values: { ...values }, active, activatedAt: new Map(activatedAt) }
     active = next
@@ -184,8 +261,10 @@ export function inspect(compiled, state) {
   const ctx = makeContext(compiled, state.values, state.active, state.activatedAt, state.time, null)
   const enabled = new Set()
   const ready = new Set()
+  // En un grafcet forzado ninguna transición está validada.
+  const forced = forcingOrders(compiled, state.active)
   for (const t of compiled.transitions) {
-    if (!t.from.every((id) => state.active.has(id))) continue
+    if (!t.from.every((id) => state.active.has(id)) || t.from.some((id) => forced.has(compiled.grafcetOf.get(id)))) continue
     enabled.add(t.id)
     if (evalBool(t.ast, ctx)) ready.add(t.id)
   }

@@ -7,6 +7,7 @@ import { NOTE_SIZE } from './notes'
 const step = (id, label, x, y, actions = [], extra = {}) => ({ id, type: 'step', position: { x, y }, data: { label, actions, ...extra } })
 const trans = (id, condition, x, y) => ({ id, type: 'transition', position: { x, y }, data: { condition } })
 const note = (id, x, y, text, size = {}) => ({ id, type: 'note', position: { x, y }, data: { text, color: 'yellow' }, ...NOTE_SIZE, height: 150, ...size })
+const frame = (id, name, kind, x, y, width, height) => ({ id, type: 'frame', position: { x, y }, width, height, zIndex: -1, data: { name, kind } })
 const links = (pairs) => pairs.map(([source, target]) => ({ id: `${source}-${target}`, source, target, type: 'grafcet' }))
 
 // Secuencia lineal en columna que vuelve al principio: [etapa, transición, etapa, transición...].
@@ -135,6 +136,94 @@ export const EXAMPLES = [
         ['t7', 's7'],
         ['s7', 't8'],
         ['t8', 's0'],
+      ])
+      return { nodes, edges }
+    },
+  },
+  {
+    id: 'emergencia',
+    title: 'Paro de emergencia (forzado)',
+    description: 'Dos grafcets parciales: el de seguridad G1 fuerza al de producción G2 a parar y a reiniciarse.',
+    tags: ['Grafcets parciales', 'Forzado'],
+    build() {
+      const nodes = [
+        frame('g1', 'G1', 'grafcet', -40, -40, 400, 560),
+        step('s10', '10', 0, 0, [], { initial: true }),
+        trans('t10', 'Emergencia', 0, 100),
+        step('s11', '11', 0, 170, ['F/G2{}', 'Alarma']),
+        trans('t11', 'Rearme · !Emergencia', 0, 270),
+        step('s12', '12', 0, 340, ['F/G2{INIT}']),
+        trans('t12', '1', 0, 440),
+        frame('g2', 'G2', 'grafcet', 420, -40, 340, 560),
+        step('s0', '0', 460, 0, [], { initial: true }),
+        trans('t1', 'Marcha', 460, 100),
+        step('s1', '1', 460, 170, ['Avanzar']),
+        trans('t2', 'Fc_delante', 460, 270),
+        step('s2', '2', 460, 340, ['Retroceder']),
+        trans('t3', 'Fc_detras', 460, 440),
+        note(
+          'nota',
+          800,
+          0,
+          'Paro de emergencia\n\nG1 vigila la seguridad. Con Emergencia, la etapa 11 ordena F/G2{}: la producción (G2) se queda sin ninguna etapa activa y no evoluciona.\n\nCon Rearme (y sin emergencia), la etapa 12 ordena F/G2{INIT}: G2 vuelve a su situación inicial.',
+          { width: 300, height: 260 },
+        ),
+      ]
+      const edges = links([
+        ['s10', 't10'],
+        ['t10', 's11'],
+        ['s11', 't11'],
+        ['t11', 's12'],
+        ['s12', 't12'],
+        ['t12', 's10'],
+        ['s0', 't1'],
+        ['t1', 's1'],
+        ['s1', 't2'],
+        ['t2', 's2'],
+        ['s2', 't3'],
+        ['t3', 's0'],
+      ])
+      return { nodes, edges }
+    },
+  },
+  {
+    id: 'macroetapa',
+    title: 'Dosificadora (macroetapa)',
+    description: 'La macroetapa M1 se detalla en su expansión, de la etapa de entrada E1 a la de salida S1.',
+    tags: ['Macroetapa', 'Temporización'],
+    build() {
+      const nodes = [
+        step('s0', '0', 0, 0, [], { initial: true }),
+        trans('t1', 'Marcha', 0, 100),
+        step('m1', 'M1', 0, 170, [], { macro: true }),
+        trans('t2', 'Retirar', 0, 270),
+        step('s2', '2', 0, 340, ['Expulsar']),
+        trans('t3', 'Fc_expulsion', 0, 440),
+        frame('fm1', 'M1', 'macro', 340, -40, 360, 460),
+        step('e1', 'E1', 380, 0, ['Llenar']),
+        trans('t11', 'Nivel', 380, 100),
+        step('s11', '11', 380, 170, ['Calentar']),
+        trans('t12', '20s/X11', 380, 270),
+        step('x1', 'S1', 380, 340, ['Listo']),
+        note(
+          'nota',
+          760,
+          0,
+          'Macroetapa\n\nAl activarse M1 se activa su etapa de entrada E1. La transición que sigue a M1 (Retirar) solo puede franquearse cuando está activa la etapa de salida S1.',
+          { width: 280, height: 200 },
+        ),
+      ]
+      const edges = links([
+        ['s0', 't1'],
+        ['t1', 'm1'],
+        ['m1', 't2'],
+        ['t2', 's2'],
+        ['s2', 't3'],
+        ['t3', 's0'],
+        ['e1', 't11'],
+        ['t11', 's11'],
+        ['s11', 't12'],
+        ['t12', 'x1'],
       ])
       return { nodes, edges }
     },

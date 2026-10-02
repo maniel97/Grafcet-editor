@@ -1,4 +1,5 @@
 import { normalizeAction } from './actions'
+import { isForcing } from './forcing'
 
 // Detección de las variables que usa el grafcet, para la tabla de variables:
 // - receptividades y condiciones de acción -> entradas (identificadores)
@@ -49,7 +50,8 @@ export function addressExpression(text, lookup) {
 export function actionSymbol(action) {
   const { text } = normalizeAction(action)
   const trimmed = text.trim()
-  if (!trimmed) return null
+  // Las órdenes de forzado (F/G2{3}) no son variables.
+  if (!trimmed || isForcing(trimmed)) return null
   const assignment = /^([\p{L}_][\p{L}\p{N}_.]*)\s*:=\s*(.*)$/u.exec(trimmed)
   if (!assignment) return { symbol: trimmed, type: 'output' }
   // "A:=1" / "A:=0" es un bit; "C:=C+1", "N:=5" es un valor numérico (palabra).

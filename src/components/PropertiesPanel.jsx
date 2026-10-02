@@ -55,7 +55,8 @@ function ActionRow({ action, onChange, onRemove }) {
         <input
           className={inputClass}
           value={action.text}
-          placeholder="p. ej. Motor ON, A:=1"
+          placeholder="p. ej. Motor ON, A:=1, F/G2{3}"
+          aria-label="Texto de la acción"
           onChange={(e) => onChange({ text: e.target.value })}
         />
         <button

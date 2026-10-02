@@ -3,6 +3,10 @@
 // - error: el grafcet no es conforme o no puede evolucionar.
 // - warning: es sintácticamente válido pero probablemente no es lo que se quiere.
 
+import { frameOf, macroName, membersOf } from './frames'
+import { parseForcing } from './forcing'
+import { normalizeAction } from './actions'
+
 const stepName = (n) => `Etapa ${n.data.label?.trim() || '(sin número)'}`
 const transitionName = (n) => `Transición «${n.data.condition?.trim() || 'sin receptividad'}»`
 const nameOf = (n) => (n.type === 'step' ? stepName(n) : transitionName(n))
@@ -27,6 +31,72 @@ export function validateGrafcet(nodes, edges) {
   const incoming = (id) => incomingOf.get(id) ?? []
   const outgoing = (id) => outgoingOf.get(id) ?? []
   const y = (id) => byId.get(id).position.y
+
+  // Marcos (grafcets parciales y expansiones de macroetapas) y órdenes de forzado.
+  const frames = nodes.filter((n) => n.type === 'frame')
+  const frameName = (f) => String(f.data.name ?? '').trim().toUpperCase()
+  const grafcetOf = (n) => (frameOf(n, frames, 'grafcet') ? frameName(frameOf(n, frames, 'grafcet')) : null)
+  const byFrameName = new Map()
+  for (const f of frames) {
+    if (!frameName(f)) add('error', 'Marco sin nombre: un grafcet parcial se llama G1, G2...; una expansión, como su macroetapa (M1).', [f.id])
+    else byFrameName.set(frameName(f), [...(byFrameName.get(frameName(f)) ?? []), f])
+  }
+  for (const [name, list] of byFrameName) {
+    if (list.length > 1) add('error', `El nombre ${name} está repetido en ${list.length} marcos.`, list.map((f) => f.id))
+  }
+  // Expansiones: entrada E.. y salida S.. (o la etapa sin entrada / sin salida dentro del marco).
+  const expansions = new Map() // id de la macroetapa -> { entry, exit, members }
+  const expansionRole = new Map() // id de etapa -> 'entry' | 'exit'
+  for (const f of frames.filter((x) => x.data.kind === 'macro')) {
+    const macro = steps.find((s) => s.data.macro && macroName(s.data.label) === frameName(f))
+    if (!macro) {
+      add('warning', `La expansión ${frameName(f)} no corresponde a ninguna macroetapa: crea la macroetapa ${frameName(f)} o renombra el marco.`, [f.id])
+      continue
+    }
+    const members = membersOf(f, steps)
+    const find = (re, dir) =>
+      members.find((s) => re.test(String(s.data.label))) ?? members.find((s) => (dir === 'in' ? incoming(s.id) : outgoing(s.id)).length === 0)
+    const entry = find(/^E/i, 'in')
+    const exit = find(/^S/i, 'out')
+    if (!entry) add('error', `La expansión ${frameName(f)} no tiene etapa de entrada (E${frameName(f).slice(1)}).`, [f.id])
+    if (!exit) add('error', `La expansión ${frameName(f)} no tiene etapa de salida (S${frameName(f).slice(1)}).`, [f.id])
+    if (entry) expansionRole.set(entry.id, 'entry')
+    if (exit) expansionRole.set(exit.id, 'exit')
+    expansions.set(macro.id, { entry, exit, members })
+  }
+  for (const s of steps) {
+    if (s.data.macro && !expansions.has(s.id)) {
+      add('warning', `Macroetapa ${macroName(s.data.label)} sin expansión: dibuja un marco «${macroName(s.data.label)}» con sus etapas (de E a S). Mientras tanto se simula como una etapa normal.`, [s.id])
+    }
+  }
+  // Forzados: grafcet destino existente, distinto del propio y con esas etapas.
+  const grafcetSteps = new Map()
+  for (const s of steps) {
+    const g = grafcetOf(s)
+    if (g) grafcetSteps.set(g, [...(grafcetSteps.get(g) ?? []), s])
+  }
+  const forcedOn = new Map() // id de etapa que fuerza -> [ids de etapas que activa]
+  for (const s of steps) {
+    for (const raw of s.data.actions ?? []) {
+      const f = parseForcing(normalizeAction(raw).text)
+      if (!f) continue
+      const isGrafcet = frames.some((x) => x.data.kind === 'grafcet' && frameName(x) === f.grafcet)
+      if (!isGrafcet) {
+        add('error', `${stepName(s)}: el forzado F/${f.grafcet}{…} se refiere a un grafcet parcial que no existe (encierra sus etapas en un marco «${f.grafcet}»).`, [s.id])
+        continue
+      }
+      if (grafcetOf(s) === f.grafcet) {
+        add('error', `${stepName(s)}: un grafcet no puede forzarse a sí mismo (F/${f.grafcet}).`, [s.id])
+        continue
+      }
+      const members = grafcetSteps.get(f.grafcet) ?? []
+      const missing = f.steps.filter((l) => !members.some((m) => String(m.data.label) === String(l)))
+      if (missing.length) add('error', `${stepName(s)}: ${missing.map((l) => `la etapa ${l}`).join(', ')} no ${missing.length > 1 ? 'son' : 'es'} del grafcet ${f.grafcet}.`, [s.id])
+      const targets = f.mode === 'init' ? members.filter((m) => m.data.initial) : members.filter((m) => f.steps.includes(String(m.data.label)))
+      forcedOn.set(s.id, [...(forcedOn.get(s.id) ?? []), ...targets.map((m) => m.id)])
+    }
+  }
+  const forcedTargets = new Set([...forcedOn.values()].flat())
 
   // Situación inicial: sin etapa inicial el grafcet no puede arrancar.
   if (steps.length && !steps.some((s) => s.data.initial)) {
@@ -62,10 +132,10 @@ export function validateGrafcet(nodes, edges) {
   }
 
   for (const s of steps) {
-    if (!s.data.initial && incoming(s.id).length === 0) {
+    if (!s.data.initial && incoming(s.id).length === 0 && expansionRole.get(s.id) !== 'entry' && !forcedTargets.has(s.id)) {
       add('warning', `${stepName(s)} no tiene enlace de entrada: nunca se activará.`, [s.id])
     }
-    if (outgoing(s.id).length === 0) {
+    if (outgoing(s.id).length === 0 && expansionRole.get(s.id) !== 'exit') {
       add('warning', `${stepName(s)} no tiene transición de salida: una vez activa no se desactiva nunca.`, [s.id])
     }
   }
@@ -101,10 +171,14 @@ export function validateGrafcet(nodes, edges) {
     if (reached.has(id)) continue
     reached.add(id)
     for (const e of outgoing(id)) queue.push(e.target)
+    // Una macroetapa activa su expansión; un forzado activa las etapas que indica.
+    const expansion = expansions.get(id)
+    if (expansion) queue.push(...expansion.members.map((m) => m.id))
+    queue.push(...(forcedOn.get(id) ?? []))
   }
   if (reached.size) {
     for (const s of steps) {
-      if (!reached.has(s.id) && incoming(s.id).length > 0) {
+      if (!reached.has(s.id) && (incoming(s.id).length > 0 || expansionRole.get(s.id) === 'entry')) {
         add('warning', `${stepName(s)} no es alcanzable desde ninguna etapa inicial.`, [s.id])
       }
     }

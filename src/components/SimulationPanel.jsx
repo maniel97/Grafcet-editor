@@ -3,6 +3,7 @@ import { AlertTriangle, ChevronDown, ChevronRight, Pause, Play, RotateCcw, SkipF
 import Chronogram from './Chronogram'
 import ScenarioControls from './ScenarioControls'
 import { chronogramCsv } from '../lib/sim/scenario'
+import { withMacros } from '../lib/sim/engine'
 import { downloadFile } from '../lib/projectFile'
 import { fileName } from '../lib/fileNames'
 
@@ -113,7 +114,8 @@ export default function SimulationPanel({ simulation, scenarios = [], onScenario
   const outputs = compiled.variables.filter((v) => v.type === 'output')
   const memories = compiled.variables.filter((v) => v.type === 'memory' || v.type === 'counter')
   const timers = compiled.variables.filter((v) => v.type === 'timer')
-  const activeSteps = compiled.steps.filter((s) => state.active.has(s.id))
+  const shownActive = withMacros(compiled, state.active)
+  const activeSteps = compiled.steps.filter((s) => shownActive.has(s.id))
 
   const elapsedOf = (label) => {
     const s = compiled.steps.find((x) => String(x.label) === String(label))
