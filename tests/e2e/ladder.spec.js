@@ -24,6 +24,10 @@ test('paso a ladder: esquema, exportaciones, ST y AWL', async ({ page }) => {
 
   await page.getByRole('tab', { name: /Texto estructurado/ }).click()
   await expect(page.locator('pre')).toContainText('Tr1 := X0 AND RT_Marcha.Q AND NOT Paro AND NOT Emergencia;')
+  await page.getByRole('tab', { name: /SCL \(TIA Portal\)/ }).click()
+  await expect(page.locator('pre')).toContainText('FUNCTION_BLOCK "Grafcet"')
+  await expect(page.locator('pre')).toContainText('#Tr1 := #X0 AND #RT_Marcha.Q AND NOT #Paro AND NOT #Emergencia;')
+  expect((await download(page, () => page.getByRole('button', { name: '.scl' }).click())).suggestedFilename()).toBe('ladder-completo.scl')
   await page.getByRole('tab', { name: /AWL/ }).click()
   await expect(page.locator('pre')).toContainText('SPBN M001')
   await page.getByRole('radio', { name: /Inglés/ }).click()

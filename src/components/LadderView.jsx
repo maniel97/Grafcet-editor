@@ -10,8 +10,11 @@ import { fileName } from '../lib/fileNames'
 const TABS = [
   { id: 'ladder', label: 'Ladder (LD)' },
   { id: 'st', label: 'Texto estructurado (ST)' },
+  { id: 'scl', label: 'SCL (TIA Portal)' },
   { id: 'awl', label: 'AWL / STL (S7)' },
 ]
+// Texto de cada pestaña: extensión del archivo descargado.
+const EXT = { st: 'st', scl: 'scl', awl: 'awl' }
 const MODES = [
   { id: 'both', label: 'Símbolo y dirección' },
   { id: 'symbol', label: 'Símbolos' },
@@ -61,6 +64,7 @@ export default function LadderView({ nodes, edges, plc, grafcetErrors, onClose }
 
   const ladder = useMemo(() => generateLadder(nodes, edges, plc), [nodes, edges, plc])
   const st = useMemo(() => toStructuredText(ladder, plc), [ladder, plc])
+  const scl = useMemo(() => toStructuredText(ladder, plc, { dialect: 'tia' }), [ladder, plc])
   const awl = useMemo(() => toAWL(ladder, { mnemonic, useAddresses: mode !== 'symbol' }), [ladder, mnemonic, mode])
 
   useEffect(() => {
@@ -75,7 +79,7 @@ export default function LadderView({ nodes, edges, plc, grafcetErrors, onClose }
   )
   const firstCycleAddress = ladder.resolver.address({ kind: 'first' })
 
-  const text = tab === 'st' ? st : awl
+  const text = { st, scl, awl }[tab] ?? ''
   // Las exportaciones pueden fallar (memoria, módulo que no carga...): siempre se avisa.
   const safely = (fn) => async () => {
     try {
@@ -110,7 +114,7 @@ export default function LadderView({ nodes, edges, plc, grafcetErrors, onClose }
           ))}
         </div>
         <div className="ml-auto flex items-center gap-2">
-          {tab !== 'st' && <Segmented value={mode} options={MODES} onChange={setMode} label="Etiquetas" />}
+          {(tab === 'ladder' || tab === 'awl') && <Segmented value={mode} options={MODES} onChange={setMode} label="Etiquetas" />}
           {tab === 'awl' && (
             <Segmented
               value={mnemonic}
@@ -141,14 +145,10 @@ export default function LadderView({ nodes, edges, plc, grafcetErrors, onClose }
               </ActionButton>
               <ActionButton
                 icon={Download}
-                onClick={() =>
-                  tab === 'st'
-                    ? downloadFile(st, fileName('st'), 'text/plain;charset=utf-8')
-                    : downloadFile(awl, fileName('awl'), 'text/plain;charset=utf-8')
-                }
+                onClick={() => downloadFile(text, fileName(EXT[tab]), 'text/plain;charset=utf-8')}
                 title="Descargar como archivo de texto"
               >
-                {tab === 'st' ? '.st' : '.awl'}
+                .{EXT[tab]}
               </ActionButton>
             </>
           )}
