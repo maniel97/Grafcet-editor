@@ -3,33 +3,44 @@ import { useReactFlow } from '@xyflow/react'
 import { capturePdf, download, renderDiagram } from '../lib/exportImage'
 import { fileName } from '../lib/fileNames'
 
-// Exportación del diagrama sin la selección (se dibuja en azul) ni el resaltado de la tabla:
-// se quitan, se captura y se restaura la selección.
+// Exportación del diagrama sin la selección (se dibuja en azul), sin el resaltado de la tabla y
+// sin los textos de ayuda de edición (index.css: .exporting): se quitan, se captura y se
+// restaura. Las capturas pueden solaparse (p. ej. React monta dos veces el diálogo en desarrollo):
+// el estado limpio lo prepara la primera y lo deshace la última.
+let exporting = 0 // capturas en curso
+let savedSelection = null // { nodes: Set, edges: Set } de antes de la primera
+
 // Devuelve la fuente de exportación del grafcet para el diálogo de exportación.
 export function useImageExport(clearHighlight, title) {
   const { getNodes, getEdges, setNodes, setEdges, getViewport } = useReactFlow()
 
   const withCleanCanvas = useCallback(
     async (fn) => {
-      const selectedNodes = new Set(getNodes().filter((n) => n.selected).map((n) => n.id))
-      const selectedEdges = new Set(getEdges().filter((e) => e.selected).map((e) => e.id))
-      const hadSelection = selectedNodes.size || selectedEdges.size
-      if (hadSelection) {
-        setNodes((nds) => nds.map((n) => ({ ...n, selected: false })))
-        setEdges((eds) => eds.map((e) => ({ ...e, selected: false })))
+      if (exporting++ === 0) {
+        savedSelection = {
+          nodes: new Set(getNodes().filter((n) => n.selected).map((n) => n.id)),
+          edges: new Set(getEdges().filter((e) => e.selected).map((e) => e.id)),
+        }
+        if (savedSelection.nodes.size || savedSelection.edges.size) {
+          setNodes((nds) => nds.map((n) => ({ ...n, selected: false })))
+          setEdges((eds) => eds.map((e) => ({ ...e, selected: false })))
+        }
+        clearHighlight()
+        document.documentElement.classList.add('exporting')
       }
-      clearHighlight()
-      // Los textos de ayuda de edición no salen en lo exportado (index.css: .exporting).
-      document.documentElement.classList.add('exporting')
-      // Espera a que React pinte el lienzo sin selección antes de capturarlo.
+      // Espera a que React pinte el lienzo limpio antes de capturarlo.
       await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
       try {
         return await fn(getViewport())
       } finally {
-        document.documentElement.classList.remove('exporting')
-        if (hadSelection) {
-          setNodes((nds) => nds.map((n) => ({ ...n, selected: selectedNodes.has(n.id) })))
-          setEdges((eds) => eds.map((e) => ({ ...e, selected: selectedEdges.has(e.id) })))
+        if (--exporting === 0) {
+          document.documentElement.classList.remove('exporting')
+          const { nodes, edges } = savedSelection
+          savedSelection = null
+          if (nodes.size || edges.size) {
+            setNodes((nds) => nds.map((n) => ({ ...n, selected: nodes.has(n.id) })))
+            setEdges((eds) => eds.map((e) => ({ ...e, selected: edges.has(e.id) })))
+          }
         }
       }
     },

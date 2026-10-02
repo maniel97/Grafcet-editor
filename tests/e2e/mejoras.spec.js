@@ -553,3 +553,23 @@ test('modo oscuro: el papel de la vista previa de exportación y su cajetín sig
   expect(await css(dialog.getByLabel('Vista previa de la imagen'), 'backgroundColor')).toBe('rgb(255, 255, 255)')
   expectNoErrors(errors)
 })
+
+test('tabla del lienzo: títulos de columna alineados con las celdas, también con nombres largos', async ({ page }) => {
+  const errors = await openEditor(page, 'ladder-completo.json')
+  await page.getByTitle(/Tabla de variables: direcciones/).click()
+  await page.getByLabel('Mostrar la tabla en el lienzo').check()
+  await page.keyboard.press('Escape')
+  await page.getByRole('button', { name: 'Encuadrar todo el diagrama' }).click()
+  const table = page.locator('.react-flow__node[data-id="variables-table"]')
+  const lefts = await table.evaluate((el) => {
+    const x = (n) => Math.round(n.getBoundingClientRect().left)
+    const headers = [...el.querySelectorAll('section > div:first-child')].map((h) => x(h.children[1]))
+    const cells = [...el.querySelectorAll('section > div.group')].map((r) => x(r.children[1]))
+    return { headers, cells }
+  })
+  const all = [...lefts.headers, ...lefts.cells]
+  expect(Math.max(...all) - Math.min(...all)).toBeLessThanOrEqual(2) // misma columna en todas las filas
+  await expect(table.locator('section').first()).toContainText(/Dirección/i)
+  await expect(table.locator('section').first()).toContainText(/Comentario/i)
+  expectNoErrors(errors)
+})

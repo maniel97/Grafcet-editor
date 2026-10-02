@@ -138,7 +138,14 @@ export default function VariablesTableNode({ id, data, selected }) {
   ]
   // Durante un arrastre se muestran también las secciones vacías, para poder soltar en ellas.
   const visible = sections.filter((s) => s.rows.length || (dragging && s.droppable))
-  const cols = showComments ? 'grid-cols-[minmax(5rem,auto)_6rem_minmax(7rem,1fr)]' : 'grid-cols-[minmax(5rem,auto)_6rem]'
+  // Columnas comunes a todas las filas (si cada fila calculara las suyas, un nombre largo
+  // desplazaría su dirección y su comentario). La primera, a la medida del nombre más largo
+  // (letra monoespaciada: 1ch por carácter) más el asa de arrastre y la preselección.
+  const longest = Math.max(
+    6,
+    ...visible.flatMap((sec) => sec.rows.map((r) => String(r.name).length + (r.extra ? String(r.extra).length + 3 : 0))),
+  )
+  const columns = { gridTemplateColumns: `max(5rem, calc(${longest}ch + 1.5rem)) 6rem${showComments ? ' minmax(7rem, 1fr)' : ''}` }
 
   return (
     <div
@@ -178,9 +185,19 @@ export default function VariablesTableNode({ id, data, selected }) {
           }}
           className={dropTarget === section.id ? 'bg-blue-50 outline-2 -outline-offset-2 outline-blue-400 outline-dashed' : ''}
         >
-          <div className="border-b border-slate-300 bg-slate-50 px-2 py-0.5 text-[0.8em] font-semibold uppercase tracking-wide text-slate-600">
-            {section.title}
-            {!section.rows.length && <span className="canvas-hint ml-1 font-normal normal-case text-slate-400">— suelta aquí</span>}
+          {/* Cabecera de la sección con los títulos de las columnas, alineados con las filas. */}
+          <div
+            style={columns}
+            // Tamaño y grosor de letra van en cada título, no en la rejilla: las columnas se miden en
+            // «ch» (anchura del «0» de su letra) y tienen que medir lo mismo que las de las filas.
+            className="grid items-baseline gap-x-1 border-b border-slate-300 bg-slate-50 px-1 py-0.5 uppercase tracking-wide text-slate-600"
+          >
+            <span className="truncate px-1 text-[0.8em] font-semibold">
+              {section.title}
+              {!section.rows.length && <span className="canvas-hint ml-1 font-normal normal-case text-slate-400">— suelta aquí</span>}
+            </span>
+            <span className="truncate px-1 text-[0.8em] font-medium text-slate-500">Dirección</span>
+            {showComments && <span className="truncate px-1 text-[0.8em] font-medium text-slate-500">Comentario</span>}
           </div>
           {section.rows.map((row) => (
             <div
@@ -196,7 +213,8 @@ export default function VariablesTableNode({ id, data, selected }) {
                 setDropTarget(null)
               }}
               onMouseEnter={() => setHighlight(new Set(row.uses))}
-              className={`nodrag group grid ${cols} items-center gap-x-1 border-b border-slate-100 px-1 py-px last:border-b-0 hover:bg-amber-50`}
+              style={columns}
+              className={`nodrag group grid items-center gap-x-1 border-b border-slate-100 px-1 py-px last:border-b-0 hover:bg-amber-50`}
             >
               <span className="flex min-w-0 items-center gap-0.5 font-mono">
                 {row.draggable && !readOnly && (
