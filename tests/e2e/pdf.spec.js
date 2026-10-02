@@ -64,3 +64,30 @@ test('PDF: sin pie de página y la selección no aparece en la captura', async (
   await expect(dialog).toHaveCount(0)
   expectNoErrors(errors)
 })
+
+test('PDF vectorial (por defecto): texto real sin imagen; desmarcado, imagen', async ({ page }, testInfo) => {
+  const errors = await openEditor(page, 'ladder-completo.json')
+  const save = async (name) => {
+    const dialog = page.getByRole('dialog', { name: 'Exportar a PDF' })
+    const file = await download(page, () => dialog.getByRole('button', { name: 'Guardar PDF' }).click())
+    const path = testInfo.outputPath(name)
+    await file.saveAs(path)
+    return readFileSync(path, 'latin1')
+  }
+  await page.getByRole('button', { name: /Exportar/ }).click()
+  await page.getByRole('menuitem', { name: /PDF/ }).click()
+  await expect(page.getByLabel(/^Vectorial/)).toBeChecked()
+  const vector = await save('vectorial.pdf')
+  expect(vector).not.toContain('/Subtype /Image')
+  // El texto del diagrama va como texto (operador Tj), no dentro de una imagen.
+  expect(vector).toMatch(/Marcha[^)]*\) Tj/)
+  expect(vector).toMatch(/Emergencia[^)]*\) Tj/)
+
+  await page.getByRole('button', { name: /Exportar/ }).click()
+  await page.getByRole('menuitem', { name: /PDF/ }).click()
+  await page.getByLabel(/^Vectorial/).uncheck()
+  const raster = await save('imagen.pdf')
+  expect(raster).toContain('/Subtype /Image')
+  expect(raster).not.toContain('Emergencia')
+  expectNoErrors(errors)
+})

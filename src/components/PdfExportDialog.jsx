@@ -118,6 +118,16 @@ export default function PdfExportDialog({ capture, projectName, onClose }) {
             onChange={(orientation) => update({ orientation })}
           />
           <fieldset className="space-y-1">
+            <legend className="text-xs font-medium uppercase tracking-wide text-slate-500">Calidad</legend>
+            <label className="flex items-start gap-2 px-1 text-sm">
+              <input type="checkbox" className="mt-1" checked={options.vector !== false} onChange={(e) => update({ vector: e.target.checked })} />
+              <span>
+                Vectorial
+                <span className="block text-xs text-slate-500">Nítido a cualquier zoom y con el texto seleccionable. Sin marcar: imagen a alta resolución.</span>
+              </span>
+            </label>
+          </fieldset>
+          <fieldset className="space-y-1">
             <legend className="text-xs font-medium uppercase tracking-wide text-slate-500">Pie de página</legend>
             <label className="flex items-center gap-2 px-1 text-sm">
               <input type="checkbox" checked={options.footer} onChange={(e) => update({ footer: e.target.checked })} />

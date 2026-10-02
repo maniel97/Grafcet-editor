@@ -1,5 +1,6 @@
 import { DEFAULT_PDF_OPTIONS, PAGE_MARGIN, pdfLayout } from './pdfLayout'
 import { fileName } from './fileNames'
+import { captureScene, drawScene } from './vectorPdf'
 
 // Margen alrededor del dibujo en la imagen exportada (px).
 const MARGIN = 48
@@ -65,7 +66,7 @@ export async function renderDiagram(format, viewport, maxPixelRatio) {
   // La librería de captura solo se descarga al exportar por primera vez.
   const { toPng, toSvg } = await import('html-to-image')
   const dataUrl = format === 'svg' ? await toSvg(viewportEl, options) : await toPng(viewportEl, options)
-  return { dataUrl, width, height }
+  return { dataUrl, width, height, viewportEl, bounds }
 }
 
 function download(href, filename) {
@@ -81,6 +82,14 @@ export async function exportDiagram(format, viewport) {
   if (image) download(image.dataUrl, fileName(format))
 }
 
+// Para el PDF: la imagen (vista previa y PDF de imagen) y la escena vectorial, capturadas a la vez.
+export async function capturePdf(viewport) {
+  const image = await renderDiagram('png', viewport, 3)
+  if (!image) return null
+  const scene = captureScene(image.viewportEl, viewport, image.bounds, MARGIN, EDITOR_ONLY_SELECTOR)
+  return { dataUrl: image.dataUrl, width: image.width, height: image.height, scene }
+}
+
 // PDF de una página, generado en el navegador (jsPDF se carga solo al usarlo), con la imagen ya
 // capturada (renderDiagram a 3x para impresión) y las opciones del diálogo de exportación.
 // La maquetación es la misma que muestra la vista previa (lib/pdfLayout.js).
@@ -88,7 +97,9 @@ export async function savePdf(image, options = DEFAULT_PDF_OPTIONS) {
   const { jsPDF } = await import('jspdf')
   const layout = pdfLayout(image, options)
   const pdf = new jsPDF({ orientation: layout.orientation, unit: 'mm', format: [layout.page.width, layout.page.height] })
-  pdf.addImage(image.dataUrl, 'PNG', layout.x, layout.y, layout.w, layout.h, undefined, 'FAST')
+  // Vectorial (por defecto): líneas y texto reales; si no, la imagen a 3x.
+  if (options.vector !== false && image.scene) drawScene(pdf, image.scene, layout)
+  else pdf.addImage(image.dataUrl, 'PNG', layout.x, layout.y, layout.w, layout.h, undefined, 'FAST')
   if (options.footer) {
     pdf.setFontSize(8)
     pdf.setTextColor(120)

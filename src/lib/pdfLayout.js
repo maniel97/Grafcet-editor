@@ -17,7 +17,7 @@ export const ORIENTATIONS = [
   { id: 'landscape', label: 'Apaisada' },
 ]
 
-export const DEFAULT_PDF_OPTIONS = { page: 'auto', orientation: 'auto', footer: true, title: 'Grafcet (IEC 60848)' }
+export const DEFAULT_PDF_OPTIONS = { page: 'auto', orientation: 'auto', footer: true, vector: true, title: 'Grafcet (IEC 60848)' }
 
 export const PAGE_MARGIN = 12 // mm
 export const FOOTER_SPACE = 8 // mm reservados al pie de página
