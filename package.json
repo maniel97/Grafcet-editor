@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:e2e": "playwright test",
-    "test:all": "vitest run && playwright test"
+    "test:all": "vitest run && playwright test",
+    "test:perf": "playwright test -c playwright.perf.config.js"
   },
   "dependencies": {
     "@fontsource/atkinson-hyperlegible": "^5.3.0",
