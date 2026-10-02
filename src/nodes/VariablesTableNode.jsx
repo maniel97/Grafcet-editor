@@ -14,7 +14,7 @@ function EditableCell({ value, placeholder, onCommit, className = '', invalid, a
   if (readOnly) {
     return (
       <span className={`block truncate px-1 ${invalid ? 'bg-red-50 text-red-700' : ''} ${value ? '' : 'text-slate-300'} ${className}`}>
-        {value || placeholder}
+        {value || <span className="canvas-hint">{placeholder}</span>}
       </span>
     )
   }
@@ -50,7 +50,7 @@ function EditableCell({ value, placeholder, onCommit, className = '', invalid, a
         invalid ? 'bg-red-50 text-red-700' : ''
       } ${value ? '' : 'text-slate-300'} ${className}`}
     >
-      {value || placeholder}
+      {value || <span className="canvas-hint">{placeholder}</span>}
     </button>
   )
 }
@@ -180,7 +180,7 @@ export default function VariablesTableNode({ id, data, selected }) {
         >
           <div className="border-b border-slate-300 bg-slate-50 px-2 py-0.5 text-[0.8em] font-semibold uppercase tracking-wide text-slate-600">
             {section.title}
-            {!section.rows.length && <span className="ml-1 font-normal normal-case text-slate-400">— suelta aquí</span>}
+            {!section.rows.length && <span className="canvas-hint ml-1 font-normal normal-case text-slate-400">— suelta aquí</span>}
           </div>
           {section.rows.map((row) => (
             <div

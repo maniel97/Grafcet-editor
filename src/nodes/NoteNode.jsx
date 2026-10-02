@@ -61,7 +61,7 @@ export default function NoteNode({ id, data, selected }) {
           />
         ) : (
           <p className={`diagram-text h-full whitespace-pre-wrap break-words ${data.text ? 'text-slate-800' : 'italic text-slate-400'}`}>
-            {data.text || 'Doble clic para escribir'}
+            {data.text || <span className="canvas-hint">Doble clic para escribir</span>}
           </p>
         )}
       </div>

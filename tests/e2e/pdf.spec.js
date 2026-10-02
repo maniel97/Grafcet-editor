@@ -143,3 +143,28 @@ test('zoom en la vista previa de exportación', async ({ page }) => {
   await expect(dialog.getByLabel('Zoom de la vista previa: ajustar')).toHaveText('100 %')
   expectNoErrors(errors)
 })
+
+test('los textos de ayuda de la tabla del lienzo no salen al exportar (queda el hueco)', async ({ page }, testInfo) => {
+  const errors = await openEditor(page)
+  await page.getByTitle(/Tabla de variables: direcciones/).click()
+  await page.getByLabel('Mostrar la tabla en el lienzo').check()
+  await page.keyboard.press('Escape')
+  const table = page.locator('.react-flow__node[data-id="variables-table"]')
+  await expect(table).toContainText('comentario') // en el lienzo, sí
+  const rowsBefore = await table.boundingBox()
+
+  await page.getByRole('button', { name: /Exportar/ }).click()
+  await page.getByRole('menuitem', { name: /PDF/ }).click()
+  const dialog = page.getByRole('dialog', { name: 'Exportar', exact: true })
+  const file = await download(page, () => dialog.getByRole('button', { name: 'Guardar PDF' }).click())
+  const path = testInfo.outputPath('sin-ayudas.pdf')
+  await file.saveAs(path)
+  const bytes = readFileSync(path, 'latin1')
+  expect(bytes).toMatch(/Marcha[^)]*\) Tj/) // la tabla sí sale
+  expect(bytes).not.toContain('comentario')
+
+  // Después, el lienzo sigue igual (con la ayuda y sin moverse).
+  await expect(table).toContainText('comentario')
+  expect((await table.boundingBox()).height).toBeCloseTo(rowsBefore.height, 0)
+  expectNoErrors(errors)
+})

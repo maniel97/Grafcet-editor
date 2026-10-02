@@ -289,3 +289,10 @@ body {
 :root[data-theme="dark"] .paper {
   background: #ffffff;
 }
+
+/* Textos de ayuda de edición («comentario», «—», «Doble clic para escribir»): solo en el lienzo.
+   Al exportar (clase .exporting en <html>, hooks/useImageExport.js) se ocultan sin mover nada:
+   queda el hueco. */
+.exporting .canvas-hint {
+  visibility: hidden;
+}

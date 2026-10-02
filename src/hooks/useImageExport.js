@@ -19,11 +19,14 @@ export function useImageExport(clearHighlight, title) {
         setEdges((eds) => eds.map((e) => ({ ...e, selected: false })))
       }
       clearHighlight()
+      // Los textos de ayuda de edición no salen en lo exportado (index.css: .exporting).
+      document.documentElement.classList.add('exporting')
       // Espera a que React pinte el lienzo sin selección antes de capturarlo.
       await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
       try {
         return await fn(getViewport())
       } finally {
+        document.documentElement.classList.remove('exporting')
         if (hadSelection) {
           setNodes((nds) => nds.map((n) => ({ ...n, selected: selectedNodes.has(n.id) })))
           setEdges((eds) => eds.map((e) => ({ ...e, selected: selectedEdges.has(e.id) })))
