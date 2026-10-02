@@ -16,7 +16,7 @@ const overflow = (page) =>
     return worst
   })
 
-for (const width of [1500, 1100]) {
+for (const width of [1500, 1280, 1100]) {
   test(`barra a ${width}px: compacta y submenú Exportar`, async ({ page }) => {
     await page.setViewportSize({ width, height: 800 })
     const errors = await openEditor(page)

@@ -19,10 +19,10 @@ import {
   StickyNote,
 } from 'lucide-react'
 
-// `primary`: el texto se ve desde pantallas medianas; el resto solo en pantallas anchas (2xl),
+// `primary`: el texto se ve desde 1280 px; el resto solo en pantallas anchas (2xl),
 // para que la barra quepa entera. `iconOnly`: nunca muestra texto. El nombre siempre está en el
 // tooltip y en aria-label (lectores de pantalla).
-const labelClass = (primary) => `hidden ${primary ? 'lg:inline' : '2xl:inline'}`
+const labelClass = (primary) => `hidden ${primary ? 'xl:inline' : '2xl:inline'}`
 
 function ToolButton({ icon: Icon, label, onClick, disabled, title, active, badge, primary, iconOnly }) {
   return (
