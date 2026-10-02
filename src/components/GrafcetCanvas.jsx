@@ -11,6 +11,7 @@ import GrafcetContextMenu from './GrafcetContextMenu'
 import GhostPreview from './GhostPreview'
 import CanvasControls from './CanvasControls'
 import { nodeTypes } from '../nodes'
+import { NOTE_SIZE } from '../lib/notes'
 import { edgeTypes } from '../edges'
 import { useSimulation } from '../lib/sim/useSimulation'
 import { useSettings } from '../lib/settings'
@@ -52,6 +53,7 @@ function Loading({ panel }) {
 const defaultData = {
   step: (nodes) => ({ label: nextStepLabel(nodes), actions: [] }),
   transition: (nodes) => ({ condition: nextTransitionLabel(nodes) }),
+  note: () => ({ text: '', color: 'yellow' }),
 }
 
 export default function GrafcetCanvas() {
@@ -90,6 +92,8 @@ export default function GrafcetCanvas() {
   const [connecting, setConnecting] = useState(null)
   // Vista previa de lo que añadiría el "+" flotante bajo el ratón (ver GhostPreview).
   const [preview, setPreview] = useState(null)
+  // Nota en edición de texto (ver nodes/NoteNode.jsx) o null.
+  const [editingNoteId, setEditingNoteId] = useState(null)
 
   const { settings, update: updateSettings, reset: resetSettings } = useSettings()
   const { screenToFlowPosition, updateNodeData, toObject, setViewport, fitView, getNode, getNodes, getEdges, deleteElements } =
@@ -181,9 +185,11 @@ export default function GrafcetCanvas() {
       simulating,
       readOnly,
       connecting,
+      editingNoteId,
+      setEditingNoteId,
       sim: simulating ? simulation.view : null,
     }),
-    [takeSnapshot, markedIssues, plcView, plcTable, highlight, setHighlight, toggleTable, simulating, readOnly, connecting, simulation.view],
+    [takeSnapshot, markedIssues, plcView, plcTable, highlight, setHighlight, toggleTable, simulating, readOnly, connecting, editingNoteId, simulation.view],
   )
 
   // --- Edición -----------------------------------------------------------------------------------
@@ -193,10 +199,19 @@ export default function GrafcetCanvas() {
       takeSnapshot()
       const rect = wrapperRef.current.getBoundingClientRect()
       const position = at ?? screenToFlowPosition({ x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 })
+      const id = crypto.randomUUID()
       setNodes((nds) => [
         ...nds,
-        { id: crypto.randomUUID(), type, position: findFreePosition(position, type, nds), data: { ...defaultData[type](nds), ...extra } },
+        {
+          id,
+          type,
+          position: findFreePosition(position, type, nds),
+          data: { ...defaultData[type](nds), ...extra },
+          ...(type === 'note' ? NOTE_SIZE : {}),
+        },
       ])
+      // Una nota nueva se abre directamente para escribir.
+      if (type === 'note') setEditingNoteId(id)
     },
     [takeSnapshot, screenToFlowPosition, setNodes],
   )
@@ -422,6 +437,7 @@ export default function GrafcetCanvas() {
               onNodeDoubleClick={(_, node) => {
                 if (loopSource || readOnly) return
                 if (node.type === 'variables') setVariablesOpen(true)
+                else if (node.type === 'note') setEditingNoteId(node.id)
                 else setEditingId(node.id)
               }}
               onPaneClick={() => {

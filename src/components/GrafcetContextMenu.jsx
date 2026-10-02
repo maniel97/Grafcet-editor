@@ -8,6 +8,7 @@ import {
   Table2,
   WandSparkles,
   Merge,
+  StickyNote,
   AlignVerticalSpaceAround,
   AlignHorizontalJustifyCenter,
   Pencil,
@@ -26,15 +27,16 @@ import { useEditor } from '../lib/editorContext'
 import { transitionOutput } from '../lib/grafcetRules'
 import { VARIABLES_TABLE_ID } from '../nodes'
 import { VARIABLE_TYPES } from '../lib/addressing'
+import { NOTE_COLORS } from '../lib/notes'
 
 // Menú contextual del lienzo: las opciones dependen de lo que se pulse con el botón derecho.
 // menu: { x, y, kind: 'node' | 'selection' | 'pane', nodeIds, flowPosition }
 export default function GrafcetContextMenu({ menu, onClose, onEdit, onAddNodeAt }) {
-  const { getNode, getEdges } = useReactFlow()
+  const { getNode, getEdges, updateNodeData } = useReactFlow()
   const quickConnect = useQuickConnect()
   const { arrange, addBranch, predecessorsOf, addAlternative, converge, toggleInitial, toggleMacro, addAction, remove } =
     useStructureActions()
-  const { startLoop, plcTable, toggleTable } = useEditor()
+  const { startLoop, plcTable, toggleTable, setEditingNoteId, takeSnapshot } = useEditor()
 
   let title
   let items = []
@@ -46,6 +48,7 @@ export default function GrafcetContextMenu({ menu, onClose, onEdit, onAddNodeAt 
       { label: 'Etapa inicial aquí', icon: InitialStepIcon, onSelect: () => onAddNodeAt('step', { initial: true }, at) },
       { label: 'Etapa aquí', icon: Square, onSelect: () => onAddNodeAt('step', {}, at) },
       { label: 'Transición aquí', icon: Minus, onSelect: () => onAddNodeAt('transition', {}, at) },
+      { label: 'Nota aquí', icon: StickyNote, onSelect: () => onAddNodeAt('note', {}, at) },
       ...(plcTable && !getNode(VARIABLES_TABLE_ID)
         ? ['separator', { label: 'Tabla de variables aquí', icon: Table2, onSelect: () => toggleTable(at) }]
         : []),
@@ -80,6 +83,31 @@ export default function GrafcetContextMenu({ menu, onClose, onEdit, onAddNodeAt 
   } else {
     const node = getNode(menu.nodeIds[0])
     if (!node) return null
+    if (node.type === 'note') {
+      return (
+        <ContextMenu
+          x={menu.x}
+          y={menu.y}
+          title="Nota"
+          onClose={onClose}
+          items={[
+            { label: 'Editar texto', icon: Pencil, onSelect: () => setEditingNoteId(node.id) },
+            'separator',
+            ...Object.entries(NOTE_COLORS).map(([id, c]) => ({
+              label: `Color ${c.label.toLowerCase()}`,
+              icon: () => <span className="h-4 w-4 rounded-sm border" style={{ background: c.bg, borderColor: c.border }} />,
+              hint: (node.data.color ?? 'yellow') === id ? 'actual' : undefined,
+              onSelect: () => {
+                takeSnapshot()
+                updateNodeData(node.id, { color: id })
+              },
+            })),
+            'separator',
+            { label: 'Eliminar', icon: Trash2, danger: true, onSelect: () => remove([node.id]) },
+          ]}
+        />
+      )
+    }
     if (node.type === 'variables') {
       return (
         <ContextMenu

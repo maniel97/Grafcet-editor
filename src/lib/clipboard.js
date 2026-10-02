@@ -10,7 +10,8 @@ export function copySelection(nodes, edges) {
   const ids = new Set(selected.map((n) => n.id))
   if (!ids.size) return null
   return {
-    nodes: selected.map(({ id, type, position, data }) => ({ id, type, position, data })),
+    // width/height: tamaño de las notas (las etapas y transiciones no lo llevan).
+    nodes: selected.map(({ id, type, position, data, width, height }) => ({ id, type, position, data, width, height })),
     edges: edges.filter((e) => ids.has(e.source) && ids.has(e.target)),
   }
 }
@@ -28,6 +29,7 @@ export function prepareClipboard(clip, existingNodes, offset = PASTE_OFFSET) {
     if (n.type === 'step') data = { ...data, label: nextStepLabel(working) }
     else if (/^T\d+$/i.test(String(data.condition ?? '').trim())) data = { ...data, condition: nextTransitionLabel(working) }
     const node = { id, type: n.type, position: { x: n.position.x + offset, y: n.position.y + offset }, data, selected: true }
+    if (n.width) Object.assign(node, { width: n.width, height: n.height })
     working.push(node)
     return node
   })

@@ -6,7 +6,7 @@ const MARGIN = 48
 const MAX_CANVAS_SIDE = 12000
 
 // Elementos de edición que nunca deben salir en el diseño final.
-const EDITOR_ONLY = ['react-flow__handle', 'ghost-preview', 'editor-only']
+const EDITOR_ONLY = ['react-flow__handle', 'ghost-preview', 'editor-only', 'react-flow__resize-control']
 const EDITOR_ONLY_SELECTOR = EDITOR_ONLY.map((c) => `.${c}`).join(',')
 const isExportable = (el) => !el.classList || !EDITOR_ONLY.some((c) => el.classList.contains(c))
 

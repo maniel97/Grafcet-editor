@@ -16,6 +16,7 @@ import {
   Play,
   CircleStop,
   Cpu,
+  StickyNote,
 } from 'lucide-react'
 
 // `primary`: el texto se ve desde pantallas medianas; el resto solo en pantallas anchas (2xl),
@@ -102,6 +103,7 @@ export default function Toolbar({
         disabled={locked || !canAddAction}
         title={canAddAction ? 'Añadir acción a la etapa seleccionada' : 'Selecciona una etapa para añadirle una acción'}
       />
+      <ToolButton icon={StickyNote} label="Nota" title="Añadir una nota de texto" disabled={locked} onClick={() => onAdd('note')} />
 
       <Separator />
 
