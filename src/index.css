@@ -1,0 +1,117 @@
+@import "tailwindcss";
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+/* Conectores (src/nodes/GrafcetHandle.jsx). Solo se muestran al pasar por el nodo, al
+   seleccionarlo o durante una conexión: en Grafcet una etapa sin enlace de entrada (p. ej. la
+   inicial sin bucle) no lleva nada encima. Las exportaciones los excluyen siempre. */
+.react-flow__handle.grafcet-handle {
+  width: 14px;
+  height: 14px;
+  border: 2px solid #2563eb;
+  border-radius: 9999px;
+  background: #ffffff;
+  opacity: 0;
+  transition:
+    opacity 0.15s,
+    transform 0.15s,
+    background-color 0.15s,
+    border-color 0.15s,
+    box-shadow 0.15s;
+}
+.react-flow__node:hover .grafcet-handle,
+.react-flow__node.selected .grafcet-handle,
+.grafcet-handle.connectingfrom,
+.grafcet-handle.is-candidate {
+  opacity: 1;
+}
+
+/* Libre: se puede conectar. */
+.grafcet-handle.is-free:hover {
+  background: #dbeafe;
+  box-shadow: 0 0 0 4px rgb(37 99 235 / 0.2);
+}
+/* Conectado. */
+.grafcet-handle.is-connected {
+  background: #2563eb;
+  border-color: #ffffff;
+  box-shadow: 0 0 0 1px #2563eb;
+}
+/* Origen de la conexión que se está arrastrando. */
+.grafcet-handle.connectingfrom {
+  background: #f59e0b;
+  border-color: #ffffff;
+  box-shadow: 0 0 0 1px #f59e0b;
+}
+/* Destino válido mientras se arrastra (pulsa para llamar la atención). */
+.grafcet-handle.is-candidate {
+  background: #dcfce7;
+  border-color: #16a34a;
+  animation: handle-pulse 1.2s ease-in-out infinite;
+}
+/* Encima de un destino: verde si se puede soltar, rojo si no. */
+.grafcet-handle.connectingto.valid {
+  background: #16a34a;
+  border-color: #ffffff;
+  box-shadow: 0 0 0 2px #16a34a;
+  animation: none;
+}
+.grafcet-handle.connectingto:not(.valid) {
+  opacity: 1;
+  background: #fee2e2;
+  border-color: #dc2626;
+  animation: none;
+}
+@keyframes handle-pulse {
+  50% {
+    box-shadow: 0 0 0 5px rgb(22 163 74 / 0.25);
+  }
+}
+
+/* Vista previa al pasar sobre un "+" flotante: lo que se crearía, en discontinuo. */
+.ghost-preview {
+  pointer-events: none;
+  opacity: 0.75;
+}
+
+/* Herramienta Bucle activa: las etapas son los destinos seleccionables. */
+.loop-picking .react-flow__node-step {
+  cursor: crosshair;
+}
+.loop-picking .react-flow__node-step:hover {
+  outline: 2px dashed #3b82f6;
+  outline-offset: 4px;
+}
+
+/* Valores por defecto; los ajustes de Opciones los sobrescriben en <html> (src/lib/settings.js). */
+:root {
+  --app-font: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --diagram-font-size: 14px;
+}
+
+body {
+  font-family: var(--app-font);
+  background: #f8fafc;
+  color: #0f172a;
+}
+
+/* Dirección de PLC mostrada en el diagrama (tabla de variables > Mostrar direcciones). */
+.plc-address {
+  font-family: ui-monospace, Consolas, "Courier New", monospace;
+  font-size: 0.72em;
+  font-weight: 400;
+  color: #64748b;
+}
+
+/* Texto del diagrama: independiente del tamaño de la interfaz. */
+.diagram-text {
+  font-size: var(--diagram-font-size);
+}
+.diagram-step-label {
+  font-size: calc(var(--diagram-font-size) * 1.3);
+}
