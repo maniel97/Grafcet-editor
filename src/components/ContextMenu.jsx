@@ -59,7 +59,7 @@ export default function ContextMenu({ x, y, title, items, onClose }) {
               onClose()
               item.onSelect()
             }}
-            className={`flex w-full items-center gap-2 px-3 py-1.5 text-left outline-none focus:bg-slate-100 hover:bg-slate-100 ${
+            className={`flex w-full items-center gap-2 px-3 py-1.5 text-left pointer-coarse:py-3 outline-none focus:bg-slate-100 hover:bg-slate-100 ${
               item.danger ? 'text-red-600' : 'text-slate-700'
             }`}
           >

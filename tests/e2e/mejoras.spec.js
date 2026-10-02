@@ -125,3 +125,52 @@ test('ejemplos y trabajos anteriores: abrir un ejemplo y recuperar lo que había
   await page.keyboard.press('Escape')
   expectNoErrors(errors)
 })
+
+test.describe('pantalla táctil', () => {
+  test.use({ hasTouch: true, isMobile: true, viewport: { width: 1100, height: 800 } })
+
+  // Pulsación larga con el dedo en (x, y): eventos de puntero táctiles reales en ese punto.
+  async function longPress(page, x, y, ms = 700) {
+    await page.evaluate(
+      async ([px, py, wait]) => {
+        const target = document.elementFromPoint(px, py)
+        const opts = { bubbles: true, cancelable: true, pointerType: 'touch', isPrimary: true, clientX: px, clientY: py, pointerId: 7 }
+        target.dispatchEvent(new PointerEvent('pointerdown', opts))
+        await new Promise((r) => setTimeout(r, wait))
+        target.dispatchEvent(new PointerEvent('pointerup', opts))
+      },
+      [x, y, ms],
+    )
+  }
+
+  test('pulsación larga abre el menú contextual; doble toque edita', async ({ page }) => {
+    const errors = await openEditor(page)
+    // Conectores más grandes en pantallas táctiles.
+    const handle = page.locator('.react-flow__node[data-id="s1"] .grafcet-handle').first()
+    expect(await handle.evaluate((el) => el.getBoundingClientRect().width)).toBeGreaterThanOrEqual(23)
+
+    // Pulsación larga en el lienzo vacío -> menú del lienzo.
+    const pane = await page.locator('.react-flow__pane').boundingBox()
+    await longPress(page, pane.x + 60, pane.y + pane.height - 80)
+    await expect(page.getByRole('menu')).toContainText('Etapa inicial aquí')
+    await page.keyboard.press('Escape')
+
+    // Pulsación larga sobre una etapa -> su menú (uno solo).
+    const s1 = await page.locator('.react-flow__node[data-id="s1"]').boundingBox()
+    await longPress(page, s1.x + 28, s1.y + 28)
+    await expect(page.getByRole('menu')).toHaveCount(1)
+    await expect(page.getByRole('menu')).toContainText('Etapa 1')
+    await page.keyboard.press('Escape')
+
+    // Un toque corto no abre menú.
+    await longPress(page, s1.x + 28, s1.y + 28, 100)
+    await page.waitForTimeout(700)
+    await expect(page.getByRole('menu')).toHaveCount(0)
+
+    // Doble toque sobre la etapa -> panel de edición.
+    await page.touchscreen.tap(s1.x + 28, s1.y + 28)
+    await page.touchscreen.tap(s1.x + 28, s1.y + 28)
+    await expect(page.getByRole('heading', { name: 'Etapa', exact: true })).toBeVisible()
+    expectNoErrors(errors)
+  })
+})

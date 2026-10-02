@@ -17,6 +17,9 @@ const NOTATION = [
     'Tabla de variables en el lienzo',
     'Clic en una dirección o comentario para editarlo; arrastra una variable a otra sección para cambiar su tipo; al pasar por una fila se resaltan los nodos que la usan.',
   ],
+  ['Notas', 'Cuadros de texto libres (barra o clic derecho en el lienzo). No forman parte del grafcet: la verificación, la simulación y el ladder las ignoran.'],
+  ['Ordenar', 'Selecciona varios nodos y, con clic derecho: Alinear en columna o Espaciar la secuencia (distancias estándar).'],
+  ['Abrir', 'Archivo .json, Ejemplos (taladradora, cilindros, semáforo, mezcladora) o Trabajos anteriores: lo que había antes de abrir o limpiar se guarda solo en este navegador.'],
   [
     'Simulación',
     'Botón Simular. Etapa activa: verde con punto. Transición validada: ámbar; franqueable: verde. Acción emitida: verde. Entradas con interruptor, pulsador o teclas 1–9; «Paso» franquea de uno en uno para ver la evolución fugaz.',

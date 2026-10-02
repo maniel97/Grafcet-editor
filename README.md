@@ -37,7 +37,12 @@ Las pruebas de navegador usan un Chromium ya instalado (Brave, Chrome o Edge; o
 - **Tabla de variables**: etapas → marcas (X0 → M0.0), entradas, salidas, marcas,
   temporizadores y contadores con direcciones Siemens o IEC 61131-3, asignación automática,
   CSV, y tabla editable sobre el propio lienzo.
-- **Archivos**: guardar / abrir proyecto `.json`; exportar PNG, SVG y PDF.
+- **Archivos**: guardar / abrir proyecto `.json`; exportar PNG, SVG y PDF (con tamaño de página,
+  orientación y vista previa).
+- **Abrir**: ejemplos listos (taladradora, cilindros A+B+A−B−, semáforo, mezcladora con O e Y) y
+  trabajos anteriores (lo que había antes de abrir o limpiar se guarda solo en el navegador).
+- **Notas** de texto en el lienzo; **alinear y espaciar** una selección; uso **táctil**
+  (pulsación larga = menú contextual, doble toque = editar, elementos más grandes).
 - **Accesibilidad**: tipo de letra (incluidas Atkinson Hyperlegible y OpenDyslexic) y tamaño de
   interfaz y diagrama.
 

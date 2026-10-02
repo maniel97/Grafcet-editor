@@ -5,7 +5,9 @@ import { useQuickConnect } from '../lib/useQuickConnect'
 import { useStructureActions } from '../lib/useStructureActions'
 import { useEditor } from '../lib/editorContext'
 
-const BUTTON_SIZE = 24
+// En pantallas táctiles los botones son mayores para poder pulsarlos con el dedo.
+const COARSE = typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches
+const BUTTON_SIZE = COARSE ? 36 : 24
 const zoomSelector = (s) => s.transform[2]
 
 // Botón redondo flotante junto al nodo seleccionado.
@@ -55,14 +57,14 @@ function FloatingButton({ position, title, onClick, centerX, disabled = false, p
                 onClick()
               }
         }
-        style={anchored ? { marginLeft: centerX * zoom - BUTTON_SIZE / 2 } : undefined}
-        className={`flex h-[24px] w-[24px] items-center justify-center rounded-full shadow-md ${
+        style={{ width: BUTTON_SIZE, height: BUTTON_SIZE, ...(anchored ? { marginLeft: centerX * zoom - BUTTON_SIZE / 2 } : {}) }}
+        className={`flex items-center justify-center rounded-full shadow-md ${
           disabled
             ? 'cursor-not-allowed bg-slate-300 text-slate-500'
             : 'bg-blue-600 text-white hover:bg-blue-700 active:bg-blue-800'
         }`}
       >
-        <Icon size={16} strokeWidth={2.5} />
+        <Icon size={COARSE ? 20 : 16} strokeWidth={2.5} />
       </button>
     </NodeToolbar>
   )

@@ -79,6 +79,15 @@ body,
   opacity: 0.75;
 }
 
+/* Pantallas táctiles: conectores más grandes para poder acertar con el dedo (y visibles en el nodo
+   seleccionado, ya que no hay "pasar el ratón por encima"). */
+@media (pointer: coarse) {
+  .react-flow__handle.grafcet-handle {
+    width: 24px;
+    height: 24px;
+  }
+}
+
 /* Solo lectura (simulando o con la edición bloqueada): sin conectores, no se puede conectar.
    visibility (no display: none) para que React Flow siga midiendo su posición: los enlaces se
    dibujan a partir de ella. */

@@ -32,6 +32,7 @@ import { useVerification } from '../hooks/useVerification'
 import { useClipboard } from '../hooks/useClipboard'
 import { useCanvasContextMenu } from '../hooks/useCanvasContextMenu'
 import { useImageExport } from '../hooks/useImageExport'
+import { useTouchGestures } from '../hooks/useTouchGestures'
 
 // Partes que no hacen falta al abrir el editor: se descargan la primera vez que se usan, para que
 // la carga inicial sea más ligera (importa sobre todo publicado en internet).
@@ -114,6 +115,16 @@ export default function GrafcetCanvas() {
   const { menu, setMenu, closeMenu, onNodeContextMenu, onSelectionContextMenu, onPaneContextMenu } = useCanvasContextMenu()
   const clearHighlight = useCallback(() => setHighlight(null), [setHighlight])
   const { exportImage, capturePdfImage } = useImageExport(clearHighlight)
+  // Pantallas táctiles: pulsación larga = menú contextual; doble toque = editar.
+  const { isDoubleTap } = useTouchGestures(wrapperRef)
+
+  // Doble clic (o doble toque) sobre un nodo: editarlo según su tipo.
+  const openNodeEditor = (node) => {
+    if (loopSourceId || readOnly) return
+    if (node.type === 'variables') setVariablesOpen(true)
+    else if (node.type === 'note') setEditingNoteId(node.id)
+    else setEditingId(node.id)
+  }
   // PNG y SVG se descargan directamente; PDF abre el diálogo con opciones y vista previa.
   const onExport = useCallback((format) => (format === 'pdf' ? setPdfOpen(true) : exportImage(format)), [exportImage])
 
@@ -473,13 +484,11 @@ export default function GrafcetCanvas() {
               nodesDraggable={!readOnly}
               nodesConnectable={!readOnly}
               elementsSelectable={!readOnly}
-              onNodeClick={(_, node) => loopSource && node.type === 'step' && finishLoop(node.id)}
-              onNodeDoubleClick={(_, node) => {
-                if (loopSource || readOnly) return
-                if (node.type === 'variables') setVariablesOpen(true)
-                else if (node.type === 'note') setEditingNoteId(node.id)
-                else setEditingId(node.id)
+              onNodeClick={(e, node) => {
+                if (loopSource) return node.type === 'step' && finishLoop(node.id)
+                if (isDoubleTap(e, node.id)) openNodeEditor(node)
               }}
+              onNodeDoubleClick={(_, node) => openNodeEditor(node)}
               onPaneClick={() => {
                 setEditingId(null)
                 setLoopSourceId(null)

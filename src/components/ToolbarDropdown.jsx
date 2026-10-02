@@ -85,7 +85,7 @@ export default function ToolbarDropdown({ icon: Icon, label, title, menuLabel, i
                 setOpen(false)
                 f.onSelect()
               }}
-              className="flex w-full items-start gap-3 px-3 py-2 text-left outline-none hover:bg-slate-100 focus:bg-slate-100 disabled:opacity-40"
+              className="flex w-full items-start gap-3 px-3 py-2 text-left pointer-coarse:py-3 outline-none hover:bg-slate-100 focus:bg-slate-100 disabled:opacity-40"
             >
               <f.icon size={18} className="mt-0.5 shrink-0 text-slate-500" />
               <span>
