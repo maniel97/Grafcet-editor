@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { AlertTriangle, Check, Copy, Download, FileCode, FileText, Image, X } from 'lucide-react'
 import LadderDiagram from './LadderDiagram'
+import LadderZoom from './LadderZoom'
 import { generateLadder } from '../lib/ladder/generate'
 import { toAWL, toStructuredText } from '../lib/ladder/exportText'
 import { svgSource } from '../lib/svgExport'
@@ -73,6 +74,11 @@ export default function LadderView({ nodes, edges, plc, grafcetErrors, onClose }
   )
 
   const ladder = useMemo(() => generateLadder(nodes, edges, plc), [nodes, edges, plc])
+  // Ancho real del esquema (para ajustarlo al ancho de la ventana).
+  const [naturalWidth, setNaturalWidth] = useState(0)
+  useLayoutEffect(() => {
+    setNaturalWidth(Number(svgRef.current?.getAttribute('width')) || 0)
+  }, [ladder, mode, tab])
   const st = useMemo(() => toStructuredText(ladder, plc), [ladder, plc])
   const scl = useMemo(() => toStructuredText(ladder, plc, { dialect: 'tia' }), [ladder, plc])
   const awl = useMemo(() => toAWL(ladder, { mnemonic, useAddresses: mode !== 'symbol' }), [ladder, mnemonic, mode])
@@ -189,17 +195,17 @@ export default function LadderView({ nodes, edges, plc, grafcetErrors, onClose }
         </div>
       )}
 
-      <div className="min-h-0 flex-1 overflow-auto p-4">
-        {tab === 'ladder' ? (
-          <div className="inline-block rounded-lg border border-slate-200 bg-white shadow-sm">
-            <LadderDiagram ref={svgRef} ladder={ladder} mode={mode} />
-          </div>
-        ) : (
+      {tab === 'ladder' ? (
+        <LadderZoom naturalWidth={naturalWidth}>
+          <LadderDiagram ref={svgRef} ladder={ladder} mode={mode} />
+        </LadderZoom>
+      ) : (
+        <div className="min-h-0 flex-1 overflow-auto p-4">
           <pre className="rounded-lg border border-slate-200 bg-white p-4 font-mono text-[13px] leading-relaxed text-slate-800 shadow-sm">
             {text}
           </pre>
-        )}
-      </div>
+        </div>
+      )}
       {exportFormat && (
         <ExportDialog
           source={exportSource}

@@ -11,7 +11,7 @@ test('paso a ladder: esquema, exportaciones, ST y AWL', async ({ page }) => {
   await page.getByTitle(/Paso a ladder/).click()
   const view = page.locator('[aria-label="Ladder generado"]')
   await expect(view.locator('header')).toContainText('16 segmentos')
-  const svg = view.locator('.inline-block > svg')
+  const svg = view.locator('[data-ladder-svg]')
   for (const title of ['Inicialización', 'Auxiliares', 'Condiciones de franqueo', 'Desactivación de etapas', 'Activación de etapas', 'Temporizaciones', 'Acciones memorizadas', 'Salidas']) {
     await expect(svg.getByText(title, { exact: true })).toHaveCount(1)
   }
@@ -53,5 +53,30 @@ test('paso a ladder: esquema, exportaciones, ST y AWL', async ({ page }) => {
 
   await page.keyboard.press('Escape')
   await expect(view).toHaveCount(0)
+  expectNoErrors(errors)
+})
+
+test('visor del ladder: centrado y ajustado al ancho en pantallas grandes, con zoom', async ({ page }) => {
+  await page.setViewportSize({ width: 2560, height: 1300 })
+  const errors = await openEditor(page, 'ladder-completo.json')
+  await page.getByTitle(/Paso a ladder/).click()
+  const svg = page.locator('[data-ladder-svg]')
+  const fit = page.getByRole('button', { name: 'Ajustar al ancho', exact: true })
+  await expect(fit).toHaveText('150 %') // ajustado (con tope) en vez de diminuto
+  const box = await svg.boundingBox()
+  const natural = Number(await svg.getAttribute('width'))
+  expect(box.width).toBeCloseTo(natural * 1.5, -1)
+  expect(Math.abs(box.x + box.width / 2 - 1280)).toBeLessThan(20) // centrado
+  await page.getByLabel('Acercar el esquema').click()
+  await expect(fit).toHaveText('200 %')
+  await page.keyboard.down('Control')
+  await page.mouse.move(1280, 700)
+  await page.mouse.wheel(0, 200) // Ctrl + rueda hacia abajo: alejar
+  await page.keyboard.up('Control')
+  await expect(fit).toHaveText('150 %')
+  await fit.click()
+  await expect(fit).toHaveText('150 %')
+  // El tamaño de exportación no cambia con el zoom.
+  expect(Number(await svg.getAttribute('width'))).toBe(natural)
   expectNoErrors(errors)
 })

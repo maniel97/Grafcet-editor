@@ -19,11 +19,16 @@ const PNG_SCALES = [
 ]
 
 function readOptions() {
+  let stored = {}
   try {
-    return { ...DEFAULT_PDF_OPTIONS, pngScale: 2, ...JSON.parse(localStorage.getItem(STORAGE_KEY)) }
+    stored = JSON.parse(localStorage.getItem(STORAGE_KEY)) ?? {}
   } catch {
-    return { ...DEFAULT_PDF_OPTIONS, pngScale: 2 }
+    // Sin almacenamiento o datos dañados: valores por defecto.
   }
+  const options = { ...DEFAULT_PDF_OPTIONS, pngScale: 2, ...stored }
+  // Un tamaño que ya no existe (A5 de versiones anteriores) pasa a A4.
+  if (!PAGE_OPTIONS.some((p) => p.id === options.page)) options.page = 'a4'
+  return options
 }
 
 function Choice({ legend, name, value, options, onChange }) {

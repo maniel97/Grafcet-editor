@@ -195,7 +195,7 @@ test('variables de etapa E1 en vez de X1: tabla, lienzo, simulación y ladder', 
   await page.getByRole('button', { name: /Detener/ }).click()
 
   await page.getByTitle(/Paso a ladder/).click()
-  await expect(page.locator('.inline-block > svg')).toContainText('Primer ciclo: activa E0')
+  await expect(page.locator('[data-ladder-svg]')).toContainText('Primer ciclo: activa E0')
   await page.keyboard.press('Escape')
   expectNoErrors(errors)
 })

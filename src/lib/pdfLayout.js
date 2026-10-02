@@ -2,13 +2,16 @@
 // Es una función pura que usan por igual la vista previa y el PDF, así que lo que se ve en la
 // vista previa es exactamente lo que se guarda.
 
-// Formatos de página en mm, en vertical.
+// Formatos de página en mm, en vertical. A4 como mínimo: más pequeño no se leen bien ni el
+// grafcet ni el ladder.
 export const PAGE_SIZES = [
-  { id: 'a5', label: 'A5', width: 148, height: 210 },
   { id: 'a4', label: 'A4', width: 210, height: 297 },
   { id: 'a3', label: 'A3', width: 297, height: 420 },
   { id: 'letter', label: 'Carta (EE. UU.)', width: 215.9, height: 279.4 },
 ]
+
+// Tamaño por id; uno que ya no existe (p. ej. A5 guardado de antes) pasa a A4.
+const pageSize = (id) => PAGE_SIZES.find((p) => p.id === id) ?? PAGE_SIZES.find((p) => p.id === 'a4')
 
 export const PAGE_OPTIONS = [{ id: 'auto', label: 'Automático (A4 o A3)' }, ...PAGE_SIZES]
 export const ORIENTATIONS = [
@@ -54,9 +57,9 @@ export function pdfLayout(image, options = DEFAULT_PDF_OPTIONS) {
     return landscape.scale > portrait.scale ? landscape : portrait
   }
 
-  if (options.page !== 'auto') return best(PAGE_SIZES.find((p) => p.id === options.page) ?? PAGE_SIZES[1])
-  const a4 = best(PAGE_SIZES[1])
-  return a4.scale >= MIN_READABLE_SCALE ? a4 : best(PAGE_SIZES[2])
+  if (options.page !== 'auto') return best(pageSize(options.page))
+  const a4 = best(pageSize('a4'))
+  return a4.scale >= MIN_READABLE_SCALE ? a4 : best(pageSize('a3'))
 }
 
 // Reparto en páginas de un dibujo alto (ladder, cronograma): los bloques [{ top, bottom, keep }]
@@ -94,7 +97,7 @@ export function exportLayout(image, options = DEFAULT_PDF_OPTIONS) {
     const one = pdfLayout(image, options)
     return { ...one, pages: [{ top: 0, bottom: image.height, h: one.h }] }
   }
-  const page = PAGE_SIZES.find((p) => p.id === options.page) ?? PAGE_SIZES[1]
+  const page = pageSize(options.page)
   const orientation = options.orientation === 'landscape' ? 'landscape' : 'portrait'
   const landscape = orientation === 'landscape'
   const pageW = landscape ? page.height : page.width

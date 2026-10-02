@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { pdfLayout, PAGE_MARGIN, FOOTER_SPACE } from '../../src/lib/pdfLayout'
+import { pdfLayout, PAGE_MARGIN, PAGE_SIZES, FOOTER_SPACE } from '../../src/lib/pdfLayout'
 
 const mm = (px) => (px * 25.4) / 96
 
@@ -25,12 +25,17 @@ describe('maquetación del PDF', () => {
   })
 
   it('respeta el tamaño y la orientación elegidos', () => {
-    const l = pdfLayout({ width: 900, height: 2400 }, { page: 'a5', orientation: 'landscape', footer: true })
-    expect(l.page.id).toBe('a5')
+    const l = pdfLayout({ width: 900, height: 3600 }, { page: 'a4', orientation: 'landscape', footer: true })
+    expect(l.page.id).toBe('a4')
     expect(l.orientation).toBe('landscape')
-    expect(l.pageW).toBe(210)
-    expect(l.pageH).toBe(148)
+    expect(l.pageW).toBe(297)
+    expect(l.pageH).toBe(210)
     expect(l.small).toBe(true) // muy reducido: se avisa
+  })
+
+  it('A4 como mínimo: no hay A5, y un A5 guardado de antes pasa a A4', () => {
+    expect(PAGE_SIZES.map((p) => p.id)).not.toContain('a5')
+    expect(pdfLayout({ width: 400, height: 300 }, { page: 'a5', orientation: 'portrait', footer: true }).page.id).toBe('a4')
   })
 
   it('el diagrama cabe siempre dentro de los márgenes (y del pie si lo hay)', () => {
