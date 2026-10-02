@@ -1,3 +1,4 @@
+import { DEFAULT_PDF_OPTIONS, PAGE_MARGIN, pdfLayout } from './pdfLayout'
 
 // Margen alrededor del dibujo en la imagen exportada (px).
 const MARGIN = 48
@@ -37,7 +38,7 @@ export function drawnBounds(viewportEl, viewport) {
 
 // Dibuja el diagrama completo (no solo la parte visible) a escala 1:1 con margen alrededor de
 // todo lo dibujado. Devuelve { dataUrl, width, height } (tamaño en px CSS) o null si está vacío.
-async function renderDiagram(format, viewport, maxPixelRatio) {
+export async function renderDiagram(format, viewport, maxPixelRatio) {
   const viewportEl = document.querySelector('.react-flow__viewport')
   if (!viewportEl) return null
   const bounds = drawnBounds(viewportEl, viewport)
@@ -79,44 +80,19 @@ export async function exportDiagram(format, viewport) {
   if (image) download(image.dataUrl, `grafcet.${format}`)
 }
 
-// Formatos de página en mm (vertical). Se usa el menor en el que el diagrama quepa sin
-// reducirse demasiado, para que se lea bien impreso.
-const PAGES = [
-  { name: 'a4', width: 210, height: 297 },
-  { name: 'a3', width: 297, height: 420 },
-]
-const PAGE_MARGIN = 12 // mm
-const FOOTER = 8 // mm reservados al pie
-const MIN_READABLE_SCALE = 0.7 // por debajo de esto en A4 se pasa a A3
-const PX_TO_MM = 25.4 / 96
-
-// PDF de una página, generado en el navegador (jsPDF se carga solo al usarlo). La imagen se
-// rasteriza a alta resolución (3x) para impresión; la orientación sigue a la forma del diagrama.
-export async function exportPdf(viewport) {
-  const image = await renderDiagram('png', viewport, 3)
-  if (!image) return
+// PDF de una página, generado en el navegador (jsPDF se carga solo al usarlo), con la imagen ya
+// capturada (renderDiagram a 3x para impresión) y las opciones del diálogo de exportación.
+// La maquetación es la misma que muestra la vista previa (lib/pdfLayout.js).
+export async function savePdf(image, options = DEFAULT_PDF_OPTIONS) {
   const { jsPDF } = await import('jspdf')
-
-  const landscape = image.width > image.height
-  const naturalW = image.width * PX_TO_MM
-  const naturalH = image.height * PX_TO_MM
-  const fit = (page) => {
-    const pageW = landscape ? page.height : page.width
-    const pageH = landscape ? page.width : page.height
-    const scale = Math.min(1, (pageW - PAGE_MARGIN * 2) / naturalW, (pageH - PAGE_MARGIN * 2 - FOOTER) / naturalH)
-    return { page, pageW, pageH, scale }
+  const layout = pdfLayout(image, options)
+  const pdf = new jsPDF({ orientation: layout.orientation, unit: 'mm', format: [layout.page.width, layout.page.height] })
+  pdf.addImage(image.dataUrl, 'PNG', layout.x, layout.y, layout.w, layout.h, undefined, 'FAST')
+  if (options.footer) {
+    pdf.setFontSize(8)
+    pdf.setTextColor(120)
+    const date = new Date().toLocaleDateString('es-ES')
+    pdf.text([options.title?.trim(), date].filter(Boolean).join(' · '), PAGE_MARGIN, layout.pageH - PAGE_MARGIN / 2)
   }
-  const layout = PAGES.map(fit).find((l) => l.scale >= MIN_READABLE_SCALE) ?? fit(PAGES[PAGES.length - 1])
-
-  const pdf = new jsPDF({ orientation: landscape ? 'landscape' : 'portrait', unit: 'mm', format: layout.page.name })
-  const w = naturalW * layout.scale
-  const h = naturalH * layout.scale
-  // Centrado en horizontal; arriba en vertical, como un plano.
-  pdf.addImage(image.dataUrl, 'PNG', (layout.pageW - w) / 2, PAGE_MARGIN, w, h, undefined, 'FAST')
-
-  pdf.setFontSize(8)
-  pdf.setTextColor(120)
-  const date = new Date().toLocaleDateString('es-ES')
-  pdf.text(`Grafcet (IEC 60848) · ${date}`, PAGE_MARGIN, layout.pageH - PAGE_MARGIN / 2)
   pdf.save('grafcet.pdf')
 }

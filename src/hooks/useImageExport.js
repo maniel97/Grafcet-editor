@@ -1,14 +1,16 @@
 import { useCallback } from 'react'
 import { useReactFlow } from '@xyflow/react'
-import { exportDiagram, exportPdf } from '../lib/exportImage'
+import { exportDiagram, renderDiagram } from '../lib/exportImage'
 
-// Exporta el diagrama (PNG, SVG, PDF) sin la selección (se dibuja en azul) ni el resaltado de
-// la tabla; después restaura la selección.
+// Exportación del diagrama sin la selección (se dibuja en azul) ni el resaltado de la tabla:
+// se quitan, se captura y se restaura la selección.
+// - exportImage('png' | 'svg'): descarga directa.
+// - capturePdfImage(): imagen a alta resolución para el diálogo de PDF (vista previa y guardado).
 export function useImageExport(clearHighlight) {
   const { getNodes, getEdges, setNodes, setEdges, getViewport } = useReactFlow()
 
-  return useCallback(
-    async (format) => {
+  const withCleanCanvas = useCallback(
+    async (fn) => {
       const selectedNodes = new Set(getNodes().filter((n) => n.selected).map((n) => n.id))
       const selectedEdges = new Set(getEdges().filter((e) => e.selected).map((e) => e.id))
       const hadSelection = selectedNodes.size || selectedEdges.size
@@ -20,10 +22,7 @@ export function useImageExport(clearHighlight) {
       // Espera a que React pinte el lienzo sin selección antes de capturarlo.
       await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
       try {
-        if (format === 'pdf') await exportPdf(getViewport())
-        else await exportDiagram(format, getViewport())
-      } catch (err) {
-        alert(`No se pudo exportar: ${err.message}`)
+        return await fn(getViewport())
       } finally {
         if (hadSelection) {
           setNodes((nds) => nds.map((n) => ({ ...n, selected: selectedNodes.has(n.id) })))
@@ -33,4 +32,20 @@ export function useImageExport(clearHighlight) {
     },
     [getNodes, getEdges, setNodes, setEdges, getViewport, clearHighlight],
   )
+
+  const exportImage = useCallback(
+    async (format) => {
+      try {
+        await withCleanCanvas((viewport) => exportDiagram(format, viewport))
+      } catch (err) {
+        alert(`No se pudo exportar: ${err.message}`)
+      }
+    },
+    [withCleanCanvas],
+  )
+
+  // 3x: resolución de impresión.
+  const capturePdfImage = useCallback(() => withCleanCanvas((viewport) => renderDiagram('png', viewport, 3)), [withCleanCanvas])
+
+  return { exportImage, capturePdfImage }
 }

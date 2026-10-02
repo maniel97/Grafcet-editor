@@ -38,6 +38,7 @@ const HelpDialog = lazy(() => import('./HelpDialog'))
 const SimulationPanel = lazy(() => import('./SimulationPanel'))
 const LadderView = lazy(() => import('./LadderView'))
 const VariablesDialog = lazy(() => import('./VariablesDialog'))
+const PdfExportDialog = lazy(() => import('./PdfExportDialog'))
 
 // Mientras se descarga una parte diferida (normalmente un instante).
 function Loading({ panel }) {
@@ -77,6 +78,7 @@ export default function GrafcetCanvas() {
   const [helpOpen, setHelpOpen] = useState(false)
   const [verifyOpen, setVerifyOpen] = useState(false)
   const [ladderOpen, setLadderOpen] = useState(false)
+  const [pdfOpen, setPdfOpen] = useState(false)
   // Modo simulación: la edición queda bloqueada y el lienzo muestra la evolución.
   const [simulating, setSimulating] = useState(false)
   // Bloqueo de edición (candado de los controles): solo mirar, desplazar y hacer zoom.
@@ -105,7 +107,9 @@ export default function GrafcetCanvas() {
   const { copy, paste, duplicate } = useClipboard(takeSnapshot)
   const { menu, setMenu, closeMenu, onNodeContextMenu, onSelectionContextMenu, onPaneContextMenu } = useCanvasContextMenu()
   const clearHighlight = useCallback(() => setHighlight(null), [setHighlight])
-  const exportImage = useImageExport(clearHighlight)
+  const { exportImage, capturePdfImage } = useImageExport(clearHighlight)
+  // PNG y SVG se descargan directamente; PDF abre el diálogo con opciones y vista previa.
+  const onExport = useCallback((format) => (format === 'pdf' ? setPdfOpen(true) : exportImage(format)), [exportImage])
 
   const editingNode = nodes.find((n) => n.id === editingId)
   const selectedStep = nodes.find((n) => n.selected && n.type === 'step')
@@ -278,7 +282,7 @@ export default function GrafcetCanvas() {
 
   const loopSource = loopSourceId ? nodes.find((n) => n.id === loopSourceId) : null
   const initialSteps = nodes.filter((n) => n.type === 'step' && n.data.initial)
-  const modalOpen = settingsOpen || helpOpen || variablesOpen || ladderOpen || !!menu
+  const modalOpen = settingsOpen || helpOpen || variablesOpen || ladderOpen || pdfOpen || !!menu
   // En solo lectura el clic derecho no abre menús de edición (ni el del navegador).
   const blockMenu = (handler) => (readOnly ? (e) => e.preventDefault() : handler)
 
@@ -293,7 +297,7 @@ export default function GrafcetCanvas() {
           onRedo={redo}
           canUndo={canUndo}
           canRedo={canRedo}
-          onExport={exportImage}
+          onExport={onExport}
           onSave={save}
           onOpen={() => fileInputRef.current?.click()}
           onClear={clear}
@@ -355,6 +359,11 @@ export default function GrafcetCanvas() {
               onReset={resetSettings}
               onClose={() => setSettingsOpen(false)}
             />
+          </Suspense>
+        )}
+        {pdfOpen && (
+          <Suspense fallback={<Loading />}>
+            <PdfExportDialog capture={capturePdfImage} onClose={() => setPdfOpen(false)} />
           </Suspense>
         )}
         {helpOpen && (

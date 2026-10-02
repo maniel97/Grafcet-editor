@@ -33,10 +33,13 @@ for (const width of [1500, 1100]) {
     await exportBtn.click()
     await page.keyboard.press('ArrowDown')
     expect((await download(page, () => page.keyboard.press('Enter'))).suggestedFilename()).toBe('grafcet.svg')
-    for (const [fmt, file] of [['PNG', 'grafcet.png'], ['PDF', 'grafcet.pdf']]) {
-      await exportBtn.click()
-      expect((await download(page, () => menu.getByRole('menuitem', { name: new RegExp(fmt) }).click())).suggestedFilename()).toBe(file)
-    }
+    await exportBtn.click()
+    expect((await download(page, () => menu.getByRole('menuitem', { name: /PNG/ }).click())).suggestedFilename()).toBe('grafcet.png')
+    // PDF abre su diálogo (probado aparte en pdf.spec.js).
+    await exportBtn.click()
+    await menu.getByRole('menuitem', { name: /PDF/ }).click()
+    await expect(page.getByRole('dialog', { name: 'Exportar a PDF' })).toBeVisible()
+    await page.keyboard.press('Escape')
     expectNoErrors(errors)
   })
 }

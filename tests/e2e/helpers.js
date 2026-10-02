@@ -19,11 +19,13 @@ export async function openEditor(page, project) {
 }
 
 // Ids de las etapas activas en la simulación (las que llevan la marca de actividad).
+// Se ignoran las marcas que React acaba de desmontar (sin nodo padre): pasa si se redibuja justo
+// entre la búsqueda y la lectura, y haría fallar la prueba de forma intermitente.
 export const activeSteps = async (page) =>
   (
     await page
       .locator('[aria-label="Etapa activa"]')
-      .evaluateAll((els) => els.map((el) => el.closest('.react-flow__node').dataset.id))
+      .evaluateAll((els) => els.map((el) => el.closest('.react-flow__node')?.dataset.id).filter(Boolean))
   )
     .sort()
     .join(',')

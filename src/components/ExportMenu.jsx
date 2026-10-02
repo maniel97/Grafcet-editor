@@ -4,7 +4,7 @@ import { ChevronDown, Download, FileCode, FileText, Image } from 'lucide-react'
 const FORMATS = [
   { id: 'png', label: 'PNG', hint: 'Imagen para documentos y webs', icon: Image },
   { id: 'svg', label: 'SVG', hint: 'Vectorial: se amplía sin perder calidad', icon: FileCode },
-  { id: 'pdf', label: 'PDF', hint: 'Para imprimir (A4 o A3 según el tamaño)', icon: FileText },
+  { id: 'pdf', label: 'PDF', hint: 'Para imprimir: tamaño, orientación y vista previa', icon: FileText },
 ]
 
 // Botón "Exportar" de la barra con un submenú de formatos. El submenú se coloca con posición
