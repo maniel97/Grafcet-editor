@@ -27,6 +27,8 @@ export const SCHEMES = [
   { id: 's7200', label: 'S7-200 / Micro/WIN (I0.0, Q0.0, V0.0, VW, T37)' },
 ]
 
+import { ioMap } from './s7200Catalog'
+
 // S7-200: solo 32 bytes de marcas (M0.0–M31.7), así que las etapas van en memoria V (V0.0…), las
 // marcas internas del ladder detrás (lib/ladder/generate.js) y las palabras en VW100…; los
 // temporizadores de 100 ms empiezan en T37.
@@ -60,7 +62,8 @@ export function parseAddress(address) {
 }
 
 // Reparte direcciones libres. `used`: Set de direcciones ocupadas (en mayúsculas).
-function makeAllocator(scheme, used) {
+// `available`: direcciones de E/S que existen (S7-200 con CPU y módulos elegidos): { I: [...], Q: [...] }.
+function makeAllocator(scheme, used, available = null) {
   const s7200 = scheme === 's7200'
   const cursors = {
     bit: { I: 0, Q: 0, M: s7200 ? 0 : MEMORY_START_BYTE * 8, V: 0 },
@@ -72,6 +75,15 @@ function makeAllocator(scheme, used) {
     next(area, numeric) {
       // S7-200: las palabras de marcas van en VW (la zona M es muy pequeña).
       if (s7200 && numeric && area === 'M') area = S7200.wordArea
+      // Con la configuración de E/S elegida, solo direcciones que existen en ella.
+      const list = !numeric && available?.[area]
+      if (list) {
+        const free = list.find((a) => !used.has(a.toUpperCase()))
+        if (free) {
+          used.add(free.toUpperCase())
+          return free
+        }
+      }
       const kind = ['T', 'C'].includes(area) ? 'num' : numeric ? 'word' : 'bit'
       const make = (i) => (kind === 'bit' ? formatBit(area, i, scheme) : kind === 'word' ? formatWord(area, i, scheme) : `${area}${i}`)
       let i = cursors[kind][area]
@@ -105,7 +117,8 @@ export function autoAssign(plc, stepNodes, symbols, { overwrite = false } = {}) 
   for (const s of stepNodes) if (keep(steps[s.id])) remember(steps[s.id].address)
   for (const [name] of symbols) if (keep(variables[name])) remember(variables[name].address)
 
-  const allocator = makeAllocator(scheme, used)
+  const io = scheme === 's7200' && plc.s7200?.cpu ? ioMap(plc.s7200) : null
+  const allocator = makeAllocator(scheme, used, io && { I: io.inputs, Q: io.outputs })
 
   // Etapas: marcas consecutivas desde M0.0 (en S7-200, V0.0) en orden de número de etapa.
   const stepArea = scheme === 's7200' ? S7200.stepArea : 'M'
@@ -204,6 +217,11 @@ export function deleteVariable(plc, name) {
 export function validatePlc(plc, stepNodes, symbols) {
   const issues = []
   const owners = new Map() // dirección -> [{ label, nodeIds }]
+  const s7200 = plc.scheme === 's7200'
+  // S7-200 con CPU y módulos elegidos: direcciones de E/S que existen.
+  const io = s7200 && plc.s7200?.cpu ? ioMap(plc.s7200) : null
+  const exists = io && { I: new Set(io.inputs), Q: new Set(io.outputs) }
+  const configName = io && io.parts.map((p) => p.label).join(' + ')
   const own = (address, label, nodeIds) => {
     const key = String(address).trim().toUpperCase()
     owners.set(key, [...(owners.get(key) ?? []), { label, nodeIds }])
@@ -214,8 +232,8 @@ export function validatePlc(plc, stepNodes, symbols) {
     if (!address) continue
     const parsed = parseAddress(address)
     if (!parsed) issues.push({ severity: 'warning', message: `Etapa ${s.data.label}: dirección «${address}» con formato no reconocido.`, nodeIds: [s.id] })
-    else if (parsed.area !== 'M')
-      issues.push({ severity: 'warning', message: `Etapa ${s.data.label}: la variable de etapa debería ser una marca (M), no ${address}.`, nodeIds: [s.id] })
+    else if (parsed.area !== 'M' && !(s7200 && parsed.area === 'V'))
+      issues.push({ severity: 'warning', message: `Etapa ${s.data.label}: la variable de etapa debería ser una marca (M${s7200 ? ' o V' : ''}), no ${address}.`, nodeIds: [s.id] })
     own(address, `etapa ${s.data.label}`, [s.id])
   }
 
@@ -226,8 +244,12 @@ export function validatePlc(plc, stepNodes, symbols) {
     const nodeIds = [...found.uses]
     const parsed = parseAddress(address)
     const expected = typeInfo(entry.type ?? found.type).area
+    // En S7-200 las marcas numéricas van en memoria V (VW).
+    const okArea = parsed && (parsed.area === expected || (s7200 && expected === 'M' && parsed.area === 'V'))
     if (!parsed) issues.push({ severity: 'warning', message: `«${name}»: dirección «${address}» con formato no reconocido.`, nodeIds })
-    else if (parsed.area !== expected)
+    else if (exists?.[parsed.area] && parsed.index !== undefined && !exists[parsed.area].has(address.toUpperCase()))
+      issues.push({ severity: 'warning', message: `«${name}»: ${address} no existe en la configuración ${configName}.`, nodeIds })
+    else if (!okArea)
       issues.push({ severity: 'warning', message: `«${name}» es de tipo ${typeInfo(entry.type ?? found.type).label.toLowerCase()} pero tiene la dirección ${address}.`, nodeIds })
     own(address, `«${name}»`, nodeIds)
   }
@@ -242,6 +264,18 @@ export function validatePlc(plc, stepNodes, symbols) {
         message: `La variable «${name}» se llama igual que la variable de la etapa ${name.slice(P.length)}: cámbiale el nombre o usa X como prefijo de etapa.`,
         nodeIds: [...found.uses, stepNames.get(name)],
       })
+    }
+  }
+
+  // Más entradas o salidas de las que tiene la configuración elegida.
+  if (io) {
+    const count = (type) => [...symbols].filter(([name, found]) => (plc.variables[name]?.type ?? found.type) === type && !found.numeric).length
+    for (const [type, label, list] of [
+      ['input', 'entradas digitales', io.inputs],
+      ['output', 'salidas digitales', io.outputs],
+    ]) {
+      const used = count(type)
+      if (used > list.length) issues.push({ severity: 'warning', message: `El proyecto usa ${used} ${label} y la configuración ${configName} tiene ${list.length}.`, nodeIds: [] })
     }
   }
 

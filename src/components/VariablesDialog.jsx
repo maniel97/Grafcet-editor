@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Download, Pencil, Plus, Trash2, WandSparkles, X } from 'lucide-react'
 import { SCHEMES, VARIABLE_TYPES, duplicatedAddresses, typeInfo } from '../lib/addressing'
 import { STEP_PREFIXES, resolveStepPrefix, setPreferredStepPrefix, stepVar } from '../lib/stepNames'
+import S7200Config from './S7200Config'
 
 const cellInput =
   'w-full rounded border border-transparent bg-transparent px-1.5 py-1 text-sm hover:border-slate-300 focus:border-blue-500 focus:bg-white focus:outline-none'
@@ -202,6 +203,8 @@ export default function VariablesDialog({
           </label>
         </div>
       </div>
+
+      {plc.scheme === 's7200' && <S7200Config plc={plc} symbols={symbols} onChange={onChange} />}
 
       <div className="flex gap-1 px-5 pt-2" role="tablist">
         {[
