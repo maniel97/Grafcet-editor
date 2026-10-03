@@ -27,13 +27,36 @@ export function useFitDrawn(wrapperRef) {
     [wrapperRef, getViewport, setViewport],
   )
 
+  // Encuadre pendiente (al abrir un proyecto, al cambiar de hoja): se hace cuando React Flow ha
+  // medido todos los nodos, no a ciegas tras unos fotogramas (en un equipo lento la tabla podía no
+  // estar medida todavía y quedar fuera).
   const nodesInitialized = useNodesInitialized()
-  const didInitialFit = useRef(false)
+  const initializedRef = useRef(nodesInitialized)
+  const pending = useRef(0) // duración del encuadre pendiente (null: ninguno); 0 = el inicial
   useEffect(() => {
-    if (!nodesInitialized || didInitialFit.current) return
-    didInitialFit.current = true
-    requestAnimationFrame(() => fitDrawn(0))
+    initializedRef.current = nodesInitialized
+    if (!nodesInitialized || pending.current === null) return
+    const duration = pending.current
+    pending.current = null
+    requestAnimationFrame(() => fitDrawn(duration))
   }, [nodesInitialized, fitDrawn])
 
-  return fitDrawn
+  // Pide un encuadre en cuanto todo esté medido (si ya lo está y no cambia nada, enseguida).
+  const fitWhenReady = useCallback(
+    (duration = 0) => {
+      pending.current = duration
+      requestAnimationFrame(() =>
+        requestAnimationFrame(() => {
+          if (pending.current !== null && initializedRef.current) {
+            const d = pending.current
+            pending.current = null
+            fitDrawn(d)
+          }
+        }),
+      )
+    },
+    [fitDrawn],
+  )
+
+  return { fitDrawn, fitWhenReady }
 }

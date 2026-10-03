@@ -142,7 +142,7 @@ export default function GrafcetCanvas() {
 
   // --- Piezas ----------------------------------------------------------------------------------
   const simulation = useSimulation(nodes, edges, plc, simulating)
-  const fitDrawn = useFitDrawn(wrapperRef)
+  const { fitDrawn, fitWhenReady } = useFitDrawn(wrapperRef)
   const openVariables = useCallback(() => setVariablesOpen(true), [])
   const { symbols, stepNodes, plcIssues, changePlc, tableShown, toggleTable, plcTable, plcView, exportCsv, highlight, setHighlight } =
     usePlcTable({ nodes, plc, setPlc, plcRef, takeSnapshot, onOpenDialog: openVariables })
@@ -304,9 +304,9 @@ export default function GrafcetCanvas() {
       setNodes((nds) => nds.map((n) => (n.selected ? { ...n, selected: false } : n)))
       setEditingId(null)
       setCurrentSheet(id)
-      requestAnimationFrame(() => requestAnimationFrame(() => fitDrawn(200)))
+      fitWhenReady(200)
     },
-    [setNodes, fitDrawn],
+    [setNodes, fitWhenReady],
   )
   const addSheet = useCallback(() => {
     const list = sheetsOf(plcRef.current)
@@ -489,16 +489,19 @@ export default function GrafcetCanvas() {
     (project, reason) => {
       pushRecent({ nodes: getNodes(), edges: getEdges(), plc: plcRef.current, name: projectNameRef.current }, reason)
       takeSnapshot()
-      setNodes(project.nodes)
+      // Cada elemento con su hoja desde el principio (los proyectos antiguos no la llevan): así no
+      // hay un segundo ciclo de dibujo al asignarla después.
+      const firstSheet = sheetsOf(project.plc ?? EMPTY_PLC)[0].id
+      setNodes(project.nodes.map((n) => (n.data?.sheet ? n : { ...n, data: { ...n.data, sheet: firstSheet } })))
       setEdges(project.edges)
       setPlc(project.plc ?? EMPTY_PLC)
       setCurrentSheet(sheetsOf(project.plc ?? EMPTY_PLC)[0].id)
       setProjectNameState(project.name ?? '')
       setEditingId(null)
       if (project.viewport) setViewport(project.viewport)
-      else requestAnimationFrame(() => requestAnimationFrame(() => fitDrawn(0)))
+      else fitWhenReady(0)
     },
-    [getNodes, getEdges, takeSnapshot, setNodes, setEdges, setViewport, fitDrawn],
+    [getNodes, getEdges, takeSnapshot, setNodes, setEdges, setViewport, fitWhenReady],
   )
 
   const load = useCallback(
