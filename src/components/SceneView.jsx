@@ -1119,8 +1119,8 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
             </button>
           ))}
         </div>
-        <button type="button" onClick={() => onAction(null, 'clear')} title="Quitar todas las piezas" className="rounded border border-slate-300 px-2 py-0.5 hover:bg-slate-100">
-          Vaciar piezas
+        <button type="button" onClick={() => onAction(null, 'clear')} title="Quita de la escena todas las piezas (cilindros, cintas y demás elementos se quedan)" className="rounded border border-slate-300 px-2 py-0.5 hover:bg-slate-100">
+          Quitar piezas
         </button>
         <span className="ml-auto" />
         <button type="button" onClick={() => setZoom((z) => Math.max(ZOOM_MIN, z - 0.1))} title="Alejar" className="rounded p-1 hover:bg-slate-100">
