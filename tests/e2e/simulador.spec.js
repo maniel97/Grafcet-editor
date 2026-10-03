@@ -265,3 +265,22 @@ test('escena: potenciómetro, calentador con termostato y detectores por tipo', 
   await expect(view.getByLabel('Propiedades del elemento').getByRole('combobox', { name: 'Tipo de detector' })).toHaveValue('inductive')
   expectNoErrors(errors)
 })
+
+test('escena: arrastrar un módulo de la paleta al punto exacto', async ({ page }) => {
+  const errors = await openEditor(page)
+  await page.getByRole('button', { name: /Simular/ }).click()
+  await page.getByRole('button', { name: /Planta virtual/ }).click()
+  const view = page.getByRole('region', { name: 'Escena de la planta' })
+  await view.getByRole('radio', { name: /Editar/ }).click()
+  const area = await view.locator('.paper').boundingBox()
+  const target = { x: area.x + 120, y: area.y + 90 }
+  await view.getByRole('button', { name: '+ Piloto' }).dragTo(view.locator('.paper'), { targetPosition: { x: 120, y: 90 } })
+  const lamp = view.locator('[data-element="lamp"]')
+  await expect(lamp).toHaveCount(1)
+  const b = await lamp.boundingBox()
+  // El centro del piloto, donde se soltó (con el ajuste a la rejilla).
+  expect(Math.abs(b.x + b.width / 2 - target.x)).toBeLessThan(12)
+  expect(Math.abs(b.y + b.height / 2 - target.y)).toBeLessThan(12)
+  await expect(view.getByLabel('Propiedades del elemento')).toContainText('Piloto')
+  expectNoErrors(errors)
+})

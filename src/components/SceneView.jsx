@@ -694,6 +694,8 @@ const PALETTE_ITEMS = Object.entries(SCENE_TYPES).flatMap(([type, t]) =>
     : [{ key: type, type, group: t.group, label: t.label, preset: {} }],
 )
 const PALETTE = PALETTE_ITEMS.reduce((groups, item) => ({ ...groups, [item.group]: [...(groups[item.group] ?? []), item] }), {})
+// Arrastrar un módulo de la paleta a la escena (tipo de dato propio del arrastre).
+const DRAG_TYPE = 'application/x-grafcet-scene'
 const PALETTE_BY_KEY = Object.fromEntries(PALETTE_ITEMS.map((i) => [i.key, i]))
 
 // Planta virtual en escena (lib/sim/scene.js), al estilo de PC_SIMU: se colocan los elementos
@@ -768,10 +770,12 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
   const rotateSelected = () => selectedElement && update({ ...selectedElement, rot: ((selectedElement.rot ?? 0) + 90) % 360 })
 
   // Nuevo elemento en el centro de lo que se ve.
-  const add = (type, preset = {}) => {
+  // Nuevo elemento: donde se suelta al arrastrarlo desde la paleta o, con un clic, en el centro
+  // de lo que se ve.
+  const add = (type, preset = {}, at = null) => {
     const el = scrollRef.current
-    const x = snap(el ? (el.scrollLeft + el.clientWidth / 2) / zoom : W / 2)
-    const y = snap(el ? (el.scrollTop + el.clientHeight / 2) / zoom : H / 2)
+    const x = snap(at ? at.x : el ? (el.scrollLeft + el.clientWidth / 2) / zoom : W / 2)
+    const y = snap(at ? at.y : el ? (el.scrollTop + el.clientHeight / 2) / zoom : H / 2)
     const element = { id: newId(), type, x, y, rot: 0, ...SCENE_TYPES[type].defaults, ...preset }
     save([...elements, element])
     setSelected(element.id)
@@ -1015,6 +1019,14 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
                       previewTimer.current = setTimeout(() => setPreview({ key: item.key, ...at }), PREVIEW_DELAY)
                     }}
                     onMouseMove={(ev) => setPreview((p) => (p ? { ...p, x: ev.clientX, y: ev.clientY } : p))}
+                    draggable
+                    onDragStart={(ev) => {
+                      clearTimeout(previewTimer.current)
+                      setPreview(null)
+                      ev.dataTransfer.setData(DRAG_TYPE, item.key)
+                      ev.dataTransfer.effectAllowed = 'copy'
+                    }}
+                    title="Arrastra a la escena (o pulsa para ponerlo en el centro)"
                     onMouseLeave={() => {
                       clearTimeout(previewTimer.current)
                       setPreview(null)
@@ -1028,7 +1040,21 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
             ))}
           </nav>
         )}
-        <div ref={scrollRef} className="paper min-w-0 flex-1 overflow-auto">
+        <div
+          ref={scrollRef}
+          className="paper min-w-0 flex-1 overflow-auto"
+          onDragOver={(ev) => {
+            if (!ev.dataTransfer.types.includes(DRAG_TYPE)) return
+            ev.preventDefault()
+            ev.dataTransfer.dropEffect = 'copy'
+          }}
+          onDrop={(ev) => {
+            const item = PALETTE_BY_KEY[ev.dataTransfer.getData(DRAG_TYPE)]
+            if (!item) return
+            ev.preventDefault()
+            add(item.type, item.preset, toScene(ev))
+          }}
+        >
           <svg
             ref={svgRef}
             width={W * zoom}
@@ -1118,7 +1144,7 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
       )}
       {mode === 'edit' && (
         <p className="border-t border-slate-200 px-2 py-1 text-[11px] text-slate-500">
-          Arrastra para mover · R gira · Supr borra · asigna las variables en el panel de la derecha. Piezas de {PIECE_SIZES.small[0]} y{' '}
+          Arrastra módulos de la paleta a la escena · arrastra para mover · R gira · Supr borra · asigna las variables en el panel de la derecha. Piezas de {PIECE_SIZES.small[0]} y{' '}
           {PIECE_SIZES.large[0]} px.
         </p>
       )}
