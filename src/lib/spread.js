@@ -29,7 +29,8 @@ export function spreadFactor(boxes) {
 // izquierdo, y las notas de la derecha, además, a la derecha de los textos (mantienen su hueco;
 // también sin separar columnas, si ya los pisaban).
 // El resto de nodos no se mueve.
-export function spreadNodes(nodes, boxes, factor) {
+// only: si se da (Set de ids), solo se mueven esos nodos (p. ej. la selección o la hoja visible).
+export function spreadNodes(nodes, boxes, factor, only = null) {
   const centers = Object.values(boxes).map((b) => (b.left + b.right) / 2)
   if (!centers.length) return nodes
   const origin = Math.min(...centers)
@@ -41,6 +42,7 @@ export function spreadNodes(nodes, boxes, factor) {
     return Math.round(Math.max(scale(x), scaledTextRight + Math.max(NOTE_GAP, x - textRight)))
   }
   return nodes.map((n) => {
+    if (only && !only.has(n.id)) return n
     const box = boxes[n.id]
     if (box) {
       const half = (box.right - box.left) / 2
@@ -54,4 +56,31 @@ export function spreadNodes(nodes, boxes, factor) {
     if (n.type === 'note') return { ...n, position: { ...n.position, x: placeNote(n.position.x) } }
     return n
   })
+}
+
+// Medidas de las etapas y transiciones ya dibujadas (en coordenadas del lienzo): el cuerpo (el
+// cuadro de la etapa o la barra de la transición) y lo que dibujan a su derecha (acciones,
+// receptividad, direcciones).
+export function measureBoxes(nodes, screenToFlowPosition, root = document) {
+  const toFlow = (r) => {
+    const a = screenToFlowPosition({ x: r.left, y: r.top })
+    const b = screenToFlowPosition({ x: r.right, y: r.bottom })
+    return { left: a.x, top: a.y, right: b.x, bottom: b.y }
+  }
+  const boxes = {}
+  for (const n of nodes) {
+    if ((n.type !== 'step' && n.type !== 'transition') || n.hidden) continue
+    const el = root.querySelector(`.react-flow__node[data-id="${CSS.escape(n.id)}"]`)
+    if (!el) continue
+    const body = toFlow((el.querySelector('.diagram-step-label') ?? el.firstElementChild ?? el).getBoundingClientRect())
+    let text = body
+    for (const child of el.querySelectorAll('*')) {
+      const r = child.getBoundingClientRect()
+      if (!r.width || !r.height) continue
+      const f = toFlow(r)
+      text = { right: Math.max(text.right, f.right), top: Math.min(text.top, f.top), bottom: Math.max(text.bottom, f.bottom) }
+    }
+    boxes[n.id] = { ...body, textRight: text.right, textTop: text.top, textBottom: text.bottom }
+  }
+  return boxes
 }

@@ -795,3 +795,77 @@ for (const [fontId, diagramFontSize] of [['inter', 14], ['opendyslexic', 22]]) {
     expectNoErrors(errors)
   })
 }
+
+test('separar columnas: una receptividad larga deja de pisar la rama vecina (con deshacer)', async ({ page }) => {
+  const errors = await openEditor(page)
+  // Divergencia en O con dos ramas a 100 px: la receptividad de la izquierda pisa la de la derecha.
+  await loadProject(page, {
+    nodes: [
+      { id: 's0', type: 'step', position: { x: 200, y: 0 }, data: { label: '0', initial: true, actions: [] } },
+      { id: 't1', type: 'transition', position: { x: 200, y: 100 }, data: { condition: 'Pieza_grande · Marcha · Cinta_libre' } },
+      { id: 't2', type: 'transition', position: { x: 300, y: 100 }, data: { condition: 'Pieza_pequena' } },
+    ],
+    edges: [
+      { id: 'a', source: 's0', target: 't1' },
+      { id: 'b', source: 's0', target: 't2' },
+    ],
+  })
+  const clash = () =>
+    page.evaluate(() => {
+      const text = document.querySelector('.react-flow__node[data-id="t1"] .diagram-text').getBoundingClientRect()
+      return text.right > document.querySelector('.react-flow__node[data-id="t2"]').getBoundingClientRect().left
+    })
+  expect(await clash()).toBe(true)
+  await page.locator('.react-flow__pane').click({ button: 'right', position: { x: 600, y: 500 } })
+  await page.getByRole('menuitem', { name: /Separar columnas/ }).click()
+  await expect.poll(clash).toBe(false)
+  expect((await position(page, 't1')).x).toBe(200) // la columna de la izquierda no se mueve
+  await page.keyboard.press('Control+z')
+  expect((await position(page, 't2')).x).toBe(300)
+  expectNoErrors(errors)
+})
+
+test('barra: la lupa abre la búsqueda (para quien no conoce Ctrl+F)', async ({ page }) => {
+  const errors = await openEditor(page)
+  await page.getByRole('button', { name: 'Buscar' }).click()
+  await expect(page.getByLabel('Buscar en el diagrama')).toBeFocused()
+  expectNoErrors(errors)
+})
+
+test('Abrir > Nuevo…: título, S7-200 con su CPU, enunciado y tabla de variables en el lienzo', async ({ page }) => {
+  const errors = await openEditor(page)
+  await page.getByTitle('Abrir un proyecto, un ejemplo o un trabajo anterior').click()
+  const items = page.getByRole('menuitem')
+  await expect(items.first()).toHaveText(/Nuevo/) // encabeza la lista
+  await items.first().click()
+  const dialog = page.getByRole('dialog', { name: 'Nuevo proyecto' })
+  await dialog.getByLabel('Título').fill('Taladradora')
+  await dialog.getByRole('radio', { name: /S7-200/ }).check()
+  await dialog.getByLabel('CPU').selectOption('224')
+  await dialog.getByLabel('Enunciado').fill('Taladrar la pieza al pulsar Marcha.')
+  await dialog.getByLabel('Autor').fill('Ana')
+  await dialog.getByRole('button', { name: 'Crear proyecto' }).click()
+  await expect(dialog).toBeHidden()
+
+  await expect(page.getByLabel('Nombre del proyecto')).toHaveValue('Taladradora')
+  await expect(page.locator('.react-flow__node-step')).toHaveCount(1)
+  await expect(page.locator('.react-flow__node-note')).toContainText('Taladrar la pieza')
+  // La tabla, ya colocada a la izquierda de la etapa inicial.
+  await page.locator('[data-auto-place="pending"]').waitFor({ state: 'detached' })
+  const table = await page.locator('.react-flow__node-variables').boundingBox()
+  const step = await page.locator('.react-flow__node-step').boundingBox()
+  expect(table.x + table.width).toBeLessThan(step.x)
+
+  // La próxima vez recuerda el autómata y el autor, no el título.
+  await page.getByTitle('Abrir un proyecto, un ejemplo o un trabajo anterior').click()
+  await page.getByRole('menuitem', { name: /Nuevo/ }).click()
+  await expect(dialog.getByLabel('Título')).toHaveValue('')
+  await expect(dialog.getByLabel('CPU')).toHaveValue('224')
+  await expect(dialog.getByLabel('Autor')).toHaveValue('Ana')
+  await dialog.getByRole('button', { name: 'Cancelar' }).click()
+
+  // Lo de antes se puede recuperar con deshacer.
+  await page.keyboard.press('Control+z')
+  await expect(page.locator('.react-flow__node-step')).toHaveCount(2)
+  expectNoErrors(errors)
+})

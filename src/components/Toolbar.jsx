@@ -24,6 +24,8 @@ import {
   History,
   Workflow,
   Wind,
+  Search,
+  FilePlus,
 } from 'lucide-react'
 
 // `primary`: el texto se ve desde 1280 px; el resto solo en pantallas anchas (2xl),
@@ -86,6 +88,8 @@ export default function Toolbar({
   onClear,
   onOpenSettings,
   onToggleVerify,
+  onSearch,
+  onNew,
   verifyOpen,
   issueCounts,
   onHelp,
@@ -100,7 +104,8 @@ export default function Toolbar({
   const locked = readOnly
   return (
     <header className="flex items-center gap-0.5 overflow-x-auto border-b border-slate-200 bg-white px-3 py-2 shadow-sm">
-      <h1 className="mr-2 hidden shrink-0 text-base font-bold tracking-tight sm:block">Grafcet Editor</h1>
+      {/* Entre 1280 y 1536 px los botones principales muestran su texto: el rótulo deja sitio. */}
+      <h1 className="mr-2 hidden shrink-0 text-base font-bold tracking-tight sm:block xl:hidden 2xl:block">Grafcet Editor</h1>
       {/* Nombre del proyecto: da nombre a los archivos guardados y exportados. */}
       <input
         value={projectName}
@@ -139,6 +144,7 @@ export default function Toolbar({
         labelClass={labelClass(false)}
         disabled={locked}
         items={[
+          { id: 'new', label: 'Nuevo…', hint: 'Proyecto en blanco: título, autómata y tabla de variables', icon: FilePlus, onSelect: onNew },
           { id: 'file', label: 'Abrir archivo…', hint: 'Proyecto .json guardado (Ctrl+O)', icon: FileJson, onSelect: onOpen },
           { id: 'examples', label: 'Ejemplos…', hint: 'Grafcets típicos listos para usar', icon: BookOpen, onSelect: onOpenExamples },
           { id: 'recent', label: 'Trabajos anteriores…', hint: 'Recuperar lo que había antes de abrir o limpiar', icon: History, onSelect: onOpenRecent },
@@ -184,6 +190,7 @@ export default function Toolbar({
         primary
         badge={<VerifyBadge {...issueCounts} />}
       />
+      <ToolButton icon={Search} label="Buscar" title="Buscar en el diagrama: etapas, receptividades, acciones y notas (Ctrl+F)" onClick={onSearch} iconOnly />
 
       <div className="ml-auto" />
       <ToolButton icon={Trash2} label="Limpiar" title="Vaciar el lienzo (se puede deshacer)" onClick={onClear} disabled={locked} />

@@ -23,6 +23,7 @@ import {
   SquareDashed,
   Group,
   Scissors,
+  MoveHorizontal,
 } from 'lucide-react'
 import ContextMenu from './ContextMenu'
 import { useQuickConnect } from '../lib/useQuickConnect'
@@ -39,7 +40,7 @@ import { FRAME_KINDS } from '../lib/frames'
 export default function GrafcetContextMenu({ menu, onClose, onEdit, onAddNodeAt, onFrameAround, sheets = [], onMoveToSheet, onShowInLadder }) {
   const { getNode, getEdges, updateNodeData, setEdges, deleteElements } = useReactFlow()
   const quickConnect = useQuickConnect()
-  const { arrange, addBranch, predecessorsOf, addAlternative, converge, toggleInitial, toggleMacro, addAction, remove } =
+  const { arrange, spread, addBranch, predecessorsOf, addAlternative, converge, toggleInitial, toggleMacro, addAction, remove } =
     useStructureActions()
   const { startLoop, plcTable, toggleTable, setEditingNoteId, takeSnapshot } = useEditor()
 
@@ -84,6 +85,8 @@ export default function GrafcetContextMenu({ menu, onClose, onEdit, onAddNodeAt,
       'separator',
       { label: 'Marco de grafcet parcial aquí', hint: 'G1', icon: SquareDashed, onSelect: () => onAddNodeAt('frame', { kind: 'grafcet' }, at) },
       { label: 'Marco de expansión aquí', hint: 'M1', icon: SquareDashed, onSelect: () => onAddNodeAt('frame', { kind: 'macro' }, at) },
+      'separator',
+      { label: 'Separar columnas', hint: 'que los textos no se pisen', icon: MoveHorizontal, onSelect: () => spread() },
       ...(plcTable && !getNode(VARIABLES_TABLE_ID)
         ? ['separator', { label: 'Tabla de variables aquí', icon: Table2, onSelect: () => toggleTable(at) }]
         : []),
@@ -111,6 +114,7 @@ export default function GrafcetContextMenu({ menu, onClose, onEdit, onAddNodeAt,
       items.push(
         { label: 'Alinear en columna', icon: AlignHorizontalJustifyCenter, onSelect: () => arrange(menu.nodeIds, 'column') },
         { label: 'Espaciar la secuencia', hint: 'distancia estándar', icon: AlignVerticalSpaceAround, onSelect: () => arrange(menu.nodeIds, 'space') },
+        { label: 'Separar columnas', hint: 'que los textos no se pisen', icon: MoveHorizontal, onSelect: () => spread(menu.nodeIds) },
       )
     }
     if (steps.length + transitions.length >= 1) {

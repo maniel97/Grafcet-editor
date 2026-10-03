@@ -5,6 +5,7 @@ import { useEditor } from './editorContext'
 import { defaultEdgeOptions } from './initialDiagram'
 import { normalizeAction } from './actions'
 import { alignColumn, spaceSequence } from './align'
+import { measureBoxes, spreadFactor, spreadNodes } from './spread'
 
 const link = (source, target) => ({ ...defaultEdgeOptions, id: `e-${source}-${target}`, source, target })
 
@@ -18,7 +19,7 @@ const newNode = (type, position, nodes) => ({
 // Operaciones de estructura Grafcet (ramificaciones y convergencias en O / en Y).
 // Todas se registran como un solo paso de deshacer y dejan seleccionado lo que crean.
 export function useStructureActions() {
-  const { getNode, getNodes, getEdges, setNodes, setEdges, updateNodeData, deleteElements } = useReactFlow()
+  const { getNode, getNodes, getEdges, setNodes, setEdges, updateNodeData, deleteElements, screenToFlowPosition } = useReactFlow()
   const { takeSnapshot } = useEditor()
 
   const insert = useCallback(
@@ -158,10 +159,27 @@ export function useStructureActions() {
     [getNodes, takeSnapshot, setNodes],
   )
 
+  // Separar columnas (lib/spread.js) para que ningún texto pise lo que tiene a su derecha: de la
+  // selección o, sin ella, de todo lo visible. Devuelve false si no hacía falta.
+  const spread = useCallback(
+    (nodeIds = null) => {
+      const all = getNodes()
+      const ids = new Set(nodeIds ?? all.filter((n) => !n.hidden).map((n) => n.id))
+      const boxes = measureBoxes(all.filter((n) => ids.has(n.id)), screenToFlowPosition)
+      const next = spreadNodes(all, boxes, spreadFactor(boxes), ids)
+      if (next.every((n, i) => n.position.x === all[i].position.x && n.width === all[i].width)) return false
+      takeSnapshot()
+      setNodes(next)
+      return true
+    },
+    [getNodes, screenToFlowPosition, takeSnapshot, setNodes],
+  )
+
   const remove = useCallback((nodeIds) => deleteElements({ nodes: nodeIds.map((id) => ({ id })) }), [deleteElements])
 
   return {
     arrange,
+    spread,
     addBranch,
     branchesOf,
     predecessorsOf,

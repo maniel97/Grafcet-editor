@@ -27,7 +27,7 @@ import { isValidGrafcetConnection } from '../lib/grafcetRules'
 import { loadAutosave, useAutosave } from '../lib/autosave'
 import { useEditorShortcuts } from '../lib/shortcuts'
 import { normalizeAction } from '../lib/actions'
-import { spreadFactor, spreadNodes } from '../lib/spread'
+import { measureBoxes, spreadFactor, spreadNodes } from '../lib/spread'
 import { useFitDrawn } from '../hooks/useFitDrawn'
 import { usePlcTable } from '../hooks/usePlcTable'
 import { useVerification } from '../hooks/useVerification'
@@ -58,6 +58,7 @@ const VariablesDialog = lazy(() => import('./VariablesDialog'))
 const ExportDialog = lazy(() => import('./ExportDialog'))
 const GemmaDialog = lazy(() => import('./GemmaDialog'))
 const PneumaticDialog = lazy(() => import('./PneumaticDialog'))
+const NewProjectDialog = lazy(() => import('./NewProjectDialog'))
 const DossierDialog = lazy(() => import('./DossierDialog'))
 const ShareDialog = lazy(() => import('./ShareDialog'))
 // Lo que va en el enlace: sin la selección ni el estado de arrastre.
@@ -124,6 +125,7 @@ export default function GrafcetCanvas() {
   const [gemmaOpen, setGemmaOpen] = useState(false)
   const [pneumaticOpen, setPneumaticOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
+  const [newOpen, setNewOpen] = useState(false)
   // Hojas (lib/sheets.js): la activa es la que se dibuja.
   const [currentSheet, setCurrentSheet] = useState(() => sheetsOf(restored?.plc ?? EMPTY_PLC)[0].id)
   const [exportFormat, setExportFormat] = useState(null) // diálogo de exportación abierto en ese formato
@@ -183,26 +185,7 @@ export default function GrafcetCanvas() {
     if (!table) return
     const frame = requestAnimationFrame(() =>
       requestAnimationFrame(() => {
-        const toFlow = (r) => {
-          const a = screenToFlowPosition({ x: r.left, y: r.top })
-          const b = screenToFlowPosition({ x: r.right, y: r.bottom })
-          return { left: a.x, top: a.y, right: b.x, bottom: b.y }
-        }
-        const boxes = {}
-        for (const n of nodes) {
-          if ((n.type !== 'step' && n.type !== 'transition') || n.hidden) continue
-          const el = wrapperRef.current?.querySelector(`.react-flow__node[data-id="${CSS.escape(n.id)}"]`)
-          if (!el) continue
-          const body = toFlow((el.querySelector('.diagram-step-label') ?? el.firstElementChild ?? el).getBoundingClientRect())
-          let text = body
-          for (const child of el.querySelectorAll('*')) {
-            const r = child.getBoundingClientRect()
-            if (!r.width || !r.height) continue
-            const f = toFlow(r)
-            text = { right: Math.max(text.right, f.right), top: Math.min(text.top, f.top), bottom: Math.max(text.bottom, f.bottom) }
-          }
-          boxes[n.id] = { ...body, textRight: text.right, textTop: text.top, textBottom: text.bottom }
-        }
+        const boxes = measureBoxes(nodes, screenToFlowPosition, wrapperRef.current ?? document)
         const factor = spreadFactor(boxes)
         setNodes((nds) =>
           spreadNodes(nds, boxes, factor).map((n) => (n.id === table.id ? { ...n, data: { ...n.data, autoPlace: 'left' } } : n)),
@@ -720,7 +703,7 @@ export default function GrafcetCanvas() {
 
   const loopSource = loopSourceId ? nodes.find((n) => n.id === loopSourceId) : null
   const initialSteps = nodes.filter((n) => n.type === 'step' && n.data.initial)
-  const modalOpen = settingsOpen || helpOpen || variablesOpen || ladderOpen || gemmaOpen || pneumaticOpen || !!exportFormat || !!projectsTab || !!menu
+  const modalOpen = settingsOpen || helpOpen || variablesOpen || ladderOpen || gemmaOpen || pneumaticOpen || newOpen || !!exportFormat || !!projectsTab || !!menu
   // En solo lectura el clic derecho no abre menús de edición (ni el del navegador).
   const blockMenu = (handler) => (readOnly ? (e) => e.preventDefault() : handler)
   // En solo lectura (simulando), el clic derecho en una etapa o transición permite ver su ladder.
@@ -752,6 +735,8 @@ export default function GrafcetCanvas() {
           onClear={clear}
           onOpenSettings={() => setSettingsOpen(true)}
           onToggleVerify={() => setVerifyOpen((v) => !v)}
+          onSearch={() => setSearchOpen(true)}
+          onNew={() => setNewOpen(true)}
           verifyOpen={verifyOpen}
           issueCounts={issueCounts}
           onHelp={() => setHelpOpen(true)}
@@ -894,6 +879,17 @@ export default function GrafcetCanvas() {
               {incoming.error ? 'Cerrar' : 'Descartar'}
             </button>
           </div>
+        )}
+        {newOpen && (
+          <Suspense fallback={<Loading />}>
+            <NewProjectDialog
+              onCreate={(project) => {
+                setNewOpen(false)
+                replaceProject(normalizeProject(project), 'Antes de crear un proyecto nuevo')
+              }}
+              onClose={() => setNewOpen(false)}
+            />
+          </Suspense>
         )}
         {pneumaticOpen && (
           <Suspense fallback={<Loading />}>
