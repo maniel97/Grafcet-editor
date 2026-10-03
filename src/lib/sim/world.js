@@ -51,7 +51,10 @@ export function makeWorld(scene = null, analogRange = () => null, electrical = n
     electrical: elec,
     // Estado inicial; con `current`, conserva lo que ya existe (elementos añadidos al vuelo).
     init: (current) => {
-      const fresh = { ...sceneInit(scene), ...(elec ? { elec: elecInit() } : {}) }
+      const blank = { ...sceneInit(scene), ...(elec ? { elec: elecInit() } : {}) }
+      // Con esquema, se calcula ya (sin tiempo ni salidas): el primer ciclo del autómata lee sus
+      // entradas como están (un contacto NC, a 1), no todas a 0.
+      const fresh = elec ? { ...blank, elec: step(blank, {}, 0).elec } : blank
       if (!current) return fresh
       return { ...fresh, ...current, pos: { ...fresh.pos, ...current.pos }, level: { ...fresh.level, ...current.level } }
     },

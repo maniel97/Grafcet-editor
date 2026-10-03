@@ -147,6 +147,59 @@ export const EXAMPLE_COMMENTS = {
       6: 'Marcado terminado: espera',
     },
   },
+  'luz-pulsador': {
+    variables: { P: 'Pulsador: encender y apagar', Luz: 'Lámpara' },
+    steps: { 0: 'Luz apagada', 1: 'Luz encendida' },
+  },
+  'estrella-triangulo-plc': {
+    variables: {
+      Marcha: 'Pulsador de marcha',
+      Paro: 'Pulsador de paro (NC)',
+      Linea: 'Contactor de línea KM1',
+      Triangulo: 'Contactor de triángulo KM2',
+      Estrella: 'Contactor de estrella KM3',
+      '5s/X1': 'Tiempo en estrella',
+      '0.5s/X2': 'Pausa entre estrella y triángulo',
+    },
+    steps: { 0: 'Motor parado', 1: 'Arranque en estrella', 2: 'Pausa (ni estrella ni triángulo)', 3: 'Marcha en triángulo' },
+  },
+  'cinta-reversible': {
+    variables: {
+      Derecha: 'Pulsador: llevar a la derecha',
+      Izquierda: 'Pulsador: llevar a la izquierda',
+      Paro: 'Pulsador de paro (NC)',
+      Fin_dcha: 'Detector: pieza en el extremo derecho',
+      Fin_izq: 'Detector: pieza en el extremo izquierdo',
+      Poner: 'Pulsador: poner una pieza',
+      Adelante: 'Contactor KM1: hacia la derecha',
+      Atras: 'Contactor KM2: hacia la izquierda',
+    },
+    steps: { 0: 'Cinta parada', 1: 'Hacia la derecha', 2: 'Hacia la izquierda' },
+  },
+  'dahlander-plc': {
+    variables: {
+      Marcha: 'Pulsador de marcha',
+      Paro_ciclo: 'Pulsador: parar (frenando en lenta)',
+      Seta: 'Seta de emergencia (NC)',
+      Rearme: 'Pulsador de rearme',
+      Lenta: 'Contactor KM1: velocidad lenta (triángulo)',
+      Rapida: 'Contactor KM2: velocidad rápida',
+      Puente: 'Contactor KM3: puente de la doble estrella',
+      Alarma: 'Piloto de emergencia',
+      '4s/X1': 'Tiempo en lenta al arrancar',
+      '3s/X3': 'Tiempo en lenta al parar',
+    },
+    steps: { 0: 'Motor parado', 1: 'Arranque en lenta', 2: 'Velocidad rápida', 3: 'Frenando en lenta', 10: 'Vigilando', 11: 'Emergencia: producción forzada a parar', 12: 'Rearme: producción al inicio' },
+  },
+  'cinta-variador': {
+    variables: {
+      Marcha: 'Interruptor de marcha',
+      Pieza: 'Detector: pieza en la zona de carga',
+      Avance: 'Orden de marcha al variador (DI1)',
+      Velocidad: 'Consigna de velocidad al variador (AI1, 0-50 Hz)',
+    },
+    steps: { 0: 'Cinta parada', 1: 'Rápida (50 Hz)', 2: 'Lenta (15 Hz) con pieza en carga' },
+  },
   semaforo: {
     variables: {
       Rojo: 'Luz roja',

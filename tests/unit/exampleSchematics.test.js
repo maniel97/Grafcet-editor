@@ -54,7 +54,8 @@ describe('todos los ejemplos traen su esquema eléctrico', () => {
       const plain = trace(project, null)
       const wired = trace(project, elec)
       for (const s of plain) expect(wired).toContain(s)
-      expect(Math.abs(plain.length - wired.length)).toBeLessThanOrEqual(3)
+      // (Con variador, la velocidad la pone el esquema: sin él la cinta va siempre a tope.)
+      if (!elec.components.some((c) => c.type === 'vfd')) expect(Math.abs(plain.length - wired.length)).toBeLessThanOrEqual(3)
     }, 30000)
   }
 })

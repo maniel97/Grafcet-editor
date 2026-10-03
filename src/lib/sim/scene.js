@@ -25,7 +25,7 @@ export const SCENE_TYPES = {
     group: 'Actuadores',
     defaults: { extend: '', retract: '', retracted: '', extended: '', position: '', vacuum: '', holding: '', mountedOn: '', stroke: 100, time: 1, text: '' },
   },
-  conveyor: { label: 'Cinta', group: 'Actuadores', defaults: { motor: '', length: 240, time: 4, text: '' } },
+  conveyor: { label: 'Cinta', group: 'Actuadores', defaults: { motor: '', reverse: '', length: 240, time: 4, text: '' } },
   limit: { label: 'Final de carrera', group: 'Detectores', defaults: { variable: '', contact: 'NO' } },
   sensor: { label: 'Detector de presencia', group: 'Detectores', defaults: { variable: '', contact: 'NO', range: 60, kind: 'optical', color: 'amber' } },
   distance: { label: 'Sensor de distancia', group: 'Detectores', defaults: { variable: '', range: 200, text: '' } },
@@ -76,7 +76,10 @@ export const SCENE_VARS = {
     ['vacuum', 'Ventosa: vacío (opcional)', 'out'],
     ['holding', 'Ventosa: pieza cogida (opcional)', 'in'],
   ],
-  conveyor: [['motor', 'Motor', 'out']],
+  conveyor: [
+    ['motor', 'Motor', 'out'],
+    ['reverse', 'Marcha atrás (opcional)', 'out'],
+  ],
   limit: [['variable', 'Entrada', 'in']],
   sensor: [['variable', 'Entrada', 'in']],
   distance: [['variable', 'Distancia (analógica)', 'analog']],
@@ -377,7 +380,9 @@ export function sceneStep(scene, state, values, dt) {
   for (const e of elements) {
     if (stuck(e)) continue
     // Con un variador, la cinta va más despacio (la señal del motor es la fracción de velocidad).
-    if (e.type === 'conveyor' && on(values, e.motor)) movers.push([e, conveyorRect(e), (Number(e.length) || 240) * fraction(values, e.motor), Number(e.time) || 4])
+    // Con marcha atrás (reverse), retrocede (tiene prioridad: con un motor de inversión llegan las dos).
+    if (e.type === 'conveyor' && on(values, e.reverse)) movers.push([e, conveyorRect(e), -(Number(e.length) || 240) * (on(values, e.motor) ? fraction(values, e.motor) : 1), Number(e.time) || 4])
+    else if (e.type === 'conveyor' && on(values, e.motor)) movers.push([e, conveyorRect(e), (Number(e.length) || 240) * fraction(values, e.motor), Number(e.time) || 4])
     if (e.type === 'diverter' && on(values, e.gate)) movers.push([e, diverterRect(e), Number(e.length) || 80, Number(e.time) || 0.5])
     if (e.type === 'ramp') movers.push([e, rampRect(e), Number(e.length) || 120, Number(e.time) || 1])
   }

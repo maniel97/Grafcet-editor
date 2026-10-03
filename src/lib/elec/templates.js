@@ -830,3 +830,16 @@ export function insertTemplate(template, existing = { components: [] }, all = ex
   }))
   return { components, wires: b.wires, renamed: Object.fromEntries(rename) }
 }
+
+// Solo la potencia de un montaje (lo que hay a la izquierda de maxX: embarrados recortados,
+// protecciones, contactos principales y motor), colocada en (ox, oy), para los ejemplos con
+// autómata: el mando (las bobinas) lo pone el autómata.
+export function powerPart(id, maxX, ox, oy, prefix = id) {
+  const template = ELEC_TEMPLATES.find((t) => t.id === id)
+  const b = template.build(ox, oy, `${prefix}-p`)
+  const kept = b.components
+    .filter((c) => c.x - ox < maxX)
+    .map((c) => (c.type === 'rail' ? { ...c, length: Math.min(Number(c.length) || 0, maxX - (c.x - ox)) } : c))
+  const ids = new Set(kept.map((c) => c.id))
+  return { components: kept, wires: b.wires.filter((w) => ids.has(w.from.c) && ids.has(w.to.c)) }
+}

@@ -136,7 +136,8 @@ export function generatePlcWiring(variables, scene, existing = { components: [],
   const lp = rail(top, 'L+')
   const m0 = rail(top + 20, 'M', { wires: 'down' })
   const m1 = rail(bottomY, 'M')
-  components.push(lp, m0, m1)
+  // (El M de abajo, solo si hay cargas que lo usen.)
+  components.push(lp, m0, ...(outputs.length ? [m1] : []))
   const tap = (x) => `t${Math.round((x - left) / GRID)}`
 
   // Autómata: alimentación y comunes (1L puenteado desde L+, por la izquierda del autómata).

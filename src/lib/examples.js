@@ -9,6 +9,8 @@ import { EXAMPLE_COMMENTS } from './exampleComments'
 import { buildPlcModel } from './plcModel'
 import { generatePlcWiring } from './elec/generate'
 import { pneumaticCircuit } from './elec/pneumaticCircuit'
+import { powerPart } from './elec/templates'
+import { terminalAddress } from './elec/catalog'
 
 const step = (id, label, x, y, actions = [], extra = {}) => ({ id, type: 'step', position: { x, y }, data: { label, actions, ...extra } })
 const trans = (id, condition, x, y) => ({ id, type: 'transition', position: { x, y }, data: { condition } })
@@ -1125,6 +1127,265 @@ export const EXAMPLES = [
       return { nodes, edges }
     },
   },
+  {
+    id: 'luz-pulsador',
+    level: 1,
+    title: 'Luz con un solo pulsador',
+    description: 'Encender y apagar con el mismo pulsador: el flanco ↑P evita que la luz parpadee mientras se mantiene pulsado.',
+    tags: ['Flancos', 'Lineal', 'Planta'],
+    build() {
+      const { nodes, edges } = cycle([{ actions: [] }, '↑P', { actions: ['Luz'] }, '↑P'])
+      nodes.push(
+        note(
+          'nota',
+          520,
+          0,
+          '# Luz con un solo pulsador\n**Nivel 1.** El mismo pulsador `P` enciende y apaga (como un telerruptor).\n\n- Las dos transiciones son **flancos** `↑P`: se cumplen solo en el instante de pulsar.\n- Sin flanco (`P` a secas), mientras se mantiene pulsado se cumplirían las dos seguidas y la luz cambiaría una y otra vez: el grafcet no sería estable.\n- Entrada: `P` · Salida: `Luz`\n\nPruébalo: **Simular** y pulsa P (y mantenlo pulsado: no cambia hasta la siguiente pulsación).',
+          { width: 320, height: 330 },
+        ),
+      )
+      const scene = {
+        elements: [
+          { id: 'luz', type: 'lamp', x: 200, y: 120, rot: 0, variable: 'Luz', color: 'yellow', text: 'Luz' },
+          { id: 'p', type: 'button', x: 0, y: 0, rot: 0, variable: 'P', contact: 'NO', color: 'black', text: 'P', place: 'desk' },
+        ],
+      }
+      return { nodes, edges, plc: { scene } }
+    },
+  },
+  {
+    id: 'estrella-triangulo-plc',
+    level: 2,
+    title: 'Arranque estrella-triángulo con autómata',
+    description: 'Secuencia temporizada: línea y estrella 5 s, una pausa sin estrella ni triángulo y después triángulo. Con su esquema de potencia.',
+    tags: ['Temporización', 'Lineal', 'Esquema eléctrico', 'Autómata', 'Planta'],
+    build() {
+      const nodes = [
+        step('s0', '0', 200, 0, [], { initial: true }),
+        trans('t1', 'Marcha · Paro', 200, 100),
+        step('s1', '1', 200, 170, ['Linea', 'Estrella']),
+        trans('t2', '5s/X1 · Paro', 200, 270),
+        trans('t5', '!Paro', 440, 270),
+        step('s2', '2', 200, 340, ['Linea']),
+        trans('t3', '0.5s/X2', 200, 440),
+        step('s3', '3', 200, 510, ['Linea', 'Triangulo']),
+        trans('t4', '!Paro', 200, 610),
+        note(
+          'nota',
+          660,
+          0,
+          '# Estrella-triángulo con autómata\n**Nivel 2.** El motor arranca en **estrella** (menos corriente) y a los 5 s pasa a **triángulo**.\n\n- La etapa 2 es una **pausa de 0,5 s** sin estrella ni triángulo: si entraran a la vez, sería un cortocircuito entre fases.\n- `Paro` es NC: `!Paro` para el motor (también durante el arranque).\n- Salidas: `Linea` (KM1), `Triangulo` (KM2), `Estrella` (KM3). Abre el **Esquema eléctrico**: el autómata manda las bobinas y la potencia lleva el motor de seis puntas.\n\nPruébalo: **Simular**, Marcha y mira el motor del esquema: estrella y luego triángulo.',
+          { width: 340, height: 430 },
+        ),
+      ]
+      const edges = links([
+        ['s0', 't1'],
+        ['t1', 's1'],
+        ['s1', 't2'],
+        ['s1', 't5'],
+        ['t2', 's2'],
+        ['t5', 's0'],
+        ['s2', 't3'],
+        ['t3', 's3'],
+        ['s3', 't4'],
+        ['t4', 's0'],
+      ])
+      const scene = {
+        elements: [
+          { id: 'motor', type: 'motor', x: 220, y: 120, rot: 0, variable: 'Linea', reverse: '', pulses: '', text: 'Motor' },
+          { id: 'marcha', type: 'button', x: 0, y: 0, rot: 0, variable: 'Marcha', contact: 'NO', color: 'green', text: 'Marcha', place: 'desk' },
+          { id: 'paro', type: 'button', x: 0, y: 0, rot: 0, variable: 'Paro', contact: 'NC', color: 'red', text: 'Paro', place: 'desk' },
+        ],
+      }
+      return { nodes, edges, plc: { scene } }
+    },
+    after: (project) =>
+      withPower(project, {
+        template: 'estrella-triangulo',
+        maxX: 330,
+        coils: { Linea: ['KM1', 'Línea'], Triangulo: ['KM2', 'Triángulo'], Estrella: ['KM3', 'Estrella'] },
+        interlocks: [['KM2', 'KM3']],
+        motor: { signal: 'Linea' },
+      }),
+  },
+  {
+    id: 'cinta-reversible',
+    level: 3,
+    title: 'Cinta reversible',
+    description: 'Selección de secuencia: hacia la derecha o hacia la izquierda (elección excluyente), hasta el detector del final. Inversión de giro con enclavamiento.',
+    tags: ['Divergencia en O', 'Esquema eléctrico', 'Autómata', 'Planta'],
+    build() {
+      const nodes = [
+        step('s0', '0', 200, 0, [], { initial: true }),
+        // Elección excluyente (IEC 60848): no puede pedirse a la vez derecha e izquierda.
+        trans('t1', 'Derecha · !Izquierda · !Fin_dcha · Paro', 200, 100),
+        trans('t3', 'Izquierda · !Derecha · !Fin_izq · Paro', 520, 100),
+        step('s1', '1', 200, 170, ['Adelante']),
+        step('s2', '2', 520, 170, ['Atras']),
+        trans('t2', 'Fin_dcha + !Paro', 200, 270),
+        trans('t4', 'Fin_izq + !Paro', 520, 270),
+        note(
+          'nota',
+          820,
+          0,
+          '# Cinta reversible\n**Nivel 3.** Desde el reposo se **elige** un sentido: `Derecha` o `Izquierda` (receptividades excluyentes, como pide IEC 60848). La cinta para al llegar la pieza al detector de ese extremo (o con `Paro`, NC).\n\n- Salidas: `Adelante` (KM1) y `Atras` (KM2). En el **Esquema eléctrico**, KM2 cruza dos fases para invertir el giro; KM1 y KM2 están **enclavados** (nunca a la vez).\n- Entradas: `Derecha`, `Izquierda`, `Paro`, `Fin_dcha`, `Fin_izq`, `Poner`\n\nPruébalo: **Simular**, Poner pieza y llévala de un extremo a otro.',
+          { width: 340, height: 400 },
+        ),
+      ]
+      const edges = links([
+        ['s0', 't1'],
+        ['s0', 't3'],
+        ['t1', 's1'],
+        ['t3', 's2'],
+        ['s1', 't2'],
+        ['s2', 't4'],
+        ['t2', 's0'],
+        ['t4', 's0'],
+      ])
+      const scene = {
+        elements: [
+          { id: 'cinta', type: 'conveyor', x: 40, y: 200, rot: 0, motor: 'Adelante', reverse: 'Atras', length: 440, time: 4, text: 'Cinta' },
+          { id: 'alimentador', type: 'feeder', x: 140, y: 200, rot: 0, trigger: 'Poner', auto: false, spacing: 0, sizes: 'small', material: 'plastic', color: 'amber' },
+          { id: 'fin_izq', type: 'sensor', x: 70, y: 230, rot: 270, variable: 'Fin_izq', contact: 'NO', range: 20, kind: 'optical', color: 'amber' },
+          { id: 'fin_dcha', type: 'sensor', x: 450, y: 230, rot: 270, variable: 'Fin_dcha', contact: 'NO', range: 20, kind: 'optical', color: 'amber' },
+          { id: 'derecha', type: 'button', x: 0, y: 0, rot: 0, variable: 'Derecha', contact: 'NO', color: 'green', text: 'Derecha', place: 'desk' },
+          { id: 'izquierda', type: 'button', x: 0, y: 0, rot: 0, variable: 'Izquierda', contact: 'NO', color: 'green', text: 'Izquierda', place: 'desk' },
+          { id: 'paro', type: 'button', x: 0, y: 0, rot: 0, variable: 'Paro', contact: 'NC', color: 'red', text: 'Paro', place: 'desk' },
+          { id: 'poner', type: 'button', x: 0, y: 0, rot: 0, variable: 'Poner', contact: 'NO', color: 'yellow', text: 'Poner pieza', place: 'desk' },
+        ],
+      }
+      return { nodes, edges, plc: { scene } }
+    },
+    after: (project) =>
+      withPower(project, {
+        template: 'inversion',
+        maxX: 310,
+        coils: { Adelante: ['KM1', 'Adelante'], Atras: ['KM2', 'Atrás'] },
+        interlocks: [['KM1', 'KM2']],
+        motor: { signal: 'Adelante', reverse: 'Atras' },
+      }),
+  },
+  {
+    id: 'dahlander-plc',
+    level: 4,
+    title: 'Motor de dos velocidades con paro de emergencia',
+    description: 'Dahlander: arranca en lenta, pasa a rápida y, al pedir el paro, frena pasando por lenta. Un grafcet de seguridad fuerza la producción con la seta de emergencia.',
+    tags: ['Grafcets parciales', 'Forzado', 'Temporización', 'Esquema eléctrico', 'Autómata', 'Planta'],
+    build() {
+      const nodes = [
+        frame('gs', 'GS', 'grafcet', -40, -40, 400, 560),
+        step('s10', '10', 0, 0, [], { initial: true }),
+        trans('t10', '!Seta', 0, 100),
+        step('s11', '11', 0, 170, ['F/GP{}', 'Alarma']),
+        trans('t11', 'Rearme · Seta', 0, 270),
+        step('s12', '12', 0, 340, ['F/GP{INIT}']),
+        trans('t12', '1', 0, 440),
+        frame('gp', 'GP', 'grafcet', 420, -40, 360, 760),
+        step('s0', '0', 460, 0, [], { initial: true }),
+        trans('t1', 'Marcha', 460, 100),
+        step('s1', '1', 460, 170, ['Lenta']),
+        trans('t2', '4s/X1', 460, 270),
+        step('s2', '2', 460, 340, ['Rapida', 'Puente']),
+        trans('t3', 'Paro_ciclo', 460, 440),
+        step('s3', '3', 460, 510, ['Lenta']),
+        trans('t4', '3s/X3', 460, 610),
+        note(
+          'nota',
+          820,
+          0,
+          '# Dos velocidades con emergencia\n**Nivel 4.** Dos grafcets parciales:\n\n- **GP** (producción): lenta 4 s, rápida (`Rapida` + `Puente`: doble estrella) hasta `Paro_ciclo`, y 3 s en lenta para frenar.\n- **GS** (seguridad): la seta (`Seta`, NC) **fuerza** GP sin etapas (**F/GP{}**: todo parado) y enciende la `Alarma`; con `Rearme`, GP vuelve a su inicio (**F/GP{INIT}**).\n- **Esquema eléctrico**: KM1 lenta (triángulo), KM2 rápida y KM3 el puente de la doble estrella; KM1 y KM2 enclavados.\n\nPruébalo: **Simular**, Marcha, espera la rápida y pulsa la seta.',
+          { width: 340, height: 430 },
+        ),
+      ]
+      const edges = links([
+        ['s10', 't10'],
+        ['t10', 's11'],
+        ['s11', 't11'],
+        ['t11', 's12'],
+        ['s12', 't12'],
+        ['t12', 's10'],
+        ['s0', 't1'],
+        ['t1', 's1'],
+        ['s1', 't2'],
+        ['t2', 's2'],
+        ['s2', 't3'],
+        ['t3', 's3'],
+        ['s3', 't4'],
+        ['t4', 's0'],
+      ])
+      const scene = {
+        elements: [
+          { id: 'motor', type: 'motor', x: 220, y: 120, rot: 0, variable: 'Lenta', reverse: '', pulses: '', text: 'Motor' },
+          { id: 'marcha', type: 'button', x: 0, y: 0, rot: 0, variable: 'Marcha', contact: 'NO', color: 'green', text: 'Marcha', place: 'desk' },
+          { id: 'paro', type: 'button', x: 0, y: 0, rot: 0, variable: 'Paro_ciclo', contact: 'NO', color: 'black', text: 'Paro de ciclo', place: 'desk' },
+          { id: 'seta', type: 'emergency', x: 0, y: 0, rot: 0, variable: 'Seta', text: 'Emergencia', place: 'desk' },
+          { id: 'rearme', type: 'button', x: 0, y: 0, rot: 0, variable: 'Rearme', contact: 'NO', color: 'blue', text: 'Rearme', place: 'desk' },
+          { id: 'alarma', type: 'lamp', x: 0, y: 0, rot: 0, variable: 'Alarma', color: 'red', text: 'Emergencia', place: 'desk' },
+        ],
+      }
+      return { nodes, edges, plc: { scene } }
+    },
+    after: (project) =>
+      withPower(project, {
+        template: 'dahlander',
+        maxX: 540,
+        coils: { Lenta: ['KM1', 'Lenta'], Rapida: ['KM2', 'Rápida'], Puente: ['KM3', 'Puente estrella'] },
+        interlocks: [['KM1', 'KM2']],
+        motor: { signal: 'Lenta' },
+      }),
+  },
+  {
+    id: 'cinta-variador',
+    level: 5,
+    title: 'Cinta con variador y consigna analógica',
+    description: 'El grafcet calcula la velocidad: rápida en vacío y lenta mientras hay pieza en la zona de carga. Salida analógica (AQW) a la entrada AI1 del variador.',
+    tags: ['Analógicas', 'Acciones memorizadas', 'Esquema eléctrico', 'Autómata', 'Planta'],
+    build() {
+      const stored = (text) => ({ text, kind: 'stored-on' })
+      const nodes = [
+        step('s0', '0', 200, 0, [stored('Velocidad:=0')], { initial: true }),
+        trans('t1', 'Marcha', 200, 100),
+        step('s1', '1', 200, 170, ['Avance', stored('Velocidad:=50')]),
+        trans('t2', 'Pieza · Marcha', 200, 270),
+        trans('t4', '!Marcha', 440, 270),
+        step('s2', '2', 200, 340, ['Avance', stored('Velocidad:=15')]),
+        trans('t3', '!Pieza · Marcha', 200, 440),
+        trans('t5', '!Marcha', 440, 440),
+        note(
+          'nota',
+          660,
+          0,
+          '# Cinta con variador\n**Nivel 5.** La velocidad la decide el grafcet: `Velocidad` es una **salida analógica** (0–50 Hz → 0–10 V) que va a la entrada **AI1** del variador.\n\n- Etapa 1: cinta rápida (`Velocidad:=50`). Mientras el detector `Pieza` ve una pieza en la zona de carga, etapa 2: lenta (`Velocidad:=15`).\n- `Avance` da la orden de marcha (entrada DI1 del variador).\n- **Esquema eléctrico**: autómata, variador -T1 y motor -M1. Mira los hercios en el variador al simular.\n\nPruébalo: **Simular** y Marcha.',
+          { width: 340, height: 400 },
+        ),
+      ]
+      const edges = links([
+        ['s0', 't1'],
+        ['t1', 's1'],
+        ['s1', 't2'],
+        ['s1', 't4'],
+        ['t2', 's2'],
+        ['t4', 's0'],
+        ['s2', 't3'],
+        ['s2', 't5'],
+        ['t3', 's1'],
+        ['t5', 's0'],
+      ])
+      const scene = {
+        elements: [
+          { id: 'cinta', type: 'conveyor', x: 40, y: 200, rot: 0, motor: 'Avance', reverse: '', length: 560, time: 4, text: 'Cinta' },
+          { id: 'alimentador', type: 'feeder', x: 70, y: 200, rot: 0, trigger: '', auto: true, spacing: 260, sizes: 'small', material: 'plastic', color: 'amber' },
+          { id: 'pieza', type: 'sensor', x: 260, y: 230, rot: 270, variable: 'Pieza', contact: 'NO', range: 20, kind: 'optical', color: 'amber' },
+          { id: 'salida', type: 'sink', x: 620, y: 200, rot: 0, text: 'Salida' },
+          { id: 'marcha', type: 'switch', x: 0, y: 0, rot: 0, variable: 'Marcha', contact: 'NO', text: 'Marcha', place: 'desk' },
+          { id: 'hz', type: 'display', x: 0, y: 0, rot: 0, variable: 'Velocidad', text: 'Consigna (Hz)', place: 'desk' },
+        ],
+      }
+      const variables = { Velocidad: { type: 'analogOut', signal: '0-10V', min: 0, max: 50, unit: 'Hz' } }
+      return { nodes, edges, plc: { scene, variables } }
+    },
+    after: (project) => withDrive(project),
+  },
 ]
 
 // Tabla de variables dibujada en el lienzo (nodes/VariablesTableNode.jsx).
@@ -1173,4 +1434,47 @@ function withSchematic(project) {
   if (!wiring.devices) return project
   const enabled = (project.plc.scene?.elements?.length ?? 0) > 0
   return { ...project, plc: { ...project.plc, electrical: { enabled, components: wiring.components, wires: wiring.wires } } }
+}
+
+// Esquema con potencia (ejemplos de motores): el cableado del autómata y, a su derecha, la potencia
+// de un montaje (lib/elec/templates.js: powerPart). Las bobinas de las salidas pasan a ser los
+// contactores de ese montaje (coils: { salida: [identificador, descripción] }), con sus
+// enclavamientos mecánicos; el motor del esquema mueve el de la planta.
+function withPower(project, { template, maxX, coils, interlocks = [], motor }) {
+  const wiring = generatePlcWiring(buildPlcModel(project.nodes, project.edges, project.plc).variables, project.plc.scene)
+  const pair = new Map(interlocks.flatMap(([a, b]) => [[a, b], [b, a]]))
+  const components = wiring.components.map((c) => {
+    if (c.type !== 'coil' || !coils[c.signal]) return c
+    const [tag, text] = coils[c.signal]
+    return { ...c, tag, kind: 'contactor', text, signal: '', ...(pair.has(tag) ? { interlock: pair.get(tag) } : {}) }
+  })
+  const rails = components.filter((c) => c.type === 'rail')
+  const right = Math.max(...rails.map((c) => c.x + Number(c.length)))
+  const top = Math.min(...components.map((c) => c.y))
+  const power = powerPart(template, maxX, right + 160, top, `${project.plc.name ?? 'ej'}-pot`)
+  const parts = power.components.map((c) => (['motor3', 'motor6', 'dahlander', 'motor2w', 'motor1'].includes(c.type) ? { ...c, ...motor } : c))
+  return { ...project, plc: { ...project.plc, electrical: { enabled: true, components: [...components, ...parts], wires: [...wiring.wires, ...power.wires] } } }
+}
+
+// Cinta con variador: el autómata manda la marcha (su salida de Avance a DI1) y la velocidad (su
+// salida analógica a AI1) del variador; el motor del variador mueve la cinta de la planta.
+function withDrive(project) {
+  const vars = buildPlcModel(project.nodes, project.edges, project.plc).variables
+  const wiring = generatePlcWiring(
+    vars.filter((v) => v.name !== 'Avance'),
+    project.plc.scene,
+  )
+  const plc = wiring.components.find((c) => c.type === 'plc')
+  const rails = wiring.components.filter((c) => c.type === 'rail')
+  const right = Math.max(...rails.map((c) => c.x + Number(c.length)))
+  // El variador, con sus bornes de mando 60 px por debajo de los del autómata.
+  const power = powerPart('variador', 300, right + 160, plc.y + 120 + 60 - 520, 'variador')
+  const vfd = power.components.find((c) => c.type === 'vfd')
+  const parts = power.components.map((c) => (c.type === 'motor3' ? { ...c, signal: 'Avance', text: 'Motor de la cinta' } : c))
+  const address = (name) => terminalAddress(vars.find((v) => v.name === name).address)
+  const wires = [
+    { id: `w-${plc.id}-avance`, from: { c: plc.id, t: address('Avance') }, to: { c: vfd.id, t: 'DI1' }, bend: 20 },
+    { id: `w-${plc.id}-velocidad`, from: { c: plc.id, t: address('Velocidad') }, to: { c: vfd.id, t: 'AI1' }, bend: 40 },
+  ]
+  return { ...project, plc: { ...project.plc, electrical: { enabled: true, components: [...wiring.components, ...parts], wires: [...wiring.wires, ...power.wires, ...wires] } } }
 }
