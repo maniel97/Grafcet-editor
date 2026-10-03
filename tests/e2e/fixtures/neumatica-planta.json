@@ -1,0 +1,222 @@
+{
+ "format": "grafcet-editor",
+ "version": 1,
+ "nodes": [
+  {
+   "id": "s0",
+   "type": "step",
+   "position": {
+    "x": 200,
+    "y": 0
+   },
+   "data": {
+    "label": "0",
+    "initial": true,
+    "actions": []
+   }
+  },
+  {
+   "id": "t0",
+   "type": "transition",
+   "position": {
+    "x": 200,
+    "y": 100
+   },
+   "data": {
+    "condition": "Marcha · a0 · b0"
+   }
+  },
+  {
+   "id": "s1",
+   "type": "step",
+   "position": {
+    "x": 200,
+    "y": 170
+   },
+   "data": {
+    "label": "1",
+    "actions": [
+     {
+      "text": "A+",
+      "kind": "continuous"
+     }
+    ]
+   }
+  },
+  {
+   "id": "t1",
+   "type": "transition",
+   "position": {
+    "x": 200,
+    "y": 270
+   },
+   "data": {
+    "condition": "a1"
+   }
+  },
+  {
+   "id": "s2",
+   "type": "step",
+   "position": {
+    "x": 200,
+    "y": 340
+   },
+   "data": {
+    "label": "2",
+    "actions": [
+     {
+      "text": "B+",
+      "kind": "continuous"
+     }
+    ]
+   }
+  },
+  {
+   "id": "t2",
+   "type": "transition",
+   "position": {
+    "x": 200,
+    "y": 440
+   },
+   "data": {
+    "condition": "b1"
+   }
+  },
+  {
+   "id": "s3",
+   "type": "step",
+   "position": {
+    "x": 200,
+    "y": 510
+   },
+   "data": {
+    "label": "3",
+    "actions": [
+     {
+      "text": "B-",
+      "kind": "continuous"
+     }
+    ]
+   }
+  },
+  {
+   "id": "t3",
+   "type": "transition",
+   "position": {
+    "x": 200,
+    "y": 610
+   },
+   "data": {
+    "condition": "b0"
+   }
+  },
+  {
+   "id": "s4",
+   "type": "step",
+   "position": {
+    "x": 200,
+    "y": 680
+   },
+   "data": {
+    "label": "4",
+    "actions": [
+     {
+      "text": "A-",
+      "kind": "continuous"
+     }
+    ]
+   }
+  },
+  {
+   "id": "t4",
+   "type": "transition",
+   "position": {
+    "x": 200,
+    "y": 780
+   },
+   "data": {
+    "condition": "a0"
+   }
+  }
+ ],
+ "edges": [
+  {
+   "id": "s0-t0",
+   "source": "s0",
+   "target": "t0"
+  },
+  {
+   "id": "t0-s1",
+   "source": "t0",
+   "target": "s1"
+  },
+  {
+   "id": "s1-t1",
+   "source": "s1",
+   "target": "t1"
+  },
+  {
+   "id": "t1-s2",
+   "source": "t1",
+   "target": "s2"
+  },
+  {
+   "id": "s2-t2",
+   "source": "s2",
+   "target": "t2"
+  },
+  {
+   "id": "t2-s3",
+   "source": "t2",
+   "target": "s3"
+  },
+  {
+   "id": "s3-t3",
+   "source": "s3",
+   "target": "t3"
+  },
+  {
+   "id": "t3-s4",
+   "source": "t3",
+   "target": "s4"
+  },
+  {
+   "id": "s4-t4",
+   "source": "s4",
+   "target": "t4"
+  },
+  {
+   "id": "t4-s0",
+   "source": "t4",
+   "target": "s0"
+  }
+ ],
+ "plc": {
+  "scheme": "siemens",
+  "showAddresses": false,
+  "steps": {},
+  "variables": {},
+  "plant": [
+   {
+    "id": "A",
+    "type": "cylinder",
+    "name": "A",
+    "extend": "A+",
+    "retract": "A-",
+    "retracted": "a0",
+    "extended": "a1",
+    "time": 0.4
+   },
+   {
+    "id": "B",
+    "type": "cylinder",
+    "name": "B",
+    "extend": "B+",
+    "retract": "B-",
+    "retracted": "b0",
+    "extended": "b1",
+    "time": 0.4
+   }
+  ]
+ }
+}

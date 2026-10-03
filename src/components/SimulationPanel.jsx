@@ -5,6 +5,7 @@ import ScenarioControls from './ScenarioControls'
 import { chronogramCsv } from '../lib/sim/scenario'
 import { withMacros } from '../lib/sim/engine'
 import { firstFailure, waitingFor } from '../lib/sim/explain'
+import { plantInputNames } from '../lib/sim/plant'
 import { downloadFile } from '../lib/projectFile'
 import { fileName, getProjectName } from '../lib/fileNames'
 import { svgMarkupSource } from '../lib/svgExport'
@@ -99,7 +100,11 @@ const fmtTime = (t) => (t < 60 ? `${t.toFixed(1)} s` : `${Math.floor(t / 60)} mi
 export default function SimulationPanel({ simulation, scenarios = [], onScenariosChange, exportProps, onFocusNode, onClose }) {
   const { compiled, sim, playing, setPlaying, speed, setSpeed, setInput, step, advance, reset } = simulation
 
-  const inputs = useMemo(() => compiled?.variables.filter((v) => v.type === 'input') ?? [], [compiled])
+  // Las entradas que gobierna la planta virtual no se cambian a mano.
+  const plantDriven = useMemo(() => plantInputNames(simulation.plantElements), [simulation.plantElements])
+  const allInputs = useMemo(() => compiled?.variables.filter((v) => v.type === 'input') ?? [], [compiled])
+  const inputs = useMemo(() => allInputs.filter((v) => !plantDriven.has(v.name)), [allInputs, plantDriven])
+  const plantInputsShown = allInputs.filter((v) => plantDriven.has(v.name))
   // Lo que espera el grafcet ahora (transiciones validadas y lo que les falta).
   const waiting = useMemo(() => (compiled && sim ? waitingFor(compiled, sim) : null), [compiled, sim])
   const [chronoExport, setChronoExport] = useState(null)
@@ -277,10 +282,17 @@ export default function SimulationPanel({ simulation, scenarios = [], onScenario
           </ul>
         </Section>
 
-        <Section title="Entradas" count={inputs.length}>
-          {inputs.length === 0 && <p className="text-xs text-slate-400">No hay entradas: escribe receptividades como «Marcha».</p>}
+        <Section title="Entradas" count={allInputs.length}>
+          {allInputs.length === 0 && <p className="text-xs text-slate-400">No hay entradas: escribe receptividades como «Marcha».</p>}
           {inputs.map((v, i) => (
             <InputRow key={v.name} variable={v} value={sim.inputs[v.name]} onChange={(on) => setInput(v.name, on)} hotkey={i < 9 ? i + 1 : null} />
+          ))}
+          {plantInputsShown.map((v) => (
+            <div key={v.name} className="flex items-center gap-2 py-1" title="La da la planta virtual">
+              <Lamp on={Boolean(sim.inputs[v.name])} color="bg-blue-500" />
+              <span className="min-w-0 flex-1 truncate font-mono text-sm">{v.name}</span>
+              <span className="rounded bg-blue-50 px-1.5 text-[11px] text-blue-700">planta</span>
+            </div>
           ))}
           {!playing && inputs.length > 0 && (
             <p className="mt-1 text-[11px] text-slate-400">En pausa, los cambios se aplican con «Paso» o «+1s».</p>
@@ -307,6 +319,8 @@ export default function SimulationPanel({ simulation, scenarios = [], onScenario
                     step={(max - min) / 200 || 1}
                     value={value}
                     aria-label={`Valor de ${v.name}`}
+                    disabled={plantDriven.has(v.name)}
+                    title={plantDriven.has(v.name) ? 'La da la planta virtual' : undefined}
                     onChange={(e) => setInput(v.name, Number(e.target.value))}
                     className="w-full accent-blue-600"
                   />

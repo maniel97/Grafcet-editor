@@ -77,3 +77,17 @@ test('«¿por qué no avanza?»: qué espera el grafcet y tarjeta al pasar por u
   await expect(card).toHaveCount(0)
   expectNoErrors(errors)
 })
+
+test('planta virtual: la secuencia neumática avanza sola con sus finales de carrera', async ({ page }) => {
+  const errors = await openEditor(page, 'neumatica-planta.json')
+  await page.getByRole('button', { name: /Simular/ }).click()
+  await expect.poll(() => activeSteps(page)).toBe('s0')
+  // Solo Marcha es manual; a0, a1, b0 y b1 los da la planta.
+  await expect(page.getByRole('switch')).toHaveCount(1)
+  await expect(page.getByText('planta', { exact: true })).toHaveCount(4)
+  await page.getByRole('switch').click() // Marcha
+  await expect.poll(() => activeSteps(page)).toBe('s1')
+  await page.getByRole('switch').click() // un solo ciclo
+  for (const s of ['s2', 's3', 's4', 's0']) await expect.poll(() => activeSteps(page), { timeout: 3000 }).toBe(s)
+  expectNoErrors(errors)
+})

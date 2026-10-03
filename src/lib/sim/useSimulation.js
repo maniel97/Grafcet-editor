@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { buildPlcModel } from '../plcModel'
 import { compile, evolve, initialState, inspect, withMacros } from './engine'
-import { advanceWithEvents, recordEvent } from './scenario'
+import { recordEvent } from './scenario'
+import { advanceWithPlant, plantAction, plantInit, plantInputs } from './plant'
 
 const TICK_MS = 50
 const MAX_LOG = 200
@@ -27,8 +28,19 @@ const sameSample = (a, b) => {
 // El modelo se compila al empezar y cada vez que cambia el diagrama o la tabla.
 export function useSimulation(nodes, edges, plc, enabled) {
   const compiled = useMemo(() => (enabled ? compile(buildPlcModel(nodes, edges, plc)) : null), [enabled, nodes, edges, plc])
+  // Planta virtual (lib/sim/plant.js): produce las entradas a partir de las salidas.
+  const plant = plc.plant
+  const plantElements = useMemo(() => (enabled ? (plant ?? []) : []), [enabled, plant])
+  const analogRange = useCallback(
+    (name) => {
+      const v = compiled?.variables.find((x) => x.name === name)
+      return v?.analog ? { min: v.analog.min ?? 0, max: v.analog.max ?? 100 } : null
+    },
+    [compiled],
+  )
 
-  // { state, inputs, log, samples, recording: [eventos] | null, playback: { scenario, next } | null }
+  // { state, inputs, log, samples, recording: [eventos] | null, playback: { scenario, next } | null,
+  //   plant: estado de la planta virtual }
   const [sim, setSim] = useState(null)
   const [playing, setPlaying] = useState(false)
   const [speed, setSpeed] = useState(1)
@@ -45,8 +57,12 @@ export function useSimulation(nodes, edges, plc, enabled) {
       // Reproduciendo un escenario: se aplican sus cambios de entradas en su instante y se para al final.
       const playback = current.playback
       const until = playback ? Math.min(time, playback.scenario.duration ?? time) : time
-      const r = advanceWithEvents(compiled, current.state, current.inputs, until, playback?.scenario, playback?.next ?? 0, options)
-      const { state, events } = r
+      const { state, inputs, plant: plantState, next: nextEvent, events } = advanceWithPlant(
+        compiled,
+        { state: current.state, inputs: current.inputs, plant: current.plant },
+        until,
+        { elements: plantElements, analogRange, scenario: playback?.scenario, next: playback?.next ?? 0, options },
+      )
       const finished = playback && until >= (playback.scenario.duration ?? Infinity)
       if (finished) setPlaying(false)
       const variable = (id) => compiled.steps.find((s) => s.id === id)?.variable
@@ -66,11 +82,11 @@ export function useSimulation(nodes, edges, plc, enabled) {
       const last = current.samples[current.samples.length - 1]
       const samples =
         last && sameSample(last.values, sample) ? current.samples : [...current.samples, { t: time, values: sample }].slice(-MAX_SAMPLES)
-      const next = { ...current, state, inputs: r.inputs, log, samples, playback: playback && !finished ? { ...playback, next: r.next } : null }
+      const next = { ...current, state, inputs, plant: plantState, log, samples, playback: playback && !finished ? { ...playback, next: nextEvent } : null }
       simRef.current = next
       setSim(next)
     },
-    [compiled],
+    [compiled, plantElements, analogRange],
   )
 
   const reset = useCallback(() => {
@@ -81,14 +97,16 @@ export function useSimulation(nodes, edges, plc, enabled) {
       if (v.type === 'input') inputs[v.name] = 0
       if (v.type === 'analogIn') inputs[v.name] = v.analog?.min ?? 0
     }
-    const first = { state, inputs, log: [], samples: [], recording: null, playback: null }
+    const plantState = plantInit(plantElements)
+    Object.assign(inputs, plantInputs(plantElements, plantState, analogRange))
+    const first = { state, inputs, plant: plantState, log: [], samples: [], recording: null, playback: null }
     simRef.current = first
     // Evolución inicial (p. ej. receptividades "1" desde la situación inicial).
     const { state: settled } = evolve(compiled, state, inputs, 0)
     const ready = { ...first, state: settled, samples: [{ t: 0, values: sampleOf(compiled, settled) }] }
     simRef.current = ready
     setSim(ready)
-  }, [compiled])
+  }, [compiled, plantElements, analogRange])
 
   // Arranque y parada de la simulación.
   useEffect(() => {
@@ -160,6 +178,19 @@ export function useSimulation(nodes, edges, plc, enabled) {
     [reset],
   )
 
+  // Acciones manuales sobre la planta («Nueva pieza»…): sus sensores cambian al momento.
+  const plantDo = useCallback(
+    (id, action) => {
+      const current = simRef.current
+      if (!current) return
+      const plantState = plantAction(current.plant, id, action)
+      const next = { ...current, plant: plantState, inputs: { ...current.inputs, ...plantInputs(plantElements, plantState, analogRange) } }
+      simRef.current = next
+      setSim(next)
+    },
+    [plantElements, analogRange],
+  )
+
   const step = useCallback(() => apply(simRef.current?.state.time ?? 0, { singleStep: true }), [apply])
   const advance = useCallback((seconds) => apply((simRef.current?.state.time ?? 0) + seconds), [apply])
 
@@ -198,5 +229,7 @@ export function useSimulation(nodes, edges, plc, enabled) {
     startRecording,
     stopRecording,
     playScenario,
+    plantElements,
+    plantDo,
   }
 }
