@@ -724,3 +724,20 @@ test('Verificar: consejos de estudiante con su explicación', async ({ page }) =
   await expect(page.locator('.react-flow__node-step').filter({ hasText: /^1/ }).locator('.bg-blue-500')).toHaveText('i')
   expectNoErrors(errors)
 })
+
+test('modo oscuro: los textos de color sobre fondos de color se leen', async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('grafcet-editor:settings', JSON.stringify({ theme: 'dark' })))
+  const errors = await openEditor(page)
+  await page.getByTitle(/Paso a ladder/).click()
+  await page.getByRole('tab', { name: 'STL S7-200 (Micro/WIN)' }).click()
+  const box = page.getByLabel('Instrucciones para Micro/WIN')
+  // Contraste: texto claro sobre fondo oscuro.
+  const lum = (css) => {
+    const m = css.match(/[\d.]+/g).map(Number)
+    if (css.startsWith('oklch')) return m[0] > 1 ? m[0] / 100 : m[0]
+    return (m[0] + m[1] + m[2]) / 765
+  }
+  const [fg, bg] = await box.evaluate((el) => [getComputedStyle(el).color, getComputedStyle(el).backgroundColor])
+  expect(lum(fg) - lum(bg)).toBeGreaterThan(0.45)
+  expectNoErrors(errors)
+})

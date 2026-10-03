@@ -304,3 +304,18 @@ body {
   background-color: oklch(20.8% 0.042 265.755); /* slate-900 original */
   color: oklch(96.8% 0.007 247.896); /* slate-100 original */
 }
+/* Más tonos oscuros de texto sobre fondos de color (avisos, instrucciones de Micro/WIN, estado
+   de la simulación): en modo oscuro, su versión clara (si no, azul oscuro sobre azul oscuro). */
+:root[data-theme="dark"] .text-blue-800:not(.react-flow *):not(.paper):not(.paper *),
+:root[data-theme="dark"] .text-blue-900:not(.react-flow *):not(.paper):not(.paper *) {
+  color: oklch(88.2% 0.059 254.128);
+}
+:root[data-theme="dark"] .text-green-900:not(.react-flow *):not(.paper):not(.paper *) {
+  color: oklch(87.1% 0.15 154.449);
+}
+:root[data-theme="dark"] .text-red-800:not(.react-flow *):not(.paper):not(.paper *) {
+  color: oklch(80.8% 0.114 19.571);
+}
+:root[data-theme="dark"] .text-violet-800:not(.react-flow *):not(.paper):not(.paper *) {
+  color: oklch(89.4% 0.057 293.283);
+}
