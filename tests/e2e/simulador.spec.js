@@ -312,12 +312,14 @@ test('escena: selección múltiple, mover en grupo, copiar/pegar/duplicar y desh
   const selected = view.locator('[data-selected]')
   await expect(items).toHaveCount(3)
 
-  // Recuadro: los dos pilotos.
+  // Recuadro (Mayús+arrastrar, como en el lienzo): los dos pilotos.
   const area = await paper.boundingBox()
   await page.mouse.move(area.x + 40, area.y + 40)
+  await page.keyboard.down('Shift')
   await page.mouse.down()
   await page.mouse.move(area.x + 200, area.y + 130, { steps: 5 })
   await page.mouse.up()
+  await page.keyboard.up('Shift')
   await expect(selected).toHaveCount(2)
   await expect(view.getByLabel('Selección')).toContainText('2 elementos seleccionados')
 
@@ -355,6 +357,43 @@ test('escena: selección múltiple, mover en grupo, copiar/pegar/duplicar y desh
   await expect(page.getByTitle('Deshacer (Ctrl+Z)')).toBeDisabled()
   // El grafcet no se ha tocado: los atajos se quedan en la escena.
   await expect(page.locator('.react-flow__node')).toHaveCount(grafcetNodes)
+  expectNoErrors(errors)
+})
+
+test('escena: desplazar la vista arrastrando el fondo (como en el lienzo), en Usar y en Editar', async ({ page }) => {
+  const errors = await openEditor(page)
+  await openExample(page, /Cilindros A\+ B\+/)
+  await page.getByRole('button', { name: /Simular/ }).click()
+  const view = page.getByRole('region', { name: 'Escena de la planta' })
+  const scroller = view.locator('.paper').first()
+  // Un punto del fondo (sin elemento debajo), cerca de la esquina inferior derecha de la vista.
+  const backgroundSpot = async () => {
+    const box = await scroller.boundingBox()
+    return page.evaluate(({ x, y, w, h }) => {
+      for (let dx = 40; dx < w; dx += 20)
+        for (let dy = 40; dy < h; dy += 20) {
+          const el = document.elementFromPoint(x + w - dx, y + h - dy)
+          if (el?.closest('svg[aria-label="Escena"]') && !el.closest('[data-element]')) return { x: x + w - dx, y: y + h - dy }
+        }
+      return null
+    }, { x: box.x, y: box.y, w: box.width, h: box.height })
+  }
+  for (const mode of ['Usar', 'Editar']) {
+    await view.getByRole('radio', { name: new RegExp(mode) }).click()
+    for (let i = 0; i < 6; i++) await view.getByTitle('Acercar').click() // más grande que la vista
+    await scroller.evaluate((el) => el.scrollTo(200, 150))
+    const spot = await backgroundSpot()
+    expect(spot, mode).not.toBeNull()
+    const before = await scroller.evaluate((el) => [el.scrollLeft, el.scrollTop])
+    await page.mouse.move(spot.x, spot.y)
+    await page.mouse.down()
+    await page.mouse.move(spot.x - 60, spot.y - 40, { steps: 4 })
+    await page.mouse.up()
+    const after = await scroller.evaluate((el) => [el.scrollLeft, el.scrollTop])
+    expect(after[0] - before[0], mode).toBeGreaterThan(50)
+    expect(after[1] - before[1], mode).toBeGreaterThan(30)
+  }
+  await expect(view.locator('[data-selected]')).toHaveCount(0) // sin recuadro de selección
   expectNoErrors(errors)
 })
 

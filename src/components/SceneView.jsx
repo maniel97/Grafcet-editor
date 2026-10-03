@@ -1803,18 +1803,21 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
     const p = toScene(ev)
     setDrag({ ...drag, dx: snap(p.x - drag.start.x), dy: snap(p.y - drag.start.y) })
   }
-  // Recuadro de selección sobre el fondo (modo Editar).
+  // Fondo, como en el lienzo del grafcet: arrastrar desplaza la vista (un clic quita la
+  // selección); Mayús+arrastrar, recuadro de selección (modo Editar; con Ctrl, se añade).
   const onBackgroundDown = (ev) => {
     sectionRef.current?.focus({ preventScroll: true })
-    if (mode !== 'edit') {
-      setSelection([])
-      return
-    }
-    const p = toScene(ev)
+    if (ev.button !== 0) return
     const add = ev.ctrlKey || ev.metaKey
     if (!add) setSelection([])
     ev.currentTarget.setPointerCapture?.(ev.pointerId)
-    setMarquee({ x0: p.x, y0: p.y, x1: p.x, y1: p.y, add })
+    if (mode === 'edit' && ev.shiftKey) {
+      const p = toScene(ev)
+      setMarquee({ x0: p.x, y0: p.y, x1: p.x, y1: p.y, add })
+      return
+    }
+    const el = scrollRef.current
+    if (el) setPanning({ x: ev.clientX, y: ev.clientY, left: el.scrollLeft, top: el.scrollTop })
   }
   const onBackgroundUp = () => {
     if (!marquee) return
@@ -2107,9 +2110,9 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
         <div className="flex min-w-0 flex-1 flex-col">
         <div
           ref={scrollRef}
-          className={`paper min-h-0 min-w-0 flex-1 overflow-auto ${panning ? 'cursor-grabbing' : ''}`}
+          className={`paper min-h-0 min-w-0 flex-1 overflow-auto ${panning ? 'cursor-grabbing' : 'cursor-grab'}`}
           // Rueda pulsada y arrastrar: desplazar la vista (como en el lienzo del grafcet), también
-          // empezando encima de un elemento.
+          // empezando encima de un elemento. Con el botón izquierdo, desde el fondo (onBackgroundDown).
           onPointerDownCapture={(ev) => {
             if (ev.button !== 1) return
             ev.preventDefault()
@@ -2373,7 +2376,7 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
       )}
       {mode === 'edit' && (
         <p className="border-t border-slate-200 px-2 py-1 text-[11px] text-slate-500">
-          Arrastra módulos a la escena o al panel · rueda: zoom · rueda pulsada: desplazar · Ctrl+clic o recuadro: varios · R gira · Supr borra · Ctrl+C/V/D copia, pega, duplica · deshacer y rehacer: los de siempre · asigna las variables en el panel de la derecha. Piezas de {PIECE_SIZES.small[0]} y{' '}
+          Arrastra módulos a la escena o al panel · rueda: zoom · arrastrar el fondo (o con la rueda pulsada): desplazar · Ctrl+clic o Mayús+arrastrar: varios · R gira · Supr borra · Ctrl+C/V/D copia, pega, duplica · deshacer y rehacer: los de siempre · asigna las variables en el panel de la derecha. Piezas de {PIECE_SIZES.small[0]} y{' '}
           {PIECE_SIZES.large[0]} px.
         </p>
       )}
