@@ -650,7 +650,7 @@ export const EXAMPLES = [
     level: 4,
     title: 'Paro de emergencia (forzado)',
     description: 'Dos grafcets parciales: el de seguridad G1 fuerza al de producción G2 a parar y a reiniciarse.',
-    tags: ['Grafcets parciales', 'Forzado'],
+    tags: ['Grafcets parciales', 'Forzado', 'Planta'],
     build() {
       const nodes = [
         frame('g1', 'G1', 'grafcet', -40, -40, 400, 560),
@@ -671,8 +671,8 @@ export const EXAMPLES = [
           'nota',
           800,
           0,
-          'Paro de emergencia\n\nG1 vigila la seguridad. Con Emergencia, la etapa 11 ordena F/G2{}: la producción (G2) se queda sin ninguna etapa activa y no evoluciona.\n\nCon Rearme (y sin emergencia), la etapa 12 ordena F/G2{INIT}: G2 vuelve a su situación inicial.',
-          { width: 300, height: 260 },
+          '# Paro de emergencia\n**Nivel 4.** G1 vigila la seguridad. Con `Emergencia`, la etapa 11 ordena **F/G2{}**: la producción (G2) se queda sin etapas activas y no evoluciona.\n\nCon `Rearme` (y sin emergencia), la etapa 12 ordena **F/G2{INIT}**: G2 vuelve a su situación inicial.\n\n- Entradas: `Marcha`, `Emergencia`, `Rearme`, `Fc_delante`, `Fc_detras`\n- Salidas: `Avanzar`, `Retroceder`, `Alarma`\n\nPruébalo: **Simular**, Marcha y pulsa Emergencia a mitad de ciclo.',
+          { width: 330, height: 380 },
         ),
       ]
       const edges = links([
@@ -689,7 +689,284 @@ export const EXAMPLES = [
         ['s2', 't3'],
         ['t3', 's0'],
       ])
-      return { nodes, edges }
+      const scene = {
+        elements: [
+          { id: 'carro', type: 'cylinder', x: 120, y: 140, rot: 0, extend: 'Avanzar', retract: 'Retroceder', retracted: 'Fc_detras', extended: 'Fc_delante', stroke: 160, time: 2, text: 'Carro' },
+          { id: 'marcha', type: 'button', x: 0, y: 0, rot: 0, variable: 'Marcha', contact: 'NO', color: 'green', text: 'Marcha', place: 'desk' },
+          { id: 'emergencia', type: 'button', x: 0, y: 0, rot: 0, variable: 'Emergencia', contact: 'NO', color: 'red', text: 'Emergencia', place: 'desk' },
+          { id: 'rearme', type: 'button', x: 0, y: 0, rot: 0, variable: 'Rearme', contact: 'NO', color: 'blue', text: 'Rearme', place: 'desk' },
+          { id: 'alarma', type: 'lamp', x: 0, y: 0, rot: 0, variable: 'Alarma', color: 'red', text: 'Alarma', place: 'desk' },
+        ],
+      }
+      return { nodes, edges, plc: { scene } }
+    },
+  },
+  {
+    id: 'manual-auto',
+    level: 4,
+    title: 'Manual / Automático',
+    description: 'Un grafcet de conducción elige el modo: en manual mueve el cilindro con pulsadores y mantiene la producción en su inicio.',
+    tags: ['Grafcets parciales', 'Forzado', 'Acción condicionada', 'Planta'],
+    build() {
+      const cond = (text, condition) => ({ text, kind: 'conditional', condition })
+      const nodes = [
+        frame('gc', 'GC', 'grafcet', -40, -40, 380, 460),
+        step('s20', '20', 0, 0, ['F/GP{INIT}', cond('A+', 'Avanzar · !a1'), cond('A-', 'Retroceder · !a0')], { initial: true }),
+        trans('t20', 'Auto · a0', 0, 100),
+        step('s21', '21', 0, 170, ['Luz_auto']),
+        // Al volver a manual, solo con la producción en reposo (fin de ciclo).
+        trans('t21', '!Auto · X0', 0, 270),
+        frame('gp', 'GP', 'grafcet', 420, -40, 320, 560),
+        step('s0', '0', 460, 0, [], { initial: true }),
+        trans('t1', 'Ciclo · a0', 460, 100),
+        step('s1', '1', 460, 170, ['A+']),
+        trans('t2', 'a1', 460, 270),
+        step('s2', '2', 460, 340, ['A-']),
+        trans('t3', 'a0', 460, 440),
+        note(
+          'nota',
+          800,
+          0,
+          '# Manual / Automático\n**Nivel 4.** Dos grafcets parciales: **GC** (conducción) y **GP** (producción).\n\n- **Manual** (etapa 20): GC fuerza a GP a su inicio (**F/GP{INIT}**) y mueve el cilindro con **acciones condicionadas**: `A+` si `Avanzar`, `A-` si `Retroceder`.\n- **Automático** (etapa 21): GP hace un ciclo con cada `Ciclo`.\n- Se vuelve a manual solo con GP en reposo (`X0`): nunca a mitad de ciclo.\n- Entradas: `Auto`, `Ciclo`, `Avanzar`, `Retroceder`, `a0`, `a1` · Salidas: `A+`, `A-`, `Luz_auto`\n\nPruébalo: **Simular**; en manual, mueve el cilindro; pasa a Auto y pulsa Ciclo.',
+          { width: 340, height: 420 },
+        ),
+      ]
+      const edges = links([
+        ['s20', 't20'],
+        ['t20', 's21'],
+        ['s21', 't21'],
+        ['t21', 's20'],
+        ['s0', 't1'],
+        ['t1', 's1'],
+        ['s1', 't2'],
+        ['t2', 's2'],
+        ['s2', 't3'],
+        ['t3', 's0'],
+      ])
+      const desk = (id, type, variable, color, text) => ({ id, type, x: 0, y: 0, rot: 0, variable, contact: 'NO', color, text, place: 'desk' })
+      const scene = {
+        elements: [
+          { id: 'A', type: 'cylinder', x: 120, y: 140, rot: 0, extend: 'A+', retract: 'A-', retracted: 'a0', extended: 'a1', stroke: 140, time: 1.5, text: 'A' },
+          desk('auto', 'switch', 'Auto', 'green', 'Manual / Auto'),
+          desk('ciclo', 'button', 'Ciclo', 'green', 'Ciclo'),
+          desk('avanzar', 'button', 'Avanzar', 'black', 'Avanzar'),
+          desk('retroceder', 'button', 'Retroceder', 'black', 'Retroceder'),
+          desk('luz', 'lamp', 'Luz_auto', 'green', 'Automático'),
+        ],
+      }
+      return { nodes, edges, plc: { scene } }
+    },
+  },
+  {
+    id: 'gemma-linea',
+    level: 4,
+    title: 'Línea con GEMMA',
+    description: 'Conducción según la guía GEMMA: marcha, paro a fin de ciclo, emergencia con defecto y rearme a la posición inicial.',
+    tags: ['GEMMA', 'Grafcets parciales', 'Forzado', 'Planta'],
+    build() {
+      const nodes = [
+        frame('gc', 'GC', 'grafcet', -40, -40, 680, 880),
+        step('s20', '20', 0, 0, [], { initial: true }),
+        trans('t20', 'Marcha · Seta_ok', 0, 100),
+        step('s21', '21', 0, 170, ['Luz_marcha']),
+        trans('t21', 'Paro · Seta_ok', 0, 270),
+        trans('t22', '!Seta_ok', 240, 270),
+        step('s22', '22', 0, 340, ['Luz_marcha']),
+        trans('t23', 'X0 · Seta_ok', 0, 440),
+        trans('t24', '!Seta_ok', 360, 440),
+        step('s23', '23', 360, 510, ['F/GP{}', 'Alarma']),
+        trans('t25', 'Seta_ok · Rearme', 360, 610),
+        step('s24', '24', 360, 680, ['F/GP{INIT}', 'A-']),
+        trans('t26', 'a0', 360, 780),
+        frame('gp', 'GP', 'grafcet', 680, -40, 320, 560),
+        step('s0', '0', 720, 0, [], { initial: true }),
+        trans('t1', 'X21 · a0', 720, 100),
+        step('s1', '1', 720, 170, ['A+']),
+        trans('t2', 'a1', 720, 270),
+        step('s2', '2', 720, 340, ['A-']),
+        trans('t3', 'a0', 720, 440),
+        note(
+          'nota',
+          1040,
+          0,
+          '# Línea con GEMMA\n**Nivel 4.** El grafcet de conducción **GC** sigue los estados de la guía GEMMA y gobierna al de producción **GP**:\n\n- **20 · A1** parada en el estado inicial → `Marcha`\n- **21 · F1** producción normal: GP hace ciclos (`X21` en su primera transición) → `Paro`\n- **22 · A2** parada a fin de ciclo: GP acaba el ciclo y vuelve a 20 al llegar a `X0`\n- **23 · D1** parada de emergencia: **F/GP{}** y `Alarma` (seta)\n- **24 · A6** puesta en el estado inicial: **F/GP{INIT}** y el cilindro vuelve (`A-`)\n\nLa seta es **NC**: `Seta_ok` vale 1 mientras no está pulsada.\n\nPruébalo: **Simular**, Marcha, y prueba Paro o la seta.',
+          { width: 360, height: 470 },
+        ),
+      ]
+      const edges = links([
+        ['s20', 't20'],
+        ['t20', 's21'],
+        ['s21', 't21'],
+        ['s21', 't22'],
+        ['t21', 's22'],
+        ['t22', 's23'],
+        ['s22', 't23'],
+        ['s22', 't24'],
+        ['t23', 's20'],
+        ['t24', 's23'],
+        ['s23', 't25'],
+        ['t25', 's24'],
+        ['s24', 't26'],
+        ['t26', 's20'],
+        ['s0', 't1'],
+        ['t1', 's1'],
+        ['s1', 't2'],
+        ['t2', 's2'],
+        ['s2', 't3'],
+        ['t3', 's0'],
+      ])
+      const desk = (id, type, variable, color, text) => ({ id, type, x: 0, y: 0, rot: 0, variable, contact: 'NO', color, text, place: 'desk' })
+      const scene = {
+        elements: [
+          { id: 'A', type: 'cylinder', x: 120, y: 140, rot: 0, extend: 'A+', retract: 'A-', retracted: 'a0', extended: 'a1', stroke: 140, time: 1.5, text: 'A' },
+          desk('marcha', 'button', 'Marcha', 'green', 'Marcha'),
+          desk('paro', 'button', 'Paro', 'black', 'Paro (fin de ciclo)'),
+          desk('rearme', 'button', 'Rearme', 'blue', 'Rearme'),
+          { id: 'seta', type: 'emergency', x: 0, y: 0, rot: 0, variable: 'Seta_ok', text: 'Emergencia', place: 'desk' },
+          desk('luz', 'lamp', 'Luz_marcha', 'green', 'En marcha'),
+          desk('alarma', 'lamp', 'Alarma', 'red', 'Alarma'),
+        ],
+      }
+      return { nodes, edges, plc: { scene } }
+    },
+  },
+  {
+    id: 'horno',
+    level: 5,
+    title: 'Horno con consigna',
+    description: 'Regulación todo/nada con histéresis a partir de una consigna analógica, y alarma de sobretemperatura.',
+    tags: ['Analógicas', 'Comparaciones', 'Acciones memorizadas', 'Planta'],
+    build() {
+      const stored = (text) => ({ text, kind: 'stored-on' })
+      const nodes = [
+        step('s0', '0', 200, 0, [], { initial: true }),
+        trans('t1', 'Marcha', 200, 100),
+        // Al entrar en cada etapa se calcula el umbral con la consigna de ese momento.
+        step('s1', '1', 200, 170, ['R', stored('Alto:=Consigna+5')]),
+        trans('t2', 'Temp >= Alto · Marcha', 200, 270),
+        trans('t4', '!Marcha', 440, 270),
+        step('s2', '2', 200, 340, [stored('Bajo:=Consigna-5')]),
+        trans('t3', 'Temp <= Bajo · Marcha', 200, 440),
+        trans('t5', '!Marcha', 440, 440),
+        // Alarma: grafcet aparte, siempre vigilando.
+        step('s10', '10', 700, 0, [], { initial: true }),
+        trans('t10', 'Temp >= 180', 700, 100),
+        step('s11', '11', 700, 170, ['Alarma']),
+        trans('t11', 'Temp <= 170', 700, 270),
+        note(
+          'nota',
+          900,
+          0,
+          '# Horno con consigna\n**Nivel 5.** Regulación **todo/nada con histéresis**: la resistencia `R` calienta hasta `Consigna + 5 °C` y se apaga hasta bajar a `Consigna − 5 °C`.\n\n- Las receptividades comparan analógicas (`Temp >= Alto`). Los umbrales se calculan con **acciones memorizadas** al entrar en cada etapa (`Alto:=Consigna+5`), con la consigna de ese momento.\n- Un segundo grafcet vigila la **sobretemperatura** (alarma a 180 °C, se quita a 170 °C).\n- Entradas: `Marcha`, `Consigna` (potenciómetro, 0–200 °C), `Temp` (sonda, 0–300 °C) · Salidas: `R`, `Alarma`\n\nPruébalo: **Simular** (sube la velocidad), Marcha y mueve la consigna.',
+          { width: 360, height: 470 },
+        ),
+      ]
+      const edges = links([
+        ['s0', 't1'],
+        ['t1', 's1'],
+        ['s1', 't2'],
+        ['s1', 't4'],
+        ['t2', 's2'],
+        ['t4', 's0'],
+        ['s2', 't3'],
+        ['s2', 't5'],
+        ['t3', 's1'],
+        ['t5', 's0'],
+        ['s10', 't10'],
+        ['t10', 's11'],
+        ['s11', 't11'],
+        ['t11', 's10'],
+      ])
+      const scene = {
+        elements: [
+          { id: 'horno', type: 'heater', x: 220, y: 140, rot: 0, heat: 'R', temperature: 'Temp', thermostat: '', setpoint: 60, ambient: 20, maxTemp: 250, tau: 15, text: 'Horno' },
+          { id: 'marcha', type: 'switch', x: 0, y: 0, rot: 0, variable: 'Marcha', contact: 'NO', text: 'Marcha', place: 'desk' },
+          { id: 'consigna', type: 'potentiometer', x: 0, y: 0, rot: 0, variable: 'Consigna', initial: 0.5, text: 'Consigna', place: 'desk' },
+          { id: 'vc', type: 'display', x: 0, y: 0, rot: 0, variable: 'Consigna', text: 'Consigna °C', place: 'desk' },
+          { id: 'vt', type: 'display', x: 0, y: 0, rot: 0, variable: 'Temp', text: 'Temperatura °C', place: 'desk' },
+          { id: 'alarma', type: 'lamp', x: 0, y: 0, rot: 0, variable: 'Alarma', color: 'red', text: 'Sobretemperatura', place: 'desk' },
+        ],
+      }
+      const variables = {
+        Consigna: { type: 'analogIn', signal: '0-10V', min: 0, max: 200, unit: '°C' },
+        Temp: { type: 'analogIn', signal: '4-20mA', min: 0, max: 300, unit: '°C' },
+      }
+      return { nodes, edges, plc: { scene, variables } }
+    },
+  },
+  {
+    id: 'deposito-nivel',
+    level: 5,
+    title: 'Depósito con regulación de nivel',
+    description: 'Nivel analógico 4–20 mA: la bomba arranca y para por umbrales, con alarmas de nivel alto y bajo.',
+    tags: ['Analógicas', 'Comparaciones', 'Grafcets independientes', 'Planta'],
+    build() {
+      const nodes = [
+        step('s0', '0', 200, 0, [], { initial: true }),
+        trans('t1', 'Marcha', 200, 100),
+        step('s1', '1', 200, 170),
+        trans('t2', 'Nivel <= 30 · Marcha', 200, 270),
+        trans('t4', '!Marcha', 440, 270),
+        step('s2', '2', 200, 340, ['Bomba']),
+        trans('t3', 'Nivel >= 80 · Marcha', 200, 440),
+        trans('t5', '!Marcha', 440, 440),
+        // Consumo (lo abre el usuario) y alarmas: grafcets independientes.
+        step('s10', '10', 680, 0, [], { initial: true }),
+        trans('t10', 'Consumir', 680, 100),
+        step('s11', '11', 680, 170, ['Salida']),
+        trans('t11', '!Consumir', 680, 270),
+        step('s20', '20', 900, 0, [], { initial: true }),
+        trans('t20', 'Nivel >= 95', 900, 100),
+        step('s21', '21', 900, 170, ['Alarma_alta']),
+        trans('t21', 'Nivel <= 90', 900, 270),
+        step('s30', '30', 1120, 0, [], { initial: true }),
+        trans('t30', 'Nivel <= 5', 1120, 100),
+        step('s31', '31', 1120, 170, ['Alarma_baja']),
+        trans('t31', 'Nivel >= 10', 1120, 270),
+        note(
+          'nota',
+          1320,
+          0,
+          '# Depósito con regulación de nivel\n**Nivel 5.** El nivel llega como analógica de **4–20 mA** (`Nivel`, 0–100 %). La bomba arranca por debajo del 30 % y para al llegar al 80 %: la diferencia entre umbrales evita arranques continuos.\n\n- Tres grafcets **independientes** más: el consumo (`Consumir` abre la `Salida`) y dos alarmas con su propia histéresis (alta 95/90 %, baja 5/10 %).\n- Entradas: `Marcha`, `Consumir`, `Nivel` · Salidas: `Bomba`, `Salida`, `Alarma_alta`, `Alarma_baja`\n\nPruébalo: **Simular**, Marcha y abre el consumo.',
+          { width: 360, height: 400 },
+        ),
+      ]
+      const edges = links([
+        ['s0', 't1'],
+        ['t1', 's1'],
+        ['s1', 't2'],
+        ['s1', 't4'],
+        ['t2', 's2'],
+        ['t4', 's0'],
+        ['s2', 't3'],
+        ['s2', 't5'],
+        ['t3', 's1'],
+        ['t5', 's0'],
+        ['s10', 't10'],
+        ['t10', 's11'],
+        ['s11', 't11'],
+        ['t11', 's10'],
+        ['s20', 't20'],
+        ['t20', 's21'],
+        ['s21', 't21'],
+        ['t21', 's20'],
+        ['s30', 't30'],
+        ['t30', 's31'],
+        ['s31', 't31'],
+        ['t31', 's30'],
+      ])
+      const scene = {
+        elements: [
+          { id: 'deposito', type: 'tank', x: 200, y: 80, rot: 0, fill: 'Bomba', drain: 'Salida', low: '', high: '', empty: '', level: 'Nivel', fillTime: 10, drainTime: 16, initial: 0.5, text: 'Depósito' },
+          { id: 'marcha', type: 'switch', x: 0, y: 0, rot: 0, variable: 'Marcha', contact: 'NO', text: 'Marcha', place: 'desk' },
+          { id: 'consumir', type: 'switch', x: 0, y: 0, rot: 0, variable: 'Consumir', contact: 'NO', text: 'Consumo', place: 'desk' },
+          { id: 'vn', type: 'display', x: 0, y: 0, rot: 0, variable: 'Nivel', text: 'Nivel %', place: 'desk' },
+          { id: 'alta', type: 'lamp', x: 0, y: 0, rot: 0, variable: 'Alarma_alta', color: 'red', text: 'Nivel alto', place: 'desk' },
+          { id: 'baja', type: 'lamp', x: 0, y: 0, rot: 0, variable: 'Alarma_baja', color: 'yellow', text: 'Nivel bajo', place: 'desk' },
+        ],
+      }
+      const variables = { Nivel: { type: 'analogIn', signal: '4-20mA', min: 0, max: 100, unit: '%' } }
+      return { nodes, edges, plc: { scene, variables } }
     },
   },
   {

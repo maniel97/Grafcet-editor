@@ -699,3 +699,51 @@ test('ejemplos de nivel 3: ascensor, doble puesto y clasificadora por tamaño', 
   }
   expectNoErrors(errors)
 })
+
+test('ejemplos de nivel 4: manual/automático y línea con GEMMA', async ({ page }) => {
+  const errors = await openEditor(page)
+  const desk = () => page.getByRole('region', { name: 'Pupitre de mando' })
+  const hold = async (label, ms = 150) => {
+    const b = await desk().locator(`[aria-label="${label}"]`).boundingBox()
+    await page.mouse.move(b.x + b.width / 2, b.y + b.height / 3)
+    await page.mouse.down()
+    await page.waitForTimeout(ms)
+    await page.mouse.up()
+  }
+  const steps = () => activeSteps(page)
+  const noteFits = async () => page.locator('.react-flow__node-note [data-note-body]').first().evaluate((el) => el.scrollHeight <= el.clientHeight + 2)
+
+  // Manual: el cilindro se mueve con los pulsadores; no se pasa a automático con él fuera.
+  await openExample(page, /Manual \/ Automático/)
+  expect(await noteFits()).toBe(true)
+  await page.getByRole('button', { name: /Simular/ }).click()
+  await expect.poll(steps).toBe('s0,s20')
+  await hold('Pulsador Avanzar', 1800)
+  await desk().locator('[aria-label="Interruptor Manual / Auto"]').click()
+  await page.waitForTimeout(300)
+  expect(await steps()).toBe('s0,s20') // a1: espera a que vuelva
+  await hold('Pulsador Retroceder', 1800)
+  await expect.poll(steps).toBe('s0,s21')
+  // Automático: un ciclo con Ciclo; al quitar Auto vuelve a manual (en reposo).
+  await hold('Pulsador Ciclo')
+  await expect.poll(steps, { intervals: [100] }).toContain('s1')
+  await expect.poll(steps, { timeout: 6000 }).toBe('s0,s21')
+  await desk().locator('[aria-label="Interruptor Manual / Auto"]').click()
+  await expect.poll(steps).toBe('s0,s20')
+  await page.getByRole('button', { name: /Detener/ }).click()
+
+  // GEMMA: marcha, emergencia (producción sin etapas) y rearme a la posición inicial.
+  await openExample(page, /Línea con GEMMA/)
+  expect(await noteFits()).toBe(true)
+  await page.getByRole('button', { name: /Simular/ }).click()
+  await expect.poll(steps).toBe('s0,s20')
+  await hold('Pulsador Marcha')
+  await expect.poll(steps, { intervals: [100] }).toContain('s1')
+  const seta = desk().locator('[aria-label="Seta de emergencia Emergencia"]')
+  await seta.click()
+  await expect.poll(steps).toBe('s23')
+  await seta.click() // desenclavar
+  await hold('Pulsador Rearme')
+  await expect.poll(steps, { timeout: 6000 }).toBe('s0,s20')
+  expectNoErrors(errors)
+})
