@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import { closest } from '../lib/autocomplete'
-import { ArrowLeft, ArrowRight, Cable, ChevronDown, Copy, Hand, Maximize2, Tag, Minimize2, Minus, MousePointer2, Plus, RotateCw, Scan, Trash2, WandSparkles, X } from 'lucide-react'
+import { ArrowLeft, ArrowRight, BookmarkPlus, Cable, ChevronDown, Copy, Download, Hand, Maximize2, Upload, Tag, Minimize2, Minus, MousePointer2, Plus, RotateCw, Scan, Trash2, WandSparkles, X } from 'lucide-react'
 import {
   PIECE_SIZES,
   SCENE_TYPES,
@@ -25,6 +25,8 @@ import {
   worldRect,
 } from '../lib/sim/scene'
 import { copyToClipboard, pasteFromClipboard } from '../lib/sim/sceneClipboard'
+import { exportGroups, importGroups, loadGroups, makeGroup, placeGroup, storeGroups } from '../lib/sim/sceneLibrary'
+import { downloadFile } from '../lib/projectFile'
 
 const W = 1200
 const H = 800
@@ -1049,6 +1051,23 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
   const [zoom, setZoom] = useState(0.8)
   const [drag, setDrag] = useState(null) // { ids, start: { x, y }, dx, dy }
   const [marquee, setMarquee] = useState(null) // { x0, y0, x1, y1, add }
+  // «Mis grupos»: guardados en este navegador.
+  const [groups, setGroups] = useState(loadGroups)
+  const [groupName, setGroupName] = useState('')
+  const [groupMessage, setGroupMessage] = useState(null)
+  const importRef = useRef(null)
+  const changeGroups = (list) => {
+    setGroups(list)
+    if (!storeGroups(list)) setGroupMessage('No se han podido guardar los grupos en este navegador.')
+  }
+  const saveSelectionAsGroup = () => {
+    const name = groupName.trim()
+    if (!name) return
+    const chosen = elements.filter((e) => selection.includes(e.id))
+    changeGroups([...groups.filter((g) => g.name !== name), makeGroup(name, chosen)])
+    setGroupName('')
+    setGroupMessage(`Guardado «${name}» en Mis grupos.`)
+  }
   const [showIO, setShowIO] = useState(false) // rótulos con las variables y sus direcciones
   const [ioOpen, setIoOpen] = useState(false) // panel de conexiones
   const [panning, setPanning] = useState(null) // { x, y, left, top }: arrastre con la rueda pulsada
@@ -1262,7 +1281,27 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
     setSelection([Z.id])
     setMode('edit')
   }
-  const addItem = (item, at = null, place = null) => (item.key === 'pickplace' ? addPickPlace(at) : add(item.type, item.preset, at, place))
+  const addGroup = (group, at = null) => {
+    const el = scrollRef.current
+    const corner = at ?? { x: el ? (el.scrollLeft + el.clientWidth / 2) / zoom - 60 : W / 2, y: el ? (el.scrollTop + el.clientHeight / 2) / zoom - 60 : H / 2 }
+    const items = placeGroup(group, { x: snap(corner.x), y: snap(corner.y) }, newId)
+    save([...elements, ...items])
+    setSelection(items.map((e) => e.id))
+    setMode('edit')
+  }
+  const addItem = (item, at = null, place = null) => {
+    if (item.savedGroup) return addGroup(item.savedGroup, at)
+    return item.key === 'pickplace' ? addPickPlace(at) : add(item.type, item.preset, at, place)
+  }
+  // Lo arrastrado desde la paleta: un módulo o uno de «Mis grupos».
+  const dropped = (ev) => {
+    const key = ev.dataTransfer.getData(DRAG_TYPE)
+    if (key.startsWith('group:')) {
+      const group = groups.find((g) => g.id === key.slice(6))
+      return group ? { key, savedGroup: group } : null
+    }
+    return PALETTE_BY_KEY[key] ?? null
+  }
 
   // Mandos y señalización: con un clic (o soltados en el pupitre) van al pupitre; soltados en la
   // escena, a la máquina.
@@ -1621,6 +1660,82 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
                 ))}
               </div>
             ))}
+            <div aria-label="Mis grupos">
+              <p className="mb-0.5 flex items-center gap-1 text-[10px] font-medium uppercase tracking-wide text-slate-400">
+                Mis grupos
+                <span className="ml-auto" />
+                <button
+                  type="button"
+                  title="Exportar mis grupos a un archivo"
+                  aria-label="Exportar mis grupos"
+                  disabled={!groups.length}
+                  onClick={() => downloadFile(exportGroups(groups), 'grupos-planta.json', 'application/json')}
+                  className="rounded p-0.5 normal-case hover:bg-slate-100 disabled:opacity-30"
+                >
+                  <Download size={11} />
+                </button>
+                <button
+                  type="button"
+                  title="Importar grupos de un archivo"
+                  aria-label="Importar grupos"
+                  onClick={() => importRef.current?.click()}
+                  className="rounded p-0.5 normal-case hover:bg-slate-100"
+                >
+                  <Upload size={11} />
+                </button>
+              </p>
+              <input
+                ref={importRef}
+                type="file"
+                accept=".json,application/json"
+                className="hidden"
+                aria-label="Archivo de grupos"
+                onChange={async (ev) => {
+                  const file = ev.target.files?.[0]
+                  ev.target.value = ''
+                  if (!file) return
+                  try {
+                    const list = importGroups(await file.text(), groups)
+                    changeGroups(list)
+                    setGroupMessage(`Importados ${list.length - groups.length} grupos.`)
+                  } catch (err) {
+                    setGroupMessage(err.message)
+                  }
+                }}
+              />
+              {groups.length === 0 && <p className="text-[11px] text-slate-500">Selecciona varios elementos y pulsa «Guardar como grupo».</p>}
+              {groups.map((g) => (
+                <div key={g.id} className="group flex items-center">
+                  <button
+                    type="button"
+                    draggable
+                    onDragStart={(ev) => {
+                      ev.dataTransfer.setData(DRAG_TYPE, `group:${g.id}`)
+                      ev.dataTransfer.effectAllowed = 'copy'
+                    }}
+                    onClick={() => addGroup(g)}
+                    title={`${g.elements.length} elementos · arrastra a la escena o pulsa para ponerlo en el centro`}
+                    className="min-w-0 flex-1 truncate rounded px-1 py-0.5 text-left hover:bg-blue-50"
+                  >
+                    + {g.name}
+                  </button>
+                  <button
+                    type="button"
+                    aria-label={`Borrar el grupo ${g.name}`}
+                    title="Borrar el grupo"
+                    onClick={() => changeGroups(groups.filter((x) => x.id !== g.id))}
+                    className="rounded p-0.5 opacity-0 hover:bg-red-500 hover:text-white group-hover:opacity-100"
+                  >
+                    <X size={11} />
+                  </button>
+                </div>
+              ))}
+              {groupMessage && (
+                <p role="status" className="mt-1 text-[11px] text-blue-700">
+                  {groupMessage}
+                </p>
+              )}
+            </div>
           </nav>
         )}
         <div className="flex min-w-0 flex-1 flex-col">
@@ -1656,7 +1771,7 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
             ev.dataTransfer.dropEffect = 'copy'
           }}
           onDrop={(ev) => {
-            const item = PALETTE_BY_KEY[ev.dataTransfer.getData(DRAG_TYPE)]
+            const item = dropped(ev)
             if (!item) return
             ev.preventDefault()
             addItem(item, toScene(ev))
@@ -1757,7 +1872,7 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
               ev.dataTransfer.dropEffect = 'copy'
             }}
             onDrop={(ev) => {
-              const item = PALETTE_BY_KEY[ev.dataTransfer.getData(DRAG_TYPE)]
+              const item = dropped(ev)
               if (!item) return
               ev.preventDefault()
               addItem(item, null, DESK_TYPES.includes(item.type) ? 'desk' : null)
@@ -1814,6 +1929,30 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
               </button>
             </div>
             <p className="text-[11px] text-slate-500">Arrastra uno de ellos para mover todo el grupo. Ctrl+clic añade o quita.</p>
+            <form
+              className="space-y-1 border-t border-slate-200 pt-2"
+              onSubmit={(ev) => {
+                ev.preventDefault()
+                saveSelectionAsGroup()
+              }}
+            >
+              <label className="block">
+                <span className="text-slate-500">Guardar como grupo (Mis grupos)</span>
+                <input
+                  value={groupName}
+                  onChange={(ev) => setGroupName(ev.target.value)}
+                  placeholder="Nombre, p. ej. Estación de taladrado"
+                  className="w-full rounded border border-slate-300 px-1 py-0.5"
+                />
+              </label>
+              <button
+                type="submit"
+                disabled={!groupName.trim()}
+                className="flex items-center gap-1 rounded border border-slate-300 px-2 py-0.5 hover:bg-slate-100 disabled:opacity-40"
+              >
+                <BookmarkPlus size={12} /> Guardar como grupo
+              </button>
+            </form>
           </aside>
         )}
         {ioOpen && !selectedElement && !(mode === 'edit' && selection.length > 1) && (

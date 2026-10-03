@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { activeSteps, expectNoErrors, openEditor, openExample, openVariables } from './helpers'
+import { activeSteps, download, expectNoErrors, openEditor, openExample, openVariables } from './helpers'
 
 test('simulación del ejemplo: entradas, salidas, pausa y paso a paso', async ({ page }) => {
   const errors = await openEditor(page)
@@ -557,5 +557,47 @@ test('estación «Clasificadora por material»: el metal y el plástico acaban e
   await view.getByRole('region', { name: 'Pupitre de mando' }).locator('[aria-label="Interruptor Marcha"]').click()
   await expect(view.locator('[aria-label="Recogida Metal"]')).toContainText(/[1-9]/, { timeout: 15000 })
   await expect(view.locator('[aria-label="Recogida Plástico"]')).toContainText(/[1-9]/, { timeout: 15000 })
+  expectNoErrors(errors)
+})
+
+test('escena: guardar una selección en «Mis grupos», colocarla, exportar e importar', async ({ page }) => {
+  const errors = await openEditor(page)
+  await openExample(page, /Pick & place/)
+  await page.getByRole('button', { name: /Simular/ }).click()
+  const view = page.getByRole('region', { name: 'Escena de la planta' })
+  await view.getByRole('radio', { name: /Editar/ }).click()
+  const machine = view.locator('svg[aria-label="Escena"] [data-element]')
+  await expect(machine).toHaveCount(4) // X, Z, almacén y destino (Marcha está en el pupitre)
+
+  // Seleccionar los dos cilindros y guardarlos como grupo.
+  await view.locator('[aria-label="Cilindro X"]').click()
+  await view.locator('[aria-label="Cilindro Z"]').click({ modifiers: ['Control'] })
+  await view.getByPlaceholder(/Nombre, p\. ej\./).fill('Brazo XZ')
+  await view.getByRole('button', { name: 'Guardar como grupo' }).click()
+  const groups = view.getByLabel('Mis grupos')
+  await expect(groups.getByRole('button', { name: '+ Brazo XZ' })).toBeVisible()
+
+  // Colocarlo: dos cilindros nuevos, el Z montado en el X nuevo.
+  await groups.getByRole('button', { name: '+ Brazo XZ' }).click()
+  await expect(machine).toHaveCount(6)
+  await expect(view.getByLabel('Selección')).toContainText('2 elementos seleccionados')
+
+  // Se recuerda en este navegador.
+  await page.reload()
+  // El autoguardado se escribe al recargar, aunque el último cambio sea de hace un instante.
+  await expect(page.getByLabel('Nombre del proyecto')).toHaveValue('Pick & place')
+  await page.getByRole('button', { name: /Simular/ }).click()
+  await view.getByRole('radio', { name: /Editar/ }).click()
+  await expect(groups.getByRole('button', { name: '+ Brazo XZ' })).toBeVisible()
+
+  // Exportar, borrar e importar.
+  const file = await download(page, () => groups.getByRole('button', { name: 'Exportar mis grupos' }).click())
+  const path = await file.path()
+  await groups.getByRole('button', { name: '+ Brazo XZ' }).hover()
+  await groups.getByRole('button', { name: 'Borrar el grupo Brazo XZ' }).click()
+  await expect(groups.getByRole('button', { name: '+ Brazo XZ' })).toHaveCount(0)
+  await groups.getByLabel('Archivo de grupos').setInputFiles(path)
+  await expect(groups.getByRole('button', { name: '+ Brazo XZ' })).toBeVisible()
+  await expect(groups.getByRole('status')).toContainText('Importados 1 grupos')
   expectNoErrors(errors)
 })
