@@ -34,13 +34,13 @@ export const SCENE_TYPES = {
   feeder: {
     label: 'Alimentador de piezas',
     group: 'Proceso',
-    defaults: { trigger: '', auto: true, sizes: 'small', material: 'plastic', color: 'amber' },
+    defaults: { trigger: '', auto: true, spacing: 0, sizes: 'small', material: 'plastic', color: 'amber' },
   },
   sink: { label: 'Recogida', group: 'Proceso', defaults: { text: '' } },
   tank: {
     label: 'Depósito',
     group: 'Proceso',
-    defaults: { fill: '', drain: '', low: '', high: '', level: '', fillTime: 10, drainTime: 10, initial: 0, text: '' },
+    defaults: { fill: '', drain: '', low: '', high: '', empty: '', level: '', fillTime: 10, drainTime: 10, initial: 0, text: '' },
   },
   motor: { label: 'Motor', group: 'Actuadores', defaults: { variable: '', reverse: '', pulses: '', text: '' } },
   display: { label: 'Visualizador', group: 'Señalización', defaults: { variable: '', text: '' } },
@@ -81,6 +81,7 @@ export const SCENE_VARS = {
     ['drain', 'Válvula de vaciado', 'out'],
     ['low', 'Sensor nivel bajo', 'in'],
     ['high', 'Sensor nivel alto', 'in'],
+    ['empty', 'Sensor de vacío (opcional)', 'in'],
     ['level', 'Nivel (analógica)', 'analog'],
   ],
   motor: [
@@ -187,8 +188,9 @@ export function sceneInit(scene) {
   return { pos, pressed, level, knob, temp, angle: {}, faults: {}, held: {}, pieces: [], counts: {}, nextPiece: 1, fed: {} }
 }
 
-// Pieza nueva en un alimentador (si su sitio está libre).
-function feed(state, e) {
+// Pieza nueva en un alimentador (si su sitio está libre; con `gap`, también ese margen alrededor:
+// el automático deja así hueco entre una pieza y la siguiente).
+function feed(state, e, gap = 0) {
   const n = state.nextPiece - 1
   const sizes = e.sizes === 'mixed' ? ['small', 'large'] : [e.sizes in PIECE_SIZES ? e.sizes : 'small']
   const [w, h] = PIECE_SIZES[sizes[n % sizes.length]]
@@ -198,7 +200,8 @@ function feed(state, e) {
   const material = e.material === 'mixed' ? (step % 2 ? 'metal' : 'plastic') : e.material === 'metal' ? 'metal' : 'plastic'
   const color = material === 'metal' ? 'metal' : (e.color ?? 'amber')
   const piece = { id: state.nextPiece, x: e.x - w / 2, y: e.y - h / 2, w, h, color, material }
-  if (state.pieces.some((p) => overlaps(p, piece))) return state
+  const area = { x: piece.x - gap, y: piece.y - gap, w: piece.w + 2 * gap, h: piece.h + 2 * gap }
+  if (state.pieces.some((p) => overlaps(p, area))) return state
   return { ...state, pieces: [...state.pieces, piece], nextPiece: state.nextPiece + 1 }
 }
 
@@ -223,7 +226,7 @@ export function sceneStep(scene, state, values, dt) {
   for (const e of elements) {
     if (e.type !== 'feeder') continue
     const order = on(values, e.trigger)
-    if (e.trigger ? order && !next.fed[e.id] : e.auto) next = feed(next, e)
+    if (e.trigger ? order && !next.fed[e.id] : e.auto) next = feed(next, e, e.trigger ? 0 : Number(e.spacing) || 0)
     next.fed[e.id] = order
   }
 
@@ -404,6 +407,7 @@ export function sceneInputs(scene, state, analogRange = () => null) {
       const level = state.level?.[e.id] ?? 0
       if (e.low) inputs[e.low] = level >= TANK.low && fault(e) !== 'sensor:low' ? 1 : 0
       if (e.high) inputs[e.high] = level >= TANK.high && fault(e) !== 'sensor:high' ? 1 : 0
+      if (e.empty) inputs[e.empty] = level <= 0.02 && fault(e) !== 'sensor:empty' ? 1 : 0
       if (e.level) {
         const range = analogRange(e.level) ?? { min: 0, max: 100 }
         inputs[e.level] = Math.round((range.min + level * (range.max - range.min)) * 100) / 100
@@ -474,6 +478,7 @@ export function sceneFaults(e) {
         { id: 'stuck', label: 'Válvulas atascadas' },
         ...(e.low ? [{ id: 'sensor:low', label: `Sensor ${e.low} roto` }] : []),
         ...(e.high ? [{ id: 'sensor:high', label: `Sensor ${e.high} roto` }] : []),
+        ...(e.empty ? [{ id: 'sensor:empty', label: `Sensor ${e.empty} roto` }] : []),
       ]
     default:
       return []

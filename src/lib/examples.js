@@ -34,7 +34,7 @@ export const EXAMPLES = [
     id: 'taladradora',
     title: 'Taladradora',
     description: 'Secuencia lineal con temporización: bajar taladrando, repasar 2 s y subir.',
-    tags: ['Lineal', 'Temporización', 'Bucle'],
+    tags: ['Lineal', 'Temporización', 'Bucle', 'Planta'],
     build() {
       const { nodes, edges } = cycle([
         { actions: [] },
@@ -51,7 +51,8 @@ export const EXAMPLES = [
           'nota',
           520,
           0,
-          'Taladradora\n\nCon pieza y Marcha, la broca baja girando hasta Fc_abajo, repasa 2 s y sube hasta Fc_arriba.\n\nAl simular, la planta virtual mueve la broca y sus finales de carrera.',
+          '# Taladradora\nCon pieza y **Marcha**, la broca baja girando hasta su final de carrera, repasa 2 s y sube.\n\n- Entradas: `Marcha`, `Pieza`, `Fc_abajo`, `Fc_arriba`\n- Salidas: `Motor_broca`, `Bajar`, `Subir`\n\nPruébalo: **Simular**, activa «Pieza colocada» y pulsa Marcha.',
+          { width: 300, height: 250 },
         ),
       )
       // Planta virtual: mandos, el motor de la broca y la broca como un cilindro vertical.
@@ -70,7 +71,7 @@ export const EXAMPLES = [
     id: 'cilindros',
     title: 'Cilindros A+ B+ A− B−',
     description: 'Secuencia neumática clásica con finales de carrera a0/a1 y b0/b1.',
-    tags: ['Lineal', 'Neumática'],
+    tags: ['Lineal', 'Neumática', 'Planta'],
     build() {
       const { nodes, edges } = cycle([
         { actions: [] },
@@ -89,7 +90,8 @@ export const EXAMPLES = [
           'nota',
           520,
           0,
-          'Secuencia A+ B+ A− B−\n\nCada movimiento empieza cuando el anterior llega a su final de carrera.\n\nAl simular, la planta virtual mueve los cilindros: solo hay que pulsar Marcha.',
+          '# Secuencia A+ B+ A− B−\nCada movimiento empieza cuando el anterior llega a su final de carrera (detectores `a0`, `a1`, `b0`, `b1`).\n\n- Entradas: `Marcha` y los cuatro detectores\n- Salidas: `A+`, `A-`, `B+`, `B-` (cilindros de doble efecto)\n\nPruébalo: **Simular** y pulsa Marcha en la planta.',
+          { width: 300, height: 250 },
         ),
       )
       const cylinder = (n, x, y, rot) => ({
@@ -145,7 +147,8 @@ export const EXAMPLES = [
           'nota',
           520,
           0,
-          'Pick & place\n\nBaja Z con vacío (V) hasta coger la pieza, sube, X la lleva, baja y suelta (sin vacío), sube y X vuelve.\n\nAl simular, la planta tiene un almacén con piezas y la recogida: basta con pulsar Marcha.',
+          '# Pick & place\nZ baja con vacío (`V`) hasta coger la pieza (`Cogida`), sube, X la lleva, Z baja y la suelta (sin vacío), sube y X vuelve.\n\n- Entradas: `Marcha`, `x0`, `x1`, `z0`, `z1`, `Cogida`\n- Salidas: `X+`, `X-`, `Z+`, `Z-`, `V`\n\nPruébalo: **Simular** y pulsa Marcha en el pupitre.',
+          { width: 300, height: 250 },
         ),
       )
       const scene = {
@@ -161,14 +164,73 @@ export const EXAMPLES = [
     },
   },
   {
+    id: 'clasificadora',
+    title: 'Clasificadora por material',
+    description: 'Cinta, detector inductivo y desviador: el metal sale a un lado y el plástico sigue hasta el final.',
+    tags: ['Divergencia en O', 'Temporización', 'Planta'],
+    build() {
+      const nodes = [
+        step('s0', '0', 200, 0, [], { initial: true }),
+        trans('t1', 'Marcha', 200, 100),
+        step('s1', '1', 200, 170, ['M']),
+        // Elección excluyente: una pieza de metal (con la cinta en marcha) o parar.
+        trans('t2', '↑Metal · Marcha', 200, 270),
+        trans('t4', '!Marcha', 440, 270),
+        step('s2', '2', 200, 340, ['M', 'D']),
+        trans('t3', '1.5s/X2', 200, 440),
+        note(
+          'nota',
+          560,
+          0,
+          '# Clasificadora por material\nCon **Marcha** la cinta lleva las piezas; el detector inductivo (`Metal`) solo ve las de metal y el desviador (`D`) las saca a su recogida. Las de plástico siguen hasta el final.\n\n- Entradas: `Marcha` (interruptor), `Metal`\n- Salidas: `M` (cinta), `D` (desviador)\n\nPruébalo: **Simular** y activa Marcha en el pupitre.',
+          { width: 300, height: 280 },
+        ),
+      ]
+      const edges = links([
+        ['s0', 't1'],
+        ['t1', 's1'],
+        ['s1', 't2'],
+        ['s1', 't4'],
+        ['t2', 's2'],
+        ['s2', 't3'],
+        ['t3', 's1'],
+        ['t4', 's0'],
+      ])
+      const scene = {
+        elements: [
+          { id: 'cinta', type: 'conveyor', x: 40, y: 200, rot: 0, motor: 'M', length: 520, time: 5, text: 'Cinta' },
+          { id: 'alimentador', type: 'feeder', x: 70, y: 200, rot: 0, trigger: '', auto: true, spacing: 200, sizes: 'small', material: 'mixed', color: 'amber' },
+          { id: 'inductivo', type: 'sensor', x: 250, y: 230, rot: 270, variable: 'Metal', contact: 'NO', kind: 'inductive', range: 20, color: 'amber' },
+          { id: 'desviador', type: 'diverter', x: 330, y: 200, rot: 90, gate: 'D', length: 80, time: 0.5, text: 'Desviador' },
+          { id: 'rampa', type: 'ramp', x: 330, y: 280, rot: 90, length: 80, time: 0.6, text: '' },
+          { id: 'metal', type: 'sink', x: 330, y: 390, rot: 0, text: 'Metal' },
+          { id: 'plastico', type: 'sink', x: 590, y: 200, rot: 0, text: 'Plástico' },
+          { id: 'marcha', type: 'switch', x: 0, y: 0, rot: 0, variable: 'Marcha', contact: 'NO', text: 'Marcha', place: 'desk' },
+          { id: 'luz', type: 'lamp', x: 0, y: 0, rot: 0, variable: 'M', color: 'green', text: 'Cinta en marcha', place: 'desk' },
+        ],
+      }
+      return { nodes, edges, plc: { scene } }
+    },
+  },
+  {
     id: 'semaforo',
     title: 'Semáforo',
     description: 'Ciclo cerrado solo con temporizaciones: rojo 10 s, verde 8 s, ámbar 3 s.',
-    tags: ['Temporización', 'Bucle'],
+    tags: ['Temporización', 'Bucle', 'Planta'],
     build() {
       const { nodes, edges } = cycle([{ actions: ['Rojo'] }, '10s/X0', { actions: ['Verde'] }, '8s/X1', { actions: ['Ámbar'] }, '3s/X2'])
-      nodes.push(note('nota', 520, 0, 'Semáforo\n\nCada etapa enciende una luz; la temporización de la etapa activa pasa a la siguiente.'))
-      return { nodes, edges }
+      nodes.push(
+        note(
+          'nota',
+          520,
+          0,
+          '# Semáforo\nCada etapa enciende una luz; la temporización de la etapa activa pasa a la siguiente.\n\n- Salidas: `Rojo`, `Verde`, `Ámbar`\n\nPruébalo: **Simular** y mira la planta.',
+          { width: 300, height: 250 },
+        ),
+      )
+      const lamp = (id, variable, color, y) => ({ id, type: 'lamp', x: 160, y, rot: 0, variable, color, text: variable })
+      const scene = { elements: [lamp('rojo', 'Rojo', 'red', 80), lamp('ambar', 'Ámbar', 'yellow', 140), lamp('verde', 'Verde', 'green', 200)] }
+      return { nodes, edges, plc: { scene } }
     },
   },
   {
@@ -176,7 +238,7 @@ export const EXAMPLES = [
     title: 'Mezcladora',
     description: 'Divergencia en O (producción o limpieza) y en Y (llenado simultáneo de dos depósitos).',
     // La rama de limpieza va a la izquierda: su bucle vuelve por la izquierda sin cruzar las demás.
-    tags: ['Divergencia en O', 'Divergencia en Y', 'Temporización'],
+    tags: ['Divergencia en O', 'Divergencia en Y', 'Temporización', 'Planta'],
     build() {
       const nodes = [
         step('s0', '0', 200, 0, [], { initial: true }),
@@ -200,8 +262,8 @@ export const EXAMPLES = [
           'nota',
           720,
           0,
-          'Mezcladora\n\nEn 0 se elige (divergencia en O): Marcha para producir o Limpieza para lavar.\n\nAl producir, A y B se llenan a la vez (divergencia en Y) y se mezcla cuando ambos están llenos (convergencia en Y).',
-          { width: 300, height: 250 },
+          '# Mezcladora\nEn 0 se elige (divergencia en O): **Marcha** para producir o **Limpieza** para lavar.\n\nAl producir, A y B se llenan a la vez (divergencia en Y) y se mezcla cuando ambos están llenos (convergencia en Y).\n\n- Entradas: `Marcha`, `Limpieza`, `Nivel_A`, `Nivel_B`, `Vacio`, `Fin_lavado`\n- Salidas: `Llenar_A`, `Llenar_B`, `Mezclar`, `Vaciar`, `Lavar`\n\nPruébalo: **Simular** (sube la velocidad: la mezcla dura 30 s).',
+          { width: 320, height: 340 },
         ),
       ]
       const edges = links([
@@ -224,7 +286,36 @@ export const EXAMPLES = [
         ['s7', 't8'],
         ['t8', 's0'],
       ])
-      return { nodes, edges }
+      const tank = (id, x, fill, high, extra = {}) => ({
+        id,
+        type: 'tank',
+        x,
+        y: 60,
+        rot: 0,
+        fill,
+        drain: 'Vaciar',
+        low: '',
+        high,
+        empty: '',
+        level: '',
+        fillTime: 4,
+        drainTime: 3,
+        initial: 0,
+        text: id === 'A' ? 'Depósito A' : 'Depósito B',
+        ...extra,
+      })
+      const scene = {
+        elements: [
+          tank('A', 60, 'Llenar_A', 'Nivel_A', { empty: 'Vacio' }),
+          tank('B', 240, 'Llenar_B', 'Nivel_B', { fillTime: 6 }),
+          { id: 'agitador', type: 'motor', x: 200, y: 290, rot: 0, variable: 'Mezclar', reverse: '', text: 'Agitador' },
+          { id: 'marcha', type: 'button', x: 0, y: 0, rot: 0, variable: 'Marcha', contact: 'NO', color: 'green', text: 'Marcha', place: 'desk' },
+          { id: 'limpieza', type: 'button', x: 0, y: 0, rot: 0, variable: 'Limpieza', contact: 'NO', color: 'blue', text: 'Limpieza', place: 'desk' },
+          { id: 'lavar', type: 'lamp', x: 0, y: 0, rot: 0, variable: 'Lavar', color: 'blue', text: 'Lavando', place: 'desk' },
+          { id: 'fin', type: 'button', x: 0, y: 0, rot: 0, variable: 'Fin_lavado', contact: 'NO', color: 'black', text: 'Fin lavado', place: 'desk' },
+        ],
+      }
+      return { nodes, edges, plc: { scene } }
     },
   },
   {

@@ -846,6 +846,7 @@ function Properties({ element, variables, onChange, onDelete, onRotate, onCreate
               Siempre una pieza esperando
             </label>
           )}
+          {!element.trigger && element.auto && number('spacing', 'Hueco hasta la siguiente (px)', 0, 10)}
         </>
       )}
       {!['limit', 'sensor', 'distance'].includes(element.type) && (

@@ -1,7 +1,41 @@
 import { useEffect, useState } from 'react'
 import { NodeResizer, useReactFlow } from '@xyflow/react'
 import { useEditor } from '../lib/editorContext'
-import { NOTE_COLORS } from '../lib/notes'
+import { NOTE_COLORS, parseNote } from '../lib/notes'
+
+// Texto de la nota con su formato ligero (lib/notes.js: títulos, listas, negrita, variables).
+function NoteText({ text }) {
+  const spans = (list) =>
+    list.map((s, i) =>
+      s.code ? (
+        <code key={i} className="rounded bg-black/5 px-0.5 font-mono text-[0.92em]">
+          {s.text}
+        </code>
+      ) : s.bold ? (
+        <strong key={i}>{s.text}</strong>
+      ) : (
+        <span key={i}>{s.text}</span>
+      ),
+    )
+  return parseNote(text).map((b, i) =>
+    b.kind === 'blank' ? (
+      <div key={i} className="h-[0.6em]" />
+    ) : b.kind === 'title' ? (
+      <p key={i} className="text-[1.08em] font-bold">
+        {spans(b.spans)}
+      </p>
+    ) : b.kind === 'item' ? (
+      <p key={i} className="flex gap-1.5 pl-1">
+        <span aria-hidden="true">•</span>
+        <span>{spans(b.spans)}</span>
+      </p>
+    ) : (
+      <p key={i} className="whitespace-pre-wrap">
+        {spans(b.spans)}
+      </p>
+    ),
+  )
+}
 
 // Nota de texto libre sobre el lienzo (enunciado, explicación, firma de un plano...). No forma
 // parte del grafcet: la verificación, la simulación, el ladder y el trazado de enlaces la ignoran.
@@ -60,9 +94,9 @@ export default function NoteNode({ id, data, selected }) {
             }}
           />
         ) : (
-          <p className={`diagram-text h-full whitespace-pre-wrap break-words ${data.text ? 'text-slate-800' : 'italic text-slate-400'}`}>
-            {data.text || <span className="canvas-hint">Doble clic para escribir</span>}
-          </p>
+          <div className={`diagram-text h-full break-words ${data.text ? 'text-slate-800' : 'italic text-slate-400'}`}>
+            {data.text ? <NoteText text={data.text} /> : <span className="canvas-hint">Doble clic para escribir</span>}
+          </div>
         )}
       </div>
     </>

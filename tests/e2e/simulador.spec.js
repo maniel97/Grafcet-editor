@@ -543,3 +543,19 @@ test('ejemplo pick & place: la ventosa lleva la pieza del almacén al destino', 
   await expect(props.getByRole('combobox', { name: 'Ventosa: vacío (opcional)' })).toBeVisible()
   expectNoErrors(errors)
 })
+
+test('estación «Clasificadora por material»: el metal y el plástico acaban en su recogida', async ({ page }) => {
+  const errors = await openEditor(page)
+  await openExample(page, /Clasificadora por material/)
+  // La nota del ejemplo, con formato: título, listas y variables.
+  const note = page.locator('.react-flow__node-note').first()
+  await expect(note.locator('p.font-bold')).toHaveText('Clasificadora por material')
+  await expect(note.locator('code').first()).toHaveText('Metal')
+  await page.getByRole('button', { name: /Simular/ }).click()
+  await page.getByLabel('Velocidad').selectOption('5')
+  const view = page.getByRole('region', { name: 'Escena de la planta' })
+  await view.getByRole('region', { name: 'Pupitre de mando' }).locator('[aria-label="Interruptor Marcha"]').click()
+  await expect(view.locator('[aria-label="Recogida Metal"]')).toContainText(/[1-9]/, { timeout: 15000 })
+  await expect(view.locator('[aria-label="Recogida Plástico"]')).toContainText(/[1-9]/, { timeout: 15000 })
+  expectNoErrors(errors)
+})
