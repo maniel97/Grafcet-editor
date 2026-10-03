@@ -484,3 +484,54 @@ export function sceneFromPlant(plant = []) {
   }
   return { elements }
 }
+
+// --- Entradas y salidas de la planta ----------------------------------------------------------
+
+// Campos imprescindibles de cada tipo (sin ellos, el elemento no hace nada); [] = ninguno.
+// Con varios, basta con uno (p. ej. el depósito, con llenado o vaciado).
+const REQUIRED = {
+  button: ['variable'],
+  switch: ['variable'],
+  emergency: ['variable'],
+  lamp: ['variable'],
+  cylinder: ['extend'],
+  conveyor: ['motor'],
+  limit: ['variable'],
+  sensor: ['variable'],
+  distance: ['variable'],
+  scale: ['variable'],
+  potentiometer: ['variable'],
+  heater: ['heat'],
+  tank: ['fill', 'drain'],
+  motor: ['variable'],
+  display: ['variable'],
+}
+
+// Resumen de las conexiones entre la escena y el grafcet (variables del modelo, con uses y
+// address):
+//   signals: cada variable que usa la escena: { name, type, address, dir, elements: [id] }
+//   unassigned: elementos a los que les falta su variable imprescindible: [id]
+//   manual: entradas del grafcet que la escena no da (se cambian a mano en el panel)
+//   unusedOutputs: salidas del grafcet que ningún elemento usa
+//   notInGrafcet: variables de la escena que el grafcet no usa
+export function sceneIO(scene, variables) {
+  const elements = elementsOf(scene)
+  const byName = new Map(variables.map((v) => [v.name, v]))
+  const signals = new Map()
+  for (const e of elements) {
+    for (const [key, , dir] of SCENE_VARS[e.type] ?? []) {
+      const name = e[key]
+      if (!name) continue
+      const v = byName.get(name)
+      const entry = signals.get(name) ?? { name, type: v?.type ?? null, address: v?.address ?? '', dir, elements: [] }
+      if (!entry.elements.includes(e.id)) entry.elements.push(e.id)
+      signals.set(name, entry)
+    }
+  }
+  const unassigned = elements.filter((e) => REQUIRED[e.type]?.length && REQUIRED[e.type].every((k) => !e[k])).map((e) => e.id)
+  const driven = sceneInputNames(scene)
+  const manual = variables.filter((v) => (v.type === 'input' || v.type === 'analogIn') && v.uses.length && !driven.has(v.name)).map((v) => v.name)
+  const unusedOutputs = variables.filter((v) => v.type === 'output' && v.uses.length && !signals.has(v.name)).map((v) => v.name)
+  const notInGrafcet = [...signals.values()].filter((s) => !byName.get(s.name)?.uses.length).map((s) => s.name)
+  return { signals: [...signals.values()].sort((a, b) => a.name.localeCompare(b.name)), unassigned, manual, unusedOutputs, notInGrafcet }
+}

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import { closest } from '../lib/autocomplete'
-import { ChevronDown, Copy, Hand, Maximize2, Minimize2, Minus, MousePointer2, Plus, RotateCw, Scan, Trash2, WandSparkles, X } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Cable, ChevronDown, Copy, Hand, Maximize2, Tag, Minimize2, Minus, MousePointer2, Plus, RotateCw, Scan, Trash2, WandSparkles, X } from 'lucide-react'
 import {
   PIECE_SIZES,
   SCENE_TYPES,
@@ -14,6 +14,7 @@ import {
   limitZone,
   measuredDistance,
   overlaps,
+  sceneIO,
   weighed,
   sceneFaults,
   sceneSignals,
@@ -501,6 +502,85 @@ function VariableField({ label, value, options, allNames, dir, onPick, onCreate 
   )
 }
 
+// Entradas y salidas de la planta: lo conectado (con su dirección) y los avisos. Un clic en un
+// elemento lo selecciona.
+function IOPanel({ io, elements, onSelect }) {
+  const label = (id) => {
+    const e = elements.find((x) => x.id === id)
+    return e ? `${SCENE_TYPES[e.type].label} ${labelOf(e)}` : id
+  }
+  const ElementLink = ({ id }) => (
+    <button type="button" onClick={() => onSelect(id)} className="text-left text-blue-700 hover:underline">
+      {label(id)}
+    </button>
+  )
+  const warnings = io.unassigned.length + io.unusedOutputs.length + io.notInGrafcet.length
+  return (
+    <div className="space-y-3 text-xs" aria-label="Conexiones de la planta">
+      <p className="font-semibold">Entradas y salidas de la planta</p>
+      {io.signals.length === 0 ? (
+        <p className="text-slate-500">Ningún elemento tiene variables todavía.</p>
+      ) : (
+        <ul className="space-y-1" aria-label="Conectadas">
+          {io.signals.map((sig) => (
+            <li key={sig.name}>
+              <span className="flex items-center gap-1 font-mono">
+                {sig.dir === 'out' ? (
+                  <ArrowRight size={12} className="shrink-0 text-green-600" aria-label="salida del grafcet hacia la planta" />
+                ) : (
+                  <ArrowLeft size={12} className="shrink-0 text-blue-600" aria-label="entrada del grafcet desde la planta" />
+                )}
+                <span className="font-semibold">{sig.name}</span>
+                <span className="text-slate-500">{sig.address || 'sin dirección'}</span>
+              </span>
+              <span className="block pl-4">
+                {sig.elements.map((id, i) => (
+                  <span key={id}>
+                    {i > 0 && ', '}
+                    <ElementLink id={id} />
+                  </span>
+                ))}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+      {warnings + io.manual.length > 0 && (
+        <div className="space-y-2 border-t border-slate-200 pt-2" aria-label="Avisos de conexión">
+          {io.unassigned.length > 0 && (
+            <div>
+              <p className="font-medium text-amber-700">Sin variable (no hacen nada):</p>
+              {io.unassigned.map((id) => (
+                <p key={id} className="pl-2">
+                  <ElementLink id={id} />
+                </p>
+              ))}
+            </div>
+          )}
+          {io.unusedOutputs.length > 0 && (
+            <p>
+              <span className="font-medium text-amber-700">Salidas del grafcet que ningún elemento usa: </span>
+              <span className="font-mono">{io.unusedOutputs.join(', ')}</span>
+            </p>
+          )}
+          {io.notInGrafcet.length > 0 && (
+            <p>
+              <span className="font-medium text-amber-700">Variables de la planta que el grafcet no usa: </span>
+              <span className="font-mono">{io.notInGrafcet.join(', ')}</span>
+            </p>
+          )}
+          {io.manual.length > 0 && (
+            <p className="text-slate-600">
+              <span className="font-medium">Entradas que se cambian a mano</span> (en el panel de simulación):{' '}
+              <span className="font-mono">{io.manual.join(', ')}</span>
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function Properties({ element, variables, onChange, onDelete, onRotate, onCreateVariable }) {
   const names = (dir) =>
     variables
@@ -852,6 +932,8 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
   const [zoom, setZoom] = useState(0.8)
   const [drag, setDrag] = useState(null) // { ids, start: { x, y }, dx, dy }
   const [marquee, setMarquee] = useState(null) // { x0, y0, x1, y1, add }
+  const [showIO, setShowIO] = useState(false) // rótulos con las variables y sus direcciones
+  const [ioOpen, setIoOpen] = useState(false) // panel de conexiones
   const [panning, setPanning] = useState(null) // { x, y, left, top }: arrastre con la rueda pulsada
   // Deshacer / rehacer de la escena (aparte del historial del grafcet).
   const history = useRef({ past: [], future: [] })
@@ -936,6 +1018,20 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
   const signals = sceneSignals(scene ?? { elements: [] }, state)
   const selectedElement = elements.find((e) => e.id === selected)
   const detected = mode === 'edit' ? detectScene(variables, scene) : []
+  const io = sceneIO(scene, variables)
+  const ioWarnings = io.unassigned.length + io.unusedOutputs.length + io.notInGrafcet.length
+  const addressOf = new Map(variables.map((v) => [v.name, v.address]))
+  // Líneas extra del rótulo (con «E/S»): cada variable del elemento con su dirección, de dos en dos
+  // (un cilindro con cuatro variables no se sale de la escena).
+  const ioLines = (e) => {
+    const items = (SCENE_VARS[e.type] ?? [])
+      .map(([key]) => e[key])
+      .filter(Boolean)
+      .map((name) => (addressOf.get(name) ? `${name} ${addressOf.get(name)}` : name))
+    const lines = []
+    for (let i = 0; i < items.length; i += 2) lines.push(items.slice(i, i + 2).join(' · '))
+    return lines
+  }
 
   // Cada cambio de la escena se guarda en el historial (deshacer / rehacer).
   const save = (list) => {
@@ -1252,6 +1348,25 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
             </button>
           ))}
         </div>
+        <button
+          type="button"
+          onClick={() => setShowIO((v) => !v)}
+          aria-pressed={showIO}
+          title="Rótulos con las variables y sus direcciones"
+          className={`flex items-center gap-1 rounded border px-2 py-0.5 ${showIO ? 'border-blue-300 bg-blue-50 text-blue-800' : 'border-slate-300 hover:bg-slate-100'}`}
+        >
+          <Tag size={12} /> E/S
+        </button>
+        <button
+          type="button"
+          onClick={() => setIoOpen((v) => !v)}
+          aria-pressed={ioOpen}
+          title="Qué está conectado y qué falta"
+          className={`flex items-center gap-1 rounded border px-2 py-0.5 ${ioOpen ? 'border-blue-300 bg-blue-50 text-blue-800' : 'border-slate-300 hover:bg-slate-100'}`}
+        >
+          <Cable size={12} /> Conexiones
+          {ioWarnings > 0 && <span className="rounded-full bg-amber-500 px-1.5 text-[10px] font-semibold text-white">{ioWarnings}</span>}
+        </button>
         <button type="button" onClick={() => onAction(null, 'clear')} title="Quita de la escena todas las piezas (cilindros, cintas y demás elementos se quedan)" className="rounded border border-slate-300 px-2 py-0.5 hover:bg-slate-100">
           Quitar piezas
         </button>
@@ -1416,6 +1531,12 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
               return (
                 <text key={`l-${e.id}`} x={b.x + b.w / 2} y={b.y + b.h + 13} textAnchor="middle" fontSize="11" fill="#334155" pointerEvents="none">
                   {labelOf(e)}
+                  {showIO &&
+                    ioLines(e).map((line) => (
+                      <tspan key={line} x={b.x + b.w / 2} dy="12" fontSize="9.5" fontFamily="ui-monospace, Consolas, monospace" fill="#2563eb">
+                        {line}
+                      </tspan>
+                    ))}
                 </text>
               )
             })}
@@ -1457,6 +1578,18 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
               </button>
             </div>
             <p className="text-[11px] text-slate-500">Arrastra uno de ellos para mover todo el grupo. Ctrl+clic añade o quita.</p>
+          </aside>
+        )}
+        {ioOpen && !selectedElement && !(mode === 'edit' && selection.length > 1) && (
+          <aside className="w-56 shrink-0 overflow-y-auto border-l border-slate-200 p-2">
+            <IOPanel
+              io={io}
+              elements={elements}
+              onSelect={(id) => {
+                setMode('edit')
+                setSelection([id])
+              }}
+            />
           </aside>
         )}
         {selectedElement && (

@@ -434,3 +434,31 @@ test('escena: escribir una variable nueva en un elemento la añade a la tabla', 
   await expect(dialog.getByRole('row', { name: /^Rearme/ })).toBeVisible()
   expectNoErrors(errors)
 })
+
+test('escena: rótulos con E/S y panel de conexiones', async ({ page }) => {
+  const errors = await openEditor(page)
+  await openExample(page, /Cilindros A\+ B\+/)
+  const table = await openVariables(page)
+  await table.getByRole('button', { name: /Rellenar vacías/ }).click()
+  await page.keyboard.press('Escape')
+  await page.getByRole('button', { name: /Simular/ }).click()
+  const view = page.getByRole('region', { name: 'Escena de la planta' })
+
+  // Rótulos: cada variable con su dirección.
+  await view.getByRole('button', { name: 'E/S' }).click()
+  await expect(view.locator('svg[aria-label="Escena"]')).toContainText(/Marcha I\d+\.\d/)
+  await expect(view.locator('svg[aria-label="Escena"]')).toContainText(/A\+ Q\d+\.\d/)
+
+  // Conexiones: todo conectado; un piloto sin variable aparece como aviso.
+  await view.getByRole('button', { name: /Conexiones/ }).click()
+  const panel = view.getByLabel('Conexiones de la planta')
+  await expect(panel.getByRole('list', { name: 'Conectadas' })).toContainText('Marcha')
+  await expect(panel.getByLabel('Avisos de conexión')).toHaveCount(0)
+  await view.getByRole('radio', { name: /Editar/ }).click()
+  await view.getByRole('button', { name: '+ Piloto' }).click()
+  await page.keyboard.press('Escape') // sin selección: vuelve el panel de conexiones
+  await expect(view.getByRole('button', { name: /Conexiones/ })).toContainText('1')
+  await panel.getByLabel('Avisos de conexión').getByRole('button', { name: /Piloto/ }).click()
+  await expect(view.getByLabel('Propiedades del elemento')).toContainText('Piloto')
+  expectNoErrors(errors)
+})

@@ -275,3 +275,31 @@ describe('escena: detectores típicos y sensores analógicos', () => {
     expect(sceneInputs(scene, s, range)).toEqual({ PosA: 75, Enc: 0 })
   })
 })
+
+describe('escena: entradas y salidas de la planta', () => {
+  it('qué está conectado, qué falta y qué no se usa', async () => {
+    const { sceneIO } = await import('../../src/lib/sim/scene')
+    const v = (name, type, uses = ['n1'], address = '') => ({ name, type, uses, address })
+    const variables = [v('Marcha', 'input', ['n1'], 'I0.0'), v('Paro', 'input'), v('a1', 'input'), v('A+', 'output', ['n2'], 'Q0.0'), v('Luz', 'output'), v('Extra', 'input', [])]
+    const scene = {
+      elements: [
+        { id: 'm', type: 'button', variable: 'Marcha' },
+        { id: 'c', type: 'cylinder', extend: 'A+', extended: 'a1' },
+        { id: 'x', type: 'sensor', variable: 'Extra' },
+        { id: 'l', type: 'lamp', variable: '' }, // sin variable
+        { id: 's', type: 'sink' }, // no la necesita
+      ],
+    }
+    const io = sceneIO(scene, variables)
+    expect(io.signals.map((s) => [s.name, s.dir, s.address, s.elements])).toEqual([
+      ['A+', 'out', 'Q0.0', ['c']],
+      ['a1', 'in', '', ['c']],
+      ['Extra', 'in', '', ['x']],
+      ['Marcha', 'in', 'I0.0', ['m']],
+    ])
+    expect(io.unassigned).toEqual(['l'])
+    expect(io.manual).toEqual(['Paro']) // la escena no la da: se pulsa en el panel
+    expect(io.unusedOutputs).toEqual(['Luz'])
+    expect(io.notInGrafcet).toEqual(['Extra'])
+  })
+})
