@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { Hand, Maximize2, Minimize2, Minus, MousePointer2, Plus, RotateCw, Scan, Trash2, WandSparkles, X } from 'lucide-react'
+import { Copy, Hand, Maximize2, Minimize2, Minus, MousePointer2, Plus, Redo2, RotateCw, Scan, Trash2, Undo2, WandSparkles, X } from 'lucide-react'
 import {
   PIECE_SIZES,
   SCENE_TYPES,
@@ -12,6 +12,7 @@ import {
   detectScene,
   limitZone,
   measuredDistance,
+  overlaps,
   weighed,
   sceneFaults,
   sceneSignals,
@@ -20,6 +21,7 @@ import {
   distanceBeam,
   worldRect,
 } from '../lib/sim/scene'
+import { copyToClipboard, pasteFromClipboard } from '../lib/sim/sceneClipboard'
 
 const W = 1200
 const H = 800
@@ -614,6 +616,8 @@ const ZOOM_MIN = 0.3
 const ZOOM_MAX = 2
 const FIT_MARGIN = 30
 
+const HISTORY_LIMIT = 100
+
 let created = 0
 const newId = () => `e${Date.now().toString(36)}${(created++).toString(36)}`
 // Vista previa de la paleta: el módulo «en acción» y para qué sirve.
@@ -705,9 +709,16 @@ const PALETTE_BY_KEY = Object.fromEntries(PALETTE_ITEMS.map((i) => [i.key, i]))
 export default function SceneView({ scene, onChange, worldState, values, time, variables, onAction, maximized, onToggleMaximize, onClose }) {
   const elements = scene?.elements ?? []
   const [mode, setMode] = useState('use')
-  const [selected, setSelected] = useState(null)
+  // Selección: ids de los elementos (Ctrl+clic añade o quita; recuadro con el ratón).
+  const [selection, setSelection] = useState([])
+  const selected = selection.length === 1 ? selection[0] : null
+  const setSelected = (id) => setSelection(id ? [id] : [])
   const [zoom, setZoom] = useState(0.8)
-  const [drag, setDrag] = useState(null) // { id, dx, dy, x, y }
+  const [drag, setDrag] = useState(null) // { ids, start: { x, y }, dx, dy }
+  const [marquee, setMarquee] = useState(null) // { x0, y0, x1, y1, add }
+  // Deshacer / rehacer de la escena (aparte del historial del grafcet).
+  const history = useRef({ past: [], future: [] })
+  const [historySize, setHistorySize] = useState({ past: 0, future: 0 }) // para los botones
   const svgRef = useRef(null)
   const scrollRef = useRef(null)
   const sectionRef = useRef(null)
@@ -761,13 +772,77 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
   const selectedElement = elements.find((e) => e.id === selected)
   const detected = mode === 'edit' ? detectScene(variables, scene) : []
 
-  const save = (list) => onChange({ ...(scene ?? {}), elements: list })
+  // Cada cambio de la escena se guarda en el historial (deshacer / rehacer).
+  const save = (list) => {
+    const h = history.current
+    h.past = [...h.past.slice(-(HISTORY_LIMIT - 1)), elements]
+    h.future = []
+    setHistorySize({ past: h.past.length, future: 0 })
+    onChange({ ...(scene ?? {}), elements: list })
+  }
+  const travel = (from, to) => {
+    const h = history.current
+    if (!h[from].length) return
+    h[to] = [...h[to], elements]
+    const list = h[from][h[from].length - 1]
+    h[from] = h[from].slice(0, -1)
+    setHistorySize({ past: h.past.length, future: h.future.length })
+    onChange({ ...(scene ?? {}), elements: list })
+    setSelection((ids) => ids.filter((id) => list.some((e) => e.id === id)))
+  }
+  const undo = () => travel('past', 'future')
+  const redo = () => travel('future', 'past')
   const update = (element) => save(elements.map((e) => (e.id === element.id ? element : e)))
+  const removeSelected = () => {
+    if (!selection.length) return
+    save(elements.filter((e) => !selection.includes(e.id)))
+    setSelection([])
+  }
   const remove = (id) => {
     save(elements.filter((e) => e.id !== id))
-    setSelected(null)
+    setSelection([])
   }
-  const rotateSelected = () => selectedElement && update({ ...selectedElement, rot: ((selectedElement.rot ?? 0) + 90) % 360 })
+  const rotateSelected = () =>
+    selection.length && save(elements.map((e) => (selection.includes(e.id) ? { ...e, rot: ((e.rot ?? 0) + 90) % 360 } : e)))
+  const copySelected = () => {
+    if (!selection.length) return
+    copyToClipboard(elements.filter((e) => selection.includes(e.id)))
+  }
+  // Pegar: copias nuevas, desplazadas (cada pegado un poco más) y seleccionadas.
+  const paste = () => {
+    const copies = pasteFromClipboard().map((e) => ({ ...e, id: newId() }))
+    if (!copies.length) return
+    save([...elements, ...copies])
+    setSelection(copies.map((e) => e.id))
+  }
+  const duplicate = () => {
+    copySelected()
+    paste()
+  }
+
+  // Teclado de la escena (solo con el foco en ella, para no mezclarse con los atajos del grafcet).
+  const onKeyDown = (ev) => {
+    if (mode !== 'edit' || ['INPUT', 'SELECT', 'TEXTAREA'].includes(ev.target.tagName)) return
+    const ctrl = ev.ctrlKey || ev.metaKey
+    const key = ev.key.toLowerCase()
+    const actions = {
+      z: ctrl && (ev.shiftKey ? redo : undo),
+      y: ctrl && redo,
+      c: ctrl && copySelected,
+      v: ctrl && paste,
+      d: ctrl && duplicate,
+      a: ctrl && (() => setSelection(elements.map((e) => e.id))),
+      r: !ctrl && rotateSelected,
+      delete: removeSelected,
+      backspace: removeSelected,
+      escape: () => setSelection([]),
+    }
+    const action = actions[key]
+    if (!action) return
+    ev.preventDefault()
+    ev.stopPropagation()
+    action()
+  }
 
   // Nuevo elemento en el centro de lo que se ve.
   // Nuevo elemento: donde se suelta al arrastrarlo desde la paleta o, con un clic, en el centro
@@ -781,18 +856,6 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
     setSelected(element.id)
     setMode('edit')
   }
-
-  // Teclado en modo edición: R gira, Supr borra.
-  useEffect(() => {
-    if (mode !== 'edit' || !selected) return
-    const onKey = (e) => {
-      if (['INPUT', 'SELECT', 'TEXTAREA'].includes(e.target.tagName)) return
-      if (e.key === 'r' || e.key === 'R') rotateSelected()
-      if (e.key === 'Delete') remove(selected)
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  })
 
   const toScene = (ev) => {
     const point = svgRef.current.createSVGPoint()
@@ -815,6 +878,7 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
 
   const onPointerDown = (ev, e) => {
     ev.stopPropagation()
+    sectionRef.current?.focus({ preventScroll: true })
     if (mode === 'use') {
       ev.currentTarget.setPointerCapture?.(ev.pointerId)
       if (e.type === 'potentiometer') {
@@ -824,16 +888,47 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
       else setSelected(e.id)
       return
     }
-    setSelected(e.id)
-    const p = toScene(ev)
+    // Ctrl+clic: añade o quita de la selección (sin mover).
+    if (ev.ctrlKey || ev.metaKey) {
+      setSelection((ids) => (ids.includes(e.id) ? ids.filter((id) => id !== e.id) : [...ids, e.id]))
+      return
+    }
+    // Arrastrar un elemento seleccionado mueve toda la selección.
+    const ids = selection.includes(e.id) ? selection : [e.id]
+    if (!selection.includes(e.id)) setSelection([e.id])
     ev.currentTarget.setPointerCapture?.(ev.pointerId)
-    setDrag({ id: e.id, dx: p.x - e.x, dy: p.y - e.y, x: e.x, y: e.y })
+    setDrag({ ids, start: toScene(ev), dx: 0, dy: 0 })
   }
   const onPointerMove = (ev) => {
     if (knobDrag) turnKnob(ev, knobDrag)
+    if (marquee) {
+      const p = toScene(ev)
+      setMarquee({ ...marquee, x1: p.x, y1: p.y })
+    }
     if (!drag) return
     const p = toScene(ev)
-    setDrag({ ...drag, x: snap(p.x - drag.dx), y: snap(p.y - drag.dy) })
+    setDrag({ ...drag, dx: snap(p.x - drag.start.x), dy: snap(p.y - drag.start.y) })
+  }
+  // Recuadro de selección sobre el fondo (modo Editar).
+  const onBackgroundDown = (ev) => {
+    sectionRef.current?.focus({ preventScroll: true })
+    if (mode !== 'edit') {
+      setSelection([])
+      return
+    }
+    const p = toScene(ev)
+    const add = ev.ctrlKey || ev.metaKey
+    if (!add) setSelection([])
+    ev.currentTarget.setPointerCapture?.(ev.pointerId)
+    setMarquee({ x0: p.x, y0: p.y, x1: p.x, y1: p.y, add })
+  }
+  const onBackgroundUp = () => {
+    if (!marquee) return
+    const box = { x: Math.min(marquee.x0, marquee.x1), y: Math.min(marquee.y0, marquee.y1), w: Math.abs(marquee.x1 - marquee.x0), h: Math.abs(marquee.y1 - marquee.y0) }
+    setMarquee(null)
+    if (box.w < 4 && box.h < 4) return
+    const hit = elements.filter((e) => overlaps(box, boundsOf(e, state.pos[e.id] ?? 0))).map((e) => e.id)
+    setSelection((ids) => (marquee.add ? [...new Set([...ids, ...hit])] : hit))
   }
   const onPointerUp = (ev, e) => {
     if (mode === 'use') {
@@ -842,13 +937,12 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
       return
     }
     if (drag) {
-      const el = elements.find((x) => x.id === drag.id)
-      if (el && (el.x !== drag.x || el.y !== drag.y)) update({ ...el, x: drag.x, y: drag.y })
+      if (drag.dx || drag.dy) save(elements.map((x) => (drag.ids.includes(x.id) ? { ...x, x: x.x + drag.dx, y: x.y + drag.dy } : x)))
       setDrag(null)
     }
   }
 
-  const shown = elements.map((e) => (drag?.id === e.id ? { ...e, x: drag.x, y: drag.y } : e))
+  const shown = elements.map((e) => (drag?.ids.includes(e.id) ? { ...e, x: e.x + drag.dx, y: e.y + drag.dy } : e))
   const draw = (e) => {
     const pos = state.pos[e.id] ?? 0
     switch (e.type) {
@@ -898,7 +992,9 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
     <section
       aria-label="Escena de la planta"
       ref={sectionRef}
-      className={`side-panel relative flex min-w-0 flex-col border-l border-slate-200 bg-white ${maximized ? 'absolute inset-y-0 left-0 right-80 z-20' : 'shrink-0'}`}
+      tabIndex={-1}
+      onKeyDown={onKeyDown}
+      className={`side-panel relative flex outline-none min-w-0 flex-col border-l border-slate-200 bg-white ${maximized ? 'absolute inset-y-0 left-0 right-80 z-20' : 'shrink-0'}`}
       style={maximized ? undefined : { width: width ?? '50%' }}
     >
       {/* Separador: arrastrar para repartir el espacio entre el grafcet y la planta. */}
@@ -966,6 +1062,16 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
             </button>
           ))}
         </div>
+        {mode === 'edit' && (
+          <>
+            <button type="button" onClick={undo} disabled={!historySize.past} title="Deshacer (Ctrl+Z)" aria-label="Deshacer en la escena" className="rounded p-1 hover:bg-slate-100 disabled:opacity-30">
+              <Undo2 size={13} />
+            </button>
+            <button type="button" onClick={redo} disabled={!historySize.future} title="Rehacer (Ctrl+Y)" aria-label="Rehacer en la escena" className="rounded p-1 hover:bg-slate-100 disabled:opacity-30">
+              <Redo2 size={13} />
+            </button>
+          </>
+        )}
         <button type="button" onClick={() => onAction(null, 'clear')} title="Quitar todas las piezas" className="rounded border border-slate-300 px-2 py-0.5 hover:bg-slate-100">
           Vaciar piezas
         </button>
@@ -1062,7 +1168,8 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
             viewBox={`0 0 ${W} ${H}`}
             className="block select-none"
             onPointerMove={onPointerMove}
-            onPointerDown={() => setSelected(null)}
+            onPointerDown={onBackgroundDown}
+            onPointerUp={onBackgroundUp}
             role="img"
             aria-label="Escena"
           >
@@ -1109,15 +1216,46 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
                 </text>
               )
             })}
-            {selected &&
-              shown
-                .filter((e) => e.id === selected)
-                .map((e) => {
-                  const b = boundsOf(e, state.pos[e.id] ?? 0)
-                  return <rect key="sel" x={b.x - 4} y={b.y - 4} width={b.w + 8} height={b.h + 8} fill="none" stroke="#3b82f6" strokeDasharray="4 3" pointerEvents="none" />
-                })}
+            {shown
+              .filter((e) => selection.includes(e.id))
+              .map((e) => {
+                const b = boundsOf(e, state.pos[e.id] ?? 0)
+                return (
+                  <rect key={`sel-${e.id}`} data-selected={e.id} x={b.x - 4} y={b.y - 4} width={b.w + 8} height={b.h + 8} fill="none" stroke="#3b82f6" strokeDasharray="4 3" pointerEvents="none" />
+                )
+              })}
+            {marquee && (
+              <rect
+                x={Math.min(marquee.x0, marquee.x1)}
+                y={Math.min(marquee.y0, marquee.y1)}
+                width={Math.abs(marquee.x1 - marquee.x0)}
+                height={Math.abs(marquee.y1 - marquee.y0)}
+                fill="#3b82f6"
+                fillOpacity="0.08"
+                stroke="#3b82f6"
+                strokeDasharray="3 2"
+                pointerEvents="none"
+              />
+            )}
           </svg>
         </div>
+        {mode === 'edit' && selection.length > 1 && (
+          <aside className="w-48 shrink-0 space-y-2 overflow-y-auto border-l border-slate-200 p-2 text-xs" aria-label="Selección">
+            <p className="font-semibold">{selection.length} elementos seleccionados</p>
+            <div className="flex flex-wrap gap-1">
+              <button type="button" onClick={rotateSelected} className="flex items-center gap-1 rounded border border-slate-300 px-2 py-0.5 hover:bg-slate-100">
+                <RotateCw size={12} /> Girar
+              </button>
+              <button type="button" onClick={duplicate} className="flex items-center gap-1 rounded border border-slate-300 px-2 py-0.5 hover:bg-slate-100">
+                <Copy size={12} /> Duplicar
+              </button>
+              <button type="button" onClick={removeSelected} className="flex items-center gap-1 rounded border border-slate-300 px-2 py-0.5 hover:bg-red-500 hover:text-white">
+                <Trash2 size={12} /> Borrar
+              </button>
+            </div>
+            <p className="text-[11px] text-slate-500">Arrastra uno de ellos para mover todo el grupo. Ctrl+clic añade o quita.</p>
+          </aside>
+        )}
         {selectedElement && (
           <aside className="w-48 shrink-0 overflow-y-auto border-l border-slate-200 p-2">
             {mode === 'edit' ? (
@@ -1144,7 +1282,7 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
       )}
       {mode === 'edit' && (
         <p className="border-t border-slate-200 px-2 py-1 text-[11px] text-slate-500">
-          Arrastra módulos de la paleta a la escena · arrastra para mover · R gira · Supr borra · asigna las variables en el panel de la derecha. Piezas de {PIECE_SIZES.small[0]} y{' '}
+          Arrastra módulos de la paleta · Ctrl+clic o recuadro: varios · R gira · Supr borra · Ctrl+C/V/D copia, pega, duplica · Ctrl+Z/Y · asigna las variables en el panel de la derecha. Piezas de {PIECE_SIZES.small[0]} y{' '}
           {PIECE_SIZES.large[0]} px.
         </p>
       )}
