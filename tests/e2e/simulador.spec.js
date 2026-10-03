@@ -155,7 +155,15 @@ test('escena de la planta: colocar mandos y piloto, asignar variables y accionar
   await page.mouse.move(box.x + box.width / 2 + 120, box.y + box.height / 2, { steps: 4 })
   await page.mouse.up()
   await palette.getByRole('button', { name: '+ Piloto' }).click()
-  await pick('Salida', await props.locator('datalist option').first().getAttribute('value'))
+  // La lista de sugerencias, justo debajo del campo; se elige con el ratón.
+  const salida = props.getByRole('combobox', { name: 'Salida' })
+  await salida.click()
+  const list = props.getByRole('listbox', { name: 'Salida' })
+  const fb = await salida.boundingBox()
+  const lb = await list.boundingBox()
+  expect(Math.abs(lb.x - fb.x)).toBeLessThan(4)
+  expect(Math.abs(lb.y - (fb.y + fb.height))).toBeLessThan(6)
+  await list.getByRole('option').first().click()
   // Las entradas de la escena ya no se tocan desde el panel.
   await expect(page.getByRole('switch')).toHaveCount(0)
 

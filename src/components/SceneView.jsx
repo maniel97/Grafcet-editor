@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import { closest } from '../lib/autocomplete'
-import { Copy, Hand, Maximize2, Minimize2, Minus, MousePointer2, Plus, RotateCw, Scan, Trash2, WandSparkles, X } from 'lucide-react'
+import { ChevronDown, Copy, Hand, Maximize2, Minimize2, Minus, MousePointer2, Plus, RotateCw, Scan, Trash2, WandSparkles, X } from 'lucide-react'
 import {
   PIECE_SIZES,
   SCENE_TYPES,
@@ -377,11 +377,25 @@ const TYPE_NAMES = { input: 'entrada', output: 'salida', analogIn: 'entrada anal
 
 // Campo de variable: se elige de la tabla o se escribe un nombre nuevo, que se añade a la tabla
 // con el tipo adecuado. Si se parece mucho a uno que ya existe, pregunta antes («¿Querías decir…?»).
+// La lista de sugerencias es propia (no la del navegador: con la simulación en marcha el panel se
+// redibuja sin parar y la lista nativa aparecía fuera de sitio).
 function VariableField({ label, value, options, allNames, dir, onPick, onCreate }) {
   const [draft, setDraft] = useState(value ?? '')
   const [typo, setTypo] = useState(null) // { name, suggestion }
+  const [open, setOpen] = useState(false)
+  const [active, setActive] = useState(0)
   const listId = useId()
+  const typed = draft.trim()
+  // Mientras se escribe, las que contienen lo escrito; si no, todas.
+  const shown = typed && typed !== (value ?? '') ? options.filter((n) => n.toLowerCase().includes(typed.toLowerCase())) : options
+  const choose = (name) => {
+    setOpen(false)
+    setTypo(null)
+    setDraft(name)
+    onPick(name)
+  }
   const commit = () => {
+    setOpen(false)
     const name = draft.trim()
     if (name === (value ?? '')) return
     if (!name || allNames.includes(name)) {
@@ -397,38 +411,75 @@ function VariableField({ label, value, options, allNames, dir, onPick, onCreate 
     onCreate(name, NEW_TYPE[dir])
     onPick(name)
   }
-  const fresh = draft.trim() && !allNames.includes(draft.trim())
+  const fresh = typed && !allNames.includes(typed)
   return (
     <div>
       <label className="block">
         <span className="text-slate-500">{label}</span>
-        <input
-          value={draft}
-          list={listId}
-          placeholder="— (elige o escribe)"
-          onChange={(ev) => {
-            setDraft(ev.target.value)
-            setTypo(null)
-            // Elegida de la lista: se aplica al momento.
-            if (options.includes(ev.target.value)) onPick(ev.target.value)
-          }}
-          onBlur={commit}
-          onKeyDown={(ev) => {
-            if (ev.key === 'Enter') commit()
-            if (ev.key === 'Escape') setDraft(value ?? '')
-          }}
-          className="w-full rounded border border-slate-300 px-1 py-0.5 font-mono"
-        />
-        <datalist id={listId}>
-          {options.map((n) => (
-            <option key={n} value={n} />
-          ))}
-        </datalist>
+        <span className="relative block">
+          <input
+            value={draft}
+            role="combobox"
+            aria-expanded={open}
+            aria-controls={listId}
+            aria-autocomplete="list"
+            placeholder="— (elige o escribe)"
+            // Al abrir, resaltada la variable actual.
+            onFocus={() => {
+              setOpen(true)
+              setActive(Math.max(0, options.indexOf(value)))
+            }}
+            onClick={() => setOpen(true)}
+            onChange={(ev) => {
+              setDraft(ev.target.value)
+              setTypo(null)
+              setOpen(true)
+              setActive(0)
+            }}
+            onBlur={commit}
+            onKeyDown={(ev) => {
+              if (ev.key === 'ArrowDown' || ev.key === 'ArrowUp') {
+                ev.preventDefault()
+                setOpen(true)
+                const n = shown.length
+                if (n) setActive((i) => (i + (ev.key === 'ArrowDown' ? 1 : n - 1)) % n)
+              } else if (ev.key === 'Enter') {
+                if (open && shown[active] && typed !== shown[active]) choose(shown[active])
+                else commit()
+              } else if (ev.key === 'Escape') {
+                setOpen(false)
+                setDraft(value ?? '')
+              }
+            }}
+            className="w-full rounded border border-slate-300 px-1 py-0.5 pr-5 font-mono"
+          />
+          <ChevronDown size={12} className="pointer-events-none absolute right-1 top-1/2 -translate-y-1/2 text-slate-400" />
+          {open && shown.length > 0 && (
+            <ul id={listId} role="listbox" aria-label={label} className="absolute left-0 right-0 top-full z-30 mt-0.5 max-h-40 overflow-auto rounded border border-slate-300 bg-white py-0.5 shadow-lg">
+              {shown.map((n, i) => (
+                <li
+                  key={n}
+                  role="option"
+                  aria-selected={n === value}
+                  // Antes de que el campo pierda el foco (si no, el clic no llega).
+                  onMouseDown={(ev) => {
+                    ev.preventDefault()
+                    choose(n)
+                  }}
+                  onMouseEnter={() => setActive(i)}
+                  className={`cursor-pointer px-1.5 py-0.5 font-mono ${i === active ? 'bg-blue-600 text-white' : n === value ? 'font-semibold' : ''}`}
+                >
+                  {n}
+                </li>
+              ))}
+            </ul>
+          )}
+        </span>
       </label>
       {typo ? (
         <p className="mt-0.5 text-[11px] text-amber-700" role="status">
           «{typo.name}» no existe. ¿Querías decir{' '}
-          <button type="button" className="font-mono font-medium underline" onClick={() => onPick(typo.suggestion)}>
+          <button type="button" className="font-mono font-medium underline" onClick={() => choose(typo.suggestion)}>
             {typo.suggestion}
           </button>
           ?{' '}
@@ -437,7 +488,7 @@ function VariableField({ label, value, options, allNames, dir, onPick, onCreate 
             className="underline"
             onClick={() => {
               onCreate(typo.name, NEW_TYPE[dir])
-              onPick(typo.name)
+              choose(typo.name)
             }}
           >
             Crear «{typo.name}»
