@@ -54,6 +54,7 @@ const LadderView = lazy(() => import('./LadderView'))
 const VariablesDialog = lazy(() => import('./VariablesDialog'))
 const ExportDialog = lazy(() => import('./ExportDialog'))
 const GemmaDialog = lazy(() => import('./GemmaDialog'))
+const PneumaticDialog = lazy(() => import('./PneumaticDialog'))
 const ProjectsDialog = lazy(() => import('./ProjectsDialog'))
 
 // Mientras se descarga una parte diferida (normalmente un instante).
@@ -111,6 +112,7 @@ export default function GrafcetCanvas() {
   // Elemento del grafcet cuyos segmentos se resaltan en el ladder («Ver en el ladder»).
   const [ladderFocus, setLadderFocus] = useState(null)
   const [gemmaOpen, setGemmaOpen] = useState(false)
+  const [pneumaticOpen, setPneumaticOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
   // Hojas (lib/sheets.js): la activa es la que se dibuja.
   const [currentSheet, setCurrentSheet] = useState(() => sheetsOf(restored?.plc ?? EMPTY_PLC)[0].id)
@@ -621,7 +623,7 @@ export default function GrafcetCanvas() {
 
   const loopSource = loopSourceId ? nodes.find((n) => n.id === loopSourceId) : null
   const initialSteps = nodes.filter((n) => n.type === 'step' && n.data.initial)
-  const modalOpen = settingsOpen || helpOpen || variablesOpen || ladderOpen || gemmaOpen || !!exportFormat || !!projectsTab || !!menu
+  const modalOpen = settingsOpen || helpOpen || variablesOpen || ladderOpen || gemmaOpen || pneumaticOpen || !!exportFormat || !!projectsTab || !!menu
   // En solo lectura el clic derecho no abre menús de edición (ni el del navegador).
   const blockMenu = (handler) => (readOnly ? (e) => e.preventDefault() : handler)
   // En solo lectura (simulando), el clic derecho en una etapa o transición permite ver su ladder.
@@ -649,6 +651,7 @@ export default function GrafcetCanvas() {
           onOpen={() => fileInputRef.current?.click()}
           onOpenExamples={() => setProjectsTab('examples')}
           onOpenRecent={() => setProjectsTab('recent')}
+          onOpenPneumatic={() => setPneumaticOpen(true)}
           onClear={clear}
           onOpenSettings={() => setSettingsOpen(true)}
           onToggleVerify={() => setVerifyOpen((v) => !v)}
@@ -741,6 +744,17 @@ export default function GrafcetCanvas() {
               fileName={(ext) => fileName(ext)}
               {...titleBlockProps}
               onClose={() => setExportFormat(null)}
+            />
+          </Suspense>
+        )}
+        {pneumaticOpen && (
+          <Suspense fallback={<Loading />}>
+            <PneumaticDialog
+              onCreate={(project) => {
+                setPneumaticOpen(false)
+                replaceProject({ ...normalizeProject(project), name: project.name }, 'Antes de generar una secuencia neumática')
+              }}
+              onClose={() => setPneumaticOpen(false)}
             />
           </Suspense>
         )}

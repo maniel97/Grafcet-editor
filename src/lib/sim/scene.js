@@ -178,7 +178,8 @@ export function sceneInit(scene) {
   const knob = {}
   const temp = {}
   for (const e of elementsOf(scene)) {
-    if (e.type === 'cylinder') pos[e.id] = 0
+    // initial: 1 si el cilindro empieza con el vástago fuera.
+    if (e.type === 'cylinder') pos[e.id] = Number(e.initial) ? 1 : 0
     // La seta de emergencia está sin pulsar (contacto cerrado) al empezar.
     if (e.type === 'button' || e.type === 'switch' || e.type === 'emergency') pressed[e.id] = false
     if (e.type === 'tank') level[e.id] = clamp(Number(e.initial) || 0)
@@ -260,7 +261,8 @@ export function sceneStep(scene, state, values, dt) {
     const back = e.retract ? on(values, e.retract) : !out
     const dir = out && !back ? 1 : back && !out ? -1 : 0
     if (!dir) continue
-    const pos = clamp(next.pos[e.id] + (dir * dt) / Math.max(0.05, Number(e.time) || 1))
+    // Redondeada: sin restos de coma flotante (0,000…003 en vez de 0) al sumar muchos pasos.
+    const pos = Math.round(clamp(next.pos[e.id] + (dir * dt) / Math.max(0.05, Number(e.time) || 1)) * 1e6) / 1e6
     next.pos[e.id] = pos
     if (dir > 0 && pos < 1) extending.add(e.id)
     // Con ventosa no empuja: coge (abajo).

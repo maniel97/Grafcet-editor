@@ -21,7 +21,10 @@ import {
   StickyNote,
   FileJson,
   BookOpen,
-  History, Workflow } from 'lucide-react'
+  History,
+  Workflow,
+  Wind,
+} from 'lucide-react'
 
 // `primary`: el texto se ve desde 1280 px; el resto solo en pantallas anchas (2xl),
 // para que la barra quepa entera. `iconOnly`: nunca muestra texto. El nombre siempre está en el
@@ -79,6 +82,7 @@ export default function Toolbar({
   onOpen,
   onOpenExamples,
   onOpenRecent,
+  onOpenPneumatic,
   onClear,
   onOpenSettings,
   onToggleVerify,
@@ -138,6 +142,7 @@ export default function Toolbar({
           { id: 'file', label: 'Abrir archivo…', hint: 'Proyecto .json guardado (Ctrl+O)', icon: FileJson, onSelect: onOpen },
           { id: 'examples', label: 'Ejemplos…', hint: 'Grafcets típicos listos para usar', icon: BookOpen, onSelect: onOpenExamples },
           { id: 'recent', label: 'Trabajos anteriores…', hint: 'Recuperar lo que había antes de abrir o limpiar', icon: History, onSelect: onOpenRecent },
+          { id: 'pneumatic', label: 'Secuencia neumática…', hint: 'Crear el grafcet y la planta de una secuencia como A+ B+ B− A−', icon: Wind, onSelect: onOpenPneumatic },
         ]}
       />
 

@@ -724,6 +724,10 @@ function Properties({ element, variables, onChange, onDelete, onRotate, onCreate
                 ))}
             </select>
           </label>
+          <label className="flex items-center gap-1">
+            <input type="checkbox" checked={Number(element.initial) === 1} onChange={(ev) => set({ initial: ev.target.checked ? 1 : 0 })} />
+            Empieza con el vástago fuera
+          </label>
           {number('stroke', 'Carrera (px)', 20, 10)}
           {number('time', 'Tiempo de carrera (s)', 0.1, 0.1)}
         </>
