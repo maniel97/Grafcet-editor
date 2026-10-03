@@ -4,7 +4,7 @@ import { AlertTriangle, Download, Gauge, Minus, Plus, Wrench, Maximize2, Minimiz
 import ElecNode from './ElecNode'
 import { ElecSymbol } from './ElecSymbols'
 import { potentialColor } from './elecColors'
-import { ELEC_TYPES, GRID, POTENTIALS, contactNumbers, nextTag, showTag, sizeOf, terminalsOf } from '../../lib/elec/catalog'
+import { ELEC_TYPES, GRID, POTENTIALS, contactNumbers, cylinderSignals, isPneumatic, newTag, nextTag, showTag, sizeOf, terminalsOf } from '../../lib/elec/catalog'
 import { COLUMN_WIDTH, FRAME_HEIGHT, FRAME_TOP, crossReferenceMap, elecSheetsOf, frameColumns, sheetOfComponent } from '../../lib/elec/sheet'
 import SheetTabs from '../SheetTabs'
 import { ElecFrameNode } from './ElecFrame'
@@ -83,6 +83,22 @@ const PALETTE = [
       { key: 'socket', type: 'socket', label: 'Base de enchufe', preset: {} },
     ],
   },
+  {
+    group: 'Neumática',
+    items: [
+      { key: 'airsource', type: 'airsource', label: 'Fuente de aire comprimido', preset: {} },
+      { key: 'frl', type: 'frl', label: 'Unidad de mantenimiento', preset: {} },
+      { key: 'pvalve:52', type: 'pvalve', label: 'Válvula 5/2 monoestable (bobina y muelle)', preset: { ways: '5/2' } },
+      { key: 'pvalve:52b', type: 'pvalve', label: 'Válvula 5/2 biestable (dos bobinas)', preset: { ways: '5/2', bistable: true } },
+      { key: 'pvalve:32', type: 'pvalve', label: 'Válvula 3/2 NC (bobina y muelle)', preset: { ways: '3/2' } },
+      { key: 'pvalve:53', type: 'pvalve', label: 'Válvula 5/3 centro cerrado', preset: { ways: '5/3', center: 'closed', bistable: true } },
+      { key: 'pvalve:32m', type: 'pvalve', label: 'Válvula 3/2 de pulsador', preset: { ways: '3/2', manual: 'button' } },
+      { key: 'pvalve:52m', type: 'pvalve', label: 'Válvula 5/2 de palanca', preset: { ways: '5/2', manual: 'lever' } },
+      { key: 'pcylinder', type: 'pcylinder', label: 'Cilindro de doble efecto', preset: { acting: 'double' } },
+      { key: 'pcylinder:1', type: 'pcylinder', label: 'Cilindro de simple efecto', preset: { acting: 'single' } },
+      { key: 'throttle', type: 'throttle', label: 'Regulador de caudal', preset: {} },
+    ],
+  },
   ...['Mando', 'Potencia', 'Autómata'].map((group) => ({
     group,
     items: Object.entries(ELEC_TYPES)
@@ -148,6 +164,11 @@ const HINTS = {
   litbutton: 'Pulsador luminoso: contacto 13-14 y piloto X1-X2 en el mismo aparato.',
   transmitter: 'Transmisor analógico: 4-20 mA a 2 hilos (+ a 24 V, − a la entrada) o 0-10 V a 3 hilos. Enlázalo con la analógica de la planta (nivel, temperatura…).',
   potentiometer: 'Potenciómetro de consigna: su cursor W da de 0 a 10 V (p. ej. a la entrada AI1 de un variador).',
+  airsource: 'Fuente de aire comprimido (compresor): da presión a lo que se une a ella con tubos.',
+  frl: 'Unidad de mantenimiento (filtro, regulador y lubricador) con llave de paso: al simular, un clic corta o da el aire.',
+  pvalve: 'Válvula distribuidora: la bobina 14 es una electroválvula del esquema (-Y1); sin bobina 12, vuelve con su muelle (monoestable); con las dos, se queda donde está (biestable, memoria).',
+  pcylinder: 'Cilindro: sale con presión en A y escape en B. Sus detectores (a0 dentro, a1 fuera) accionan los finales de carrera del esquema enlazados con esa señal.',
+  throttle: 'Regulador de caudal unidireccional: frena el cilindro (mejor en el escape). Al simular, un clic lo abre más.',
 }
 
 // Referencia de cada aparato (identificador IEC 81346 y bornes).
@@ -192,11 +213,32 @@ const NORMS = {
   litbutton: 'Identificador -S · 13-14 y X1-X2.',
   transmitter: 'Identificador -B · 4-20 mA (2 hilos) o 0-10 V (3 hilos).',
   potentiometer: 'Identificador -R · cursor W (0-10 V).',
+  airsource: 'ISO 1219-1 (triángulo blanco: neumática) · identificación ISO 1219-2: 0P1.',
+  frl: 'ISO 1219-1, símbolo simplificado · 0Z1 · conexiones 1 (entrada) y 2 (salida).',
+  pvalve: 'ISO 1219-1 · conexiones ISO 5599: 1 presión, 2 y 4 utilización, 3 y 5 escape; pilotajes 14 (abre 1→4) y 12 (abre 1→2) · 1V1.',
+  pcylinder: 'ISO 1219-1 · ISO 1219-2 lo identifica 1A1; aquí, con letra (A, B…) para escribir las secuencias A+ B+ A− B−.',
+  throttle: 'ISO 1219-1: estrangulación regulable con antirretorno en paralelo · 1V2.',
+}
+
+// Bobinas de una válvula nueva: las primeras electroválvulas -Y libres (las que no mueve ya otra
+// válvula), existan ya en el esquema o no; las de accionamiento manual no llevan bobina.
+function solenoidsFor(components, preset) {
+  if (preset.manual && preset.manual !== 'none') return { sol14: '', sol12: '' }
+  const taken = new Set(components.filter((c) => c.type === 'pvalve').flatMap((c) => [c.sol14, c.sol12]).filter(Boolean))
+  const pick = () => {
+    const free = components.filter((c) => c.type === 'valve' && c.tag && !taken.has(c.tag)).map((c) => c.tag)
+    const tag = free[0] ?? nextTag([...components, ...[...taken].map((t) => ({ tag: t }))], 'Y')
+    taken.add(tag)
+    return tag
+  }
+  const sol14 = pick()
+  return { sol14, sol12: preset.bistable ? pick() : '' }
 }
 
 // Vista previa de un aparato de la paleta: su símbolo (con sus bornes) tal como queda en el esquema.
 function ElecPreview({ item }) {
-  const c = { id: 'preview', type: item.type, x: 0, y: 0, tag: `${item.prefix ?? ELEC_TYPES[item.type].prefix}1`, ...ELEC_TYPES[item.type].defaults, ...item.preset }
+  const c = { id: 'preview', type: item.type, x: 0, y: 0, tag: ELEC_TYPES[item.type].letterTag ? 'A' : `${item.prefix ?? ELEC_TYPES[item.type].prefix}1`, ...ELEC_TYPES[item.type].defaults, ...item.preset }
+  if (c.type === 'pvalve' && (c.manual ?? 'none') === 'none') Object.assign(c, { sol14: 'Y1', ...(c.bistable ? { sol12: 'Y2' } : {}) })
   if (c.type === 'rail') c.length = 160
   if (c.type === 'plc') Object.assign(c, { inputs: 4, outputs: 3 })
   if (c.type === 'contact' || c.type === 'maincontacts') c.ref = 'KM1'
@@ -367,9 +409,10 @@ function Inner({ schematic, onChange, elecState, onAction, variables = [], build
       type: item.type,
       x,
       y,
-      tag: strip ?? nextTag(components, item.prefix ?? t.prefix),
+      tag: strip ?? newTag(allComponents, item.type, item.prefix ?? t.prefix),
       ...t.defaults,
       ...item.preset,
+      ...(item.type === 'pvalve' ? solenoidsFor(allComponents, item.preset) : {}),
       ...(ref ? { ref } : {}),
       ...(strip ? { n: nextTerminalNumber(components, strip) } : {}),
     }
@@ -406,7 +449,7 @@ function Inner({ schematic, onChange, elecState, onAction, variables = [], build
       const id = newId('e')
       map.set(c.id, id)
       const prefix = ELEC_TYPES[c.type]?.prefix
-      const tag = c.type === 'contact' || c.type === 'maincontacts' || c.type === 'rail' ? c.tag : nextTag(all, (c.tag ?? '').replace(/\d+$/, '') || prefix)
+      const tag = c.type === 'contact' || c.type === 'maincontacts' || c.type === 'rail' ? c.tag : ELEC_TYPES[c.type]?.letterTag ? newTag(all, c.type) : nextTag(all, (c.tag ?? '').replace(/\d+$/, '') || prefix)
       const copyC = { ...c, id, x: c.x + 40, y: c.y + 40, tag, sheet: sheetId }
       all = [...all, copyC]
       return copyC
@@ -513,11 +556,32 @@ function Inner({ schematic, onChange, elecState, onAction, variables = [], build
     [sch.frame, cols, titleInfo, sheets, sheetId],
   )
   const allNodes = useMemo(() => [...frameNode, ...nodes], [frameNode, nodes])
+  const pneumaticIds = useMemo(() => new Set(components.filter((c) => isPneumatic(c.type)).map((c) => c.id)), [components])
   const edges = useMemo(
     () =>
       wires.map((w) => {
         const p = view?.pot?.[`${w.from.c}:${w.from.t}`]
         const sel = selectedWires.includes(w.id)
+        if (pneumaticIds.has(w.from.c)) {
+          // Tubo de aire: azul con presión; gris a escape o sin aire.
+          const air = view?.pneu?.ports?.[`${w.from.c}:${w.from.t}`]
+          return {
+            id: w.id,
+            source: w.from.c,
+            sourceHandle: w.from.t,
+            target: w.to.c,
+            targetHandle: w.to.t,
+            type: 'step',
+            selected: sel,
+            selectable: mode === 'edit',
+            style: {
+              stroke: view?.faults?.[w.id] ? '#dc2626' : sel ? '#2563eb' : air === 'P' ? '#0284c7' : '#64748b',
+              strokeWidth: air === 'P' ? 2.6 : 1.6,
+              ...(view?.faults?.[w.id] ? { strokeDasharray: '6 4' } : {}),
+            },
+            data: { air: air ?? null },
+          }
+        }
         return {
           id: w.id,
           source: w.from.c,
@@ -544,7 +608,7 @@ function Inner({ schematic, onChange, elecState, onAction, variables = [], build
           data: { potential: p ?? null },
         }
       }),
-    [wires, view, selectedWires, mode, wireLabels],
+    [wires, view, selectedWires, mode, wireLabels, pneumaticIds],
   )
 
   const onNodesChange = (changes) => {
@@ -574,6 +638,12 @@ function Inner({ schematic, onChange, elecState, onAction, variables = [], build
       (w.from.c === source && w.from.t === sourceHandle && w.to.c === target && w.to.t === targetHandle) ||
       (w.to.c === source && w.to.t === sourceHandle && w.from.c === target && w.from.t === targetHandle)
     if (wires.some(same)) return
+    // Tubos de aire entre conexiones neumáticas; cables entre bornes eléctricos.
+    const isAir = (id, t) => Boolean(terminalsOf(components.find((c) => c.id === id) ?? {}).find((x) => x.id === t)?.pneu)
+    if (isAir(source, sourceHandle) !== isAir(target, targetHandle)) {
+      setMessage({ kind: 'warn', text: 'Un tubo de aire solo une conexiones neumáticas (y un cable, bornes eléctricos).' })
+      return
+    }
     save({ wires: [...wires, { id: newId('w'), from: { c: source, t: sourceHandle }, to: { c: target, t: targetHandle } }] })
   }
 
@@ -596,7 +666,9 @@ function Inner({ schematic, onChange, elecState, onAction, variables = [], build
   const selectedC = selected.length === 1 ? components.find((c) => c.id === selected[0]) : null
   const short = view?.short
   // Hay autómata o aparatos enlazados con la planta, pero el esquema no está conectado.
-  const hiddenWarning = simulating && !sch.enabled && components.some((c) => c.type === 'plc' || c.signal)
+  // (Los detectores de los cilindros neumáticos, a0 / a1…, son del propio esquema: no cuentan.)
+  const ownSignals = new Set(allComponents.filter((c) => c.type === 'pcylinder').flatMap((c) => cylinderSignals(c.tag)))
+  const hiddenWarning = simulating && !sch.enabled && components.some((c) => c.type === 'plc' || (c.signal && !ownSignals.has(c.signal)))
 
   return (
     <section
@@ -1151,8 +1223,21 @@ function Properties({ c, components, variables, onChange, onDelete }) {
       </select>
     </label>
   )
+  // Los contactos también pueden accionarlos los detectores de los cilindros neumáticos (a0, a1…).
+  const cylSignals = isContact && c.type !== 'transmitter' ? components.filter((x) => x.type === 'pcylinder').flatMap((x) => cylinderSignals(x.tag)) : []
   const signalSelect = (key, label) =>
-    select(key, label, [['', '(sin enlazar)'], ...signals.map((v) => [v.name, v.name]), ...(c[key] && !signals.some((v) => v.name === c[key]) ? [[c[key], c[key]]] : [])])
+    select(key, label, [
+      ['', '(sin enlazar)'],
+      ...cylSignals.map((n) => [n, `${n} (cilindro ${n[0].toUpperCase()})`]),
+      ...signals.filter((v) => !cylSignals.includes(v.name)).map((v) => [v.name, v.name]),
+      ...(c[key] && !signals.some((v) => v.name === c[key]) && !cylSignals.includes(c[key]) ? [[c[key], c[key]]] : []),
+    ])
+  const solenoidSelect = (key, label, none) =>
+    select(key, label, [
+      ['', none],
+      ...components.filter((x) => x.type === 'valve' && x.tag).map((x) => [x.tag, showTag(x.tag)]),
+      ...(c[key] && !components.some((x) => x.type === 'valve' && x.tag === c[key]) ? [[c[key], `${showTag(c[key])} (falta en el esquema)`]] : []),
+    ])
 
   return (
     <aside className="w-48 shrink-0 space-y-2 overflow-y-auto border-l border-slate-200 p-2 text-xs" aria-label="Propiedades del aparato">
@@ -1206,6 +1291,48 @@ function Properties({ c, components, variables, onChange, onDelete }) {
           ['4-20mA', '4-20 mA (2 hilos)'],
           ['0-10V', '0-10 V (3 hilos)'],
         ])}
+      {c.type === 'pvalve' && (
+        <>
+          {select('ways', 'Vías / posiciones', [
+            ['5/2', '5/2'],
+            ['3/2', '3/2'],
+            ['5/3', '5/3'],
+          ])}
+          {c.ways === '3/2' &&
+            select('normally', 'En reposo', [
+              ['NC', 'Cerrada (NC)'],
+              ['NO', 'Abierta (NA)'],
+            ])}
+          {c.ways === '5/3' &&
+            select('center', 'Posición central', [
+              ['closed', 'Cerrada'],
+              ['exhaust', 'A escape'],
+              ['pressure', 'A presión'],
+            ])}
+          {select('manual', 'Accionamiento manual', [
+            ['none', '(ninguno)'],
+            ['button', 'Pulsador'],
+            ['lever', 'Palanca (se queda)'],
+          ])}
+          {solenoidSelect('sol14', 'Bobina 14 (electroválvula)', '(sin bobina)')}
+          {solenoidSelect('sol12', c.ways === '5/3' ? 'Bobina 12' : 'Bobina 12 (sin ella: muelle)', '(muelle)')}
+        </>
+      )}
+      {c.type === 'pcylinder' && (
+        <>
+          {select('acting', 'Tipo', [
+            ['double', 'Doble efecto'],
+            ['single', 'Simple efecto (muelle)'],
+          ])}
+          {text('time', 'Tiempo de carrera (s)', { type: 'number', min: 0.1, step: 0.1 })}
+          {select('initial', 'Al empezar', [
+            ['0', 'Dentro'],
+            ['1', 'Fuera'],
+          ])}
+          <p className="text-slate-500">{`Detectores: ${cylinderSignals(c.tag).join(' (dentro) y ')} (fuera)`}</p>
+        </>
+      )}
+      {c.type === 'throttle' && text('setting', 'Apertura (0,05 a 1)', { type: 'number', min: 0.05, max: 1, step: 0.05 })}
       {c.type === 'potentiometer' && text('initial', 'Posición al empezar (0 a 1)', { type: 'number', min: 0, max: 1, step: 0.05 })}
       {c.type === 'vfd' && text('speed2', '2ª velocidad (Hz)', { type: 'number', min: 1, max: 50, step: 1 })}
       {c.type === 'softstarter' && text('ramp', 'Rampa (s)', { type: 'number', min: 0.5, step: 0.5 })}

@@ -1,7 +1,7 @@
 // Plantillas del esquema eléctrico: los montajes clásicos, listos para simular y modificar.
 // Cada una devuelve { components, wires } colocados a partir de (ox, oy). Los identificadores son
 // los de los planos de siempre (-Q1, -KM1, -F2, -S0, -S1, -M1…).
-import { GRID } from './catalog'
+import { ELEC_TYPES, GRID, cylinderSignals, nextLetterTag } from './catalog'
 
 // Constructor: añade componentes y cables con ids propios de esta inserción.
 function builder(ox, oy, prefix) {
@@ -500,6 +500,38 @@ ELEC_TEMPLATES.push(
       return b
     },
   },
+  {
+    id: 'electroneumatica',
+    title: 'Cilindro con electroválvula 5/2',
+    description: 'Electroneumática: mientras se pulsa S1, -Y1 pilota la 5/2 monoestable y el cilindro A sale (frenado en el escape por 1V2); al soltar, vuelve con el muelle de la válvula. El detector a1 enciende H1.',
+    build(ox, oy, prefix) {
+      const b = builder(ox, oy, prefix)
+      b.add('Lp', 'rail', 0, 0, { potential: 'L+', length: 200 })
+      b.add('M', 'rail', 0, 400, { potential: 'M', length: 200 })
+      b.add('S1', 'pushbutton', 20, 60, { tag: 'S1', contact: 'NO', text: 'A+' })
+      b.add('Y1', 'valve', 20, 240, { tag: 'Y1', text: 'A+' })
+      b.wire('Lp', tap(40), 'S1', '13')
+      b.wire('S1', '14', 'Y1', 'A1')
+      b.wire('Y1', 'A2', 'M', tap(40))
+      b.add('B1', 'limit', 120, 60, { tag: 'B1', contact: 'NO', signal: 'a1', text: 'A fuera' })
+      b.add('H1', 'lamp', 120, 240, { tag: 'H1', color: 'green', text: 'A fuera' })
+      b.wire('Lp', tap(140), 'B1', '13')
+      b.wire('B1', '14', 'H1', 'X1')
+      b.wire('H1', 'X2', 'M', tap(140))
+      // Aire: fuente -> unidad de mantenimiento -> 1V1 -> cilindro (1V2 en el escape del lado B).
+      b.add('A', 'pcylinder', 340, 20, { tag: 'A', acting: 'double', time: 1, initial: 0, text: '' })
+      b.add('V2', 'throttle', 460, 140, { tag: '1V2', setting: 0.5 })
+      b.add('V1', 'pvalve', 220, 260, { tag: '1V1', ways: '5/2', sol14: 'Y1', sol12: '', manual: 'none' })
+      b.add('Z', 'frl', 360, 380, { tag: '0Z1' })
+      b.add('P', 'airsource', 360, 500, { tag: '0P1' })
+      b.wire('P', '1', 'Z', '1')
+      b.wire('Z', '2', 'V1', '1')
+      b.wire('V1', '4', 'A', 'A')
+      b.wire('V1', '2', 'V2', '1')
+      b.wire('V2', '2', 'A', 'B')
+      return b
+    },
+  },
 )
 
 // Inserta una plantilla debajo de lo que ya haya en la hoja (o en el origen). Sus identificadores
@@ -514,6 +546,11 @@ export function insertTemplate(template, existing = { components: [] }, all = ex
   const rename = new Map()
   for (const c of b.components) {
     if (!c.tag || c.type === 'rail' || rename.has(c.tag) || !used.has(c.tag)) continue
+    // Cilindros: la siguiente letra libre (A -> B).
+    if (ELEC_TYPES[c.type]?.letterTag) {
+      rename.set(c.tag, nextLetterTag([...all, ...[...rename.values()].map((tag) => ({ tag }))]))
+      continue
+    }
     const prefix = c.tag.replace(/\d+$/, '')
     let n = 1
     while (used.has(`${prefix}${n}`) || [...rename.values()].includes(`${prefix}${n}`)) n++
@@ -521,11 +558,22 @@ export function insertTemplate(template, existing = { components: [] }, all = ex
   }
   for (const v of rename.values()) used.add(v)
   const fix = (t) => (t && rename.has(t) ? rename.get(t) : t)
+  // Detectores de un cilindro renombrado: a0/a1 -> b0/b1.
+  const signals = new Map()
+  for (const c of b.components) {
+    if (c.type !== 'pcylinder' || !rename.has(c.tag)) continue
+    const [o0, o1] = cylinderSignals(c.tag)
+    const [n0, n1] = cylinderSignals(rename.get(c.tag))
+    signals.set(o0, n0).set(o1, n1)
+  }
   const components = b.components.map((c) => ({
     ...c,
     ...(c.tag ? { tag: fix(c.tag) } : {}),
     ...(c.ref ? { ref: fix(c.ref) } : {}),
     ...(c.interlock ? { interlock: fix(c.interlock) } : {}),
+    ...(c.sol14 ? { sol14: fix(c.sol14) } : {}),
+    ...(c.sol12 ? { sol12: fix(c.sol12) } : {}),
+    ...(c.signal && signals.has(c.signal) ? { signal: signals.get(c.signal) } : {}),
   }))
   return { components, wires: b.wires, renamed: Object.fromEntries(rename) }
 }

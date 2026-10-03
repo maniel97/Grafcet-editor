@@ -1044,6 +1044,28 @@ test('esquema eléctrico: vivienda (conmutada) y botón de prueba del diferencia
   expectNoErrors(errors)
 })
 
+test('esquema eléctrico: electroneumática (5/2 monoestable, cilindro, regulador y detector a1)', async ({ page }) => {
+  const errors = await openEditor(page)
+  await page.getByRole('button', { name: 'Esquema eléctrico' }).click()
+  const view = page.getByRole('region', { name: 'Esquema eléctrico' })
+  await view.getByLabel('Insertar montaje').selectOption('electroneumatica')
+  await view.getByRole('button', { name: 'Pantalla completa' }).click()
+  await expect(view.locator('[data-elec="pvalve"]')).toContainText('1V1')
+  await page.getByRole('button', { name: /Simular/ }).click()
+  const cylinder = view.locator('[data-elec="pcylinder"][data-tag="A"]')
+  await expect(cylinder).toHaveAttribute('data-pos', '0')
+  const s1 = await view.locator('[data-elec="pushbutton"][data-tag="S1"]').boundingBox()
+  await page.mouse.move(s1.x + s1.width / 2, s1.y + s1.height / 2)
+  await page.mouse.down()
+  await expect(view.locator('[data-elec="pvalve"]')).toHaveAttribute('data-on', '1')
+  await expect(cylinder).toHaveAttribute('data-pos', '100', { timeout: 8000 })
+  await expect(view.locator('[data-elec="lamp"][data-tag="H1"]')).toHaveAttribute('data-on', '1')
+  await page.mouse.up()
+  await expect(cylinder).toHaveAttribute('data-pos', '0', { timeout: 8000 })
+  await expect(view.locator('[data-elec="lamp"][data-tag="H1"]')).toHaveAttribute('data-on', '0')
+  expectNoErrors(errors)
+})
+
 test('esquema eléctrico: parada de emergencia con relé de seguridad (rearme, seta y puerta)', async ({ page }) => {
   const errors = await openEditor(page)
   await page.getByRole('button', { name: 'Esquema eléctrico' }).click()

@@ -20,6 +20,7 @@ export function makeWorld(scene = null, analogRange = () => null, electrical = n
   const withPlc = linked && elec.components.some((c) => c.type === 'plc')
   const inVars = variables.filter((v) => v.type === 'input' && v.address)
   const outVars = variables.filter((v) => v.type === 'output' && v.address)
+  const inNames = new Set(variables.filter((v) => v.type === 'input').map((v) => v.name))
   const outNames = new Set(variables.filter((v) => v.type === 'output').map((v) => v.name))
   // Analógicas: en el esquema van como mA o V (según la señal de cada variable); en la planta y en
   // el grafcet, en unidades físicas. pct: tanto por uno del rango físico.
@@ -57,6 +58,9 @@ export function makeWorld(scene = null, analogRange = () => null, electrical = n
     step,
     inputs: (state) => {
       const inputs = sceneInputs(scene, state, analogRange)
+      // Conectado y sin autómata: los detectores de los cilindros neumáticos (a0, a1…) llegan al
+      // grafcet si hay una entrada con ese nombre.
+      if (linked && !withPlc) for (const [name, on] of Object.entries(state.elec?.pneuSignals ?? {})) if (inNames.has(name)) inputs[name] = on
       if (!withPlc) return inputs
       const plcIn = state.elec?.view?.plcIn ?? {}
       for (const v of inVars) inputs[v.name] = plcIn[terminalAddress(v.address)] ? 1 : 0

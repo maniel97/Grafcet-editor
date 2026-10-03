@@ -44,6 +44,19 @@ const threePoles = (h = 80) =>
     { id: String(2 * i + 2), x: 20 + 40 * i, y: h, side: 'bottom' },
   ])
 
+// Conexión neumática (se une con tubos, no con cables).
+const pneu = (id, x, y, side) => ({ id, x, y, side, pneu: true })
+// Válvulas: una casilla por posición (80 px), con el accionamiento a cada lado (40 px). Las
+// conexiones se dibujan en la casilla de reposo: la de la derecha (o la central en las de 3
+// posiciones); la de la izquierda es la del pilotaje 14.
+export const VALVE_SIDE = 40
+export const VALVE_SQUARE = 80
+export const valveSquares = (c) => (c.ways === '5/3' ? 3 : 2)
+export const restSquare = () => 1
+export const isPneumatic = (type) => ELEC_TYPES[type]?.group === 'Neumática'
+// Señales de los detectores de un cilindro (A: a0 dentro, a1 fuera).
+export const cylinderSignals = (tag) => (tag ? [`${tag.toLowerCase()}0`, `${tag.toLowerCase()}1`] : [])
+
 // Entradas y salidas del autómata (CPU S7-200 224 por defecto: 14 E / 10 S).
 export function plcTerminals(c) {
   const ins = Math.max(1, Math.min(24, Number(c.inputs) || 14))
@@ -367,6 +380,34 @@ export const ELEC_TYPES = {
       { id: 'PE', x: 60, y: 0, side: 'top' },
     ],
   },
+  // Neumática (ISO 1219-1; conexiones ISO 5599: 1 presión, 2 y 4 utilización, 3 y 5 escape). Sus
+  // conexiones (pneu) se unen con tubos, no con cables; identificación ISO 1219-2 (0P1, 0Z1, 1V1) y
+  // cilindros con letra (A, B…: detectores a0 / a1) como en las secuencias A+ B+ A− B−.
+  airsource: { label: 'Fuente de aire comprimido', group: 'Neumática', prefix: '0P', defaults: { text: '' }, size: () => ({ w: 40, h: 40 }), terminals: () => [pneu('1', 20, 0, 'top')] },
+  frl: { label: 'Unidad de mantenimiento', group: 'Neumática', prefix: '0Z', defaults: { text: '' }, size: () => ({ w: 40, h: 80 }), terminals: () => [pneu('2', 20, 0, 'top'), pneu('1', 20, 80, 'bottom')] },
+  pvalve: {
+    label: 'Válvula distribuidora',
+    group: 'Neumática',
+    prefix: '1V',
+    defaults: { ways: '5/2', sol14: '', sol12: '', manual: 'none', normally: 'NC', center: 'closed', text: '' },
+    size: (c) => ({ w: VALVE_SIDE * 2 + VALVE_SQUARE * valveSquares(c), h: 80 }),
+    terminals: (c) => {
+      const x0 = VALVE_SIDE + VALVE_SQUARE * restSquare(c)
+      return c.ways === '3/2'
+        ? [pneu('2', x0 + 20, 0, 'top'), pneu('1', x0 + 20, 80, 'bottom'), pneu('3', x0 + 60, 80, 'bottom')]
+        : [pneu('4', x0 + 20, 0, 'top'), pneu('2', x0 + 60, 0, 'top'), pneu('5', x0 + 20, 80, 'bottom'), pneu('1', x0 + 40, 80, 'bottom'), pneu('3', x0 + 60, 80, 'bottom')]
+    },
+  },
+  pcylinder: {
+    label: 'Cilindro neumático',
+    group: 'Neumática',
+    prefix: '',
+    letterTag: true,
+    defaults: { acting: 'double', time: 1, initial: 0, text: '' },
+    size: () => ({ w: 160, h: 60 }),
+    terminals: (c) => (c.acting === 'single' ? [pneu('A', 20, 60, 'bottom')] : [pneu('A', 20, 60, 'bottom'), pneu('B', 140, 60, 'bottom')]),
+  },
+  throttle: { label: 'Regulador de caudal', group: 'Neumática', prefix: '1V', defaults: { setting: 0.5, text: '' }, size: () => ({ w: 40, h: 80 }), terminals: () => [pneu('2', 20, 0, 'top'), pneu('1', 20, 80, 'bottom')] },
   plc: {
     label: 'Autómata (E/S)',
     group: 'Autómata',
@@ -394,6 +435,14 @@ export function nextTag(components, prefix) {
   const used = new Set(components.map((c) => c.tag))
   for (let i = 1; ; i++) if (!used.has(`${prefix}${i}`)) return `${prefix}${i}`
 }
+// Siguiente letra libre (cilindros: A, B, C…).
+export function nextLetterTag(components) {
+  const used = new Set(components.map((c) => c.tag))
+  for (let i = 0; i < 26; i++) if (!used.has(String.fromCharCode(65 + i))) return String.fromCharCode(65 + i)
+  return nextTag(components, 'Z')
+}
+// Identificador nuevo para un componente de este tipo.
+export const newTag = (components, type, prefix = ELEC_TYPES[type]?.prefix) => (ELEC_TYPES[type]?.letterTag ? nextLetterTag(components) : nextTag(components, prefix))
 
 // Numeración de los contactos auxiliares de cada aparato (de izquierda a derecha, de arriba
 // abajo): NA 13-14, 23-24…; NC 11-12, 21-22…; los del relé térmico, 95-96 (NC) y 97-98 (NA).

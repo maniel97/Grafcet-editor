@@ -1,7 +1,7 @@
 import { Handle, Position } from '@xyflow/react'
 import { ElecSymbol } from './ElecSymbols'
 import { INK, POTENTIAL_COLORS } from './elecColors'
-import { ELEC_TYPES, POTENTIALS, showTag, sizeOf, terminalsOf } from '../../lib/elec/catalog'
+import { ELEC_TYPES, POTENTIALS, isPneumatic, showTag, sizeOf, terminalsOf } from '../../lib/elec/catalog'
 
 // Lo que se acciona con el ratón al simular (modo Usar).
 const MOMENTARY = new Set(['pushbutton', 'litbutton'])
@@ -23,6 +23,8 @@ const HINTS = {
   lightcurtain: 'Clic: cortar el haz (o dejarlo libre)',
   potentiometer: 'Clic: +25 % (de 100 % vuelve a 0)',
   litbutton: 'Mantén pulsado para accionarlo',
+  frl: 'Clic: abrir o cortar el aire',
+  throttle: 'Clic: abrir más el regulador (+25 %)',
 }
 
 // Componente del esquema eléctrico en el lienzo (React Flow): símbolo, bornes (handles) y rótulos.
@@ -34,18 +36,27 @@ export default function ElecNode({ data }) {
   const terminals = terminalsOf(c)
   const use = mode === 'use'
   // Con el polímetro o las averías, el clic es para la herramienta, no para accionar.
-  const momentary = use && !tool && MOMENTARY.has(c.type)
-  const toggle = use && !tool && TOGGLES.has(c.type)
+  const momentary = use && !tool && (MOMENTARY.has(c.type) || (c.type === 'pvalve' && c.manual === 'button'))
+  const toggle = use && !tool && (TOGGLES.has(c.type) || (c.type === 'pvalve' && c.manual === 'lever') || c.type === 'frl' || c.type === 'throttle')
+  const hint = c.type === 'pvalve' ? { button: 'Mantén pulsado para accionar la válvula', lever: 'Clic: mover la palanca' }[c.manual] : HINTS[c.type]
   const fault = view?.faults?.[c.id]
   const label = ELEC_TYPES[c.type]?.label ?? c.type
   const tag = c.type === 'contact' || c.type === 'maincontacts' ? c.ref : c.tag
   const rail = c.type === 'rail'
   // Estado al simular (para leerlo y para las pruebas): cargas y motores, encendidos; contactos,
   // cerrados; protecciones, disparadas.
-  const on = view ? Boolean(view.loads?.[c.id] ?? view.motors?.[c.id]?.running ?? view.closed?.[c.id]) : undefined
+  const air = view?.pneu
+  const cyl = air?.cylinders?.[c.id]
+  const on = view
+    ? c.type === 'pvalve'
+      ? air?.valves?.[c.id] === '14'
+      : c.type === 'pcylinder'
+        ? (cyl?.pos ?? 0) >= 0.98
+        : Boolean(view.loads?.[c.id] ?? view.motors?.[c.id]?.running ?? view.closed?.[c.id])
+    : undefined
   // Números de borne junto a cada borne (los de los contactos auxiliares, calculados).
   const boxed = ['psu', 'phasemonitor', 'vfd', 'softstarter', 'safetyrelay'].includes(c.type)
-  const termLabel = (t, i) => (c.type === 'contact' ? numbers?.[i] : rail || c.type === 'plc' || c.type === 'terminal' || boxed ? null : t.id)
+  const termLabel = (t, i) => (c.type === 'contact' ? numbers?.[i] : rail || c.type === 'plc' || c.type === 'terminal' || boxed || c.type === 'pcylinder' || c.type === 'airsource' ? null : t.id)
 
   return (
     <div
@@ -55,7 +66,8 @@ export default function ElecNode({ data }) {
       data-tag={tag || undefined}
       data-on={on === undefined ? undefined : on ? '1' : '0'}
       aria-label={`${label} ${showTag(tag)}`.trim()}
-      title={use && HINTS[c.type] ? HINTS[c.type] : undefined}
+      title={use && hint ? hint : undefined}
+      data-pos={cyl ? Math.round(cyl.pos * 100) : undefined}
       onPointerDown={momentary ? (e) => (e.stopPropagation(), onAction(c.id, 'press')) : undefined}
       onPointerUp={momentary ? () => onAction(c.id, 'release') : undefined}
       onPointerLeave={momentary ? () => onAction(c.id, 'release') : undefined}
@@ -99,8 +111,9 @@ export default function ElecNode({ data }) {
       </svg>
       {!rail && c.type !== 'plc' && (
         // Rótulo a la derecha; la descripción se parte en líneas para no pisar al aparato de al lado.
-        <div className="pointer-events-none absolute top-[22px] w-[92px] text-[11px] leading-tight text-slate-900" style={{ left: w + 2 }}>
-          <div className="font-semibold">{c.type === 'terminal' ? `${showTag(tag)}:${c.n ?? 1}` : showTag(tag)}</div>
+        <div className="pointer-events-none absolute top-[22px] w-[92px] text-[11px] leading-tight text-slate-900" style={c.type === 'pcylinder' ? { left: 30, top: 40 } : { left: w + 2 }}>
+          {/* Neumática: identificación ISO 1219-2, sin guion (1V1, A). */}
+          <div className="font-semibold">{c.type === 'terminal' ? `${showTag(tag)}:${c.n ?? 1}` : isPneumatic(c.type) ? tag : showTag(tag)}</div>
           {c.text && <div className="text-[10px] text-slate-600">{c.text}</div>}
           {c.type === 'coil' && (c.kind === 'ton' || c.kind === 'tof') && <div className="text-slate-600">{`${c.kind === 'ton' ? 'Conexión' : 'Desconexión'} ${c.preset ?? 0} s`}</div>}
           {c.type === 'sensor3' && <div className="text-slate-600">{`${{ inductive: 'Inductivo', capacitive: 'Capacitivo', optical: 'Óptico' }[c.kind] ?? ''} ${c.output ?? 'PNP'}`}</div>}
@@ -123,6 +136,11 @@ export default function ElecNode({ data }) {
           {c.type === 'softstarter' && <div className="text-slate-600">{`Rampa ${c.ramp ?? 3} s`}</div>}
           {c.type === 'safetyrelay' && view?.safety?.[c.id]?.discrepancy && <div className="font-semibold text-amber-700">Discrepancia entre canales</div>}
           {c.type === 'brake' && view && <div className={view.loads?.[c.id] ? 'text-green-700' : 'text-red-700'}>{view.loads?.[c.id] ? 'Suelto' : 'Frenado'}</div>}
+          {c.type === 'pcylinder' && <div className="text-slate-600">{c.acting === 'single' ? 'Simple efecto' : 'Doble efecto'}</div>}
+          {cyl?.note && <div className="text-amber-700">{cyl.note}</div>}
+          {c.type === 'pvalve' && <div className="text-slate-600">{`${c.ways ?? '5/2'} ${c.ways === '5/3' ? `centro ${{ closed: 'cerrado', exhaust: 'a escape', pressure: 'a presión' }[c.center] ?? 'cerrado'}` : c.sol12 ? 'biestable' : c.ways === '3/2' && c.normally === 'NO' ? 'NA' : 'monoestable'}`}</div>}
+          {c.type === 'throttle' && <div className="text-slate-600">{`Abierto ${Math.round((view?.knob?.[c.id] ?? Number(c.setting ?? 0.5)) * 100)} %`}</div>}
+          {c.type === 'airsource' && air?.leaks && <div className="font-semibold text-amber-700">Fuga: el aire sale por un escape</div>}
           {view?.motors?.[c.id]?.running && view.motors[c.id].speed < 1 && <div className="text-green-700">{`${Math.round(view.motors[c.id].speed * 100)} % de velocidad`}</div>}
         </div>
       )}

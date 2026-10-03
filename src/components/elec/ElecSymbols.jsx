@@ -4,6 +4,7 @@
 import { plcTerminals, sizeOf, terminalsOf } from '../../lib/elec/catalog'
 
 import { INK, POTENTIAL_COLORS } from './elecColors'
+import { PneuSymbol } from './PneuSymbols'
 
 const LIVE = '#16a34a'
 const LAMP_COLORS = { green: '#22c55e', red: '#ef4444', amber: '#f59e0b', white: '#f8fafc', blue: '#3b82f6' }
@@ -557,6 +558,6 @@ export function ElecSymbol({ c, view }) {
     case 'plc':
       return <Plc c={c} s={view} />
     default:
-      return null
+      return <PneuSymbol c={c} view={view} />
   }
 }

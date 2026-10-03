@@ -14,6 +14,7 @@
 //     protección, se avisa y todo queda sin tensión.
 // Puro: se prueba sin navegador.
 import { POTENTIALS, isSecondary, terminalsOf } from './catalog'
+import { pneuStep } from './pneumatic'
 
 const key = (c, t) => `${c}:${t}`
 const PAIRS = [
@@ -70,7 +71,7 @@ export function voltageBetween(a, b) {
 export function elecInit() {
   // faults: averías provocadas { [componente o cable]: 'open' | 'welded' | 'cut' }; hidden: si se
   // han puesto al azar sin decir dónde (para practicar el diagnóstico con el polímetro).
-  return { pressed: {}, latched: {}, opened: {}, tripped: {}, pos: {}, coils: {}, timers: {}, counts: {}, impulse: {}, safety: {}, safetyReset: {}, knob: {}, faults: {}, hidden: false, view: null }
+  return { pressed: {}, latched: {}, opened: {}, tripped: {}, pos: {}, coils: {}, timers: {}, counts: {}, impulse: {}, safety: {}, safetyReset: {}, knob: {}, faults: {}, hidden: false, pneu: {}, pneuSignals: {}, view: null }
 }
 
 const components = (schematic) => schematic?.components ?? []
@@ -113,6 +114,14 @@ export function elecAction(schematic, state, id, action) {
       return { ...s, opened: { ...s.opened, [id]: !s.opened[id] } }
     }
     if (c.type === 'thermal') return { ...s, tripped: { ...s.tripped, [id]: !s.tripped[id] } }
+    // Neumática: válvula de palanca (se queda), unidad de mantenimiento (abrir o cortar el aire) y
+    // regulador de caudal (+25 %; de 100 % vuelve a 25 %).
+    if (c.type === 'pvalve' && c.manual === 'lever') return { ...s, latched: { ...s.latched, [id]: !s.latched[id] } }
+    if (c.type === 'frl') return { ...s, opened: { ...s.opened, [id]: !s.opened[id] } }
+    if (c.type === 'throttle') {
+      const now = s.knob[id] ?? Number(c.setting ?? 0.5)
+      return { ...s, knob: { ...s.knob, [id]: now >= 0.999 ? 0.25 : Math.min(1, Math.round((now + 0.25) * 4) / 4) } }
+    }
   }
   if (action.startsWith?.('set:') && c.type === 'potentiometer') return { ...s, knob: { ...s.knob, [id]: Math.min(1, Math.max(0, Number(action.slice(4)) || 0)) } }
   if (action === 'overload' && (c.type === 'thermal' || c.type === 'motorprotector')) return { ...s, tripped: { ...s.tripped, [id]: true } }
@@ -320,7 +329,9 @@ export function elecStep(schematic, state, { physical = {}, analog = {}, plcOut 
   const coilsList = list.filter((c) => c.type === 'coil' && c.tag)
   const counters = list.filter((c) => c.type === 'counter' && c.tag)
   const closed = (c) => !s.opened[c.id] && !tripped[c.id]
-  const activated = (c) => Boolean(s.pressed[c.id] || s.latched[c.id] || (c.signal && physical[c.signal]))
+  // Los detectores de los cilindros neumáticos (a0, a1…) también accionan contactos.
+  const sensed = { ...physical, ...s.pneuSignals }
+  const activated = (c) => Boolean(s.pressed[c.id] || s.latched[c.id] || (c.signal && sensed[c.signal]))
   const timer = (tag) => s.timers[tag] ?? { on: 0, off: Infinity }
   // Salida de una bobina temporizada o especial, con su alimentación actual.
   const coilQ = (c, energized, timers = s.timers, impulse = s.impulse) => {
@@ -593,7 +604,12 @@ export function elecStep(schematic, state, { physical = {}, analog = {}, plcOut 
     if (c.type === 'maincontacts') view.closed[c.id] = Boolean(devices[c.ref])
     if (MANUAL.has(c.type)) view.closed[c.id] = closed(c)
   }
-  return { state: { ...after, view }, plcIn, plcInAnalog, actuators }
+  // Neumática: las electroválvulas con tensión mueven sus válvulas.
+  const solenoids = new Set(list.filter((c) => c.type === 'valve' && c.tag && loads[c.id]).map((c) => c.tag))
+  const air = pneuStep(schematic, s.pneu, { solenoids, manual: (c) => s.pressed[c.id] || s.latched[c.id], opened: s.opened, setting: (c) => s.knob[c.id] ?? Number(c.setting ?? 0.5), faults: s.faults }, dt)
+  view.pneu = air.view
+  view.pneuSignals = air.signals
+  return { state: { ...after, pneu: air.state, pneuSignals: air.signals, view }, plcIn, plcInAnalog, actuators }
 }
 
 // Motor trifásico: gira con las tres fases distintas; el sentido, por el orden de las fases.

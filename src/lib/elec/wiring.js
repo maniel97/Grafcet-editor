@@ -1,7 +1,7 @@
 // Cableado del esquema como en un plano: números de cable (uno por red equipotencial, como en
 // los planos de máquina) y puntos de unión (donde salen dos o más cables de un mismo borne, o se
 // toma un embarrado).
-import { terminalsOf } from './catalog'
+import { isPneumatic, terminalsOf } from './catalog'
 
 const key = (c, t) => `${c}:${t}`
 
@@ -37,6 +37,8 @@ export function wireNumbers(schematic) {
   }
   const groups = new Map()
   for (const w of schematic?.wires ?? []) {
+    // Los tubos de aire no llevan número de cable.
+    if (isPneumatic(comps.get(w.from.c)?.type)) continue
     const r = find(key(w.from.c, w.from.t))
     const a = where(w.from)
     const b = where(w.to)
