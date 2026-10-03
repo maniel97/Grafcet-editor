@@ -674,7 +674,9 @@ function IOPanel({ io, elements, onSelect }) {
     const e = elements.find((x) => x.id === id)
     return e ? `${SCENE_TYPES[e.type].label} ${labelOf(e)}` : id
   }
-  const ElementLink = ({ id }) => (
+  // Función, no componente: definido dentro de IOPanel, React lo montaría de nuevo en cada paso de la
+  // simulación (y el botón «se movería» bajo el ratón).
+  const elementLink = (id) => (
     <button type="button" onClick={() => onSelect(id)} className="text-left text-blue-700 hover:underline">
       {label(id)}
     </button>
@@ -702,7 +704,7 @@ function IOPanel({ io, elements, onSelect }) {
                 {sig.elements.map((id, i) => (
                   <span key={id}>
                     {i > 0 && ', '}
-                    <ElementLink id={id} />
+                    {elementLink(id)}
                   </span>
                 ))}
               </span>
@@ -717,7 +719,7 @@ function IOPanel({ io, elements, onSelect }) {
               <p className="font-medium text-amber-700">Sin variable (no hacen nada):</p>
               {io.unassigned.map((id) => (
                 <p key={id} className="pl-2">
-                  <ElementLink id={id} />
+                  {elementLink(id)}
                 </p>
               ))}
             </div>

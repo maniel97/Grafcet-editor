@@ -28,6 +28,9 @@ export default function ElecNode({ data }) {
   const label = ELEC_TYPES[c.type]?.label ?? c.type
   const tag = c.type === 'contact' || c.type === 'maincontacts' ? c.ref : c.tag
   const rail = c.type === 'rail'
+  // Estado al simular (para leerlo y para las pruebas): cargas y motores, encendidos; contactos,
+  // cerrados; protecciones, disparadas.
+  const on = view ? Boolean(view.loads?.[c.id] ?? view.motors?.[c.id]?.running ?? view.closed?.[c.id]) : undefined
   // Números de borne junto a cada borne (los de los contactos auxiliares, calculados).
   const termLabel = (t, i) => (c.type === 'contact' ? numbers?.[i] : rail || c.type === 'plc' ? null : t.id)
 
@@ -37,6 +40,7 @@ export default function ElecNode({ data }) {
       style={{ width: w, height: h }}
       data-elec={c.type}
       data-tag={tag || undefined}
+      data-on={on === undefined ? undefined : on ? '1' : '0'}
       aria-label={`${label} ${showTag(tag)}`.trim()}
       title={use && HINTS[c.type] ? HINTS[c.type] : undefined}
       onPointerDown={momentary ? (e) => (e.stopPropagation(), onAction(c.id, 'press')) : undefined}

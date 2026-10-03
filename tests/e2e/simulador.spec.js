@@ -877,3 +877,112 @@ test('planta: «Tope / pared» en la paleta, con su explicación', async ({ page
   await expect(view.locator('[aria-label="Plataforma Tope"]')).toHaveCount(1)
   expectNoErrors(errors)
 })
+
+test('esquema eléctrico: inversión de giro (plantilla), con su enclavamiento', async ({ page }) => {
+  const errors = await openEditor(page)
+  await page.getByRole('button', { name: 'Esquema eléctrico' }).click()
+  const view = page.getByRole('region', { name: 'Esquema eléctrico' })
+  await view.getByLabel('Insertar montaje').selectOption('inversion')
+  await view.getByRole('button', { name: 'Pantalla completa' }).click()
+  await page.getByRole('button', { name: /Simular/ }).click()
+  const hold = async (tag) => {
+    const b = await view.locator(`[data-elec="pushbutton"][data-tag="${tag}"]`).boundingBox()
+    await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2)
+    await page.mouse.down()
+    await page.waitForTimeout(250)
+    await page.mouse.up()
+  }
+  const motor = view.locator('[data-elec="motor3"]')
+  await expect(motor).toHaveAttribute('data-on', '0')
+  await hold('S1')
+  await expect(motor).toHaveAttribute('data-on', '1')
+  await expect(motor).toContainText('↻')
+  await hold('S2') // enclavado: no entra KM2 ni hay cortocircuito
+  await expect(view.locator('[data-elec="coil"][data-tag="KM2"]')).toHaveAttribute('data-on', '0')
+  await expect(view.getByText(/Cortocircuito/)).toHaveCount(0)
+  await hold('S0')
+  await hold('S2')
+  await expect(motor).toContainText('↺')
+  expectNoErrors(errors)
+})
+
+test('esquema eléctrico: cablear un piloto entre L y N, simular y deshacer', async ({ page }) => {
+  const errors = await openEditor(page)
+  await page.getByRole('button', { name: 'Esquema eléctrico' }).click()
+  const view = page.getByRole('region', { name: 'Esquema eléctrico' })
+  const paper = view.locator('.paper')
+  const drop = (name, x, y) => view.getByRole('button', { name, exact: true }).dragTo(paper, { targetPosition: { x, y } })
+  await drop('+ Embarrado L', 100, 80)
+  await drop('+ Piloto', 160, 180)
+  await drop('+ Embarrado N', 100, 380)
+  const lamp = view.locator('[data-elec="lamp"]')
+  await expect(lamp).toHaveCount(1)
+  // Cables: arrastrar de borne a borne (de la toma del embarrado que queda encima del piloto).
+  const center = async (loc) => {
+    const b = await loc.boundingBox()
+    return { x: b.x + b.width / 2, y: b.y + b.height / 2 }
+  }
+  const wire = async (from, to) => {
+    const a = await center(from)
+    const b = await center(to)
+    await page.mouse.move(a.x, a.y)
+    await page.mouse.down()
+    await page.mouse.move(b.x, b.y, { steps: 8 })
+    await page.mouse.up()
+  }
+  const x1 = lamp.locator('.react-flow__handle[data-handleid="X1"]')
+  const x2 = lamp.locator('.react-flow__handle[data-handleid="X2"]')
+  const nearest = async (rail, target) => {
+    const t = await center(target)
+    const handles = view.locator(`[data-elec="rail"]`).nth(rail).locator('.react-flow__handle')
+    const n = await handles.count()
+    let best = 0
+    let dist = Infinity
+    for (let i = 0; i < n; i++) {
+      const c = await center(handles.nth(i))
+      if (Math.abs(c.x - t.x) < dist) {
+        dist = Math.abs(c.x - t.x)
+        best = i
+      }
+    }
+    return handles.nth(best)
+  }
+  await wire(await nearest(0, x1), x1)
+  await wire(x2, await nearest(1, x2))
+  await expect(view.locator('.react-flow__edge')).toHaveCount(2)
+  await page.getByRole('button', { name: /Simular/ }).click()
+  await expect(lamp).toHaveAttribute('data-on', '1')
+  await page.getByRole('button', { name: /Detener/ }).click()
+  // Deshacer (el de siempre, en la barra): quita el último cable; al simular, el piloto ya no luce.
+  await view.getByText(/Arrastra de borne a borne/).click() // el esquema es el último panel tocado
+  await page.getByTitle('Deshacer (Ctrl+Z)').click()
+  await expect(view.locator('.react-flow__edge')).toHaveCount(1)
+  await page.getByRole('button', { name: /Simular/ }).click()
+  await expect(lamp).toHaveAttribute('data-on', '0')
+  expectNoErrors(errors)
+})
+
+test('esquema eléctrico: conexiones del autómata desde la tabla, conectadas con la planta', async ({ page }) => {
+  const errors = await openEditor(page)
+  await openExample(page, /Marcha y paro/)
+  await page.getByRole('button', { name: 'Esquema eléctrico' }).click()
+  const view = page.getByRole('region', { name: 'Esquema eléctrico' })
+  await view.getByRole('button', { name: 'Conexiones del autómata' }).click()
+  await expect(view.getByRole('status')).toContainText('conectadas con el autómata y la planta')
+  await expect(view.getByLabel('Conectar con el autómata y la planta')).toBeChecked()
+  await page.getByRole('button', { name: /Simular/ }).click()
+  const desk = page.getByRole('region', { name: 'Panel de control' })
+  const b = await desk.locator('[aria-label="Pulsador Marcha"]').boundingBox()
+  await page.mouse.move(b.x + b.width / 2, b.y + b.height / 3)
+  await page.mouse.down()
+  await page.waitForTimeout(300)
+  await page.mouse.up()
+  // Marcha llega por el cable a I0.0, el grafcet activa Motor (Q0.0) y su bobina se excita.
+  await expect(view.locator('[data-elec="coil"]')).toHaveAttribute('data-on', '1')
+  await expect.poll(() => activeSteps(page)).toBe('s1')
+  // Sin conectar, la planta y el autómata ya no usan los cables (el grafcet sigue con la planta).
+  await view.getByRole('radio', { name: /Editar/ }).click()
+  await view.getByLabel('Conectar con el autómata y la planta').uncheck()
+  await expect(view.getByText(/no usan estos cables/)).toBeVisible()
+  expectNoErrors(errors)
+})

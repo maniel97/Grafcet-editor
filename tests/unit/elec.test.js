@@ -235,3 +235,56 @@ describe('esquema de conexiones del autómata (generado) en la simulación', asy
     expect(w.angle.motor ?? 0).toBe(0)
   })
 })
+
+describe('plantillas del esquema eléctrico (montajes clásicos)', async () => {
+  const { ELEC_TEMPLATES } = await import('../../src/lib/elec/templates')
+  const build = (id) => {
+    const b = ELEC_TEMPLATES.find((t) => t.id === id).build(0, 0, 'p')
+    return { components: b.components, wires: b.wires }
+  }
+  const press = (s, state, name) => {
+    let st = elecAction(s, state, `p-${name}`, 'press')
+    st = run(s, st).state
+    return run(s, elecAction(s, st, `p-${name}`, 'release')).state
+  }
+
+  it('marcha-paro: arranca, se mantiene y para; el piloto lo indica', () => {
+    const s = build('marcha-paro')
+    let st = press(s, elecInit(), 'S1')
+    expect(st.coils.KM1).toBe(true)
+    expect(st.view.loads['p-H1']).toBe(true)
+    st = press(s, st, 'S0')
+    expect(st.coils.KM1).toBe(false)
+  })
+
+  it('arranque directo: el motor gira y el relé térmico lo para', () => {
+    const s = build('directo')
+    let st = press(s, elecInit(), 'S1')
+    expect(st.view.motors['p-M1']).toMatchObject({ running: true, dir: 1 })
+    st = run(s, elecAction(s, st, 'p-F2', 'overload')).state
+    expect(st.coils.KM1).toBe(false)
+    expect(st.view.motors['p-M1'].running).toBe(false)
+  })
+
+  it('inversión: cada sentido y el enclavamiento impide el cortocircuito', () => {
+    const s = build('inversion')
+    let st = press(s, elecInit(), 'S1')
+    expect(st.view.motors['p-M1']).toMatchObject({ running: true, dir: 1 })
+    st = press(s, st, 'S2') // con KM1 dentro, KM2 no entra
+    expect(st.coils.KM2).toBe(false)
+    expect(st.view.short).toBe(null)
+    st = press(s, st, 'S0')
+    st = press(s, st, 'S2')
+    expect(st.view.motors['p-M1']).toMatchObject({ running: true, dir: -1 })
+  })
+
+  it('estrella-triángulo: arranca en estrella y a los 5 s pasa a triángulo', () => {
+    const s = build('estrella-triangulo')
+    let st = press(s, elecInit(), 'S1')
+    expect(st.view.motors['p-M1']).toMatchObject({ running: true, mode: 'estrella' })
+    st = run(s, st, 5.3).state
+    expect(st.view.motors['p-M1']).toMatchObject({ running: true, mode: 'triángulo' })
+    expect(st.view.short).toBe(null)
+    expect(st.coils.KM3).toBe(false)
+  })
+})

@@ -1,9 +1,10 @@
 // Mundo de la simulación: la escena de la planta (scene.js, plc.scene), que produce las entradas
 // del grafcet a partir de sus salidas. Su estado es el de la escena (y, en `elec`, el del esquema).
-// Con el esquema eléctrico activado (plc.electrical.enabled, lib/elec), las señales pasan por los
-// cables: los mandos y detectores de la planta accionan sus contactos del esquema, las bobinas,
-// electroválvulas, pilotos y motores mueven la planta y, si hay autómata, sus entradas son las que
-// llegan por los cables a sus bornes y sus salidas cierran los contactos de los bornes Q.
+// El esquema eléctrico (plc.electrical, lib/elec) se simula siempre que tenga componentes. Conectado
+// (plc.electrical.enabled), las señales pasan por sus cables: los mandos y detectores de la planta
+// accionan sus contactos, las bobinas, electroválvulas, pilotos y motores mueven la planta y, si hay
+// autómata, sus entradas son las que llegan por los cables a sus bornes y sus salidas cierran los
+// contactos de los bornes Q.
 import { sceneInit, sceneInputNames, sceneInputs, scenePhysical, sceneStep } from './scene'
 import { advanceWithEvents } from './scenario'
 import { elecAction, elecInit, elecStep } from '../elec/solve'
@@ -14,8 +15,9 @@ import { terminalAddress } from '../elec/catalog'
 export const WORLD_DT = 0.05
 
 export function makeWorld(scene = null, analogRange = () => null, electrical = null, variables = []) {
-  const elec = electrical?.enabled && electrical.components?.length ? electrical : null
-  const withPlc = Boolean(elec?.components.some((c) => c.type === 'plc'))
+  const elec = electrical?.components?.length ? electrical : null
+  const linked = Boolean(elec?.enabled)
+  const withPlc = linked && elec.components.some((c) => c.type === 'plc')
   const inVars = variables.filter((v) => v.type === 'input' && v.address)
   const outVars = variables.filter((v) => v.type === 'output' && v.address)
   const outNames = new Set(variables.filter((v) => v.type === 'output').map((v) => v.name))
@@ -26,7 +28,7 @@ export function makeWorld(scene = null, analogRange = () => null, electrical = n
     const r = elecStep(elec, state.elec, { physical: scenePhysical(scene, state), plcOut }, dt)
     // Con autómata, la planta solo se mueve por lo que llega por los cables.
     const driven = withPlc ? Object.fromEntries(Object.entries(values).filter(([k]) => !outNames.has(k))) : values
-    const next = sceneStep(scene, state, { ...driven, ...r.actuators }, dt)
+    const next = sceneStep(scene, state, linked ? { ...driven, ...r.actuators } : values, dt)
     return { ...next, elec: r.state }
   }
   return {

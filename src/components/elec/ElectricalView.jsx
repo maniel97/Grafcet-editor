@@ -5,6 +5,7 @@ import ElecNode from './ElecNode'
 import { INK, POTENTIAL_COLORS } from './elecColors'
 import { ELEC_TYPES, GRID, POTENTIALS, contactNumbers, crossReferences, nextTag, showTag, sizeOf } from '../../lib/elec/catalog'
 import { generatePlcWiring } from '../../lib/elec/generate'
+import { ELEC_TEMPLATES, insertTemplate } from '../../lib/elec/templates'
 
 const nodeTypes = { elec: ElecNode }
 const EMPTY = { enabled: false, components: [], wires: [] }
@@ -69,7 +70,7 @@ function Inner({ schematic, onChange, elecState, onAction, variables = [], build
   const sch = schematic ?? EMPTY
   const components = useMemo(() => sch.components ?? [], [sch.components])
   const wires = useMemo(() => sch.wires ?? [], [sch.wires])
-  const { screenToFlowPosition, fitView } = useReactFlow()
+  const { screenToFlowPosition, fitView, getNodes } = useReactFlow()
   const wrapperRef = useRef(null)
   // Al empezar o acabar la simulación, Usar o Editar (se puede cambiar a mano).
   const [mode, setMode] = useState(simulating ? 'use' : 'edit')
@@ -83,9 +84,11 @@ function Inner({ schematic, onChange, elecState, onAction, variables = [], build
   const [dragPos, setDragPos] = useState({})
   const [message, setMessage] = useState(null)
   const view = elecState?.view ?? null
-  // Al cambiar el tamaño del panel (vista dividida o completa, empezar a simular), reencuadrar.
+  // Al cambiar el tamaño del panel (vista dividida o completa, empezar a simular), reencuadrar. Se
+  // observa el panel entero, no el lienzo: abrir las propiedades no debe mover la vista.
+  const sectionRef = useRef(null)
   useEffect(() => {
-    const el = wrapperRef.current
+    const el = sectionRef.current
     if (!el || typeof ResizeObserver === 'undefined') return
     let last = ''
     let frame = 0
@@ -94,14 +97,15 @@ function Inner({ schematic, onChange, elecState, onAction, variables = [], build
       if (size === last) return
       last = size
       cancelAnimationFrame(frame)
-      frame = requestAnimationFrame(() => fitView({ padding: 0.15 }))
+      // Vacío, no: React Flow lo dejaría en cola y reencuadraría al añadir el primer aparato.
+      frame = requestAnimationFrame(() => getNodes().length && fitView({ padding: 0.15 }))
     })
     ro.observe(el)
     return () => {
       ro.disconnect()
       cancelAnimationFrame(frame)
     }
-  }, [fitView])
+  }, [fitView, getNodes])
 
   // Historial propio (los botones y atajos de siempre lo usan con onHistory).
   const history = useRef({ past: [], future: [] })
@@ -129,11 +133,18 @@ function Inner({ schematic, onChange, elecState, onAction, variables = [], build
     const coils = components.filter((c) => c.type === 'coil')
     const ref =
       item.type === 'contact' ? coils[0]?.tag ?? 'KM1' : item.type === 'maincontacts' ? coils.find((c) => c.kind === 'contactor')?.tag ?? 'KM1' : undefined
+    // Sin caer encima de otro (al añadir con clic, todos irían al mismo sitio).
+    let x = snap(center.x)
+    let y = snap(center.y)
+    while (!at && components.some((o) => o.x === x && o.y === y)) {
+      x += 2 * GRID
+      y += 2 * GRID
+    }
     const c = {
       id: newId('e'),
       type: item.type,
-      x: snap(center.x),
-      y: snap(center.y),
+      x,
+      y,
       tag: nextTag(components, item.prefix ?? t.prefix),
       ...t.defaults,
       ...item.preset,
@@ -294,18 +305,20 @@ function Inner({ schematic, onChange, elecState, onAction, variables = [], build
     save({ components: [...components, ...r.components], wires: [...wires, ...r.wires], enabled: true })
     setMessage({
       kind: r.skipped.length ? 'warn' : 'ok',
-      text: `Conexiones del autómata creadas (${r.components.length - 3} aparatos) y simulación con el esquema activada.${r.skipped.length ? ` Sin borne: ${r.skipped.join(', ')}.` : ''}`,
+      text: `Conexiones del autómata creadas (${r.components.length - 3} aparatos) y conectadas con el autómata y la planta.${r.skipped.length ? ` Sin borne: ${r.skipped.join(', ')}.` : ''}`,
     })
     requestAnimationFrame(() => requestAnimationFrame(() => fitView({ padding: 0.15 })))
   }
 
   const selectedC = selected.length === 1 ? components.find((c) => c.id === selected[0]) : null
   const short = view?.short
-  const hiddenWarning = simulating && !sch.enabled && components.length > 0
+  // Hay autómata o aparatos enlazados con la planta, pero el esquema no está conectado.
+  const hiddenWarning = simulating && !sch.enabled && components.some((c) => c.type === 'plc' || c.signal)
 
   return (
     <section
       aria-label="Esquema eléctrico"
+      ref={sectionRef}
       tabIndex={-1}
       onPointerDownCapture={onActivate}
       onKeyDown={(e) => {
@@ -317,8 +330,9 @@ function Inner({ schematic, onChange, elecState, onAction, variables = [], build
           removeSelected()
         }
       }}
-      className={`side-panel @container relative flex min-w-0 flex-col border-l border-slate-200 bg-white outline-none ${
-        maximized ? `absolute inset-y-0 left-0 z-20 ${simulating ? 'right-80' : 'right-0'}` : 'w-1/2 shrink-0'
+      // relative y absolute no pueden ir juntas (en el CSS generado ganaría relative).
+      className={`side-panel @container flex min-w-0 flex-col border-l border-slate-200 bg-white outline-none ${
+        maximized ? `absolute inset-y-0 left-0 z-20 ${simulating ? 'right-80' : 'right-0'}` : 'relative w-1/2 shrink-0'
       }`}
     >
       <header className="flex flex-wrap items-center gap-1 border-b border-slate-200 px-2 py-1.5 text-xs">
@@ -344,9 +358,12 @@ function Inner({ schematic, onChange, elecState, onAction, variables = [], build
             ))}
           </div>
         )}
-        <label className="flex items-center gap-1 rounded border border-slate-300 px-2 py-0.5" title="Al simular, las señales pasan por los cables: si hay autómata, sus entradas y salidas son las de sus bornes">
+        <label
+          className="flex items-center gap-1 rounded border border-slate-300 px-2 py-0.5"
+          title="El esquema se simula siempre. Conectado, el autómata y la planta usan sus cables: las entradas del autómata son las de sus bornes, sus salidas cierran los bornes Q y la planta se mueve con las bobinas y motores enlazados"
+        >
           <input type="checkbox" checked={Boolean(sch.enabled)} onChange={(e) => save({ enabled: e.target.checked })} />
-          Simular con el esquema
+          Conectar con el autómata y la planta
         </label>
         <button
           type="button"
@@ -358,6 +375,29 @@ function Inner({ schematic, onChange, elecState, onAction, variables = [], build
           <WandSparkles size={12} /> <span className="hidden @2xl:inline">Conexiones del autómata</span>
           <span className="@2xl:hidden">Autómata</span>
         </button>
+        {mode === 'edit' && (
+          <select
+            value=""
+            aria-label="Insertar montaje"
+            title="Montajes clásicos listos para simular y modificar"
+            onChange={(e) => {
+              const t = ELEC_TEMPLATES.find((x) => x.id === e.target.value)
+              if (!t) return
+              const r = insertTemplate(t, sch)
+              save({ components: [...components, ...r.components], wires: [...wires, ...r.wires] })
+              setMessage({ kind: 'ok', text: `${t.title}: ${t.description}` })
+              requestAnimationFrame(() => requestAnimationFrame(() => fitView({ padding: 0.15 })))
+            }}
+            className="rounded border border-slate-300 px-1 py-0.5"
+          >
+            <option value="">Insertar montaje…</option>
+            {ELEC_TEMPLATES.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.title}
+              </option>
+            ))}
+          </select>
+        )}
         <span className="ml-auto" />
         <button type="button" onClick={() => fitView({ padding: 0.15 })} title="Ajustar la vista" aria-label="Ajustar la vista" className="rounded p-1 hover:bg-slate-100">
           <Scan size={14} />
@@ -377,7 +417,9 @@ function Inner({ schematic, onChange, elecState, onAction, variables = [], build
             </p>
           )}
           {view?.oscillating && <p className="text-amber-700">El circuito no se estabiliza (unos relés se activan y desactivan entre sí).</p>}
-          {hiddenWarning && <p className="text-amber-700">Activa «Simular con el esquema» para que la simulación pase por estos cables.</p>}
+          {hiddenWarning && (
+            <p className="text-amber-700">El autómata y la planta no usan estos cables: marca «Conectar con el autómata y la planta».</p>
+          )}
           {message && <p className={message.kind === 'ok' ? 'text-green-700' : 'text-amber-700'}>{message.text}</p>}
         </div>
       )}
@@ -410,20 +452,20 @@ function Inner({ schematic, onChange, elecState, onAction, variables = [], build
         <div
           ref={wrapperRef}
           className="paper relative min-h-0 min-w-0 flex-1"
-          onDragOver={(e) => {
-            if (!e.dataTransfer.types.includes(DRAG_TYPE)) return
-            e.preventDefault()
-            e.dataTransfer.dropEffect = 'copy'
-          }}
-          onDrop={(e) => {
-            const key = e.dataTransfer.getData(DRAG_TYPE)
-            const item = PALETTE.flatMap((g) => g.items).find((i) => i.key === key)
-            if (!item) return
-            e.preventDefault()
-            add(item, screenToFlowPosition({ x: e.clientX, y: e.clientY }))
-          }}
         >
           <ReactFlow
+            onDragOver={(e) => {
+              if (!e.dataTransfer.types.includes(DRAG_TYPE)) return
+              e.preventDefault()
+              e.dataTransfer.dropEffect = 'copy'
+            }}
+            onDrop={(e) => {
+              const key = e.dataTransfer.getData(DRAG_TYPE)
+              const item = PALETTE.flatMap((g) => g.items).find((i) => i.key === key)
+              if (!item) return
+              e.preventDefault()
+              add(item, screenToFlowPosition({ x: e.clientX, y: e.clientY }))
+            }}
             nodes={nodes}
             edges={edges}
             nodeTypes={nodeTypes}
@@ -431,13 +473,16 @@ function Inner({ schematic, onChange, elecState, onAction, variables = [], build
             onEdgesChange={onEdgesChange}
             onNodeDragStop={onNodeDragStop}
             onConnect={onConnect}
+            // Con un manejador de clic, React Flow deja pasar el ratón a los nodos aunque (al simular)
+            // no se puedan seleccionar ni arrastrar: así se pulsan los pulsadores.
+            onNodeClick={() => {}}
             connectionMode={ConnectionMode.Loose}
             connectionLineStyle={{ stroke: '#2563eb', strokeWidth: 2 }}
             snapToGrid
             snapGrid={[GRID, GRID]}
             deleteKeyCode={null}
-            fitView
-            fitViewOptions={{ padding: 0.15 }}
+            // Sin fitView automático (reencuadraría al añadir el primer aparato): lo hace el observador
+            // de tamaño al abrir el panel y el botón «Ajustar la vista».
             minZoom={0.2}
             maxZoom={3}
             proOptions={{ hideAttribution: true }}
