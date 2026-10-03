@@ -358,3 +358,39 @@ describe('escena: desviador y rampa', () => {
     expect(s.counts).toEqual({ rm: 1, rp: 1 }) // el metal por el desviador; el plástico, al final
   })
 })
+
+describe('escena: pick & place', () => {
+  // X horizontal (carrera 160) y Z vertical montado en su vástago, con ventosa.
+  const X = { id: 'X', type: 'cylinder', x: 100, y: 100, rot: 0, extend: 'X+', retract: 'X-', stroke: 160, time: 1 }
+  const Z = { id: 'Z', type: 'cylinder', x: 188, y: 100, rot: 90, extend: 'Z+', retract: 'Z-', stroke: 80, time: 0.5, vacuum: 'V', holding: 'Cogida', mountedOn: 'X' }
+  const scene = { elements: [X, Z] }
+
+  it('Z viaja con X; la ventosa coge, lleva y suelta la pieza', async () => {
+    const { platePlaced } = await import('../../src/lib/sim/scene')
+    let s = { ...sceneInit(scene), pieces: [{ id: 1, x: 174, y: 262, w: 28, h: 28 }] }
+    // Bajar con vacío: coge (y no empuja la pieza).
+    s = run(scene, s, { 'Z+': 1, V: 1 }, 0.6)
+    expect(sceneInputs(scene, s).Cogida).toBe(1)
+    expect(s.pieces[0].y).toBe(262)
+    // Subir: la pieza sube con la ventosa.
+    s = run(scene, s, { 'Z-': 1, V: 1 }, 0.6)
+    expect(s.pieces[0].y).toBeLessThan(200)
+    // Trasladar: Z (y la pieza) se mueven con el vástago de X.
+    s = run(scene, s, { 'X+': 1, V: 1 }, 1.1)
+    expect(platePlaced(scene, s, Z).x).toBe(174 + 160)
+    expect(s.pieces[0].x).toBeCloseTo(174 + 160)
+    // Bajar y soltar: la pieza se queda en su sitio nuevo.
+    s = run(scene, s, { 'X+': 1, 'Z+': 1, V: 1 }, 0.6)
+    s = run(scene, s, { 'X+': 1, 'Z+': 1 }, 0.1)
+    expect(sceneInputs(scene, s).Cogida).toBe(0)
+    s = run(scene, s, { 'X+': 1, 'Z-': 1 }, 0.6)
+    expect(s.pieces[0]).toMatchObject({ x: 334, y: 262 })
+  })
+
+  it('avería: ventosa sin vacío, no coge', () => {
+    let s = { ...sceneInit(scene), pieces: [{ id: 1, x: 174, y: 262, w: 28, h: 28 }] }
+    s = sceneAction(scene, s, 'Z', 'fault:vacuum')
+    s = run(scene, s, { 'Z+': 1, V: 1 }, 0.6)
+    expect(sceneInputs(scene, s).Cogida).toBe(0)
+  })
+})

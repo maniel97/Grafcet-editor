@@ -519,3 +519,27 @@ test('escena: desviador y rampa en la paleta, con sus propiedades', async ({ pag
   await expect(view.locator('svg[aria-label="Escena"] [data-element="ramp"]')).toHaveCount(1)
   expectNoErrors(errors)
 })
+
+test('ejemplo pick & place: la ventosa lleva la pieza del almacén al destino', async ({ page }) => {
+  const errors = await openEditor(page)
+  await openExample(page, /Pick & place/)
+  await page.getByRole('button', { name: /Simular/ }).click()
+  const view = page.getByRole('region', { name: 'Escena de la planta' })
+  const marcha = view.getByRole('region', { name: 'Pupitre de mando' }).locator('[aria-label="Pulsador Marcha"]')
+  const b = await marcha.boundingBox()
+  await page.mouse.move(b.x + b.width / 2, b.y + b.height / 3)
+  await page.mouse.down()
+  await expect.poll(() => activeSteps(page)).toBe('s1')
+  await page.mouse.up()
+  // Un ciclo completo: la pieza llega a la recogida (contador 1) y X vuelve a casa.
+  await expect(view.locator('[aria-label="Recogida Destino"]')).toContainText('1', { timeout: 12000 })
+  await expect.poll(() => activeSteps(page), { timeout: 5000 }).toBe('s0')
+
+  // En modo Editar: «Pick & place» de la paleta crea X y Z ya montado en él.
+  await view.getByRole('radio', { name: /Editar/ }).click()
+  await view.getByRole('button', { name: '+ Pick & place (2 cilindros)' }).click()
+  const props = view.getByLabel('Propiedades del elemento')
+  await expect(props.getByRole('combobox', { name: 'Montado en el vástago de' })).toHaveValue(/.+/)
+  await expect(props.getByRole('combobox', { name: 'Ventosa: vacío (opcional)' })).toBeVisible()
+  expectNoErrors(errors)
+})

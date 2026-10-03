@@ -14,6 +14,7 @@ import {
   limitZone,
   measuredDistance,
   overlaps,
+  placed,
   sceneIO,
   weighed,
   sceneFaults,
@@ -116,6 +117,15 @@ function CylinderShape({ e, pos, values }) {
       {e.extended && <circle cx="68" cy="15" r="3" fill={pos >= 0.999 ? ON : OFF} stroke={INK} strokeWidth="0.5" />}
       {/* Carrera (guía discontinua) */}
       <line x1="88" y1="18" x2={88 + stroke} y2="18" stroke="#94a3b8" strokeDasharray="3 3" />
+      {/* Ventosa: verde con vacío */}
+      {e.vacuum && (
+        <path
+          d={`M ${88 + pos * stroke} -9 L ${94 + pos * stroke} -13 L ${94 + pos * stroke} 13 L ${88 + pos * stroke} 9 Z`}
+          fill={isOn(values, e.vacuum) ? ON : '#94a3b8'}
+          stroke={INK}
+          strokeWidth="0.75"
+        />
+      )}
     </g>
   )
 }
@@ -615,7 +625,7 @@ function IOPanel({ io, elements, onSelect }) {
   )
 }
 
-function Properties({ element, variables, onChange, onDelete, onRotate, onCreateVariable, onMoveInDesk }) {
+function Properties({ element, variables, onChange, onDelete, onRotate, onCreateVariable, onMoveInDesk, cylinders = [] }) {
   const names = (dir) =>
     variables
       .filter((v) =>
@@ -699,6 +709,19 @@ function Properties({ element, variables, onChange, onDelete, onRotate, onCreate
       )}
       {element.type === 'cylinder' && (
         <>
+          <label className="block">
+            <span className="text-slate-500">Montado en el vástago de</span>
+            <select value={element.mountedOn ?? ''} onChange={(ev) => set({ mountedOn: ev.target.value })} className={field}>
+              <option value="">— (fijo)</option>
+              {cylinders
+                .filter((c) => c.id !== element.id && c.mountedOn !== element.id)
+                .map((c) => (
+                  <option key={c.id} value={c.id}>
+                    Cilindro {labelOf(c)}
+                  </option>
+                ))}
+            </select>
+          </label>
           {number('stroke', 'Carrera (px)', 20, 10)}
           {number('time', 'Tiempo de carrera (s)', 0.1, 0.1)}
         </>
@@ -907,6 +930,8 @@ const HINTS = {
   'sensor:capacitive': 'Detector capacitivo: detecta cualquier material (plástico, metal…) a poca distancia.',
   'sensor:color': 'Detector de color: solo da 1 con piezas del color elegido. Para clasificar por colores.',
   distance: 'Sensor de distancia (ultrasonidos): valor analógico proporcional a la distancia al primer objeto de su haz.',
+  pickplace:
+    'Pick & place: cilindro horizontal X y vertical Z montado en su vástago. Asigna a Z la ventosa (vacío) para coger la pieza que toca y llevarla con los dos vástagos.',
   diverter: 'Desviador: mientras su salida está activa, empuja las piezas de su zona hacia donde apunta la flecha (para sacarlas de una cinta).',
   ramp: 'Rampa: las piezas resbalan solas hasta su extremo (a la salida de una cinta, hacia una recogida…).',
   scale: 'Báscula: valor analógico con el peso (kg) de las piezas que tiene encima; el metal pesa el triple.',
@@ -923,6 +948,19 @@ const PREVIEW_DELAY = 450
 // Dibujo de muestra de un módulo (con sus valores por defecto y «en marcha»).
 function ModulePreview({ item }) {
   const { type } = item
+  if (item.key === 'pickplace') {
+    const base = { type: 'cylinder', rot: 0, ...SCENE_TYPES.cylinder.defaults }
+    const values = { E: 1, V: 1 }
+    return (
+      <svg viewBox="-10 -30 270 140" className="mx-auto block max-h-28 w-full" aria-hidden="true">
+        <CylinderShape e={{ ...base, stroke: 160 }} pos={0.4} values={{}} />
+        <g transform="translate(152 0) rotate(90)">
+          <CylinderShape e={{ ...base, stroke: 40, vacuum: 'V', extend: 'E' }} pos={0.6} values={values} />
+        </g>
+        <rect x="139" y="102" width="28" height="28" rx="3" fill={COLORS.amber} stroke={INK} />
+      </svg>
+    )
+  }
   const e = { id: 'preview', type, x: 0, y: 0, rot: 0, ...SCENE_TYPES[type].defaults, ...item.preset }
   const demo = { motor: 'M', variable: 'V', extend: 'E', fill: 'F', high: 'H', low: 'L' }
   const values = { M: 1, V: 1, E: 1, F: 1 }
@@ -972,7 +1010,12 @@ const PALETTE_ITEMS = Object.entries(SCENE_TYPES).flatMap(([type, t]) =>
         label: SENSOR_PALETTE[kind],
         preset: { kind, range: k.range },
       }))
-    : [{ key: type, type, group: t.group, label: t.label, preset: {} }],
+    : type === 'cylinder'
+      ? [
+          { key: type, type, group: t.group, label: t.label, preset: {} },
+          { key: 'pickplace', type, group: t.group, label: 'Pick & place (2 cilindros)', preset: {} },
+        ]
+      : [{ key: type, type, group: t.group, label: t.label, preset: {} }],
 )
 const PALETTE = PALETTE_ITEMS.reduce((groups, item) => ({ ...groups, [item.group]: [...(groups[item.group] ?? []), item] }), {})
 // Elementos por los que pasan las piezas: se dibujan debajo de todo.
@@ -1206,6 +1249,20 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
   // Nuevo elemento en el centro de lo que se ve.
   // Nuevo elemento: donde se suelta al arrastrarlo desde la paleta o, con un clic, en el centro
   // de lo que se ve.
+  // Pick & place: un cilindro horizontal (X) y uno vertical (Z) montado en su vástago, con ventosa.
+  const addPickPlace = (at = null) => {
+    const el = scrollRef.current
+    const x = snap(at ? at.x - 120 : el ? (el.scrollLeft + el.clientWidth / 2) / zoom - 120 : W / 2 - 120)
+    const y = snap(at ? at.y - 60 : el ? (el.scrollTop + el.clientHeight / 2) / zoom - 60 : H / 2 - 60)
+    const base = SCENE_TYPES.cylinder.defaults
+    const X = { id: newId(), type: 'cylinder', x, y, rot: 0, ...base, stroke: 160, text: 'X' }
+    const Z = { id: newId(), type: 'cylinder', x: x + 88, y, rot: 90, ...base, stroke: 80, time: 0.5, text: 'Z', mountedOn: X.id }
+    save([...elements, X, Z])
+    setSelection([Z.id])
+    setMode('edit')
+  }
+  const addItem = (item, at = null, place = null) => (item.key === 'pickplace' ? addPickPlace(at) : add(item.type, item.preset, at, place))
+
   // Mandos y señalización: con un clic (o soltados en el pupitre) van al pupitre; soltados en la
   // escena, a la máquina.
   const add = (type, preset = {}, at = null, place = null) => {
@@ -1346,7 +1403,8 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
   }
 
   const shown = elements.map((e) => (drag?.ids.includes(e.id) ? { ...e, x: e.x + drag.dx, y: e.y + drag.dy } : e))
-  const machine = shown.filter((e) => !isDesk(e))
+  // Los cilindros montados en el vástago de otro, donde están ahora.
+  const machine = shown.filter((e) => !isDesk(e)).map((e) => (e.type === 'cylinder' ? placed(scene ?? { elements: [] }, state, e) : e))
   const deskItems = elements.filter(isDesk)
   const draw = (e) => {
     const pos = state.pos[e.id] ?? 0
@@ -1535,7 +1593,7 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
                     onClick={() => {
                       clearTimeout(previewTimer.current)
                       setPreview(null)
-                      add(item.type, item.preset)
+                      addItem(item)
                     }}
                     onMouseEnter={(ev) => {
                       const at = { x: ev.clientX, y: ev.clientY }
@@ -1600,7 +1658,7 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
             const item = PALETTE_BY_KEY[ev.dataTransfer.getData(DRAG_TYPE)]
             if (!item) return
             ev.preventDefault()
-            add(item.type, item.preset, toScene(ev))
+            addItem(item, toScene(ev))
           }}
         >
           <svg
@@ -1701,7 +1759,7 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
               const item = PALETTE_BY_KEY[ev.dataTransfer.getData(DRAG_TYPE)]
               if (!item) return
               ev.preventDefault()
-              add(item.type, item.preset, null, DESK_TYPES.includes(item.type) ? 'desk' : null)
+              addItem(item, null, DESK_TYPES.includes(item.type) ? 'desk' : null)
             }}
           >
             {deskItems.length === 0 && (
@@ -1780,6 +1838,7 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
                 onRotate={rotateSelected}
                 onCreateVariable={onCreateVariable}
                 onMoveInDesk={(dir) => moveInDesk(selectedElement.id, dir)}
+                cylinders={elements.filter((e) => e.type === 'cylinder')}
               />
             ) : (
               <Faults element={selectedElement} fault={state.faults?.[selectedElement.id]} onAction={onAction} />

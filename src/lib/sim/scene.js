@@ -18,7 +18,7 @@ export const SCENE_TYPES = {
   cylinder: {
     label: 'Cilindro',
     group: 'Actuadores',
-    defaults: { extend: '', retract: '', retracted: '', extended: '', position: '', stroke: 100, time: 1, text: '' },
+    defaults: { extend: '', retract: '', retracted: '', extended: '', position: '', vacuum: '', holding: '', mountedOn: '', stroke: 100, time: 1, text: '' },
   },
   conveyor: { label: 'Cinta', group: 'Actuadores', defaults: { motor: '', length: 240, time: 4, text: '' } },
   limit: { label: 'Final de carrera', group: 'Detectores', defaults: { variable: '', contact: 'NO' } },
@@ -60,6 +60,8 @@ export const SCENE_VARS = {
     ['retracted', 'Detector dentro (a0)', 'in'],
     ['extended', 'Detector fuera (a1)', 'in'],
     ['position', 'Posición (analógica, opcional)', 'analog'],
+    ['vacuum', 'Ventosa: vacío (opcional)', 'out'],
+    ['holding', 'Ventosa: pieza cogida (opcional)', 'in'],
   ],
   conveyor: [['motor', 'Motor', 'out']],
   limit: [['variable', 'Entrada', 'in']],
@@ -149,6 +151,19 @@ export const rampRect = (e) => worldRect(e, 0, -20, Number(e.length) || 120, 40)
 export const conveyorRect = (e) => worldRect(e, 0, -15, Number(e.length) || 240, 30)
 export const sinkRect = (e) => worldRect(e, -30, -30, 60, 60)
 
+// Cilindro montado en el vástago de otro (e.mountedOn): viaja con él. Su x, y son los de con el
+// otro recogido; se le suma lo que haya salido el vástago del otro (y, en cadena, lo del suyo).
+export function placed(scene, state, e, depth = 0) {
+  if (e.type !== 'cylinder' || !e.mountedOn || depth > 4) return e
+  const carrier = (scene?.elements ?? []).find((c) => c.id === e.mountedOn && c.type === 'cylinder' && c.id !== e.id)
+  if (!carrier) return e
+  const base = placed(scene, state, carrier, depth + 1)
+  const [dx, dy] = rotate((state.pos?.[carrier.id] ?? 0) * (Number(carrier.stroke) || 100), 0, carrier.rot)
+  return { ...e, x: e.x + dx + (base.x - carrier.x), y: e.y + dy + (base.y - carrier.y) }
+}
+// Placa del vástago de un cilindro donde está ahora (con su montaje).
+export const platePlaced = (scene, state, c) => cylinderPlate(placed(scene, state, c), state.pos?.[c.id] ?? 0)
+
 // --- Simulación ----------------------------------------------------------------------------
 
 const on = (values, name) => Boolean(name) && Number(values[name] ?? 0) !== 0
@@ -169,7 +184,7 @@ export function sceneInit(scene) {
     if (e.type === 'potentiometer') knob[e.id] = clamp(Number(e.initial ?? 0.5))
     if (e.type === 'heater') temp[e.id] = Number(e.ambient ?? 20)
   }
-  return { pos, pressed, level, knob, temp, angle: {}, faults: {}, pieces: [], counts: {}, nextPiece: 1, fed: {} }
+  return { pos, pressed, level, knob, temp, angle: {}, faults: {}, held: {}, pieces: [], counts: {}, nextPiece: 1, fed: {} }
 }
 
 // Pieza nueva en un alimentador (si su sitio está libre).
@@ -215,6 +230,8 @@ export function sceneStep(scene, state, values, dt) {
   // Lo que mueve piezas: cintas en marcha, desviadores activos (empujan de lado; sobre una cinta,
   // la pieza sale en diagonal) y rampas (siempre). Las piezas cuyo centro está en la zona avanzan,
   // sin montarse sobre la de delante.
+  const heldIds = new Set(Object.values(state.held ?? {}).map((h) => h.id))
+  const extending = new Set() // cilindros cuyo vástago sigue saliendo en este paso
   const movers = []
   for (const e of elements) {
     if (stuck(e)) continue
@@ -226,7 +243,7 @@ export function sceneStep(scene, state, values, dt) {
     const speed = length / Math.max(0.1, time)
     const [dx, dy] = rotate(speed * dt, 0, e.rot)
     for (const p of next.pieces) {
-      if (!inside(center(p), rect)) continue
+      if (heldIds.has(p.id) || !inside(center(p), rect)) continue
       const moved = { ...p, x: p.x + dx, y: p.y + dy }
       const blocked = next.pieces.some((o) => o !== p && overlaps(moved, o) && !overlaps(p, o))
       if (!blocked) Object.assign(p, { x: moved.x, y: moved.y })
@@ -242,11 +259,13 @@ export function sceneStep(scene, state, values, dt) {
     if (!dir) continue
     const pos = clamp(next.pos[e.id] + (dir * dt) / Math.max(0.05, Number(e.time) || 1))
     next.pos[e.id] = pos
-    if (dir < 0) continue
-    const plate = cylinderPlate(e, pos)
+    if (dir > 0 && pos < 1) extending.add(e.id)
+    // Con ventosa no empuja: coge (abajo).
+    if (dir < 0 || e.vacuum) continue
+    const plate = platePlaced(scene, next, e)
     const [ux, uy] = rotate(1, 0, e.rot)
     for (const p of next.pieces) {
-      if (!overlaps(plate, p)) continue
+      if (heldIds.has(p.id) || !overlaps(plate, p)) continue
       // Delante de la placa, en el sentido del vástago.
       if (ux > 0) p.x = plate.x + plate.w
       if (ux < 0) p.x = plate.x - p.w
@@ -254,6 +273,36 @@ export function sceneStep(scene, state, values, dt) {
       if (uy < 0) p.y = plate.y - p.h
     }
   }
+
+  // Ventosas: con vacío cogen la pieza que tocan y la llevan con el vástago; sin vacío, la sueltan
+  // donde esté (y vuelve a moverla lo que tenga debajo: una cinta, una rampa…).
+  const held = { ...(state.held ?? {}) }
+  for (const e of elements) {
+    if (e.type !== 'cylinder' || !e.vacuum) continue
+    if (!on(values, e.vacuum) || faults[e.id] === 'vacuum') {
+      delete held[e.id]
+      continue
+    }
+    // Coge al llegar (vástago parado o al final), no al rozar mientras sale: así no la hunde.
+    if (held[e.id] || extending.has(e.id)) continue
+    const plate = platePlaced(scene, next, e)
+    const grip = { x: plate.x - 4, y: plate.y - 4, w: plate.w + 8, h: plate.h + 8 }
+    const taken = new Set(Object.values(held).map((h) => h.id))
+    const p = next.pieces.find((q) => !taken.has(q.id) && overlaps(grip, q))
+    if (p) held[e.id] = { id: p.id, dx: p.x - plate.x, dy: p.y - plate.y }
+  }
+  for (const [id, h] of Object.entries(held)) {
+    const c = elements.find((x) => x.id === id)
+    const p = next.pieces.find((x) => x.id === h.id)
+    if (!c || !p) {
+      delete held[id]
+      continue
+    }
+    const plate = platePlaced(scene, next, c)
+    p.x = plate.x + h.dx
+    p.y = plate.y + h.dy
+  }
+  next.held = held
 
   // Depósitos: se llenan y vacían con sus válvulas.
   for (const e of elements) {
@@ -284,7 +333,8 @@ export function sceneStep(scene, state, values, dt) {
   for (const e of elements) {
     if (e.type !== 'sink') continue
     const rect = sinkRect(e)
-    const kept = next.pieces.filter((p) => !inside(center(p), rect))
+    const carried = new Set(Object.values(next.held).map((h) => h.id))
+    const kept = next.pieces.filter((p) => carried.has(p.id) || !inside(center(p), rect))
     next.counts[e.id] = (next.counts[e.id] ?? 0) + next.pieces.length - kept.length
     next.pieces = kept
   }
@@ -299,7 +349,7 @@ function touching(scene, state, zone, sensor = null) {
   if (state.pieces.some((p) => sees(p) && overlaps(zone, p))) return true
   // Los vástagos (metálicos) los ven todos menos el de color.
   if (kind === 'color') return false
-  return elementsOf(scene).some((c) => c.type === 'cylinder' && overlaps(zone, cylinderPlate(c, state.pos[c.id] ?? 0)))
+  return elementsOf(scene).some((c) => c.type === 'cylinder' && overlaps(zone, platePlaced(scene, state, c)))
 }
 
 // Distancia (px) del sensor de distancia al primer objeto de su haz; null si no hay ninguno.
@@ -313,7 +363,7 @@ export function measuredDistance(scene, state, e) {
     ...state.pieces,
     ...elementsOf(scene)
       .filter((c) => c.type === 'cylinder')
-      .map((c) => cylinderPlate(c, state.pos[c.id] ?? 0)),
+      .map((c) => platePlaced(scene, state, c)),
   ].filter((r) => overlaps(beam, r))
   if (!rects.length) return null
   return Math.min(range, Math.max(0, Math.min(...rects.map(along))))
@@ -365,6 +415,7 @@ export function sceneInputs(scene, state, analogRange = () => null) {
       inputs[name] = Math.round((range.min + clamp(fraction) * (range.max - range.min)) * 100) / 100
     }
     if (e.type === 'cylinder' && e.position) scaled(e.position, state.pos[e.id] ?? 0)
+    if (e.type === 'cylinder' && e.holding) inputs[e.holding] = state.held?.[e.id] ? 1 : 0
     if (e.type === 'potentiometer' && e.variable) scaled(e.variable, state.knob?.[e.id] ?? 0.5)
     if (e.type === 'distance' && e.variable) {
       const d = fault(e) === 'broken' ? null : measuredDistance(scene, state, e)
@@ -405,6 +456,7 @@ export function sceneFaults(e) {
         { id: 'stuck', label: 'Atascado' },
         ...(e.retracted ? [{ id: 'sensor:retracted', label: `Detector ${e.retracted} roto` }] : []),
         ...(e.extended ? [{ id: 'sensor:extended', label: `Detector ${e.extended} roto` }] : []),
+        ...(e.vacuum ? [{ id: 'vacuum', label: 'Ventosa sin vacío (no coge)' }] : []),
       ]
     case 'conveyor':
     case 'motor':

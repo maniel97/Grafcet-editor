@@ -117,6 +117,50 @@ export const EXAMPLES = [
     },
   },
   {
+    id: 'pickplace',
+    title: 'Pick & place',
+    description: 'Dos cilindros (X horizontal, Z vertical montado en su vástago) y una ventosa: coger una pieza y dejarla en otro sitio.',
+    tags: ['Lineal', 'Neumática', 'Planta'],
+    build() {
+      const { nodes, edges } = cycle([
+        { actions: [] },
+        'Marcha · x0 · z0',
+        { actions: ['Z+', 'V'] },
+        'Cogida',
+        { actions: ['Z-', 'V'] },
+        'z0',
+        { actions: ['X+', 'V'] },
+        'x1',
+        { actions: ['Z+', 'V'] },
+        'z1',
+        { actions: [] },
+        '!Cogida',
+        { actions: ['Z-'] },
+        'z0',
+        { actions: ['X-'] },
+        'x0',
+      ])
+      nodes.push(
+        note(
+          'nota',
+          520,
+          0,
+          'Pick & place\n\nBaja Z con vacío (V) hasta coger la pieza, sube, X la lleva, baja y suelta (sin vacío), sube y X vuelve.\n\nAl simular, la planta tiene un almacén con piezas y la recogida: basta con pulsar Marcha.',
+        ),
+      )
+      const scene = {
+        elements: [
+          { id: 'marcha', type: 'button', x: 60, y: 60, rot: 0, variable: 'Marcha', contact: 'NO', color: 'green', text: 'Marcha', place: 'desk' },
+          { id: 'X', type: 'cylinder', x: 100, y: 100, rot: 0, extend: 'X+', retract: 'X-', retracted: 'x0', extended: 'x1', stroke: 160, time: 1, text: 'X' },
+          { id: 'Z', type: 'cylinder', x: 188, y: 100, rot: 90, extend: 'Z+', retract: 'Z-', retracted: 'z0', extended: 'z1', vacuum: 'V', holding: 'Cogida', mountedOn: 'X', stroke: 80, time: 0.5, text: 'Z' },
+          { id: 'almacen', type: 'feeder', x: 188, y: 276, rot: 0, trigger: '', auto: true, sizes: 'small', material: 'plastic', color: 'amber' },
+          { id: 'destino', type: 'sink', x: 348, y: 276, rot: 0, text: 'Destino' },
+        ],
+      }
+      return { nodes, edges, plc: { scene } }
+    },
+  },
+  {
     id: 'semaforo',
     title: 'Semáforo',
     description: 'Ciclo cerrado solo con temporizaciones: rojo 10 s, verde 8 s, ámbar 3 s.',
