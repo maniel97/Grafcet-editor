@@ -5,10 +5,13 @@
 //   x, y: punto de anclaje (px de la escena); rot: 0 | 90 | 180 | 270 (sentido horario).
 // Física sencilla, sin motor físico: rectángulos que se mueven y se empujan; los detectores
 // miran si algo entra en su zona.
+// scene.gravity: vista de frente (como PC_SIMU) en vez de desde arriba: las piezas caen hasta
+// apoyarse en algo (cinta, rampa, plataforma, báscula, placa de un cilindro, fondo de una
+// recogida, otra pieza o el suelo de la escena) y las cintas arrastran lo que llevan encima.
 //
 // Estado: { pos: { [cilindro]: 0..1 }, pressed: { [mando]: bool }, level: { [depósito]: 0..1 },
 //           angle: { [motor]: grados }, faults: { [elemento]: avería }, pieces: [{ id, x, y, w, h,
-//           color }], counts: { [recogida]: n }, nextPiece, fed: { [alimentador]: valor anterior } }
+//           color, vy }], counts: { [recogida]: n }, nextPiece, fed: { [alimentador]: valor anterior } }
 
 export const SCENE_TYPES = {
   button: { label: 'Pulsador', group: 'Mandos', defaults: { variable: '', contact: 'NO', color: 'green', text: '' } },
@@ -46,6 +49,7 @@ export const SCENE_TYPES = {
   display: { label: 'Visualizador', group: 'Señalización', defaults: { variable: '', text: '' } },
   diverter: { label: 'Desviador', group: 'Actuadores', defaults: { gate: '', length: 80, time: 0.5, text: '' } },
   ramp: { label: 'Rampa', group: 'Proceso', defaults: { length: 120, time: 1, text: '' } },
+  platform: { label: 'Plataforma', group: 'Proceso', defaults: { length: 160, text: '' } },
   siren: { label: 'Sirena', group: 'Señalización', defaults: { variable: '', sound: false, text: '' } },
   trafficlight: { label: 'Semáforo', group: 'Señalización', defaults: { red: '', amber: '', green: '', text: '' } },
   valve: { label: 'Electroválvula', group: 'Actuadores', defaults: { variable: '', text: '' } },
@@ -100,6 +104,7 @@ export const SCENE_VARS = {
   display: [['variable', 'Valor', 'any']],
   diverter: [['gate', 'Desviar (salida)', 'out']],
   ramp: [],
+  platform: [],
   siren: [['variable', 'Salida', 'out']],
   trafficlight: [
     ['red', 'Rojo (salida)', 'out'],
@@ -175,6 +180,16 @@ export const diverterRect = (e) => worldRect(e, 0, -25, Number(e.length) || 80, 
 export const rampRect = (e) => worldRect(e, 0, -20, Number(e.length) || 120, 40)
 export const conveyorRect = (e) => worldRect(e, 0, -15, Number(e.length) || 240, 30)
 export const sinkRect = (e) => worldRect(e, -30, -30, 60, 60)
+// Plataforma: superficie fija (anclaje: extremo izquierdo de su cara de arriba).
+export const platformRect = (e) => worldRect(e, 0, 0, Number(e.length) || 160, 14)
+
+// Vista de frente (scene.gravity): aceleración (px/s²), suelo de la escena (10 px por encima del
+// borde de abajo, para que se vea) y
+// cuánto puede «subir» una pieza a una superficie que la alcanza (la placa de un cilindro que la
+// eleva, el extremo de una cinta un poco más alta).
+export const GRAVITY = 900
+export const SCENE_FLOOR = 790
+const STEP_UP = 24
 
 // Cilindro montado en el vástago de otro (e.mountedOn): viaja con él. Su x, y son los de con el
 // otro recogido; se le suma lo que haya salido el vástago del otro (y, en cadena, lo del suyo).
@@ -190,6 +205,59 @@ export function placed(scene, state, e, depth = 0) {
 export const platePlaced = (scene, state, c) => cylinderPlate(placed(scene, state, c), state.pos?.[c.id] ?? 0)
 
 // --- Simulación ----------------------------------------------------------------------------
+
+// Superficies fijas en las que se apoyan las piezas con gravedad.
+function supports(scene, state) {
+  const out = []
+  for (const e of elementsOf(scene)) {
+    if (e.type === 'conveyor') out.push(conveyorRect(e))
+    if (e.type === 'ramp') out.push(rampRect(e))
+    if (e.type === 'platform') out.push(platformRect(e))
+    if (e.type === 'scale') out.push(scaleRect(e))
+    if (e.type === 'cylinder' && !e.vacuum) out.push(platePlaced(scene, state, e))
+    if (e.type === 'sink') {
+      const r = sinkRect(e)
+      out.push({ x: r.x, y: r.y + r.h, w: r.w, h: 1 }) // el fondo: lo que cae dentro se recoge
+    }
+  }
+  return out
+}
+// ¿Descansa la pieza sobre la cara de arriba de r? (con gravedad, lo que mueve una cinta)
+const restsOn = (p, r) => Math.abs(p.y + p.h - r.y) < 1 && p.x + p.w / 2 >= r.x && p.x + p.w / 2 <= r.x + r.w
+
+// Caída de las piezas (de la más baja a la más alta: las de abajo sirven de apoyo a las de
+// encima). Una pieza se apoya si su centro está sobre la superficie (si no, vuelca y cae). En el
+// aire conserva la velocidad horizontal con la que salió (de una cinta, una rampa…).
+function fall(scene, state, held, dt) {
+  const fixed = supports(scene, state)
+  const below = []
+  for (const p of [...state.pieces].sort((a, b) => b.y + b.h - (a.y + a.h))) {
+    if (held.has(p.id)) {
+      below.push(p)
+      continue
+    }
+    const cx = p.x + p.w / 2
+    const bottom = p.y + p.h
+    let top = SCENE_FLOOR
+    for (const r of [...fixed, ...below]) if (cx >= r.x && cx <= r.x + r.w && r.y >= bottom - STEP_UP && r.y < top) top = r.y
+    const land = () => {
+      p.y = top - p.h
+      p.vy = 0
+      p.vx = 0
+    }
+    if (top <= bottom + 0.5) land()
+    else {
+      const vy = (p.vy ?? 0) + GRAVITY * dt
+      if (bottom + vy * dt >= top) land()
+      else {
+        p.y = Math.round((p.y + vy * dt) * 1000) / 1000
+        p.x = Math.round((p.x + (p.vx ?? 0) * dt) * 1000) / 1000
+        p.vy = vy
+      }
+    }
+    below.push(p)
+  }
+}
 
 const on = (values, name) => Boolean(name) && Number(values[name] ?? 0) !== 0
 const clamp = (x) => Math.min(1, Math.max(0, x))
@@ -272,10 +340,10 @@ export function sceneStep(scene, state, values, dt) {
     const speed = length / Math.max(0.1, time)
     const [dx, dy] = rotate(speed * dt, 0, e.rot)
     for (const p of next.pieces) {
-      if (heldIds.has(p.id) || !inside(center(p), rect)) continue
+      if (heldIds.has(p.id) || !(scene?.gravity ? restsOn(p, rect) : inside(center(p), rect))) continue
       const moved = { ...p, x: p.x + dx, y: p.y + dy }
       const blocked = next.pieces.some((o) => o !== p && overlaps(moved, o) && !overlaps(p, o))
-      if (!blocked) Object.assign(p, { x: moved.x, y: moved.y })
+      if (!blocked) Object.assign(p, { x: moved.x, y: moved.y }, scene?.gravity ? { vx: dx / dt } : {})
     }
   }
 
@@ -367,6 +435,8 @@ export function sceneStep(scene, state, values, dt) {
     const dir = on(values, e.variable) ? (on(values, e.reverse) ? -1 : 1) : 0
     if (dir) next.angle[e.id] = ((next.angle[e.id] ?? 0) + dir * 360 * dt) % 360
   }
+
+  if (scene?.gravity) fall(scene, next, new Set(Object.values(next.held).map((h) => h.id)), dt)
 
   // Recogidas: retiran (y cuentan) las piezas que caen dentro.
   for (const e of elements) {

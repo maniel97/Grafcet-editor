@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import { closest } from '../lib/autocomplete'
-import { ArrowLeft, ArrowRight, BookmarkPlus, Cable, ChevronDown, Copy, Download, Hand, Maximize2, Upload, Tag, Minimize2, Minus, MousePointer2, Plus, RotateCw, Scan, Trash2, WandSparkles, X } from 'lucide-react'
+import { ArrowLeft, ArrowRight, BookmarkPlus, Cable, ChevronDown, Copy, Download, Hand, Maximize2, Upload, Tag, Minimize2, Minus, MousePointer2, Plus, RotateCw, Scan, Trash2, WandSparkles, X, ArrowDownToLine } from 'lucide-react'
 import {
   PIECE_SIZES,
   SCENE_TYPES,
@@ -24,6 +24,8 @@ import {
   sinkRect,
   distanceBeam,
   worldRect,
+  platformRect,
+  SCENE_FLOOR,
 } from '../lib/sim/scene'
 import { copyToClipboard, pasteFromClipboard } from '../lib/sim/sceneClipboard'
 import { exportGroups, importGroups, loadGroups, makeGroup, placeGroup, storeGroups } from '../lib/sim/sceneLibrary'
@@ -254,6 +256,18 @@ function DiverterShape({ e, active }) {
   )
 }
 // Rampa: superficie inclinada (más alta al principio) por la que resbalan las piezas.
+// Plataforma: superficie fija (mesa, suelo, pared si se gira).
+function PlatformShape({ e }) {
+  const len = Number(e.length) || 160
+  return (
+    <g>
+      <rect x="0" y="0" width={len} height="14" fill="#cbd5e1" stroke={INK} />
+      {Array.from({ length: Math.floor(len / 12) }, (_, i) => (
+        <line key={i} x1={6 + i * 12} y1="14" x2={14 + i * 12} y2="2" stroke="#94a3b8" />
+      ))}
+    </g>
+  )
+}
 function RampShape({ e }) {
   const len = Number(e.length) || 120
   return (
@@ -474,6 +488,8 @@ function boundsOf(e, pos = 0) {
     }
     case 'ramp':
       return worldRect(e, 0, -20, Number(e.length) || 120, 40)
+    case 'platform':
+      return platformRect(e)
     case 'siren':
       return r(-20, -20, 44, 40)
     case 'trafficlight':
@@ -917,6 +933,7 @@ function Properties({ element, variables, onChange, onDelete, onRotate, onCreate
           {number('height', 'Alto (px)', 20, 10)}
         </>
       )}
+      {element.type === 'platform' && number('length', 'Largo (px)', 30, 10)}
       {(element.type === 'diverter' || element.type === 'ramp') && (
         <>
           {number('length', 'Largo (px)', 30, 10)}
@@ -1088,6 +1105,7 @@ const HINTS = {
     'Pick & place: cilindro horizontal X y vertical Z montado en su vástago. Asigna a Z la ventosa (vacío) para coger la pieza que toca y llevarla con los dos vástagos.',
   diverter: 'Desviador: mientras su salida está activa, empuja las piezas de su zona hacia donde apunta la flecha (para sacarlas de una cinta).',
   ramp: 'Rampa: las piezas resbalan solas hasta su extremo (a la salida de una cinta, hacia una recogida…).',
+  platform: 'Plataforma: superficie fija (mesa, estante, suelo). En la vista de frente, las piezas se apoyan en ella.',
   siren: 'Sirena: avisa (con sonido, si se activa en sus propiedades) mientras su salida está activa.',
   trafficlight: 'Semáforo: tres luces (rojo, ámbar y verde), cada una con su salida.',
   valve: 'Electroválvula: abierta (azul) mientras su salida está activa. Para dibujar el circuito de un depósito.',
@@ -1145,6 +1163,7 @@ function ModulePreview({ item }) {
     heater: <HeaterShape e={e} temp={85} heating />,
     diverter: <DiverterShape e={e} active />,
     ramp: <RampShape e={e} />,
+    platform: <PlatformShape e={e} />,
     siren: <SirenShape on />,
     trafficlight: <TrafficLightShape e={{ ...e, green: 'V' }} values={values} />,
     valve: <ValveShape open />,
@@ -1218,7 +1237,7 @@ async function loadImage(file) {
 }
 
 // Elementos por los que pasan las piezas: se dibujan debajo de todo.
-const UNDER = ['image', 'pipe', 'conveyor', 'sink', 'ramp', 'diverter']
+const UNDER = ['image', 'pipe', 'conveyor', 'sink', 'ramp', 'diverter', 'platform']
 
 // Panel de control: los mandos y la señalización pueden ir en un panel fijo, aparte del
 // mecanismo (como el cuadro eléctrico real). e.place: 'desk' | 'machine' (por defecto, máquina).
@@ -1262,6 +1281,8 @@ function drawElement(e, { scene, state, values, time, signals }) {
       return <DiverterShape e={e} active={isOn(values, e.gate) && state.faults?.[e.id] !== 'stuck'} />
     case 'ramp':
       return <RampShape e={e} />
+    case 'platform':
+      return <PlatformShape e={e} />
     case 'siren':
       return <SirenShape on={isOn(values, e.variable)} />
     case 'trafficlight':
@@ -1824,7 +1845,7 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
       ref={sectionRef}
       tabIndex={-1}
       onKeyDown={onKeyDown}
-      className={`side-panel relative flex outline-none min-w-0 flex-col border-l border-slate-200 bg-white ${maximized ? 'absolute inset-y-0 left-0 right-80 z-20' : 'shrink-0'}`}
+      className={`side-panel @container relative flex outline-none min-w-0 flex-col border-l border-slate-200 bg-white ${maximized ? 'absolute inset-y-0 left-0 right-80 z-20' : 'shrink-0'}`}
       style={maximized ? undefined : { width: width ?? '50%' }}
     >
       {/* Separador: arrastrar para repartir el espacio entre el grafcet y la planta. */}
@@ -1906,10 +1927,26 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
           onClick={() => setIoOpen((v) => !v)}
           aria-pressed={ioOpen}
           title="Qué está conectado y qué falta"
+          aria-label="Conexiones"
           className={`flex items-center gap-1 rounded border px-2 py-0.5 ${ioOpen ? 'border-blue-300 bg-blue-50 text-blue-800' : 'border-slate-300 hover:bg-slate-100'}`}
         >
-          <Cable size={12} /> Conexiones
+          {/* Con la planta estrecha, solo los iconos: la cabecera no salta a dos líneas. */}
+          <Cable size={12} /> <span className="hidden @3xl:inline">Conexiones</span>
           {ioWarnings > 0 && <span className="rounded-full bg-amber-500 px-1.5 text-[10px] font-semibold text-white">{ioWarnings}</span>}
+        </button>
+        <button
+          type="button"
+          onClick={() => onChange({ ...(scene ?? {}), gravity: !scene?.gravity })}
+          aria-pressed={Boolean(scene?.gravity)}
+          aria-label="Gravedad"
+          title={
+            scene?.gravity
+              ? 'Vista de frente: las piezas caen y se apoyan en cintas, plataformas y otras piezas. Pulsa para verla desde arriba (sin gravedad)'
+              : 'Vista desde arriba: las piezas no caen. Pulsa para verla de frente, con gravedad'
+          }
+          className={`flex items-center gap-1 rounded border px-2 py-0.5 ${scene?.gravity ? 'border-blue-300 bg-blue-50 text-blue-800' : 'border-slate-300 hover:bg-slate-100'}`}
+        >
+          <ArrowDownToLine size={12} /> <span className="hidden @3xl:inline">Gravedad</span>
         </button>
         <button type="button" onClick={() => onAction(null, 'clear')} title="Quita de la escena todas las piezas (cilindros, cintas y demás elementos se quedan)" className="rounded border border-slate-300 px-2 py-0.5 hover:bg-slate-100">
           Quitar piezas
@@ -2119,6 +2156,8 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
             </defs>
             <rect width={W} height={H} fill="white" />
             {mode === 'edit' && <rect width={W} height={H} fill="url(#scene-grid)" />}
+            {/* Vista de frente: el suelo, donde acaba lo que cae. */}
+            {scene?.gravity && <rect x="0" y={SCENE_FLOOR} width={W} height={H - SCENE_FLOOR} fill="#cbd5e1" data-floor="" />}
             {machine.length === 0 && (
               <text x={W / 2} y={H / 2} textAnchor="middle" fontSize="16" fill="#94a3b8">
                 Pulsa «Editar» y añade elementos: pulsadores, cilindros, cintas, detectores…

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { compile, evolve, initialState } from '../../src/lib/sim/engine'
 import { buildPlcModel } from '../../src/lib/plcModel'
 import { EMPTY_PLC } from '../../src/lib/addressing'
-import { detectScene, measuredDistance, rotate, sceneAction, sceneFaults, sceneFromPlant, sceneInit, sceneInputNames, sceneInputs, sceneStep, worldRect } from '../../src/lib/sim/scene'
+import { SCENE_FLOOR, detectScene, measuredDistance, rotate, sceneAction, sceneFaults, sceneFromPlant, sceneInit, sceneInputNames, sceneInputs, sceneStep, worldRect } from '../../src/lib/sim/scene'
 import { normalizeProject } from '../../src/lib/projectFile'
 import { advanceWorld, makeWorld } from '../../src/lib/sim/world'
 import { links, step, transition } from './helpers'
@@ -434,5 +434,65 @@ describe('escena: barrera', () => {
     s = run(scene, s, { Abrir: 1 }, 1.1)
     expect(sceneInputs(scene, s).Abajo).toBe(1) // atascada
     expect(sceneFaults(scene.elements[0]).map((f) => f.label)).toEqual(['Atascada', 'Final Arriba roto', 'Final Abajo roto'])
+  })
+})
+
+describe('vista de frente (gravedad)', () => {
+  const feederAt = (x, y) => ({ id: 'f', type: 'feeder', x, y, rot: 0, trigger: 'Poner', auto: false, spacing: 0, sizes: 'small', material: 'plastic' })
+  const drop = (scene, values = {}, seconds = 2) => {
+    let state = sceneStep(scene, sceneInit(scene), { Poner: 1 }, 0.05)
+    return run(scene, state, values, seconds)
+  }
+
+  it('sin gravedad (desde arriba) la pieza se queda donde sale', () => {
+    const scene = { elements: [feederAt(100, 100)] }
+    expect(drop(scene).pieces[0].y).toBe(100 - 14)
+  })
+
+  it('cae hasta el suelo de la escena o hasta la plataforma que tenga debajo', () => {
+    expect(drop({ gravity: true, elements: [feederAt(100, 100)] }).pieces[0].y + 28).toBe(SCENE_FLOOR)
+    const onTable = drop({ gravity: true, elements: [feederAt(100, 100), { id: 'm', type: 'platform', x: 50, y: 300, rot: 0, length: 160 }] })
+    expect(onTable.pieces[0].y + 28).toBe(300)
+    expect(onTable.pieces[0].vy).toBe(0)
+  })
+
+  it('se apilan: la segunda pieza queda encima de la primera', () => {
+    const scene = { gravity: true, elements: [feederAt(100, 100), { id: 'm', type: 'platform', x: 50, y: 300, rot: 0, length: 160 }] }
+    let state = drop(scene)
+    state = sceneStep(scene, state, { Poner: 0 }, 0.05)
+    state = run(scene, sceneStep(scene, state, { Poner: 1 }, 0.05), {}, 2)
+    const ys = state.pieces.map((p) => p.y + p.h).sort((a, b) => a - b)
+    expect(ys).toEqual([300 - 28, 300])
+  })
+
+  it('la cinta lleva la pieza que tiene encima y, al acabarse, la pieza cae a la recogida', () => {
+    const scene = {
+      gravity: true,
+      elements: [
+        feederAt(60, 100),
+        { id: 'c', type: 'conveyor', x: 20, y: 300, rot: 0, motor: 'M', length: 200, time: 2 },
+        // Sale despedida a 100 px/s y cae unos 0,7 s: la recogida está algo más allá del final.
+        { id: 'r', type: 'sink', x: 300, y: 500, rot: 0 },
+      ],
+    }
+    const resting = drop(scene)
+    expect(resting.pieces[0].y + 28).toBe(300 - 15) // sobre la banda
+    const stopped = run(scene, resting, {}, 1)
+    expect(stopped.pieces[0].x).toBe(resting.pieces[0].x) // cinta parada: no se mueve
+    const end = run(scene, resting, { M: 1 }, 4)
+    expect(end.pieces).toHaveLength(0)
+    expect(end.counts.r).toBe(1)
+  })
+
+  it('un cilindro vertical eleva la pieza que tiene encima y, al bajar, la pieza baja con él', () => {
+    const lift = { id: 'a', type: 'cylinder', x: 100, y: 400, rot: 270, extend: 'A', retract: '', stroke: 100, time: 1 }
+    const scene = { gravity: true, elements: [feederAt(100, 200), lift] }
+    const resting = drop(scene)
+    const plateTop = (state) => worldRect(lift, 80 + (state.pos.a ?? 0) * 100, -14, 8, 28).y
+    expect(resting.pieces[0].y + 28).toBe(plateTop(resting))
+    const up = run(scene, resting, { A: 1 }, 1.5)
+    expect(up.pieces[0].y + 28).toBeCloseTo(plateTop(up), 3)
+    const down = run(scene, up, { A: 0 }, 1.5)
+    expect(down.pieces[0].y + 28).toBeCloseTo(plateTop(down), 3)
   })
 })

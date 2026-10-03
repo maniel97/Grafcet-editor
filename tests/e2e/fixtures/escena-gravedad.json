@@ -1,0 +1,30 @@
+{
+  "format": "grafcet-editor",
+  "version": 1,
+  "nodes": [
+    { "id": "s0", "type": "step", "position": { "x": 200, "y": 0 }, "data": { "label": "0", "initial": true, "actions": [] } },
+    { "id": "t1", "type": "transition", "position": { "x": 200, "y": 100 }, "data": { "condition": "Marcha" } },
+    { "id": "s1", "type": "step", "position": { "x": 200, "y": 170 }, "data": { "label": "1", "actions": [{ "text": "M", "kind": "continuous" }] } },
+    { "id": "t2", "type": "transition", "position": { "x": 200, "y": 270 }, "data": { "condition": "!Marcha" } }
+  ],
+  "edges": [
+    { "id": "a", "source": "s0", "target": "t1" },
+    { "id": "b", "source": "t1", "target": "s1" },
+    { "id": "c", "source": "s1", "target": "t2" },
+    { "id": "d", "source": "t2", "target": "s0" }
+  ],
+  "plc": {
+    "scheme": "siemens",
+    "showAddresses": false,
+    "steps": {},
+    "variables": { "Marcha": { "type": "input" }, "M": { "type": "output" } },
+    "scene": {
+      "elements": [
+        { "id": "f", "type": "feeder", "x": 150, "y": 100, "rot": 0, "trigger": "", "auto": false, "spacing": 0, "sizes": "small", "material": "plastic", "color": "amber" },
+        { "id": "c", "type": "conveyor", "x": 100, "y": 300, "rot": 0, "motor": "M", "length": 300, "time": 3, "text": "" },
+        { "id": "r", "type": "sink", "x": 470, "y": 560, "rot": 0, "text": "" },
+        { "id": "marcha", "type": "switch", "x": 0, "y": 0, "rot": 0, "variable": "Marcha", "contact": "NO", "text": "Marcha", "place": "desk" }
+      ]
+    }
+  }
+}

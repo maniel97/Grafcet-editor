@@ -806,3 +806,22 @@ test('escena: sirena, semáforo, electroválvula, barrera, tubería, rótulo e i
   await expect(props.getByRole('checkbox', { name: /Con sonido/ })).not.toBeChecked()
   expectNoErrors(errors)
 })
+
+test('planta de frente: con «Gravedad» la pieza cae a la cinta y, al final de la cinta, a la recogida', async ({ page }) => {
+  const errors = await openEditor(page, 'escena-gravedad.json')
+  await page.getByRole('button', { name: /Simular/ }).click()
+  const view = page.getByRole('region', { name: 'Escena de la planta' })
+  // Una pieza en el alimentador (se suelta al pulsarlo en modo Usar).
+  await view.locator('[aria-label^="Alimentador"]').click()
+  const piece = view.locator('[data-piece] rect')
+  await expect(piece).toHaveCount(1)
+  const bottom = async () => Number(await piece.getAttribute('y')) + Number(await piece.getAttribute('height'))
+  expect(await bottom()).toBe(114) // desde arriba no cae
+  await view.getByRole('button', { name: 'Gravedad' }).click()
+  await expect(view.getByRole('button', { name: 'Gravedad' })).toHaveAttribute('aria-pressed', 'true')
+  await expect.poll(bottom).toBe(285) // sobre la banda de la cinta (300 − 15)
+  await page.getByRole('region', { name: 'Panel de control' }).locator('[aria-label="Interruptor Marcha"]').click()
+  await expect(view.locator('[aria-label^="Recogida"]')).toContainText('1', { timeout: 8000 })
+  await expect(piece).toHaveCount(0)
+  expectNoErrors(errors)
+})
