@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { compile, evolve, initialState } from '../../src/lib/sim/engine'
-import { advanceWithPlant, detectPlant, plantAction, plantFaults, plantInit, plantInputNames, plantInputs, plantStep, setPlantFault } from '../../src/lib/sim/plant'
+import { detectPlant, plantAction, plantFaults, plantInit, plantInputNames, plantInputs, plantStep, setPlantFault } from '../../src/lib/sim/plant'
 import { buildPlcModel } from '../../src/lib/plcModel'
+import { advanceWorld, makeWorld } from '../../src/lib/sim/world'
 import { EMPTY_PLC } from '../../src/lib/addressing'
 import { links, step, transition } from './helpers'
 
@@ -83,8 +84,9 @@ describe('planta virtual en la simulación', () => {
     let state = evolve(compiled, initialState(compiled), inputs, 0).state
     const visited = []
     for (let t = 0.1; t <= 5; t += 0.1) {
-      const r = advanceWithPlant(compiled, { state, inputs, plant }, t, { elements })
-      ;({ state, inputs, plant } = r)
+      const r = advanceWorld(compiled, { state, inputs, world: { ...makeWorld(elements).init(), plant } }, t, { world: makeWorld(elements) })
+      ;({ state, inputs } = r)
+      plant = r.world.plant
       if (t > 0.5) inputs = { ...inputs, Marcha: 0 } // un solo ciclo
       const label = compiled.steps.find((s) => state.active.has(s.id)).label
       if (visited.at(-1) !== label) visited.push(label)
@@ -98,7 +100,7 @@ describe('planta virtual en la simulación', () => {
     let plant = plantInit(elements)
     let inputs = { Marcha: 1, ...plantInputs(elements, plant) }
     let state = evolve(compiled, initialState(compiled), inputs, 0).state
-    ;({ state, inputs, plant } = advanceWithPlant(compiled, { state, inputs, plant }, 2.2, { elements }))
+    ;({ state } = advanceWorld(compiled, { state, inputs, world: { ...makeWorld(elements).init(), plant } }, 2.2, { world: makeWorld(elements) }))
     // A fuera (1 s) y B fuera (0,5 s) y vuelta de B (0,5 s): en X4, recogiendo A.
     expect(compiled.steps.find((s) => state.active.has(s.id)).label).toBe('4')
   })

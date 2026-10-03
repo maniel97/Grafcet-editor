@@ -49,6 +49,7 @@ import { EMPTY_GEMMA, generateConduction } from '../lib/gemma'
 const SettingsDialog = lazy(() => import('./SettingsDialog'))
 const HelpDialog = lazy(() => import('./HelpDialog'))
 const SimulationPanel = lazy(() => import('./SimulationPanel'))
+const SceneView = lazy(() => import('./SceneView'))
 const LadderView = lazy(() => import('./LadderView'))
 const VariablesDialog = lazy(() => import('./VariablesDialog'))
 const ExportDialog = lazy(() => import('./ExportDialog'))
@@ -103,6 +104,8 @@ export default function GrafcetCanvas() {
   const [helpOpen, setHelpOpen] = useState(false)
   const [verifyOpen, setVerifyOpen] = useState(false)
   const [ladderOpen, setLadderOpen] = useState(false)
+  // Escena de la planta durante la simulación: null | 'split' (junto al grafcet) | 'full'.
+  const [sceneView, setSceneView] = useState(null)
   // Elemento del grafcet cuyos segmentos se resaltan en el ladder («Ver en el ladder»).
   const [ladderFocus, setLadderFocus] = useState(null)
   const [gemmaOpen, setGemmaOpen] = useState(false)
@@ -747,7 +750,7 @@ export default function GrafcetCanvas() {
             <HelpDialog onClose={() => setHelpOpen(false)} />
           </Suspense>
         )}
-        <div className="flex min-h-0 flex-1">
+        <div className="relative flex min-h-0 flex-1">
           <div ref={wrapperRef} className={`relative flex-1 ${loopSource ? 'loop-picking' : ''} ${readOnly ? 'read-only' : ''}`}>
             {editLocked && !simulating && (
               <div className="absolute left-1/2 top-3 z-10 flex -translate-x-1/2 items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-sm text-amber-900 shadow">
@@ -859,9 +862,27 @@ export default function GrafcetCanvas() {
               />
             )}
           </div>
+          {simulating && sceneView && simulation.sim && (
+            <Suspense fallback={<Loading panel />}>
+              <SceneView
+                scene={plc.scene}
+                onChange={(scene) => setPlc((p) => ({ ...p, scene }))}
+                worldState={simulation.sim.world?.scene}
+                values={{ ...simulation.sim.state.values, ...simulation.sim.inputs }}
+                time={simulation.sim.state.time}
+                variables={simulation.compiled.variables}
+                onAction={simulation.sceneDo}
+                maximized={sceneView === 'full'}
+                onToggleMaximize={() => setSceneView((v) => (v === 'full' ? 'split' : 'full'))}
+                onClose={() => setSceneView(null)}
+              />
+            </Suspense>
+          )}
           {simulating ? (
             <Suspense fallback={<Loading panel />}>
               <SimulationPanel
+                sceneOpen={Boolean(sceneView)}
+                onToggleScene={() => setSceneView((v) => (v ? null : 'split'))}
                 simulation={simulation}
                 scenarios={plc.scenarios}
                 onScenariosChange={(update) => setPlc((p) => ({ ...p, scenarios: update(p.scenarios ?? []) }))}

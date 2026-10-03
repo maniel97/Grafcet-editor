@@ -1,0 +1,207 @@
+{
+ "format": "grafcet-editor",
+ "version": 1,
+ "nodes": [
+  {
+   "id": "s0",
+   "type": "step",
+   "position": {
+    "x": 200,
+    "y": 0
+   },
+   "data": {
+    "label": "0",
+    "actions": [
+     {
+      "text": "M",
+      "kind": "continuous"
+     }
+    ],
+    "initial": true
+   }
+  },
+  {
+   "id": "t1",
+   "type": "transition",
+   "position": {
+    "x": 200,
+    "y": 100
+   },
+   "data": {
+    "condition": "Marcha · S"
+   }
+  },
+  {
+   "id": "s1",
+   "type": "step",
+   "position": {
+    "x": 200,
+    "y": 170
+   },
+   "data": {
+    "label": "1",
+    "actions": [
+     {
+      "text": "A+",
+      "kind": "continuous"
+     }
+    ]
+   }
+  },
+  {
+   "id": "t2",
+   "type": "transition",
+   "position": {
+    "x": 200,
+    "y": 270
+   },
+   "data": {
+    "condition": "a1"
+   }
+  },
+  {
+   "id": "s2",
+   "type": "step",
+   "position": {
+    "x": 200,
+    "y": 340
+   },
+   "data": {
+    "label": "2",
+    "actions": [
+     {
+      "text": "A-",
+      "kind": "continuous"
+     }
+    ]
+   }
+  },
+  {
+   "id": "t3",
+   "type": "transition",
+   "position": {
+    "x": 200,
+    "y": 440
+   },
+   "data": {
+    "condition": "a0"
+   }
+  }
+ ],
+ "edges": [
+  {
+   "id": "s0-t1",
+   "source": "s0",
+   "target": "t1"
+  },
+  {
+   "id": "t1-s1",
+   "source": "t1",
+   "target": "s1"
+  },
+  {
+   "id": "s1-t2",
+   "source": "s1",
+   "target": "t2"
+  },
+  {
+   "id": "t2-s2",
+   "source": "t2",
+   "target": "s2"
+  },
+  {
+   "id": "s2-t3",
+   "source": "s2",
+   "target": "t3"
+  },
+  {
+   "id": "t3-s0",
+   "source": "t3",
+   "target": "s0"
+  }
+ ],
+ "plc": {
+  "scheme": "siemens",
+  "showAddresses": false,
+  "steps": {},
+  "variables": {},
+  "scene": {
+   "elements": [
+    {
+     "id": "marcha",
+     "type": "switch",
+     "x": 60,
+     "y": 60,
+     "rot": 0,
+     "variable": "Marcha",
+     "contact": "NO",
+     "text": "Marcha"
+    },
+    {
+     "id": "luz",
+     "type": "lamp",
+     "x": 140,
+     "y": 60,
+     "rot": 0,
+     "variable": "M",
+     "color": "green",
+     "text": "Cinta"
+    },
+    {
+     "id": "cinta",
+     "type": "conveyor",
+     "x": 100,
+     "y": 200,
+     "rot": 0,
+     "motor": "M",
+     "length": 400,
+     "time": 4,
+     "text": ""
+    },
+    {
+     "id": "alim",
+     "type": "feeder",
+     "x": 130,
+     "y": 200,
+     "rot": 0,
+     "trigger": "",
+     "auto": true,
+     "sizes": "small",
+     "color": "amber"
+    },
+    {
+     "id": "det",
+     "type": "sensor",
+     "x": 360,
+     "y": 250,
+     "rot": 270,
+     "variable": "S",
+     "contact": "NO",
+     "range": 60
+    },
+    {
+     "id": "A",
+     "type": "cylinder",
+     "x": 360,
+     "y": 60,
+     "rot": 90,
+     "extend": "A+",
+     "retract": "A-",
+     "retracted": "a0",
+     "extended": "a1",
+     "stroke": 120,
+     "time": 0.6,
+     "text": "A"
+    },
+    {
+     "id": "rec",
+     "type": "sink",
+     "x": 360,
+     "y": 300,
+     "rot": 0,
+     "text": ""
+    }
+   ]
+  }
+ }
+}

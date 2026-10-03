@@ -1,8 +1,6 @@
 // Planta virtual: elementos sencillos que leen las salidas del grafcet y producen sus entradas,
 // para probar sin ir pulsando finales de carrera. Puro: se prueba sin navegador.
 //
-import { advanceWithEvents } from './scenario'
-
 // Configuración (plc.plant): [{ id, type, name, ...variables y tiempos }]
 //   cylinder: extend (salida A+), retract (A−; vacía = simple efecto con muelle),
 //             retracted (a0), extended (a1), time (s de carrera)
@@ -172,25 +170,3 @@ export function detectPlant(variables, existing = []) {
 // Paso máximo de la planta: a velocidades altas el tiempo avanza a saltos y se trocea, para que
 // los sensores no se salten (p. ej. un final de carrera que se pisa solo un instante).
 export const PLANT_DT = 0.05
-
-// Avanza simulación y planta hasta `until`: a trozos de PLANT_DT, la planta se mueve con las
-// salidas del trozo anterior y sus sensores son las entradas del siguiente. Sin planta, de un
-// salto (como antes). Devuelve { state, inputs, plant, next, events }.
-export function advanceWithPlant(compiled, { state, inputs, plant }, until, { elements = [], analogRange, scenario, next = 0, options } = {}) {
-  const events = []
-  let t = state.time
-  do {
-    const to = elements.length ? Math.min(until, t + PLANT_DT) : until
-    if (elements.length) {
-      plant = plantStep(elements, plant, state.values, to - t)
-      inputs = { ...inputs, ...plantInputs(elements, plant, analogRange) }
-    }
-    const r = advanceWithEvents(compiled, state, inputs, to, scenario, next, options)
-    state = r.state
-    inputs = r.inputs
-    next = r.next
-    events.push(...r.events)
-    t = to
-  } while (t < until - 1e-9)
-  return { state, inputs, plant, next, events }
-}

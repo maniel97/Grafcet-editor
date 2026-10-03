@@ -92,30 +92,6 @@ test('planta virtual: la secuencia neumática avanza sola con sus finales de car
   expectNoErrors(errors)
 })
 
-test('panel de la planta: configurar una cinta y ver cómo la pieza para el motor', async ({ page }) => {
-  const errors = await openEditor(page)
-  await page.getByRole('button', { name: /Simular/ }).click()
-  await page.getByRole('button', { name: /Planta virtual/ }).click()
-  const panel = page.getByRole('region', { name: 'Planta virtual' })
-  await panel.getByLabel('Tipo de elemento').selectOption({ label: 'Cinta transportadora' })
-  await panel.getByRole('button', { name: 'Añadir' }).click()
-  // Motor: la salida del ejemplo; sensor final: Paro (al llegar la pieza, vuelve a X0).
-  await panel.getByRole('combobox', { name: 'Motor', exact: true }).selectOption({ index: 1 })
-  await panel.getByRole('combobox', { name: 'Sensor final' }).selectOption('Paro')
-  await panel.getByRole('spinbutton', { name: 'Recorrido (s)' }).fill('1')
-  await expect(page.getByText('planta', { exact: true })).toHaveCount(1)
-
-  await panel.getByRole('button', { name: 'Nueva pieza' }).click()
-  await expect(panel.getByRole('img', { name: /Cinta .*: 1 piezas/ })).toBeVisible()
-  await page.getByRole('switch').first().click() // Marcha
-  await expect.poll(() => activeSteps(page)).toBe('s1')
-  await page.getByRole('switch').first().click()
-  // La pieza llega al sensor (Paro) en 1 s: vuelve a X0 y la cinta se para con la pieza delante.
-  await expect.poll(() => activeSteps(page), { timeout: 4000 }).toBe('s0')
-  await expect(panel.getByRole('img', { name: /Cinta .*: 1 piezas/ })).toBeVisible()
-  expectNoErrors(errors)
-})
-
 test('ejemplo con planta, averías y «Detectar planta»', async ({ page }) => {
   const errors = await openEditor(page)
   await openExample(page, /Cilindros A\+ B\+/)
@@ -138,5 +114,52 @@ test('ejemplo con planta, averías y «Detectar planta»', async ({ page }) => {
   await panel.getByRole('button', { name: 'Quitar B' }).click()
   await panel.getByRole('button', { name: /Detectar planta: cilindro A, cilindro B/ }).click()
   await expect(panel.getByRole('img', { name: /Cilindro [AB]/ })).toHaveCount(2)
+  expectNoErrors(errors)
+})
+
+test('escena de la planta: colocar mandos y piloto, asignar variables y accionar', async ({ page }) => {
+  const errors = await openEditor(page)
+  await page.getByRole('button', { name: /Simular/ }).click()
+  await page.getByRole('button', { name: /Planta virtual/ }).click()
+  const view = page.getByRole('region', { name: 'Escena de la planta' })
+  await view.getByRole('radio', { name: /Editar/ }).click()
+  const palette = view.getByRole('navigation', { name: 'Elementos' })
+  const props = view.getByLabel('Propiedades del elemento')
+
+  await palette.getByRole('button', { name: '+ Pulsador' }).click()
+  await props.getByRole('combobox', { name: 'Entrada' }).selectOption('Marcha')
+  await palette.getByRole('button', { name: '+ Pulsador' }).click()
+  await props.getByRole('combobox', { name: 'Entrada' }).selectOption('Paro')
+  await props.getByRole('combobox', { name: 'Color' }).selectOption('red')
+  // El segundo pulsador encima del primero: se aparta arrastrándolo.
+  const second = view.locator('[aria-label="Pulsador Paro"]')
+  const box = await second.boundingBox()
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(box.x + box.width / 2 + 120, box.y + box.height / 2, { steps: 4 })
+  await page.mouse.up()
+  await palette.getByRole('button', { name: '+ Piloto' }).click()
+  await props.getByRole('combobox', { name: 'Salida' }).selectOption({ index: 1 })
+  // Las entradas de la escena ya no se tocan desde el panel.
+  await expect(page.getByRole('switch')).toHaveCount(0)
+
+  await view.getByRole('radio', { name: /Usar/ }).click()
+  const marcha = view.locator('[aria-label="Pulsador Marcha"]')
+  const mb = await marcha.boundingBox()
+  await page.mouse.move(mb.x + mb.width / 2, mb.y + mb.height / 2)
+  await page.mouse.down()
+  await expect.poll(() => activeSteps(page)).toBe('s1')
+  await page.mouse.up()
+  const pb = await second.boundingBox()
+  await page.mouse.move(pb.x + pb.width / 2, pb.y + pb.height / 2)
+  await page.mouse.down()
+  await expect.poll(() => activeSteps(page)).toBe('s0')
+  await page.mouse.up()
+
+  // La escena se guarda en el proyecto y vuelve a verse al simular otra vez.
+  await page.getByRole('button', { name: /Detener/ }).click()
+  await expect(view).toHaveCount(0)
+  await page.getByRole('button', { name: /Simular/ }).click()
+  await expect(view.locator('[data-element]')).toHaveCount(3)
   expectNoErrors(errors)
 })

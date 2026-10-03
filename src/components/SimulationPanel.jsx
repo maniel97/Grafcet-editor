@@ -5,7 +5,6 @@ import ScenarioControls from './ScenarioControls'
 import { chronogramCsv } from '../lib/sim/scenario'
 import { withMacros } from '../lib/sim/engine'
 import { firstFailure, waitingFor } from '../lib/sim/explain'
-import { plantInputNames } from '../lib/sim/plant'
 import PlantPanel from './PlantPanel'
 import { downloadFile } from '../lib/projectFile'
 import { fileName, getProjectName } from '../lib/fileNames'
@@ -98,13 +97,13 @@ function chronogramSource(samples, signals, now) {
 const fmtTime = (t) => (t < 60 ? `${t.toFixed(1)} s` : `${Math.floor(t / 60)} min ${(t % 60).toFixed(1)} s`)
 
 // Panel de control de la simulación.
-export default function SimulationPanel({ simulation, scenarios = [], onScenariosChange, onPlantChange, exportProps, onFocusNode, onClose }) {
+export default function SimulationPanel({ simulation, scenarios = [], onScenariosChange, onPlantChange, sceneOpen, onToggleScene, exportProps, onFocusNode, onClose }) {
   const { compiled, sim, playing, setPlaying, speed, setSpeed, setInput, step, advance, reset } = simulation
 
-  // Planta virtual: panel flotante (abierto de entrada si el proyecto ya tiene planta).
+  // Planta por elementos (la anterior a la escena): panel flotante, si el proyecto la tiene.
   const [plantOpen, setPlantOpen] = useState(() => simulation.plantElements.length > 0)
   // Las entradas que gobierna la planta virtual no se cambian a mano.
-  const plantDriven = useMemo(() => plantInputNames(simulation.plantElements), [simulation.plantElements])
+  const plantDriven = useMemo(() => simulation.world.inputNames(), [simulation.world])
   const allInputs = useMemo(() => compiled?.variables.filter((v) => v.type === 'input') ?? [], [compiled])
   const inputs = useMemo(() => allInputs.filter((v) => !plantDriven.has(v.name)), [allInputs, plantDriven])
   const plantInputsShown = allInputs.filter((v) => plantDriven.has(v.name))
@@ -288,20 +287,21 @@ export default function SimulationPanel({ simulation, scenarios = [], onScenario
         <div className="border-b border-slate-100 px-4 py-2">
           <button
             type="button"
-            onClick={() => setPlantOpen((o) => !o)}
-            aria-pressed={plantOpen}
-            className={`flex w-full items-center gap-1.5 rounded-md border px-2 py-1 text-sm ${plantOpen ? 'border-blue-300 bg-blue-50 text-blue-800' : 'border-slate-300 hover:bg-slate-50'}`}
+            onClick={onToggleScene}
+            aria-pressed={sceneOpen}
+            title="Escena de la planta junto al grafcet: pulsadores, cilindros, cintas, detectores…"
+            className={`flex w-full items-center gap-1.5 rounded-md border px-2 py-1 text-sm ${sceneOpen ? 'border-blue-300 bg-blue-50 text-blue-800' : 'border-slate-300 hover:bg-slate-50'}`}
           >
             <Factory size={14} /> Planta virtual
             <span className="ml-auto text-xs text-slate-500">
-              {simulation.plantElements.length ? `${simulation.plantElements.length} elementos` : 'sin elementos'}
+              {simulation.sceneCount ? `${simulation.sceneCount} elementos` : 'sin elementos'}
             </span>
           </button>
         </div>
         {plantOpen && (
           <PlantPanel
             elements={simulation.plantElements}
-            plantState={sim.plant}
+            plantState={sim.world?.plant}
             values={{ ...state.values, ...sim.inputs }}
             variables={compiled.variables}
             onChange={onPlantChange}
