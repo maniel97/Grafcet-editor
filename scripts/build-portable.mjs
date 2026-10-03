@@ -12,8 +12,14 @@ execSync('npx vite build', { stdio: 'inherit', env: { ...process.env, PORTABLE: 
 
 let html = readFileSync(join(out, 'index.html'), 'utf8')
 const read = (href) => readFileSync(join(out, href.replace(/^\.\//, '')), 'utf8')
-// Scripts de módulo: dentro del HTML («</script» escapado para no cerrar la etiqueta antes de tiempo).
-html = html.replace(/<script type="module" crossorigin src="([^"]+)"><\/script>/g, (_, src) => `<script type="module">${read(src).replaceAll('</script', '<\/script')}</script>`)
+// Scripts de módulo: dentro del HTML. «</script» dentro del código cerraría la etiqueta antes de
+// tiempo: se escribe «<\/script» (en JavaScript significa lo mismo).
+const SCRIPT_END = '</' + 'script'
+const ESCAPED_END = '<' + String.fromCharCode(92) + '/script'
+html = html.replace(
+  /<script type="module" crossorigin src="([^"]+)"><\/script>/g,
+  (_, src) => `<script type="module">${read(src).replaceAll(SCRIPT_END, ESCAPED_END)}</script>`,
+)
 html = html.replace(/<link rel="stylesheet" crossorigin href="([^"]+)">/g, (_, href) => `<style>${read(href)}</style>`)
 // Sin manifiesto ni precarga de módulos (no hay servidor); el icono, como dato.
 html = html.replace(/<link rel="manifest"[^>]*>\s*/g, '').replace(/<link rel="modulepreload"[^>]*>\s*/g, '').replace(/<link rel="apple-touch-icon"[^>]*>\s*/g, '')
