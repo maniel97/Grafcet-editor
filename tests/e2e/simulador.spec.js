@@ -986,3 +986,35 @@ test('esquema eléctrico: conexiones del autómata desde la tabla, conectadas co
   await expect(view.getByText(/no usan estos cables/)).toBeVisible()
   expectNoErrors(errors)
 })
+
+test('esquema eléctrico: vista previa en la paleta, separador redimensionable y zoom', async ({ page }) => {
+  await page.setViewportSize({ width: 1500, height: 850 })
+  const errors = await openEditor(page)
+  await page.getByRole('button', { name: 'Esquema eléctrico' }).click()
+  const view = page.getByRole('region', { name: 'Esquema eléctrico' })
+  // Vista previa: el símbolo, para qué sirve y su referencia.
+  await view.getByRole('button', { name: '+ Contactor (bobina)' }).hover()
+  const tip = page.getByRole('tooltip', { name: 'Vista previa: Contactor (bobina)' })
+  await expect(tip).toContainText('A1-A2')
+  if (process.env.SHOTS) await page.screenshot({ path: `${process.env.SHOTS}/elec-preview.png` })
+  await page.mouse.move(5, 5)
+  await expect(tip).toHaveCount(0)
+  // Separador: más ancho al arrastrarlo a la izquierda; se recuerda; doble clic, mitad y mitad.
+  const width = async () => (await view.boundingBox()).width
+  const before = await width()
+  const sep = await view.getByRole('separator', { name: 'Ancho del esquema' }).boundingBox()
+  await page.mouse.move(sep.x + sep.width / 2, sep.y + 200)
+  await page.mouse.down()
+  await page.mouse.move(sep.x - 200, sep.y + 200, { steps: 5 })
+  await page.mouse.up()
+  await expect.poll(width).toBeGreaterThan(before + 50) // con su límite: el grafcet conserva sitio
+  await page.getByRole('button', { name: 'Esquema eléctrico' }).click() // cerrar y abrir: mismo ancho
+  await page.getByRole('button', { name: 'Esquema eléctrico' }).click()
+  await expect.poll(width).toBeGreaterThan(before + 50) // con su límite: el grafcet conserva sitio
+  await view.getByRole('separator', { name: 'Ancho del esquema' }).dblclick()
+  await expect.poll(width).toBeLessThan(before + 20)
+  // Zoom con sus botones y el porcentaje.
+  await view.getByRole('button', { name: 'Acercar' }).click()
+  await expect(view.getByText(/^\d+ %$/)).not.toHaveText('100 %')
+  expectNoErrors(errors)
+})

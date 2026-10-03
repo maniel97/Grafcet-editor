@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Background, BackgroundVariant, ConnectionMode, ReactFlow, ReactFlowProvider, useReactFlow } from '@xyflow/react'
-import { AlertTriangle, Maximize2, Minimize2, MousePointer2, Hand, Scan, Trash2, WandSparkles, X, Zap } from 'lucide-react'
+import { Background, BackgroundVariant, ConnectionMode, ReactFlow, ReactFlowProvider, useReactFlow, useViewport } from '@xyflow/react'
+import { AlertTriangle, Minus, Plus, Maximize2, Minimize2, MousePointer2, Hand, Scan, Trash2, WandSparkles, X, Zap } from 'lucide-react'
 import ElecNode from './ElecNode'
+import { ElecSymbol } from './ElecSymbols'
 import { INK, POTENTIAL_COLORS } from './elecColors'
-import { ELEC_TYPES, GRID, POTENTIALS, contactNumbers, crossReferences, nextTag, showTag, sizeOf } from '../../lib/elec/catalog'
+import { ELEC_TYPES, GRID, POTENTIALS, contactNumbers, crossReferences, nextTag, showTag, sizeOf, terminalsOf } from '../../lib/elec/catalog'
 import { generatePlcWiring } from '../../lib/elec/generate'
 import { ELEC_TEMPLATES, insertTemplate } from '../../lib/elec/templates'
 
@@ -12,6 +13,25 @@ const EMPTY = { enabled: false, components: [], wires: [] }
 const HISTORY_LIMIT = 100
 const DRAG_TYPE = 'application/x-grafcet-elec'
 const snap = (v) => Math.round(v / GRID) * GRID
+const PREVIEW_DELAY = 450
+// Ancho del panel (arrastrando el separador), recordado entre sesiones.
+const WIDTH_KEY = 'grafcet-editor:elec-width'
+const MIN_WIDTH = 360
+const loadWidth = () => {
+  try {
+    const w = Number(localStorage.getItem(WIDTH_KEY))
+    return w >= MIN_WIDTH ? w : null
+  } catch {
+    return null
+  }
+}
+const saveWidth = (w) => {
+  try {
+    localStorage.setItem(WIDTH_KEY, String(Math.round(w)))
+  } catch {
+    /* sin almacenamiento */
+  }
+}
 const newId = (p) => `${p}${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`
 
 // Paleta: embarrados de cada potencial y el resto de aparatos por grupos.
@@ -55,6 +75,57 @@ const HINTS = {
   plc: 'Autómata: entradas I (con 1M a M) y salidas Q por relé (1L común).',
 }
 
+// Referencia de cada aparato (identificador IEC 81346 y bornes).
+const NORMS = {
+  rail: 'Colores IEC 60445: L1 marrón, L2 negro, L3 gris, N azul, PE verde-amarillo.',
+  pushbutton: 'Identificador -S · bornes 13-14 (NA), 11-12 (NC).',
+  switch: 'Identificador -S · bornes 13-14 (NA), 11-12 (NC).',
+  emergency: 'Identificador -S · NC 11-12 de apertura forzada (IEC 60947-5-5).',
+  limit: 'Identificador -B (detectores) · 13-14 / 11-12.',
+  contact: 'Lleva el identificador de su aparato · 13-14, 23-24… (NA); 11-12, 21-22… (NC); térmico 95-96 / 97-98.',
+  coil: 'Contactor -KM, relé -KA, temporizador -KT · bobina A1-A2.',
+  valve: 'Identificador -Y (válvula) · A1-A2.',
+  lamp: 'Identificador -H (señalización) · X1-X2.',
+  breaker: 'Identificador -Q · polos 1-2, 3-4, 5-6.',
+  motorprotector: 'Identificador -Q · polos 1-2, 3-4, 5-6.',
+  thermal: 'Identificador -F · polos 1-2, 3-4, 5-6; contactos 95-96 (NC) y 97-98 (NA).',
+  maincontacts: 'Lleva el identificador del contactor (-KM) · 1-2, 3-4, 5-6.',
+  motor3: 'Identificador -M · bornes U, V, W.',
+  motor6: 'Identificador -M · U1 V1 W1 / U2 V2 W2.',
+  plc: 'Identificador -A · entradas I con común 1M; salidas por relé Q con común 1L.',
+}
+
+// Vista previa de un aparato de la paleta: su símbolo (con sus bornes) tal como queda en el esquema.
+function ElecPreview({ item }) {
+  const c = { id: 'preview', type: item.type, x: 0, y: 0, tag: `${item.prefix ?? ELEC_TYPES[item.type].prefix}1`, ...ELEC_TYPES[item.type].defaults, ...item.preset }
+  if (c.type === 'rail') c.length = 160
+  if (c.type === 'plc') Object.assign(c, { inputs: 4, outputs: 3 })
+  if (c.type === 'contact' || c.type === 'maincontacts') c.ref = 'KM1'
+  const { w, h } = sizeOf(c)
+  const label = (t) => (c.type === 'contact' ? (t.side === 'top' ? '13' : '14') : t.id)
+  return (
+    <svg viewBox={`-40 -14 ${w + 120} ${h + 28}`} className="mx-auto block max-h-28 w-full" aria-hidden="true">
+      <ElecSymbol c={c} view={null} />
+      {!['rail', 'plc'].includes(c.type) &&
+        terminalsOf(c).map((t) => (
+          <text key={t.id} x={t.x + 4} y={t.side === 'top' ? t.y + 11 : t.y - 4} fontSize="8.5" fontFamily="ui-monospace, monospace" fill="#475569">
+            {label(t)}
+          </text>
+        ))}
+      {c.type === 'rail' && (
+        <text x="-6" y="14" textAnchor="end" fontSize="12" fontWeight="700" fill="#0f172a">
+          {c.potential}
+        </text>
+      )}
+      {!['rail', 'plc'].includes(c.type) && (
+        <text x={w + 4} y="34" fontSize="11" fontWeight="700" fill="#0f172a">
+          {showTag(c.type === 'contact' || c.type === 'maincontacts' ? c.ref : c.tag)}
+        </text>
+      )}
+    </svg>
+  )
+}
+
 // Esquema eléctrico (lib/elec): mando, potencia y autómata, editable y simulable.
 // schematic: plc.electrical; elecState: estado de la simulación (o null); onAction(id, action).
 // onHistory: como en la planta, deshacer/rehacer/copiar/pegar de siempre actúan aquí (modo Editar).
@@ -70,7 +141,7 @@ function Inner({ schematic, onChange, elecState, onAction, variables = [], build
   const sch = schematic ?? EMPTY
   const components = useMemo(() => sch.components ?? [], [sch.components])
   const wires = useMemo(() => sch.wires ?? [], [sch.wires])
-  const { screenToFlowPosition, fitView, getNodes } = useReactFlow()
+  const { screenToFlowPosition, fitView, getNodes, zoomIn, zoomOut } = useReactFlow()
   const wrapperRef = useRef(null)
   // Al empezar o acabar la simulación, Usar o Editar (se puede cambiar a mano).
   const [mode, setMode] = useState(simulating ? 'use' : 'edit')
@@ -83,6 +154,12 @@ function Inner({ schematic, onChange, elecState, onAction, variables = [], build
   const [selectedWires, setSelectedWires] = useState([])
   const [dragPos, setDragPos] = useState({})
   const [message, setMessage] = useState(null)
+  const [width, setWidth] = useState(loadWidth)
+  const resizing = useRef(null)
+  const [preview, setPreview] = useState(null) // { item, x, y }
+  const previewTimer = useRef(null)
+  useEffect(() => () => clearTimeout(previewTimer.current), [])
+  const { zoom } = useViewport()
   const view = elecState?.view ?? null
   // Al cambiar el tamaño del panel (vista dividida o completa, empezar a simular), reencuadrar. Se
   // observa el panel entero, no el lienzo: abrir las propiedades no debe mover la vista.
@@ -332,9 +409,50 @@ function Inner({ schematic, onChange, elecState, onAction, variables = [], build
       }}
       // relative y absolute no pueden ir juntas (en el CSS generado ganaría relative).
       className={`side-panel @container flex min-w-0 flex-col border-l border-slate-200 bg-white outline-none ${
-        maximized ? `absolute inset-y-0 left-0 z-20 ${simulating ? 'right-80' : 'right-0'}` : 'relative w-1/2 shrink-0'
+        maximized ? `absolute inset-y-0 left-0 z-20 ${simulating ? 'right-80' : 'right-0'}` : 'relative shrink-0'
       }`}
+      style={maximized ? undefined : { width: width ?? '50%' }}
     >
+      {/* Separador: arrastrar para repartir el espacio con el grafcet (doble clic: mitad y mitad). */}
+      {!maximized && (
+        <div
+          role="separator"
+          aria-orientation="vertical"
+          aria-label="Ancho del esquema"
+          title="Arrastra para cambiar el ancho del esquema (doble clic: mitad y mitad)"
+          className="absolute inset-y-0 -left-1 z-10 w-2 cursor-col-resize hover:bg-blue-400/40"
+          onPointerDown={(ev) => {
+            const right = sectionRef.current.getBoundingClientRect().right
+            const total = sectionRef.current.parentElement.getBoundingClientRect().width
+            resizing.current = { right, max: total - 320 - MIN_WIDTH, frame: 0, width: null }
+            ev.currentTarget.setPointerCapture(ev.pointerId)
+          }}
+          onPointerMove={(ev) => {
+            const r = resizing.current
+            if (!r) return
+            r.width = Math.round(Math.min(Math.max(MIN_WIDTH, r.right - ev.clientX), Math.max(MIN_WIDTH, r.max)))
+            // Un cambio por fotograma (el lienzo del grafcet se redimensiona con él).
+            if (!r.frame) {
+              r.frame = requestAnimationFrame(() => {
+                r.frame = 0
+                setWidth(r.width)
+              })
+            }
+          }}
+          onPointerUp={() => {
+            const r = resizing.current
+            resizing.current = null
+            if (!r?.width) return
+            cancelAnimationFrame(r.frame)
+            setWidth(r.width)
+            saveWidth(r.width)
+          }}
+          onDoubleClick={() => {
+            setWidth(null)
+            saveWidth(0)
+          }}
+        />
+      )}
       <header className="flex flex-wrap items-center gap-1 border-b border-slate-200 px-2 py-1.5 text-xs">
         <span className="mr-1 flex items-center gap-1 text-sm font-semibold">
           <Zap size={14} /> Esquema eléctrico
@@ -399,6 +517,13 @@ function Inner({ schematic, onChange, elecState, onAction, variables = [], build
           </select>
         )}
         <span className="ml-auto" />
+        <button type="button" onClick={() => zoomOut()} title="Alejar" aria-label="Alejar" className="rounded p-1 hover:bg-slate-100">
+          <Minus size={13} />
+        </button>
+        <span className="w-11 text-center whitespace-nowrap tabular-nums">{Math.round(zoom * 100)} %</span>
+        <button type="button" onClick={() => zoomIn()} title="Acercar" aria-label="Acercar" className="rounded p-1 hover:bg-slate-100">
+          <Plus size={13} />
+        </button>
         <button type="button" onClick={() => fitView({ padding: 0.15 })} title="Ajustar la vista" aria-label="Ajustar la vista" className="rounded p-1 hover:bg-slate-100">
           <Scan size={14} />
         </button>
@@ -425,7 +550,7 @@ function Inner({ schematic, onChange, elecState, onAction, variables = [], build
       )}
       <div className="flex min-h-0 flex-1">
         {mode === 'edit' && (
-          <nav className="w-36 shrink-0 space-y-2 overflow-y-auto border-r border-slate-200 p-1.5 text-xs" aria-label="Aparatos">
+          <nav className="w-44 shrink-0 space-y-2 overflow-y-auto border-r border-slate-200 p-1.5 text-xs" aria-label="Aparatos">
             {PALETTE.map(({ group, items }) => (
               <div key={group}>
                 <p className="mb-0.5 text-[10px] font-medium uppercase tracking-wide text-slate-400">{group}</p>
@@ -435,11 +560,27 @@ function Inner({ schematic, onChange, elecState, onAction, variables = [], build
                     type="button"
                     draggable
                     onDragStart={(e) => {
+                      clearTimeout(previewTimer.current)
+                      setPreview(null)
                       e.dataTransfer.setData(DRAG_TYPE, item.key)
                       e.dataTransfer.effectAllowed = 'copy'
                     }}
-                    onClick={() => add(item)}
-                    title={HINTS[item.type]}
+                    onClick={() => {
+                      clearTimeout(previewTimer.current)
+                      setPreview(null)
+                      add(item)
+                    }}
+                    onMouseEnter={(ev) => {
+                      const at = { x: ev.clientX, y: ev.clientY }
+                      clearTimeout(previewTimer.current)
+                      previewTimer.current = setTimeout(() => setPreview({ item, ...at }), PREVIEW_DELAY)
+                    }}
+                    onMouseMove={(ev) => setPreview((p) => (p ? { ...p, x: ev.clientX, y: ev.clientY } : p))}
+                    onMouseLeave={() => {
+                      clearTimeout(previewTimer.current)
+                      setPreview(null)
+                    }}
+                    title="Arrastra al esquema (o pulsa para ponerlo en el centro)"
                     className="block w-full truncate rounded px-1 py-0.5 text-left hover:bg-slate-100"
                   >
                     + {item.label}
@@ -485,6 +626,8 @@ function Inner({ schematic, onChange, elecState, onAction, variables = [], build
             // de tamaño al abrir el panel y el botón «Ajustar la vista».
             minZoom={0.2}
             maxZoom={3}
+            // Desplazar arrastrando el fondo (como en el lienzo) o con la rueda pulsada.
+            panOnDrag={[0, 1]}
             proOptions={{ hideAttribution: true }}
             onPaneClick={() => {
               setSelected([])
@@ -510,9 +653,24 @@ function Inner({ schematic, onChange, elecState, onAction, variables = [], build
           />
         )}
       </div>
+      {preview && mode === 'edit' && (
+        <div
+          role="tooltip"
+          aria-label={`Vista previa: ${preview.item.label}`}
+          className="side-panel pointer-events-none fixed z-50 w-60 rounded-md border border-slate-200 bg-white p-2 text-xs text-slate-700 shadow-lg"
+          style={{ left: Math.min(preview.x + 16, window.innerWidth - 250), top: Math.min(preview.y + 12, window.innerHeight - 240) }}
+        >
+          <p className="mb-1 font-semibold">{preview.item.label}</p>
+          <div className="paper rounded border border-slate-100 bg-white p-1">
+            <ElecPreview item={preview.item} />
+          </div>
+          <p className="mt-1 text-slate-600">{HINTS[preview.item.type]}</p>
+          {NORMS[preview.item.type] && <p className="mt-0.5 text-[10px] text-slate-500">{NORMS[preview.item.type]}</p>}
+        </div>
+      )}
       <p className="border-t border-slate-200 px-3 py-1 text-[11px] text-slate-500">
         {mode === 'edit'
-          ? 'Arrastra de borne a borne para cablear · Supr borra · Ctrl+C/V/D copia, pega, duplica · deshacer y rehacer: los de siempre · los cables se colorean con su potencial al simular.'
+          ? 'Arrastra de borne a borne para cablear · rueda: zoom · arrastrar el fondo (o con la rueda pulsada): desplazar · Mayús+arrastrar: varios · Supr borra · Ctrl+C/V/D copia, pega, duplica · deshacer y rehacer: los de siempre · los cables se colorean con su potencial al simular.'
           : 'Pulsa los pulsadores (mantén), conmuta interruptores y protecciones; los cables con tensión toman el color de su potencial.'}
       </p>
     </section>
