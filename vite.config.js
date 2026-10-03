@@ -12,7 +12,16 @@ export default defineConfig({
   define: { 'import.meta.env.BUILD_ID': JSON.stringify(Date.now().toString(36)) },
   // PERF_NO_MINIFY=1: compilación sin minimizar, para que los perfiles de CPU muestren nombres reales.
   // asset-manifest.json: lista de archivos que el service worker guarda para funcionar sin conexión.
-  build: { manifest: 'asset-manifest.json', ...(process.env.PERF_NO_MINIFY ? { minify: false } : {}) },
+  build: process.env.PORTABLE
+    ? // Versión portable (scripts/build-portable.mjs): un solo paquete, recursos como datos.
+      {
+        outDir: 'dist-portable',
+        assetsInlineLimit: () => true,
+        cssCodeSplit: false,
+        modulePreload: false,
+        rollupOptions: { output: { inlineDynamicImports: true } },
+      }
+    : { manifest: 'asset-manifest.json', ...(process.env.PERF_NO_MINIFY ? { minify: false } : {}) },
   // Pruebas unitarias (npm test). Las de navegador van aparte con Playwright (tests/e2e).
   test: {
     include: ['tests/unit/**/*.test.js'],

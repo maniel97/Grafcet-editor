@@ -42,6 +42,12 @@ aplicación funciona sin internet (`public/sw.js` guarda todos sus archivos al i
 se publica una versión nueva, avisa con «Hay una versión nueva del editor · Recargar» sin recargar
 por su cuenta. En `npm run dev` no se activa (a propósito); se prueba con `npm run test:pwa`.
 
+**Versión portable (un solo archivo)**: `npm run build:portable` genera
+`dist-portable/grafcet-editor.html`, con todo dentro (código, estilos, fuentes). Se abre con doble
+clic desde cualquier carpeta o USB, sin instalar nada, sin servidor y sin conexión. Los datos
+(autoguardado, opciones) se guardan en el navegador con el que se abra; los proyectos se guardan
+como siempre en `.json`. No se actualiza sola: para una versión nueva, se vuelve a generar.
+
 **Alternativas**: Netlify o Cloudflare Pages (arrastrar la carpeta `dist/` tras `npm run build`).
 
 ## Funciones (hito `hito-editor-v1`)

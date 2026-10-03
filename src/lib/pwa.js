@@ -12,7 +12,8 @@ export function onUpdateAvailable(fn) {
 }
 
 export function registerServiceWorker() {
-  if (!import.meta.env.PROD || !('serviceWorker' in navigator)) return
+  // Ni en desarrollo ni abierto como archivo (versión portable: file://).
+  if (!import.meta.env.PROD || !('serviceWorker' in navigator) || location.protocol === 'file:') return
   window.addEventListener('load', async () => {
     try {
       const registration = await navigator.serviceWorker.register(`./sw.js?build=${import.meta.env.BUILD_ID}`)

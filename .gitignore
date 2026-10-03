@@ -26,3 +26,4 @@ dist-ssr
 # Informes de las pruebas de navegador (Playwright)
 test-results
 playwright-report
+dist-portable
