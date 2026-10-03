@@ -581,7 +581,7 @@ function IOPanel({ io, elements, onSelect }) {
   )
 }
 
-function Properties({ element, variables, onChange, onDelete, onRotate, onCreateVariable }) {
+function Properties({ element, variables, onChange, onDelete, onRotate, onCreateVariable, onMoveInDesk }) {
   const names = (dir) =>
     variables
       .filter((v) =>
@@ -621,6 +621,27 @@ function Properties({ element, variables, onChange, onDelete, onRotate, onCreate
           onCreate={onCreateVariable}
         />
       ))}
+      {DESK_TYPES.includes(element.type) && (
+        <div className="flex items-end gap-1">
+          <label className="block flex-1">
+            <span className="text-slate-500">Ubicación</span>
+            <select value={element.place === 'desk' ? 'desk' : 'machine'} onChange={(ev) => set({ place: ev.target.value })} className={field}>
+              <option value="desk">En el pupitre</option>
+              <option value="machine">En la máquina</option>
+            </select>
+          </label>
+          {element.place === 'desk' && (
+            <>
+              <button type="button" onClick={() => onMoveInDesk(-1)} title="Mover a la izquierda en el pupitre" className="rounded border border-slate-300 px-1.5 py-0.5 hover:bg-slate-100">
+                ◀
+              </button>
+              <button type="button" onClick={() => onMoveInDesk(1)} title="Mover a la derecha en el pupitre" className="rounded border border-slate-300 px-1.5 py-0.5 hover:bg-slate-100">
+                ▶
+              </button>
+            </>
+          )}
+        </div>
+      )}
       {['button', 'switch', 'limit', 'sensor'].includes(element.type) && (
         <label className="block">
           <span className="text-slate-500">Contacto</span>
@@ -910,6 +931,11 @@ const PALETTE_ITEMS = Object.entries(SCENE_TYPES).flatMap(([type, t]) =>
     : [{ key: type, type, group: t.group, label: t.label, preset: {} }],
 )
 const PALETTE = PALETTE_ITEMS.reduce((groups, item) => ({ ...groups, [item.group]: [...(groups[item.group] ?? []), item] }), {})
+// Pupitre de mando: los mandos y la señalización pueden ir en un panel fijo, aparte del
+// mecanismo (como el cuadro eléctrico real). e.place: 'desk' | 'machine' (por defecto, máquina).
+const DESK_TYPES = ['button', 'switch', 'emergency', 'potentiometer', 'lamp', 'display']
+const isDesk = (e) => DESK_TYPES.includes(e.type) && e.place === 'desk'
+
 // Arrastrar un módulo de la paleta a la escena (tipo de dato propio del arrastre).
 const DRAG_TYPE = 'application/x-grafcet-scene'
 const PALETTE_BY_KEY = Object.fromEntries(PALETTE_ITEMS.map((i) => [i.key, i]))
@@ -953,7 +979,7 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
   const pendingScroll = useRef(null)
   const fit = useCallback(() => {
     const el = scrollRef.current
-    const list = scene?.elements ?? []
+    const list = (scene?.elements ?? []).filter((e) => !isDesk(e))
     if (!el || !list.length) return
     const boxes = list.map((e) => boundsOf(e, 1))
     // Hueco para los rótulos, debajo de cada elemento.
@@ -1133,11 +1159,14 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
   // Nuevo elemento en el centro de lo que se ve.
   // Nuevo elemento: donde se suelta al arrastrarlo desde la paleta o, con un clic, en el centro
   // de lo que se ve.
-  const add = (type, preset = {}, at = null) => {
+  // Mandos y señalización: con un clic (o soltados en el pupitre) van al pupitre; soltados en la
+  // escena, a la máquina.
+  const add = (type, preset = {}, at = null, place = null) => {
     const el = scrollRef.current
     const x = snap(at ? at.x : el ? (el.scrollLeft + el.clientWidth / 2) / zoom : W / 2)
     const y = snap(at ? at.y : el ? (el.scrollTop + el.clientHeight / 2) / zoom : H / 2)
-    const element = { id: newId(), type, x, y, rot: 0, ...SCENE_TYPES[type].defaults, ...preset }
+    const where = place ?? (DESK_TYPES.includes(type) && !at ? 'desk' : null)
+    const element = { id: newId(), type, x, y, rot: 0, ...SCENE_TYPES[type].defaults, ...preset, ...(where ? { place: where } : {}) }
     save([...elements, element])
     setSelected(element.id)
     setMode('edit')
@@ -1149,6 +1178,47 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
     point.y = ev.clientY
     const p = point.matrixTransform(svgRef.current.getScreenCTM().inverse())
     return { x: p.x, y: p.y }
+  }
+
+  // Orden en el pupitre: intercambia el elemento con el anterior o el siguiente del pupitre.
+  const moveInDesk = (id, dir) => {
+    const desk = elements.filter(isDesk)
+    const i = desk.findIndex((e) => e.id === id)
+    const other = desk[i + dir]
+    if (!other) return
+    const a = elements.findIndex((e) => e.id === id)
+    const b = elements.findIndex((e) => e.id === other.id)
+    const list = [...elements]
+    ;[list[a], list[b]] = [list[b], list[a]]
+    save(list)
+  }
+
+  // Pupitre: los mismos mandos que en la escena, en celdas fijas (el potenciómetro, por la
+  // posición del ratón en su celda).
+  const [deskKnob, setDeskKnob] = useState(null)
+  const turnDeskKnob = (ev, e) => {
+    const r = ev.currentTarget.getBoundingClientRect()
+    onAction(e.id, `set:${Math.min(1, Math.max(0, (ev.clientX - r.left) / r.width))}`)
+  }
+  const onDeskDown = (ev, e) => {
+    ev.stopPropagation()
+    sectionRef.current?.focus({ preventScroll: true })
+    if (mode === 'use') {
+      ev.currentTarget.setPointerCapture?.(ev.pointerId)
+      if (e.type === 'potentiometer') {
+        setDeskKnob(e.id)
+        turnDeskKnob(ev, e)
+      } else if (operable(e)) operate(e, 'down')
+      else setSelected(e.id)
+      return
+    }
+    if (ev.ctrlKey || ev.metaKey) setSelection((ids) => (ids.includes(e.id) ? ids.filter((id) => id !== e.id) : [...ids, e.id]))
+    else setSelection([e.id])
+  }
+  const onDeskUp = (e) => {
+    if (mode !== 'use') return
+    setDeskKnob(null)
+    operate(e, 'up')
   }
 
   // Potenciómetro: la posición del ratón respecto al mando (de −30 a +30 px) es el valor.
@@ -1213,7 +1283,7 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
     const box = { x: Math.min(marquee.x0, marquee.x1), y: Math.min(marquee.y0, marquee.y1), w: Math.abs(marquee.x1 - marquee.x0), h: Math.abs(marquee.y1 - marquee.y0) }
     setMarquee(null)
     if (box.w < 4 && box.h < 4) return
-    const hit = elements.filter((e) => overlaps(box, boundsOf(e, state.pos[e.id] ?? 0))).map((e) => e.id)
+    const hit = elements.filter((e) => !isDesk(e) && overlaps(box, boundsOf(e, state.pos[e.id] ?? 0))).map((e) => e.id)
     setSelection((ids) => (marquee.add ? [...new Set([...ids, ...hit])] : hit))
   }
   const onPointerUp = (ev, e) => {
@@ -1229,6 +1299,8 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
   }
 
   const shown = elements.map((e) => (drag?.ids.includes(e.id) ? { ...e, x: e.x + drag.dx, y: e.y + drag.dy } : e))
+  const machine = shown.filter((e) => !isDesk(e))
+  const deskItems = elements.filter(isDesk)
   const draw = (e) => {
     const pos = state.pos[e.id] ?? 0
     switch (e.type) {
@@ -1441,9 +1513,10 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
             ))}
           </nav>
         )}
+        <div className="flex min-w-0 flex-1 flex-col">
         <div
           ref={scrollRef}
-          className={`paper min-w-0 flex-1 overflow-auto ${panning ? 'cursor-grabbing' : ''}`}
+          className={`paper min-h-0 min-w-0 flex-1 overflow-auto ${panning ? 'cursor-grabbing' : ''}`}
           // Rueda pulsada y arrastrar: desplazar la vista (como en el lienzo del grafcet), también
           // empezando encima de un elemento.
           onPointerDownCapture={(ev) => {
@@ -1498,13 +1571,13 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
             </defs>
             <rect width={W} height={H} fill="white" />
             {mode === 'edit' && <rect width={W} height={H} fill="url(#scene-grid)" />}
-            {elements.length === 0 && (
+            {machine.length === 0 && (
               <text x={W / 2} y={H / 2} textAnchor="middle" fontSize="16" fill="#94a3b8">
                 Pulsa «Editar» y añade elementos: pulsadores, cilindros, cintas, detectores…
               </text>
             )}
             {/* Las cintas y recogidas, debajo de todo (las piezas van encima). */}
-            {[...shown].sort((a, b) => (a.type === 'conveyor' || a.type === 'sink' ? -1 : 0) - (b.type === 'conveyor' || b.type === 'sink' ? -1 : 0)).map((e) => (
+            {[...machine].sort((a, b) => (a.type === 'conveyor' || a.type === 'sink' ? -1 : 0) - (b.type === 'conveyor' || b.type === 'sink' ? -1 : 0)).map((e) => (
               <g
                 key={e.id}
                 data-element={e.type}
@@ -1526,7 +1599,7 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
               <PieceShape key={p.id} p={p} />
             ))}
             {/* Rótulos (sin girar) */}
-            {shown.map((e) => {
+            {machine.map((e) => {
               const b = boundsOf(e, state.pos[e.id] ?? 0)
               return (
                 <text key={`l-${e.id}`} x={b.x + b.w / 2} y={b.y + b.h + 13} textAnchor="middle" fontSize="11" fill="#334155" pointerEvents="none">
@@ -1540,7 +1613,7 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
                 </text>
               )
             })}
-            {shown
+            {machine
               .filter((e) => selection.includes(e.id))
               .map((e) => {
                 const b = boundsOf(e, state.pos[e.id] ?? 0)
@@ -1562,6 +1635,59 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
               />
             )}
           </svg>
+        </div>
+        {(deskItems.length > 0 || mode === 'edit') && (
+          <div
+            role="region"
+            aria-label="Pupitre de mando"
+            className="paper flex shrink-0 items-start gap-2 overflow-x-auto border-t-4 border-slate-400 bg-slate-300 px-3 py-2"
+            onDragOver={(ev) => {
+              if (!ev.dataTransfer.types.includes(DRAG_TYPE)) return
+              ev.preventDefault()
+              ev.dataTransfer.dropEffect = 'copy'
+            }}
+            onDrop={(ev) => {
+              const item = PALETTE_BY_KEY[ev.dataTransfer.getData(DRAG_TYPE)]
+              if (!item) return
+              ev.preventDefault()
+              add(item.type, item.preset, null, DESK_TYPES.includes(item.type) ? 'desk' : null)
+            }}
+          >
+            {deskItems.length === 0 && (
+              <p className="py-3 text-xs text-slate-600">Pupitre de mando: arrastra aquí pulsadores, pilotos, potenciómetros…</p>
+            )}
+            {deskItems.map((e) => {
+              const b = boundsOf({ ...e, x: 0, y: 0 })
+              return (
+                <div
+                  key={e.id}
+                  data-element={e.type}
+                  data-desk=""
+                  aria-label={`${SCENE_TYPES[e.type].label} ${labelOf(e)}`}
+                  className={`flex w-20 shrink-0 select-none flex-col items-center rounded bg-slate-200 p-1 shadow-sm ${
+                    selection.includes(e.id) ? 'ring-2 ring-blue-500' : ''
+                  }`}
+                  style={{ cursor: mode === 'use' && operable(e) ? 'pointer' : 'default' }}
+                  onPointerDown={(ev) => onDeskDown(ev, e)}
+                  onPointerMove={(ev) => deskKnob === e.id && turnDeskKnob(ev, e)}
+                  onPointerUp={() => onDeskUp(e)}
+                  onPointerCancel={() => onDeskUp(e)}
+                >
+                  <svg viewBox={`${b.x - 4} ${b.y - 4} ${b.w + 8} ${b.h + 8}`} className="h-14 w-full" aria-hidden="true">
+                    {draw({ ...e, x: 0, y: 0 })}
+                  </svg>
+                  <span className="max-w-full truncate text-[10px] text-slate-700">{labelOf(e)}</span>
+                  {showIO &&
+                    ioLines(e).map((line) => (
+                      <span key={line} className="max-w-full truncate font-mono text-[9px] text-blue-700">
+                        {line}
+                      </span>
+                    ))}
+                </div>
+              )
+            })}
+          </div>
+        )}
         </div>
         {mode === 'edit' && selection.length > 1 && (
           <aside className="w-48 shrink-0 space-y-2 overflow-y-auto border-l border-slate-200 p-2 text-xs" aria-label="Selección">
@@ -1602,6 +1728,7 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
                 onDelete={() => remove(selectedElement.id)}
                 onRotate={rotateSelected}
                 onCreateVariable={onCreateVariable}
+                onMoveInDesk={(dir) => moveInDesk(selectedElement.id, dir)}
               />
             ) : (
               <Faults element={selectedElement} fault={state.faults?.[selectedElement.id]} onAction={onAction} />
@@ -1625,7 +1752,7 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
       )}
       {mode === 'edit' && (
         <p className="border-t border-slate-200 px-2 py-1 text-[11px] text-slate-500">
-          Arrastra módulos de la paleta · rueda: zoom · rueda pulsada: desplazar · Ctrl+clic o recuadro: varios · R gira · Supr borra · Ctrl+C/V/D copia, pega, duplica · deshacer y rehacer: los de siempre · asigna las variables en el panel de la derecha. Piezas de {PIECE_SIZES.small[0]} y{' '}
+          Arrastra módulos a la escena o al pupitre · rueda: zoom · rueda pulsada: desplazar · Ctrl+clic o recuadro: varios · R gira · Supr borra · Ctrl+C/V/D copia, pega, duplica · deshacer y rehacer: los de siempre · asigna las variables en el panel de la derecha. Piezas de {PIECE_SIZES.small[0]} y{' '}
           {PIECE_SIZES.large[0]} px.
         </p>
       )}

@@ -194,7 +194,7 @@ test('escena: separador para cambiar el ancho y «Ajustar» para ver todo', asyn
   await openExample(page, /Cilindros A\+ B\+/)
   await page.getByRole('button', { name: /Simular/ }).click()
   const view = page.getByRole('region', { name: 'Escena de la planta' })
-  const scroller = view.locator('.paper')
+  const scroller = view.locator('.paper').first()
   // Todo a la vista: cada elemento dentro de la zona visible de la escena.
   const allVisible = async () => {
     const area = await scroller.boundingBox()
@@ -284,9 +284,9 @@ test('escena: arrastrar un módulo de la paleta al punto exacto', async ({ page 
   await page.getByRole('button', { name: /Planta virtual/ }).click()
   const view = page.getByRole('region', { name: 'Escena de la planta' })
   await view.getByRole('radio', { name: /Editar/ }).click()
-  const area = await view.locator('.paper').boundingBox()
+  const area = await view.locator('.paper').first().boundingBox()
   const target = { x: area.x + 120, y: area.y + 90 }
-  await view.getByRole('button', { name: '+ Piloto' }).dragTo(view.locator('.paper'), { targetPosition: { x: 120, y: 90 } })
+  await view.getByRole('button', { name: '+ Piloto' }).dragTo(view.locator('.paper').first(), { targetPosition: { x: 120, y: 90 } })
   const lamp = view.locator('[data-element="lamp"]')
   await expect(lamp).toHaveCount(1)
   const b = await lamp.boundingBox()
@@ -303,7 +303,7 @@ test('escena: selección múltiple, mover en grupo, copiar/pegar/duplicar y desh
   await page.getByRole('button', { name: /Planta virtual/ }).click()
   const view = page.getByRole('region', { name: 'Escena de la planta' })
   await view.getByRole('radio', { name: /Editar/ }).click()
-  const paper = view.locator('.paper')
+  const paper = view.locator('.paper').first()
   const drop = (name, x, y) => view.getByRole('button', { name }).dragTo(paper, { targetPosition: { x, y } })
   await drop('+ Piloto', 80, 80)
   await drop('+ Piloto', 160, 80)
@@ -363,7 +363,7 @@ test('escena: desplazar la vista arrastrando con la rueda pulsada', async ({ pag
   await openExample(page, /Cilindros A\+ B\+/)
   await page.getByRole('button', { name: /Simular/ }).click()
   const view = page.getByRole('region', { name: 'Escena de la planta' })
-  const scroller = view.locator('.paper')
+  const scroller = view.locator('.paper').first()
   for (let i = 0; i < 6; i++) await view.getByTitle('Acercar').click() // más grande que la vista
   await scroller.evaluate((el) => el.scrollTo(200, 150))
   const before = await scroller.evaluate((el) => [el.scrollLeft, el.scrollTop])
@@ -460,5 +460,45 @@ test('escena: rótulos con E/S y panel de conexiones', async ({ page }) => {
   await expect(view.getByRole('button', { name: /Conexiones/ })).toContainText('1')
   await panel.getByLabel('Avisos de conexión').getByRole('button', { name: /Piloto/ }).click()
   await expect(view.getByLabel('Propiedades del elemento')).toContainText('Piloto')
+  expectNoErrors(errors)
+})
+
+test('escena: pupitre de mando aparte de la máquina', async ({ page }) => {
+  const errors = await openEditor(page)
+  await page.getByRole('button', { name: /Simular/ }).click()
+  await page.getByRole('button', { name: /Planta virtual/ }).click()
+  const view = page.getByRole('region', { name: 'Escena de la planta' })
+  await view.getByRole('radio', { name: /Editar/ }).click()
+  const desk = view.getByRole('region', { name: 'Pupitre de mando' })
+  const props = view.getByLabel('Propiedades del elemento')
+  const pick = async (name, value) => {
+    await props.getByRole('combobox', { name }).fill(value)
+    await props.getByRole('combobox', { name }).press('Enter')
+  }
+  // Con un clic, los mandos van al pupitre; arrastrado al pupitre, también.
+  await view.getByRole('button', { name: '+ Pulsador' }).click()
+  await pick('Entrada', 'Marcha')
+  await view.getByRole('button', { name: '+ Piloto' }).dragTo(desk)
+  await expect(desk.locator('[data-element]')).toHaveCount(2)
+  await expect(view.locator('svg[aria-label="Escena"] [data-element]')).toHaveCount(0)
+  // Orden en el pupitre: el piloto (seleccionado) a la izquierda.
+  await props.getByTitle('Mover a la izquierda en el pupitre').click()
+  await expect(desk.locator('[data-element]').first()).toHaveAttribute('data-element', 'lamp')
+
+  // Funciona igual desde el pupitre.
+  await view.getByRole('radio', { name: /Usar/ }).click()
+  const marcha = desk.locator('[aria-label="Pulsador Marcha"]')
+  const b = await marcha.boundingBox()
+  await page.mouse.move(b.x + b.width / 2, b.y + b.height / 3)
+  await page.mouse.down()
+  await expect.poll(() => activeSteps(page)).toBe('s1')
+  await page.mouse.up()
+
+  // A la máquina: pasa a la escena.
+  await view.getByRole('radio', { name: /Editar/ }).click()
+  await desk.locator('[aria-label="Pulsador Marcha"]').click()
+  await props.getByRole('combobox', { name: 'Ubicación' }).selectOption('machine')
+  await expect(view.locator('svg[aria-label="Escena"] [aria-label="Pulsador Marcha"]')).toHaveCount(1)
+  await expect(desk.locator('[data-element]')).toHaveCount(1)
   expectNoErrors(errors)
 })
