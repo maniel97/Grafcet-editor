@@ -29,6 +29,10 @@ const NOTATION = [
     'Botón Ladder: una marca por etapa con SET/RESET (inicialización, condiciones de franqueo, desactivación, activación, temporizaciones, acciones memorizadas y salidas). Exporta el esquema (SVG, PNG, PDF) y el programa en texto estructurado (ST) y AWL de S7.',
   ],
   [
+    'GEMMA',
+    'Botón GEMMA de la barra: marca los estados que usas (A, F, D), sus transiciones y la orden de forzado de cada uno sobre el grafcet de producción (p. ej. D1: F/G1{}, A6: F/G1{INIT}). «Generar» crea el grafcet de conducción en la hoja GEMMA (marco GC). El grafcet de producción tiene que estar en un marco con su nombre (G1).',
+  ],
+  [
     'Hojas',
     'Pestañas abajo del lienzo: + añade una hoja, doble clic la renombra. Con varios elementos seleccionados, clic derecho > «Mover a…». Los enlaces entre hojas se dibujan como referencias («a la etapa 5 (Hoja 2)»). La simulación, el ladder y Verificar ven todas las hojas; al exportar a PDF se puede elegir «Todas las hojas».',
   ],

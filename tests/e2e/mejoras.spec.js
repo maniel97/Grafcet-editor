@@ -642,3 +642,37 @@ test('hojas: añadir, mover elementos, referencias entre hojas y simulación del
   await expect(page.locator('aside.side-panel').getByRole('button', { name: 'X1', exact: true })).toBeVisible()
   expectNoErrors(errors)
 })
+
+test('GEMMA: ejemplo típico, aviso del grafcet de producción y grafcet de conducción generado', async ({ page }) => {
+  const errors = await openEditor(page)
+  // Grafcet de producción en un marco G1.
+  await page.locator('.react-flow__pane').click({ position: { x: 600, y: 500 } })
+  await page.keyboard.press('Control+a')
+  await page.locator('.react-flow__node-step').first().click({ button: 'right' })
+  await page.getByRole('menuitem', { name: 'Encerrar en un grafcet parcial' }).click()
+
+  await page.getByTitle(/Asistente GEMMA/).click()
+  const dialog = page.getByRole('dialog', { name: 'Asistente GEMMA' })
+  await expect(dialog.getByRole('list', { name: 'Pendiente' })).toContainText('Marca al menos un estado')
+  await dialog.getByRole('button', { name: 'Cargar el ejemplo típico' }).click()
+  await expect(dialog.getByLabel('Orden de forzado en D1')).toHaveValue('EMPTY')
+  await expect(dialog.getByRole('list', { name: 'Pendiente' })).toHaveCount(0)
+  await dialog.getByLabel('Grafcet de producción').fill('G9')
+  await expect(dialog).toContainText('No hay ningún grafcet parcial «G9»')
+  await dialog.getByLabel('Grafcet de producción').fill('G1')
+  await expect(dialog).not.toContainText('No hay ningún grafcet parcial')
+  await dialog.getByRole('button', { name: /Generar grafcet de conducción/ }).click()
+
+  const tabs = page.getByRole('tablist', { name: 'Hojas' })
+  await expect(tabs.getByRole('tab', { name: 'GEMMA' })).toHaveAttribute('aria-selected', 'true')
+  await expect(page.locator('.react-flow__node-step')).toHaveCount(6)
+  await expect(page.locator('.react-flow__node-frame')).toContainText('GC')
+  await expect(page.locator('.react-flow__node-step').filter({ hasText: 'D1' })).toContainText('F/G1{}')
+  // Conforme: Verificar sin errores (los forzados apuntan a G1, que existe).
+  await expect(page.getByTitle('Verificar conformidad con IEC 60848')).not.toContainText(/\d+ error/)
+  // Regenerar sustituye lo anterior (no duplica).
+  await page.getByTitle(/Asistente GEMMA/).click()
+  await dialog.getByRole('button', { name: /Generar grafcet de conducción/ }).click()
+  await expect(page.locator('.react-flow__node-step')).toHaveCount(6)
+  expectNoErrors(errors)
+})

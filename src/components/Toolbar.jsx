@@ -20,8 +20,7 @@ import {
   StickyNote,
   FileJson,
   BookOpen,
-  History,
-} from 'lucide-react'
+  History, Workflow } from 'lucide-react'
 
 // `primary`: el texto se ve desde 1280 px; el resto solo en pantallas anchas (2xl),
 // para que la barra quepa entera. `iconOnly`: nunca muestra texto. El nombre siempre está en el
@@ -89,6 +88,7 @@ export default function Toolbar({
   readOnly,
   onToggleSimulation,
   onOpenLadder,
+  onOpenGemma,
 }) {
   // En solo lectura (simulando o con la edición bloqueada) se desactiva lo que modifica el diagrama.
   const locked = readOnly
@@ -102,7 +102,7 @@ export default function Toolbar({
         placeholder="Sin título"
         aria-label="Nombre del proyecto"
         title="Nombre del proyecto (se usa al guardar y exportar)"
-        className="mr-2 w-28 shrink-0 rounded-md border border-transparent px-2 py-1 text-sm text-slate-700 placeholder:italic placeholder:text-slate-400 hover:border-slate-300 focus:border-blue-500 focus:outline-none 2xl:w-44"
+        className="mr-2 w-20 shrink-0 rounded-md border border-transparent px-2 py-1 text-sm text-slate-700 placeholder:italic placeholder:text-slate-400 hover:border-slate-300 focus:border-blue-500 focus:outline-none 2xl:w-44"
       />
 
       <ToolButton icon={Undo2} label="Deshacer" title="Deshacer (Ctrl+Z)" onClick={onUndo} disabled={locked || !canUndo} iconOnly />
@@ -166,6 +166,7 @@ export default function Toolbar({
         onClick={onOpenLadder}
         primary
       />
+      <ToolButton icon={Workflow} label="GEMMA" title="Asistente GEMMA: modos de marcha y parada (grafcet de conducción)" disabled={locked} onClick={onOpenGemma} />
       <ToolButton
         icon={ShieldCheck}
         disabled={locked}

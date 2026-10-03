@@ -41,6 +41,7 @@ import SearchBar from './SearchBar'
 import SheetTabs from './SheetTabs'
 import SheetRefs from './SheetRefs'
 import { crossSheetRefs, sheetOf, sheetsOf, visibleEdges, visibleNodes } from '../lib/sheets'
+import { EMPTY_GEMMA, generateConduction } from '../lib/gemma'
 
 // Partes que no hacen falta al abrir el editor: se descargan la primera vez que se usan, para que
 // la carga inicial sea más ligera (importa sobre todo publicado en internet).
@@ -50,6 +51,7 @@ const SimulationPanel = lazy(() => import('./SimulationPanel'))
 const LadderView = lazy(() => import('./LadderView'))
 const VariablesDialog = lazy(() => import('./VariablesDialog'))
 const ExportDialog = lazy(() => import('./ExportDialog'))
+const GemmaDialog = lazy(() => import('./GemmaDialog'))
 const ProjectsDialog = lazy(() => import('./ProjectsDialog'))
 
 // Mientras se descarga una parte diferida (normalmente un instante).
@@ -100,6 +102,7 @@ export default function GrafcetCanvas() {
   const [helpOpen, setHelpOpen] = useState(false)
   const [verifyOpen, setVerifyOpen] = useState(false)
   const [ladderOpen, setLadderOpen] = useState(false)
+  const [gemmaOpen, setGemmaOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
   // Hojas (lib/sheets.js): la activa es la que se dibuja.
   const [currentSheet, setCurrentSheet] = useState(() => sheetsOf(restored?.plc ?? EMPTY_PLC)[0].id)
@@ -338,6 +341,33 @@ export default function GrafcetCanvas() {
     [takeSnapshot, setNodes],
   )
 
+  // --- GEMMA ----------------------------------------------------------------------------------
+  // Genera (o sustituye) el grafcet de conducción en la hoja «GEMMA», dentro de un marco «GC».
+  const generateGemma = useCallback(() => {
+    const gemma = plcRef.current.gemma ?? EMPTY_GEMMA
+    takeSnapshot()
+    let list = sheetsOf(plcRef.current)
+    let sheet = list.find((s) => s.name === 'GEMMA')
+    if (!sheet) {
+      sheet = { id: crypto.randomUUID(), name: 'GEMMA' }
+      list = [...list, sheet]
+    }
+    const generated = generateConduction(gemma, { sheet: sheet.id })
+    // Margen a la derecha para las cajas de acción (órdenes de forzado), que el marco no mide.
+    const box = frameAround(generated.nodes)
+    const frame = { id: 'gemma-frame', type: 'frame', ...box, width: box.width + 140, zIndex: -1, data: { kind: 'grafcet', name: 'GC', sheet: sheet.id } }
+    const isGemma = (id) => id.startsWith('gemma-')
+    setNodes((nds) => [...nds.filter((n) => !isGemma(n.id)), ...generated.nodes, frame])
+    setEdges((eds) => [...eds.filter((e) => !isGemma(e.source) && !isGemma(e.target)), ...generated.edges])
+    setPlc((p) => {
+      const steps = Object.fromEntries(Object.entries(p.steps).filter(([id]) => !isGemma(id)))
+      for (const [id, comment] of Object.entries(generated.comments)) steps[id] = { ...steps[id], comment }
+      return { ...p, sheets: list, steps }
+    })
+    setGemmaOpen(false)
+    selectSheet(sheet.id)
+  }, [takeSnapshot, setNodes, setEdges, setPlc, selectSheet])
+
   // Renumerar una etapa: al terminar de editar su número (o al cerrar el panel) se actualizan
   // las referencias a ella (X5, 5s/X5, F/G2{5}). Se compara con el número que tenía al empezar.
   const labelAtStart = useRef(new Map())
@@ -563,7 +593,7 @@ export default function GrafcetCanvas() {
 
   const loopSource = loopSourceId ? nodes.find((n) => n.id === loopSourceId) : null
   const initialSteps = nodes.filter((n) => n.type === 'step' && n.data.initial)
-  const modalOpen = settingsOpen || helpOpen || variablesOpen || ladderOpen || !!exportFormat || !!projectsTab || !!menu
+  const modalOpen = settingsOpen || helpOpen || variablesOpen || ladderOpen || gemmaOpen || !!exportFormat || !!projectsTab || !!menu
   // En solo lectura el clic derecho no abre menús de edición (ni el del navegador).
   const blockMenu = (handler) => (readOnly ? (e) => e.preventDefault() : handler)
 
@@ -596,6 +626,7 @@ export default function GrafcetCanvas() {
           readOnly={readOnly}
           onToggleSimulation={() => (simulating ? setSimulating(false) : startSimulation())}
           onOpenLadder={() => setLadderOpen(true)}
+          onOpenGemma={() => setGemmaOpen(true)}
         />
         {ladderOpen && (
           <Suspense fallback={<Loading />}>
@@ -666,6 +697,17 @@ export default function GrafcetCanvas() {
               fileName={(ext) => fileName(ext)}
               {...titleBlockProps}
               onClose={() => setExportFormat(null)}
+            />
+          </Suspense>
+        )}
+        {gemmaOpen && (
+          <Suspense fallback={<Loading />}>
+            <GemmaDialog
+              gemma={plc.gemma ?? EMPTY_GEMMA}
+              onChange={(gemma) => setPlc((p) => ({ ...p, gemma }))}
+              grafcets={nodes.filter((n) => n.type === 'frame' && n.data.kind === 'grafcet').map((n) => String(n.data.name).toUpperCase())}
+              onGenerate={generateGemma}
+              onClose={() => setGemmaOpen(false)}
             />
           </Suspense>
         )}
