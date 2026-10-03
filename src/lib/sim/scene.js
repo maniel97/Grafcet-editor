@@ -537,6 +537,17 @@ export function sceneSignals(scene, state) {
   return signals
 }
 
+// Señales «accionadas» de la planta, por nombre (para el esquema eléctrico, que pone sus propios
+// contactos NA / NC): pulsadores, interruptores y setas pulsados, detectores que detectan, y los
+// sensores de cilindros y depósitos activos.
+export function scenePhysical(scene, state) {
+  const out = {}
+  const signals = sceneSignals(scene, state)
+  for (const [name, value] of Object.entries(sceneInputs(scene, state))) out[name] = Boolean(Number(value))
+  for (const e of elementsOf(scene)) if (e.variable && e.id in signals) out[e.variable] = signals[e.id]
+  return out
+}
+
 // Entradas que produce la escena (contactos NA / NC; la seta es siempre NC).
 // `analogRange(name)` -> { min, max } de una entrada analógica (nivel del depósito).
 export function sceneInputs(scene, state, analogRange = () => null) {

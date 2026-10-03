@@ -41,7 +41,10 @@ export function useSimulation(nodes, edges, plc, enabled) {
     },
     [compiled],
   )
-  const world = useMemo(() => makeWorld(enabled ? scene : null, analogRange), [enabled, scene, analogRange])
+  const world = useMemo(
+    () => makeWorld(enabled ? scene : null, analogRange, enabled ? plc.electrical : null, compiled?.variables ?? []),
+    [enabled, scene, analogRange, plc.electrical, compiled],
+  )
 
   // Modo «Autómata» (plc.cpu.enabled): la lógica la pone un programa S7-200 (el generado del grafcet
   // o uno de Micro/WIN) en la CPU simulada, en lugar del grafcet. Solo se rehace (y la CPU vuelve a
@@ -234,6 +237,11 @@ export function useSimulation(nodes, edges, plc, enabled) {
     [world],
   )
   const sceneDo = useCallback((id, action) => changeWorld((w) => sceneAction(scene, w, id, action)), [changeWorld, scene])
+  // Esquema eléctrico: pulsar un mando, conmutar o rearmar una protección…
+  const elecDo = useCallback(
+    (id, action) => changeWorld((w) => world.elecDo(w, id, action, simRef.current?.state.values ?? {})),
+    [changeWorld, world],
+  )
 
   const step = useCallback(() => apply(simRef.current?.state.time ?? 0, { singleStep: true }), [apply])
   const advance = useCallback((seconds) => apply((simRef.current?.state.time ?? 0) + seconds), [apply])
@@ -276,6 +284,7 @@ export function useSimulation(nodes, edges, plc, enabled) {
     stopRecording,
     playScenario,
     sceneDo,
+    elecDo,
     world,
     sceneCount: scene?.elements?.length ?? 0,
   }
