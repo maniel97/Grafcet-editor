@@ -741,3 +741,20 @@ test('modo oscuro: los textos de color sobre fondos de color se leen', async ({ 
   expect(lum(fg) - lum(bg)).toBeGreaterThan(0.45)
   expectNoErrors(errors)
 })
+
+for (const [fontId, diagramFontSize] of [['inter', 14], ['opendyslexic', 24], ['serif', 20]]) {
+  test(`notas de los ejemplos: ninguna se corta (letra ${fontId}, ${diagramFontSize}px)`, async ({ page }) => {
+    await page.addInitScript((s) => localStorage.setItem('grafcet-editor:settings', JSON.stringify(s)), { fontId, diagramFontSize })
+    const errors = await openEditor(page)
+    const { EXAMPLES } = await import('../../src/lib/examples.js')
+    for (const ex of EXAMPLES) {
+      await openExample(page, ex.title)
+      const notes = page.locator('.react-flow__node-note [data-note-body]')
+      // Tiempo para que la fuente cargue y las notas crezcan.
+      await expect
+        .poll(async () => notes.evaluateAll((els) => els.filter((el) => el.scrollHeight > el.clientHeight + 2).length), { message: ex.title })
+        .toBe(0)
+    }
+    expectNoErrors(errors)
+  })
+}

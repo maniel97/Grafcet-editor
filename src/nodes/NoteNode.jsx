@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { NodeResizer, useReactFlow } from '@xyflow/react'
 import { useEditor } from '../lib/editorContext'
 import { NOTE_COLORS, parseNote } from '../lib/notes'
@@ -43,8 +43,26 @@ function NoteText({ text }) {
 // esquinas al seleccionarla.
 export default function NoteNode({ id, data, selected }) {
   const { takeSnapshot, readOnly, editingNoteId, setEditingNoteId } = useEditor()
-  const { updateNodeData } = useReactFlow()
+  const { updateNodeData, updateNode } = useReactFlow()
   const [draft, setDraft] = useState(null)
+  const showing = draft === null // el texto (no el campo de edición)
+  // La nota crece sola si su texto no cabe (otra letra o tamaño en Opciones, la fuente que termina de
+  // cargar…). Nunca encoge: el tamaño elegido a mano se respeta si el texto cabe.
+  const bodyRef = useRef(null)
+  const contentRef = useRef(null)
+  useLayoutEffect(() => {
+    const body = bodyRef.current
+    const content = contentRef.current
+    if (!body || !content) return
+    const grow = () => {
+      const overflow = body.scrollHeight - body.clientHeight
+      if (overflow > 1) updateNode(id, (n) => ({ height: Math.ceil((n.height ?? n.measured?.height ?? body.offsetHeight) + overflow + 2) }))
+    }
+    grow()
+    const observer = new ResizeObserver(grow)
+    observer.observe(content)
+    return () => observer.disconnect()
+  }, [id, updateNode, data.text, showing])
   const color = NOTE_COLORS[data.color] ?? NOTE_COLORS.yellow
 
   // Edición pedida desde fuera (nota recién creada, menú contextual o doble clic).
@@ -73,6 +91,7 @@ export default function NoteNode({ id, data, selected }) {
         onResizeStart={() => takeSnapshot()}
       />
       <div
+        ref={bodyRef}
         data-note-body
         className="h-full w-full overflow-hidden rounded-sm border-2 p-[10px] shadow-sm"
         style={{ background: color.bg, borderColor: selected ? '#3b82f6' : color.border }}
@@ -94,7 +113,7 @@ export default function NoteNode({ id, data, selected }) {
             }}
           />
         ) : (
-          <div className={`diagram-text h-full break-words ${data.text ? 'text-slate-800' : 'italic text-slate-400'}`}>
+          <div ref={contentRef} className={`diagram-text break-words ${data.text ? 'text-slate-800' : 'italic text-slate-400'}`}>
             {data.text ? <NoteText text={data.text} /> : <span className="canvas-hint">Doble clic para escribir</span>}
           </div>
         )}
