@@ -216,7 +216,7 @@ export function elecStep(schematic, state, { physical = {}, plcOut = {} } = {}, 
   const actuators = {}
   const plcIn = {}
   const motors = {}
-  const view = { pot: {}, loads, motors, closed: {}, short, oscillating: r.oscillating, plcIn }
+  const view = { pot: {}, loads, motors, closed: {}, short, oscillating: r.oscillating, plcIn, plcOut, tripped }
   for (const c of list) {
     for (const t of terminalsOf(c)) view.pot[key(c.id, t.id)] = pot(c.id, t.id)
     if (c.type === 'coil' || c.type === 'valve' || c.type === 'lamp') {

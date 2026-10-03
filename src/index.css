@@ -17,6 +17,29 @@ body,
   pointer-events: auto;
 }
 
+/* Bornes del esquema eléctrico (components/elec/ElecNode.jsx): pequeños; los de los embarrados,
+   solo al pasar por encima o al cablear; al simular (no conectables), ocultos. */
+.react-flow__handle.elec-handle {
+  width: 7px;
+  height: 7px;
+  min-width: 0;
+  min-height: 0;
+  border: 1.5px solid #0f172a;
+  border-radius: 9999px;
+  background: #ffffff;
+}
+.react-flow__handle.elec-handle-rail {
+  opacity: 0;
+}
+.react-flow__node:hover .elec-handle-rail,
+.react-flow__handle.elec-handle-rail.connectionindicator:hover,
+.react-flow__handle.elec-handle-rail.connectingfrom {
+  opacity: 1;
+}
+.react-flow__handle.elec-handle:not(.connectable) {
+  opacity: 0;
+}
+
 /* Conectores (src/nodes/GrafcetHandle.jsx). Solo se muestran al pasar por el nodo, al
    seleccionarlo o durante una conexión: en Grafcet una etapa sin enlace de entrada (p. ej. la
    inicial sin bucle) no lleva nada encima. Las exportaciones los excluyen siempre. */

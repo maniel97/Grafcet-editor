@@ -10,6 +10,9 @@ import { GRID, nextTag, plcTerminals, terminalAddress } from './catalog'
 
 const PLC_X = 100
 const PLC_Y = 300
+// Separación entre aparatos (los bornes del autómata van cada 40 px; los aparatos, con su rótulo,
+// necesitan más sitio: el cable baja hasta su borne).
+const PITCH = 140
 
 // Aparato de una entrada según el elemento de la planta que da esa señal.
 function inputDevice(name, scene) {
@@ -55,7 +58,7 @@ export function generatePlcWiring(variables, scene, existing = { components: [],
   const ins = variables.filter((v) => v.type === 'input' && at(terminalAddress(v.address)))
   const outs = variables.filter((v) => v.type === 'output' && at(terminalAddress(v.address)))
   const skipped = variables.filter((v) => (v.type === 'input' || v.type === 'output') && !at(terminalAddress(v.address))).map((v) => v.name)
-  const width = Math.max(...terms.map((t) => t.x)) + 40
+  const width = Math.max(Math.max(...terms.map((t) => t.x)) + 40, Math.max(ins.length, outs.length) * PITCH + 40)
 
   // Fuente de 24 V: L+ arriba, M abajo (embarrados con tomas cada 20 px desde x = PLC_X).
   const top = { id: id('rail'), type: 'rail', x: PLC_X, y: PLC_Y + offset - 200, potential: 'L+', length: width }
@@ -67,23 +70,25 @@ export function generatePlcWiring(variables, scene, existing = { components: [],
   wire(plc.id, '1M', bottom.id, tap(PLC_X + at('1M').x))
   wire(top.id, tap(PLC_X + at('1L').x), plc.id, '1L')
 
-  for (const v of ins) {
+  ins.forEach((v, i) => {
     const t = at(terminalAddress(v.address))
     const d = inputDevice(v.name, scene)
     const nc = d.type === 'emergency' || d.contact === 'NC'
-    const c = { id: id('in'), type: d.type, x: PLC_X + t.x - 20, y: PLC_Y + offset - 140, tag: nextTag(all, d.prefix), signal: v.name, text: v.comment || v.name, ...(d.contact ? { contact: d.contact } : {}) }
+    const x = PLC_X + 40 + i * PITCH
+    const c = { id: id('in'), type: d.type, x, y: PLC_Y + offset - 140, tag: nextTag(all, d.prefix), signal: v.name, text: v.comment || v.name, ...(d.contact ? { contact: d.contact } : {}) }
     all.push(c)
     components.push(c)
-    wire(top.id, tap(PLC_X + t.x), c.id, nc ? '11' : '13')
+    wire(top.id, tap(x + 20), c.id, nc ? '11' : '13')
     wire(c.id, nc ? '12' : '14', plc.id, t.id)
-  }
-  for (const v of outs) {
+  })
+  outs.forEach((v, i) => {
     const t = at(terminalAddress(v.address))
     const d = outputDevice(v.name, scene)
+    const x = PLC_X + 40 + i * PITCH
     const c = {
       id: id('out'),
       type: d.type,
-      x: PLC_X + t.x - 20,
+      x,
       y: PLC_Y + offset + 180,
       tag: nextTag(all, d.prefix),
       signal: v.name,
@@ -95,7 +100,7 @@ export function generatePlcWiring(variables, scene, existing = { components: [],
     components.push(c)
     const [a, b] = d.type === 'lamp' ? ['X1', 'X2'] : ['A1', 'A2']
     wire(plc.id, t.id, c.id, a)
-    wire(c.id, b, bottom.id, tap(PLC_X + t.x))
-  }
+    wire(c.id, b, bottom.id, tap(x + 20))
+  })
   return { components, wires, skipped }
 }

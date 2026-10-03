@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { AlertTriangle, ChevronDown, ChevronRight, Factory, Pause, Play, RotateCcw, SkipForward, Square, Timer } from 'lucide-react'
+import { AlertTriangle, ChevronDown, ChevronRight, Factory, Pause, Play, RotateCcw, SkipForward, Square, Timer, Zap } from 'lucide-react'
 import Chronogram from './Chronogram'
 import ScenarioControls from './ScenarioControls'
 import CpuControls from './CpuControls'
@@ -97,7 +97,7 @@ function chronogramSource(samples, signals, now) {
 const fmtTime = (t) => (t < 60 ? `${t.toFixed(1)} s` : `${Math.floor(t / 60)} min ${(t % 60).toFixed(1)} s`)
 
 // Panel de control de la simulación.
-export default function SimulationPanel({ simulation, scenarios = [], onScenariosChange, cpuConfig, onCpuChange, onApplySymbols, sceneOpen, onToggleScene, exportProps, onFocusNode, onClose }) {
+export default function SimulationPanel({ simulation, scenarios = [], onScenariosChange, cpuConfig, onCpuChange, onApplySymbols, sceneOpen, onToggleScene, elecOpen, onToggleElec, exportProps, onFocusNode, onClose }) {
   const { compiled, sim, playing, setPlaying, speed, setSpeed, setInput, step, advance, reset } = simulation
 
   // Las entradas que gobierna la planta virtual no se cambian a mano.
@@ -297,6 +297,15 @@ export default function SimulationPanel({ simulation, scenarios = [], onScenario
             <span className="ml-auto text-xs text-slate-500">
               {simulation.sceneCount ? `${simulation.sceneCount} elementos` : 'sin elementos'}
             </span>
+          </button>
+          <button
+            type="button"
+            onClick={onToggleElec}
+            aria-pressed={elecOpen}
+            title="Esquema eléctrico junto al grafcet: mando, potencia y conexiones del autómata"
+            className={`mt-1 flex w-full items-center gap-1.5 rounded-md border px-2 py-1 text-sm ${elecOpen ? 'border-blue-300 bg-blue-50 text-blue-800' : 'border-slate-300 hover:bg-slate-50'}`}
+          >
+            <Zap size={14} /> Esquema eléctrico
           </button>
         </div>
 

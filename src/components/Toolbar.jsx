@@ -27,6 +27,7 @@ import {
   Wind,
   Search,
   FilePlus,
+  Zap,
 } from 'lucide-react'
 
 // `primary`: el texto se ve desde 1280 px; el resto solo en pantallas anchas (2xl),
@@ -91,6 +92,8 @@ export default function Toolbar({
   onToggleVerify,
   onSearch,
   onNew,
+  electricalOpen,
+  onToggleElectrical,
   verifyOpen,
   issueCounts,
   onHelp,
@@ -183,6 +186,14 @@ export default function Toolbar({
         title="Paso a ladder (LD), texto estructurado y AWL"
         onClick={onOpenLadder}
         primary
+      />
+      <ToolButton
+        icon={Zap}
+        label="Esquema eléctrico"
+        title="Esquema eléctrico: mando, potencia y conexiones del autómata (simulable)"
+        onClick={onToggleElectrical}
+        active={electricalOpen}
+        iconOnly
       />
       <ToolButton icon={Workflow} label="GEMMA" title="Asistente GEMMA: modos de marcha y parada (grafcet de conducción)" disabled={locked} onClick={onOpenGemma} />
       <ToolButton

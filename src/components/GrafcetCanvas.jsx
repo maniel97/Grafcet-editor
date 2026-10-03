@@ -46,6 +46,7 @@ import { crossSheetRefs, sheetOf, sheetsOf, visibleEdges, visibleNodes } from '.
 import { EMPTY_GEMMA, generateConduction } from '../lib/gemma'
 import { clearSharedHash, decodeProject, sharedData } from '../lib/share'
 import { applySymbols } from '../lib/plc/symbolTable'
+import { buildPlcModel } from '../lib/plcModel'
 
 // Partes que no hacen falta al abrir el editor: se descargan la primera vez que se usan, para que
 // la carga inicial sea más ligera (importa sobre todo publicado en internet).
@@ -53,6 +54,7 @@ const SettingsDialog = lazy(() => import('./SettingsDialog'))
 const HelpDialog = lazy(() => import('./HelpDialog'))
 const SimulationPanel = lazy(() => import('./SimulationPanel'))
 const SceneView = lazy(() => import('./SceneView'))
+const ElectricalView = lazy(() => import('./elec/ElectricalView'))
 const LadderView = lazy(() => import('./LadderView'))
 const VariablesDialog = lazy(() => import('./VariablesDialog'))
 const ExportDialog = lazy(() => import('./ExportDialog'))
@@ -131,7 +133,12 @@ export default function GrafcetCanvas() {
   const [exportFormat, setExportFormat] = useState(null) // diálogo de exportación abierto en ese formato
   // Modo simulación: la edición queda bloqueada y el lienzo muestra la evolución.
   const [simulating, setSimulating] = useState(false)
-  const activeSceneHistory = simulating && sceneView ? sceneHistory : null
+  // Esquema eléctrico (components/elec): panel junto al lienzo, también sin simular.
+  const [elecView, setElecView] = useState(null) // null | 'split' | 'full'
+  const [elecHistory, setElecHistory] = useState(null)
+  // Panel que se tocó por última vez: a él van deshacer/rehacer/copiar/pegar de la barra.
+  const [lastPanel, setLastPanel] = useState(null)
+  const activeSceneHistory = lastPanel === 'elec' && elecView && elecHistory ? elecHistory : simulating && sceneView ? sceneHistory : null
   // Bloqueo de edición (candado de los controles): solo mirar, desplazar y hacer zoom.
   const [editLocked, setEditLocked] = useState(false)
   // Solo lectura: al simular o con la edición bloqueada.
@@ -736,6 +743,8 @@ export default function GrafcetCanvas() {
           onOpenSettings={() => setSettingsOpen(true)}
           onToggleVerify={() => setVerifyOpen((v) => !v)}
           onSearch={() => setSearchOpen(true)}
+          electricalOpen={Boolean(elecView)}
+          onToggleElectrical={() => setElecView((v) => (v ? null : 'split'))}
           onNew={() => setNewOpen(true)}
           verifyOpen={verifyOpen}
           issueCounts={issueCounts}
@@ -919,7 +928,11 @@ export default function GrafcetCanvas() {
           </Suspense>
         )}
         <div className="relative flex min-h-0 flex-1">
-          <div ref={wrapperRef} className={`relative flex-1 ${loopSource ? 'loop-picking' : ''} ${readOnly ? 'read-only' : ''}`}>
+          <div
+            ref={wrapperRef}
+            onPointerDownCapture={() => setLastPanel(null)}
+            className={`relative flex-1 ${loopSource ? 'loop-picking' : ''} ${readOnly ? 'read-only' : ''}`}
+          >
             {editLocked && !simulating && (
               <div className="absolute left-1/2 top-3 z-10 flex -translate-x-1/2 items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-sm text-amber-900 shadow">
                 <Lock size={14} /> Edición bloqueada: solo puedes desplazarte y hacer zoom
@@ -1030,8 +1043,32 @@ export default function GrafcetCanvas() {
               />
             )}
           </div>
+          {elecView && (
+            <Suspense fallback={<Loading panel />}>
+              <ElectricalView
+                schematic={plc.electrical}
+                onChange={(electrical) => setPlc((p) => ({ ...p, electrical }))}
+                elecState={simulating ? (simulation.sim?.world?.elec ?? null) : null}
+                onAction={simulation.elecDo}
+                variables={[...symbols].map(([name, found]) => ({ name, type: plc.variables?.[name]?.type ?? found.type }))}
+                buildVariables={() => buildPlcModel(nodes, edges, plc).variables}
+                scene={plc.scene}
+                simulating={simulating}
+                onHistory={setElecHistory}
+                onActivate={() => setLastPanel('elec')}
+                maximized={elecView === 'full'}
+                onToggleMaximize={() => setElecView((v) => (v === 'full' ? 'split' : 'full'))}
+                onClose={() => {
+                  setElecView(null)
+                  setLastPanel(null)
+                }}
+              />
+            </Suspense>
+          )}
           {simulating && sceneView && simulation.sim && (
             <Suspense fallback={<Loading panel />}>
+              {/* contents: no cambia el diseño; solo marca la planta como el último panel tocado. */}
+              <div className="contents" onPointerDownCapture={() => setLastPanel('scene')}>
               <SceneView
                 scene={plc.scene}
                 onChange={(scene) => setPlc((p) => ({ ...p, scene }))}
@@ -1048,13 +1085,19 @@ export default function GrafcetCanvas() {
                 onToggleMaximize={() => setSceneView((v) => (v === 'full' ? 'split' : 'full'))}
                 onClose={() => setSceneView(null)}
               />
+              </div>
             </Suspense>
           )}
           {simulating ? (
             <Suspense fallback={<Loading panel />}>
               <SimulationPanel
                 sceneOpen={Boolean(sceneView)}
-                onToggleScene={() => setSceneView((v) => (v ? null : 'split'))}
+                onToggleScene={() => {
+                  setSceneView((v) => (v ? null : 'split'))
+                  setLastPanel('scene')
+                }}
+                elecOpen={Boolean(elecView)}
+                onToggleElec={() => setElecView((v) => (v ? null : 'split'))}
                 simulation={simulation}
                 scenarios={plc.scenarios}
                 onScenariosChange={(update) => setPlc((p) => ({ ...p, scenarios: update(p.scenarios ?? []) }))}
