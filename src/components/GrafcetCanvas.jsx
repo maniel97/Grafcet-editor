@@ -27,6 +27,7 @@ import { isValidGrafcetConnection } from '../lib/grafcetRules'
 import { loadAutosave, useAutosave } from '../lib/autosave'
 import { useEditorShortcuts } from '../lib/shortcuts'
 import { normalizeAction } from '../lib/actions'
+import { spreadFactor, spreadNodes } from '../lib/spread'
 import { useFitDrawn } from '../hooks/useFitDrawn'
 import { usePlcTable } from '../hooks/usePlcTable'
 import { useVerification } from '../hooks/useVerification'
@@ -173,10 +174,47 @@ export default function GrafcetCanvas() {
   }, [])
   const { fitDrawn, fitWhenReady } = useFitDrawn(wrapperRef)
 
+  // Ejemplos (data.autoPlace = 'spread' en su tabla de variables): primero se separan las columnas
+  // si algún texto pisa lo que tiene a su derecha (depende de la letra y el tamaño; lib/spread).
+  const nodesInitialized = useNodesInitialized()
+  useEffect(() => {
+    if (!nodesInitialized) return
+    const table = nodes.find((n) => n.data?.autoPlace === 'spread')
+    if (!table) return
+    const frame = requestAnimationFrame(() =>
+      requestAnimationFrame(() => {
+        const toFlow = (r) => {
+          const a = screenToFlowPosition({ x: r.left, y: r.top })
+          const b = screenToFlowPosition({ x: r.right, y: r.bottom })
+          return { left: a.x, top: a.y, right: b.x, bottom: b.y }
+        }
+        const boxes = {}
+        for (const n of nodes) {
+          if ((n.type !== 'step' && n.type !== 'transition') || n.hidden) continue
+          const el = wrapperRef.current?.querySelector(`.react-flow__node[data-id="${CSS.escape(n.id)}"]`)
+          if (!el) continue
+          const body = toFlow((el.querySelector('.diagram-step-label') ?? el.firstElementChild ?? el).getBoundingClientRect())
+          let text = body
+          for (const child of el.querySelectorAll('*')) {
+            const r = child.getBoundingClientRect()
+            if (!r.width || !r.height) continue
+            const f = toFlow(r)
+            text = { right: Math.max(text.right, f.right), top: Math.min(text.top, f.top), bottom: Math.max(text.bottom, f.bottom) }
+          }
+          boxes[n.id] = { ...body, textRight: text.right, textTop: text.top, textBottom: text.bottom }
+        }
+        const factor = spreadFactor(boxes)
+        setNodes((nds) =>
+          spreadNodes(nds, boxes, factor).map((n) => (n.id === table.id ? { ...n, data: { ...n.data, autoPlace: 'left' } } : n)),
+        )
+      }),
+    )
+    return () => cancelAnimationFrame(frame)
+  }, [nodesInitialized, nodes, setNodes, screenToFlowPosition])
+
   // Tabla de variables de los ejemplos (data.autoPlace = 'left'): se coloca a la izquierda de todo
   // lo dibujado una vez medida, con su ancho real (depende de la letra, el tamaño y los comentarios)
   // y contando los bucles de retorno, que se dibujan a la izquierda de las etapas.
-  const nodesInitialized = useNodesInitialized()
   useEffect(() => {
     if (!nodesInitialized) return
     const table = nodes.find((n) => n.data?.autoPlace === 'left' && n.measured?.width)

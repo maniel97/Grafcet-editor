@@ -760,7 +760,7 @@ for (const [fontId, diagramFontSize] of [['inter', 14], ['opendyslexic', 24], ['
 }
 
 for (const [fontId, diagramFontSize] of [['inter', 14], ['opendyslexic', 22]]) {
-  test(`ejemplos: la tabla de variables no pisa el grafcet (letra ${fontId}, ${diagramFontSize}px)`, async ({ page }) => {
+  test(`ejemplos: ni la tabla de variables ni las receptividades pisan nada (letra ${fontId}, ${diagramFontSize}px)`, async ({ page }) => {
     await page.setViewportSize({ width: 1400, height: 850 })
     await page.addInitScript((s) => localStorage.setItem('grafcet-editor:settings', JSON.stringify(s)), { fontId, diagramFontSize })
     const errors = await openEditor(page)
@@ -775,6 +775,22 @@ for (const [fontId, diagramFontSize] of [['inter', 14], ['opendyslexic', 22]]) {
           return Math.round(Math.min(...others) - table.right)
         })
       await expect.poll(gap, { message: ex.title }).toBeGreaterThan(5)
+      // Ninguna receptividad pisa otra etapa o transición (ni sus textos) ni una nota.
+      const clashes = await page.evaluate(() => {
+        const hit = (a, b) => a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom
+        const out = []
+        for (const t of document.querySelectorAll('.react-flow__node-transition')) {
+          const text = t.querySelector('.diagram-text')?.getBoundingClientRect()
+          if (!text) continue
+          for (const o of document.querySelectorAll('.react-flow__node-transition, .react-flow__node-step, .react-flow__node-note')) {
+            if (o === t) continue
+            const rects = [o, ...o.querySelectorAll('.diagram-text')].map((e) => e.getBoundingClientRect())
+            if (rects.some((r) => hit(text, r))) out.push(`${t.dataset.id} pisa ${o.dataset.id}`)
+          }
+        }
+        return out
+      })
+      expect(clashes, ex.title).toEqual([])
     }
     expectNoErrors(errors)
   })
