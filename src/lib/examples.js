@@ -1386,6 +1386,327 @@ export const EXAMPLES = [
     },
     after: (project) => withDrive(project),
   },
+  {
+    id: 'semaforo-peatones',
+    level: 1,
+    title: 'Semáforo con pulsador de peatones',
+    description: 'Los coches tienen verde hasta que un peatón pide paso; un segundo grafcet recuerda la petición mientras dura el ciclo.',
+    tags: ['Temporización', 'Memoria', 'Planta'],
+    build() {
+      const nodes = [
+        step('s0', '0', 200, 0, ['VerdeC', 'RojoP'], { initial: true }),
+        trans('t1', '10s/X0 · X11', 200, 100),
+        step('s1', '1', 200, 170, ['AmbarC', 'RojoP']),
+        trans('t2', '3s/X1', 200, 270),
+        step('s2', '2', 200, 340, ['RojoC', 'RojoP']),
+        trans('t3', '1s/X2', 200, 440),
+        step('s3', '3', 200, 510, ['RojoC', 'VerdeP']),
+        trans('t4', '8s/X3', 200, 610),
+        // Memoria de la petición: se pide con el pulsador y se borra al dar verde a los peatones.
+        step('s10', '10', 560, 0, [], { initial: true }),
+        trans('t10', '↑Pulsador', 560, 100),
+        step('s11', '11', 560, 170, ['Espere']),
+        trans('t11', 'X3', 560, 270),
+        note(
+          'nota',
+          820,
+          0,
+          '# Semáforo con pulsador de peatones\n**Nivel 1.** Los coches tienen verde (al menos 10 s) hasta que un peatón pulsa.\n\n- El grafcet de la derecha **recuerda la petición** (etapa 11, piloto `Espere`) aunque se suelte el pulsador, y la borra cuando los peatones tienen verde (`X3`).\n- La receptividad `10s/X0 · X11` combina el tiempo mínimo de verde con la petición.\n- Entrada: `Pulsador` · Salidas: `VerdeC`, `AmbarC`, `RojoC`, `VerdeP`, `RojoP`, `Espere`\n\nPruébalo: **Simular** y pulsa el pulsador de peatones.',
+          { width: 340, height: 400 },
+        ),
+      ]
+      const edges = links([
+        ['s0', 't1'],
+        ['t1', 's1'],
+        ['s1', 't2'],
+        ['t2', 's2'],
+        ['s2', 't3'],
+        ['t3', 's3'],
+        ['s3', 't4'],
+        ['t4', 's0'],
+        ['s10', 't10'],
+        ['t10', 's11'],
+        ['s11', 't11'],
+        ['t11', 's10'],
+      ])
+      const scene = {
+        elements: [
+          { id: 'coches', type: 'trafficlight', x: 200, y: 120, rot: 0, red: 'RojoC', amber: 'AmbarC', green: 'VerdeC', text: 'Coches' },
+          { id: 'peatones', type: 'trafficlight', x: 360, y: 120, rot: 0, red: 'RojoP', amber: '', green: 'VerdeP', text: 'Peatones' },
+          { id: 'pulsador', type: 'button', x: 0, y: 0, rot: 0, variable: 'Pulsador', contact: 'NO', color: 'yellow', text: 'Peatones', place: 'desk' },
+          { id: 'espere', type: 'lamp', x: 0, y: 0, rot: 0, variable: 'Espere', color: 'amber', text: 'Espere', place: 'desk' },
+        ],
+      }
+      return { nodes, edges, plc: { scene } }
+    },
+  },
+  {
+    id: 'aparcamiento',
+    level: 2,
+    title: 'Aparcamiento con contador de plazas',
+    description: 'Contaje hacia arriba y hacia abajo con dos detectores; comparaciones para los pilotos de Libre y Completo.',
+    tags: ['Contadores', 'Flancos', 'Comparaciones', 'Acción condicionada', 'Planta'],
+    build() {
+      const cond = (text, condition) => ({ text, kind: 'conditional', condition })
+      const stored = (text) => ({ text, kind: 'stored-on' })
+      const nodes = [
+        step('s0', '0', 200, 0, [cond('Libre', 'C < 5'), cond('Completo', 'C >= 5')], { initial: true }),
+        trans('t1', '↑Entra · !Sale · C < 5', 200, 100),
+        step('s1', '1', 200, 170, [stored('C:=C+1')]),
+        trans('t2', '1', 200, 270),
+        trans('t3', '↑Sale · !Entra · C > 0', 560, 100),
+        step('s2', '2', 560, 170, [stored('C:=C-1')]),
+        trans('t4', '1', 560, 270),
+        note(
+          'nota',
+          860,
+          0,
+          '# Aparcamiento\n**Nivel 2.** `C` cuenta los coches que hay dentro (5 plazas).\n\n- Cada **flanco** `↑Entra` suma 1 y cada `↑Sale` resta 1 (acciones memorizadas en las etapas 1 y 2, que duran un instante).\n- No se cuenta una entrada con el aparcamiento lleno (`C < 5`) ni una salida con él vacío (`C > 0`); las dos receptividades son excluyentes.\n- Los pilotos son **acciones condicionadas** de la etapa 0: `Libre` si `C < 5`, `Completo` si `C >= 5`.\n\nPruébalo: **Simular** y pulsa «Coche entra» seis veces.',
+          { width: 340, height: 430 },
+        ),
+      ]
+      const edges = links([
+        ['s0', 't1'],
+        ['t1', 's1'],
+        ['s1', 't2'],
+        ['t2', 's0'],
+        ['s0', 't3'],
+        ['t3', 's2'],
+        ['s2', 't4'],
+        ['t4', 's0'],
+      ])
+      const scene = {
+        elements: [
+          { id: 'entra', type: 'button', x: 0, y: 0, rot: 0, variable: 'Entra', contact: 'NO', color: 'green', text: 'Coche entra', place: 'desk' },
+          { id: 'sale', type: 'button', x: 0, y: 0, rot: 0, variable: 'Sale', contact: 'NO', color: 'black', text: 'Coche sale', place: 'desk' },
+          { id: 'libre', type: 'lamp', x: 0, y: 0, rot: 0, variable: 'Libre', color: 'green', text: 'Libre', place: 'desk' },
+          { id: 'completo', type: 'lamp', x: 0, y: 0, rot: 0, variable: 'Completo', color: 'red', text: 'Completo', place: 'desk' },
+          { id: 'c', type: 'display', x: 0, y: 0, rot: 0, variable: 'C', text: 'Coches dentro', place: 'desk' },
+        ],
+      }
+      return { nodes, edges, plc: { scene } }
+    },
+  },
+  {
+    id: 'silo-vibrador',
+    level: 2,
+    title: 'Silo con vibrador',
+    description: 'Acciones retardada y limitada en el tiempo (IEC 60848): aviso solo los 2 primeros segundos de la descarga y vibrador a partir del cuarto.',
+    tags: ['Acción condicionada', 'Temporización', 'Lineal', 'Planta'],
+    build() {
+      const cond = (text, condition) => ({ text, kind: 'conditional', condition })
+      const { nodes, edges } = cycle([
+        { actions: [] },
+        'Marcha · Lleno',
+        { actions: ['Descarga', cond('Aviso', '!2s/X1'), cond('Vibrador', '4s/X1')] },
+        'Vacio',
+        { actions: ['Llenar'] },
+        'Lleno',
+      ])
+      nodes.push(
+        note(
+          'nota',
+          620,
+          0,
+          '# Silo con vibrador\n**Nivel 2.** Durante la descarga (etapa 1):\n\n- **Acción limitada en el tiempo**: la sirena `Aviso` suena solo los 2 primeros segundos (condición `!2s/X1`).\n- **Acción retardada**: el `Vibrador` arranca a los 4 s (condición `4s/X1`), para ayudar a que el producto no se atasque.\n- Después se rellena el silo (`Llenar`) hasta `Lleno`.\n- Entradas: `Marcha`, `Lleno`, `Vacio` · Salidas: `Descarga`, `Aviso`, `Vibrador`, `Llenar`\n\nPruébalo: **Simular** y Marcha.',
+          { width: 340, height: 400 },
+        ),
+      )
+      const scene = {
+        elements: [
+          { id: 'silo', type: 'tank', x: 220, y: 60, rot: 0, fill: 'Llenar', fillFine: '', drain: 'Descarga', low: '', high: 'Lleno', empty: 'Vacio', level: '', fillTime: 6, drainTime: 8, initial: 1, text: 'Silo' },
+          { id: 'vibrador', type: 'motor', x: 380, y: 120, rot: 0, variable: 'Vibrador', reverse: '', pulses: '', text: 'Vibrador' },
+          { id: 'aviso', type: 'siren', x: 380, y: 40, rot: 0, variable: 'Aviso', sound: false, text: 'Aviso' },
+          { id: 'marcha', type: 'button', x: 0, y: 0, rot: 0, variable: 'Marcha', contact: 'NO', color: 'green', text: 'Marcha', place: 'desk' },
+        ],
+      }
+      return { nodes, edges, plc: { scene } }
+    },
+  },
+  {
+    id: 'dos-carros',
+    level: 3,
+    title: 'Dos carros con un tramo común',
+    description: 'Recurso compartido: un carro solo entra en el tramo común si el otro está en reposo (variables de etapa). Si los dos lo piden a la vez, tiene prioridad A.',
+    tags: ['Recurso compartido', 'Variables de etapa', 'Grafcets independientes', 'Planta'],
+    build() {
+      const nodes = [
+        step('s10', '10', 0, 0, [], { initial: true }),
+        trans('tA1', 'Pide_A · X30', 0, 100),
+        step('s11', '11', 0, 170, ['A+']),
+        trans('tA2', 'a1', 0, 270),
+        step('s12', '12', 0, 340, ['A-']),
+        trans('tA3', 'a0', 0, 440),
+        step('s30', '30', 360, 0, [], { initial: true }),
+        trans('tB1', 'Pide_B · !Pide_A · X10', 360, 100),
+        step('s31', '31', 360, 170, ['B+']),
+        trans('tB2', 'b1', 360, 270),
+        step('s32', '32', 360, 340, ['B-']),
+        trans('tB3', 'b0', 360, 440),
+        note(
+          'nota',
+          760,
+          0,
+          '# Dos carros con un tramo común\n**Nivel 3.** Los carros A y B comparten un tramo de vía: nunca pueden estar los dos en él.\n\n- Cada carro tiene su grafcet. Para entrar, el otro tiene que estar en reposo: lo dicen sus **variables de etapa** (`X30` en la receptividad de A, `X10` en la de B).\n- Si los dos piden a la vez, entra A: `!Pide_A` en la de B da la **prioridad**.\n- Otra forma clásica: una **etapa de recurso** común, que cada carro toma al entrar (convergencia en Y) y devuelve al salir.\n- Entradas: `Pide_A`, `Pide_B`, `a0`, `a1`, `b0`, `b1` · Salidas: `A+`, `A-`, `B+`, `B-`\n\nPruébalo: **Simular** y pide los dos carros a la vez.',
+          { width: 340, height: 470 },
+        ),
+      ]
+      const edges = links([
+        ['s10', 'tA1'],
+        ['tA1', 's11'],
+        ['s11', 'tA2'],
+        ['tA2', 's12'],
+        ['s12', 'tA3'],
+        ['tA3', 's10'],
+        ['s30', 'tB1'],
+        ['tB1', 's31'],
+        ['s31', 'tB2'],
+        ['tB2', 's32'],
+        ['s32', 'tB3'],
+        ['tB3', 's30'],
+      ])
+      const cart = (n, x, rot) => ({
+        id: n,
+        type: 'cylinder',
+        x,
+        y: 160,
+        rot,
+        text: `Carro ${n}`,
+        extend: `${n}+`,
+        retract: `${n}-`,
+        retracted: `${n.toLowerCase()}0`,
+        extended: `${n.toLowerCase()}1`,
+        stroke: 120,
+        time: 1.5,
+      })
+      const scene = {
+        elements: [
+          cart('A', 80, 0),
+          cart('B', 520, 180),
+          { id: 'tramo', type: 'label', x: 300, y: 110, rot: 0, text: 'Tramo común', size: 14 },
+          { id: 'pide_a', type: 'button', x: 0, y: 0, rot: 0, variable: 'Pide_A', contact: 'NO', color: 'green', text: 'Pide A', place: 'desk' },
+          { id: 'pide_b', type: 'button', x: 0, y: 0, rot: 0, variable: 'Pide_B', contact: 'NO', color: 'blue', text: 'Pide B', place: 'desk' },
+        ],
+      }
+      return { nodes, edges, plc: { scene } }
+    },
+  },
+  {
+    id: 'taladradora-verificacion',
+    level: 4,
+    title: 'Taladradora con marcha de verificación',
+    description: 'Un grafcet de modos (GEMMA): en producción el ciclo es automático; en verificación avanza una transición por cada pulsación de Paso.',
+    tags: ['Grafcets parciales', 'GEMMA', 'Modos de marcha', 'Planta'],
+    build() {
+      const go = (condition) => `${condition} · (X20 + ↑Paso)`
+      const nodes = [
+        frame('gm', 'GM', 'grafcet', -40, -40, 380, 400),
+        step('s20', '20', 0, 0, ['Produccion'], { initial: true }),
+        trans('t20', 'Verificacion · X0', 0, 100),
+        step('s21', '21', 0, 170, ['Modo_verif']),
+        trans('t21', '!Verificacion · X0', 0, 270),
+        frame('gp', 'GP', 'grafcet', 420, -40, 420, 760),
+        step('s0', '0', 460, 0, [], { initial: true }),
+        trans('t1', go('Marcha · Pieza'), 460, 100),
+        step('s1', '1', 460, 170, ['Motor_broca', 'Bajar']),
+        trans('t2', go('Fc_abajo'), 460, 270),
+        step('s2', '2', 460, 340, ['Motor_broca']),
+        trans('t3', go('2s/X2'), 460, 440),
+        step('s3', '3', 460, 510, ['Subir']),
+        trans('t4', go('Fc_arriba'), 460, 610),
+        note(
+          'nota',
+          880,
+          0,
+          '# Marcha de verificación\n**Nivel 4.** Dos grafcets parciales:\n\n- **GM** (modos, GEMMA): etapa 20 = **producción normal** (A1/F1); etapa 21 = **marcha de verificación en orden** (F5). Solo se cambia de modo con la máquina en reposo (`X0`).\n- **GP** (producción): cada receptividad lleva `(X20 + ↑Paso)`: en producción avanza sola; en verificación, solo con cada pulsación de `Paso` (para comprobar la máquina paso a paso).\n- Entradas: `Marcha`, `Pieza`, `Fc_abajo`, `Fc_arriba`, `Verificacion`, `Paso` · Salidas: `Motor_broca`, `Bajar`, `Subir`, `Produccion`, `Modo_verif`\n\nPruébalo: **Simular**, pasa a Verificación y avanza con Paso.',
+          { width: 360, height: 470 },
+        ),
+      ]
+      const edges = links([
+        ['s20', 't20'],
+        ['t20', 's21'],
+        ['s21', 't21'],
+        ['t21', 's20'],
+        ['s0', 't1'],
+        ['t1', 's1'],
+        ['s1', 't2'],
+        ['t2', 's2'],
+        ['s2', 't3'],
+        ['t3', 's3'],
+        ['s3', 't4'],
+        ['t4', 's0'],
+      ])
+      const scene = {
+        elements: [
+          { id: 'motor', type: 'motor', x: 300, y: 50, rot: 0, variable: 'Motor_broca', reverse: '', text: 'Motor broca' },
+          { id: 'broca', type: 'cylinder', x: 300, y: 100, rot: 90, extend: 'Bajar', retract: 'Subir', retracted: 'Fc_arriba', extended: 'Fc_abajo', stroke: 120, time: 1.5, text: 'Broca' },
+          { id: 'marcha', type: 'button', x: 0, y: 0, rot: 0, variable: 'Marcha', contact: 'NO', color: 'green', text: 'Marcha', place: 'desk' },
+          { id: 'pieza', type: 'switch', x: 0, y: 0, rot: 0, variable: 'Pieza', contact: 'NO', text: 'Pieza colocada', place: 'desk' },
+          { id: 'verif', type: 'switch', x: 0, y: 0, rot: 0, variable: 'Verificacion', contact: 'NO', text: 'Verificación', place: 'desk' },
+          { id: 'paso', type: 'button', x: 0, y: 0, rot: 0, variable: 'Paso', contact: 'NO', color: 'blue', text: 'Paso', place: 'desk' },
+          { id: 'l_prod', type: 'lamp', x: 0, y: 0, rot: 0, variable: 'Produccion', color: 'green', text: 'Producción', place: 'desk' },
+          { id: 'l_verif', type: 'lamp', x: 0, y: 0, rot: 0, variable: 'Modo_verif', color: 'amber', text: 'Verificación', place: 'desk' },
+        ],
+      }
+      return { nodes, edges, plc: { scene } }
+    },
+  },
+  {
+    id: 'dosificacion-peso',
+    level: 5,
+    title: 'Dosificación por peso',
+    description: 'Tolva pesada (4-20 mA): tara al empezar, llenado grueso hasta 8 kg antes de la consigna y fino hasta llegar, estabilización y descarga.',
+    tags: ['Analógicas', 'Comparaciones', 'Acciones memorizadas', 'Planta'],
+    build() {
+      const stored = (text) => ({ text, kind: 'stored-on' })
+      const nodes = [
+        step('s0', '0', 200, 0, [], { initial: true }),
+        trans('t1', 'Marcha', 200, 100),
+        step('s1', '1', 200, 170, ['Gruesa', stored('Tara:=Peso'), stored('Corte:=Peso+Consigna-8'), stored('Meta:=Peso+Consigna'), stored('Fin:=Peso+1')]),
+        trans('t2', 'Peso >= Corte', 200, 270),
+        step('s2', '2', 200, 340, ['Fina']),
+        trans('t3', 'Peso >= Meta', 200, 440),
+        step('s3', '3', 200, 510),
+        trans('t4', '2s/X3', 200, 610),
+        step('s4', '4', 200, 680, ['Descarga']),
+        trans('t5', 'Peso <= Fin', 200, 780),
+        note(
+          'nota',
+          700,
+          0,
+          '# Dosificación por peso\n**Nivel 5.** La tolva está sobre una báscula: `Peso` (4-20 mA, 0–100 kg). `Consigna` (potenciómetro, 0–60 kg) es lo que hay que añadir.\n\n- Al empezar se toma la **tara** (`Tara:=Peso`: lo que ya había) y se calculan los umbrales con **acciones memorizadas**.\n- **Llenado grueso** (`Gruesa`, rápido) hasta 8 kg antes; **fino** (`Fina`, cinco veces más lento) hasta la consigna: así no se pasa.\n- 2 s de **estabilización** y **descarga** hasta volver a la tara.\n\nPruébalo: **Simular** (sube la velocidad), elige la consigna y pulsa Marcha.',
+          { width: 360, height: 450 },
+        ),
+      ]
+      const edges = links([
+        ['s0', 't1'],
+        ['t1', 's1'],
+        ['s1', 't2'],
+        ['t2', 's2'],
+        ['s2', 't3'],
+        ['t3', 's3'],
+        ['s3', 't4'],
+        ['t4', 's4'],
+        ['s4', 't5'],
+        ['t5', 's0'],
+      ])
+      const scene = {
+        elements: [
+          { id: 'tolva', type: 'tank', x: 220, y: 60, rot: 0, fill: 'Gruesa', fillFine: 'Fina', drain: 'Descarga', low: '', high: '', empty: '', level: 'Peso', fillTime: 20, drainTime: 10, initial: 0.1, text: 'Tolva' },
+          { id: 'marcha', type: 'button', x: 0, y: 0, rot: 0, variable: 'Marcha', contact: 'NO', color: 'green', text: 'Marcha', place: 'desk' },
+          { id: 'consigna', type: 'potentiometer', x: 0, y: 0, rot: 0, variable: 'Consigna', initial: 0.5, text: 'Consigna', place: 'desk' },
+          { id: 'v_peso', type: 'display', x: 0, y: 0, rot: 0, variable: 'Peso', text: 'Peso (kg)', place: 'desk' },
+          { id: 'v_cons', type: 'display', x: 0, y: 0, rot: 0, variable: 'Consigna', text: 'Consigna (kg)', place: 'desk' },
+          { id: 'v_tara', type: 'display', x: 0, y: 0, rot: 0, variable: 'Tara', text: 'Tara (kg)', place: 'desk' },
+        ],
+      }
+      const variables = {
+        Peso: { type: 'analogIn', signal: '4-20mA', min: 0, max: 100, unit: 'kg' },
+        Consigna: { type: 'analogIn', signal: '0-10V', min: 0, max: 60, unit: 'kg' },
+      }
+      return { nodes, edges, plc: { scene, variables } }
+    },
+  },
 ]
 
 // Tabla de variables dibujada en el lienzo (nodes/VariablesTableNode.jsx).

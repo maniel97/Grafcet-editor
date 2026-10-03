@@ -40,7 +40,10 @@ test('esquema eléctrico: el esquema de cada ejemplo, sin textos que se pisen', 
   // aire): pulsadores y bobinas, detectores de 3 hilos, analógica 4-20 mA…
   for (const ex of EXAMPLES) {
     const id = ex.id
-    await openExample(page, new RegExp(`^${ex.title.replace(/[.*+?^${}()|[\]\\]/g, (c) => `\\${c}`)}`))
+    // El botón se llama «título descripción etiquetas»: título y principio de la descripción (hay
+    // títulos que empiezan igual, como «Taladradora» y «Taladradora con marcha de verificación»).
+    const esc = (t) => t.replace(/[.*+?^${}()|[\]\\]/g, (c) => `\\${c}`)
+    await openExample(page, new RegExp(`^${esc(ex.title)}\\s*${esc(ex.description.slice(0, 15))}`))
     const button = page.getByRole('button', { name: 'Esquema eléctrico' })
     await button.click()
     const view = page.getByRole('region', { name: 'Esquema eléctrico' })

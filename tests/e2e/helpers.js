@@ -51,7 +51,12 @@ export async function saveFromDialog(page, format) {
 export async function openExample(page, name) {
   await page.getByTitle('Abrir un proyecto, un ejemplo o un trabajo anterior').click()
   await page.getByRole('menuitem', { name: /Ejemplos/ }).click()
-  await page.getByRole('button', { name }).click()
+  // Si el nombre vale para varios (p. ej. «Taladradora» y «Taladradora con marcha de
+  // verificación»), el de título más corto: el que se buscaba.
+  const buttons = page.getByRole('button', { name })
+  await buttons.first().waitFor()
+  const titles = await buttons.evaluateAll((list) => list.map((b) => b.querySelector('span')?.textContent?.length ?? 999))
+  await buttons.nth(titles.indexOf(Math.min(...titles))).click()
   // La tabla de variables se coloca y la vista se reencuadra un instante después de abrirse:
   // se espera a que termine (si no, un clic podría caer donde ya no está lo buscado).
   await page.locator('[data-auto-place="pending"]').waitFor({ state: 'detached' })

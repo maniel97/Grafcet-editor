@@ -159,7 +159,10 @@ export function validateGrafcet(nodes, edges) {
         `${transitionName(t)} vuelve atrás y continúa a la vez: activaría ambas etapas simultáneamente. Para «volver O seguir» usa dos transiciones alternativas (divergencia en O).`,
         [t.id],
       )
-    } else if (loops.length > 1) {
+    } else if (loops.length > 1 && !loops.every((e) => outgoing(e.target).some((next) => incoming(next.target).length > 1))) {
+      // Varios bucles a la vez solo tienen sentido si esas etapas se esperan después en una
+      // convergencia en Y (p. ej. devolver un recurso compartido junto con el reposo de su
+      // secuencia, IEC 60848); si no, suele ser un «volver aquí O allí» mal dibujado.
       add('error', `${transitionName(t)} tiene varios bucles: activaría todas esas etapas a la vez.`, [t.id])
     }
   }

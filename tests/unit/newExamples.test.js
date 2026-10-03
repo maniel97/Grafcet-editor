@@ -120,3 +120,95 @@ describe('ejemplos nuevos: funcionan con su planta y su esquema', () => {
     expect(s.motor().speed).toBeCloseTo(0.3)
   })
 })
+
+describe('ejemplos nuevos (2): funcionan con su planta y su esquema', () => {
+  it('semáforo con peatones: sin petición sigue en verde; con ella, ámbar, rojo y verde para peatones', () => {
+    const s = open('semaforo-peatones')
+    s.run(15)
+    expect(s.active()).toEqual(['s0', 's10'])
+    s.press('pulsador')
+    expect(s.state.values.Espere).toBe(1)
+    s.run(1)
+    expect(s.state.values.AmbarC).toBe(1) // ya llevaba más de 10 s en verde
+    s.run(4.5)
+    expect(s.state.values.VerdeP).toBe(1)
+    expect(s.state.values.Espere).toBe(0) // la petición se borra al dar paso
+    s.run(9)
+    expect(s.state.values.VerdeC).toBe(1)
+  })
+
+  it('aparcamiento: cuenta entradas y salidas, no pasa de 5 y enciende Completo', () => {
+    const s = open('aparcamiento')
+    for (let i = 0; i < 6; i++) s.press('entra')
+    expect(s.state.values.C).toBe(5)
+    expect(s.state.values.Completo).toBe(1)
+    expect(s.state.values.Libre).toBe(0)
+    s.press('sale')
+    expect(s.state.values.C).toBe(4)
+    expect(s.state.values.Libre).toBe(1)
+  })
+
+  it('silo: aviso solo los 2 primeros segundos, vibrador desde el cuarto; luego se rellena', () => {
+    const s = open('silo-vibrador')
+    s.press('marcha').run(0.5)
+    expect(s.state.values.Aviso).toBe(1)
+    expect(s.state.values.Vibrador).toBe(0)
+    s.run(2)
+    expect(s.state.values.Aviso).toBe(0)
+    s.run(2)
+    expect(s.state.values.Vibrador).toBe(1)
+    s.run(6)
+    expect(s.active()).toEqual(['s2']) // vacío: rellenando
+    s.run(8)
+    expect(s.active()).toEqual(['s0'])
+  })
+
+  it('dos carros: si piden a la vez entra A; B espera al tramo libre y nunca están los dos dentro', () => {
+    const s = open('dos-carros')
+    s.do('pide_a', 'press').do('pide_b', 'press').run(0.3).do('pide_a', 'release').run(0.1)
+    expect(s.active()).toContain('s11')
+    expect(s.active()).toContain('s30')
+    let both = false
+    for (let i = 0; i < 80; i++) {
+      s.run(0.1)
+      const a = s.active()
+      if ((a.includes('s11') || a.includes('s12')) && (a.includes('s31') || a.includes('s32'))) both = true
+    }
+    s.do('pide_b', 'release').run(4)
+    expect(both).toBe(false)
+    expect(s.active()).toEqual(['s10', 's30'])
+  })
+
+  it('verificación: en producción hace el ciclo solo; en verificación, un paso por pulsación', () => {
+    const s = open('taladradora-verificacion')
+    s.do('pieza', 'toggle').press('marcha').run(6)
+    expect(s.active()).toEqual(['s0', 's20']) // ciclo completo
+    s.do('verif', 'toggle').run(0.3)
+    expect(s.active()).toEqual(['s0', 's21'])
+    s.press('marcha').run(1)
+    expect(s.active()).toEqual(['s0', 's21']) // sin Paso no arranca
+    s.do('marcha', 'press').run(0.2).press('paso').do('marcha', 'release').run(2)
+    expect(s.active()).toEqual(['s1', 's21']) // abajo, esperando otro Paso
+    s.press('paso').run(0.2)
+    expect(s.active()).toEqual(['s2', 's21'])
+  })
+
+  it('dosificación: tara, grueso, fino y para en la consigna sin pasarse más de 1 kg', () => {
+    const s = open('dosificacion-peso')
+    s.press('marcha')
+    expect(s.active()).toEqual(['s1'])
+    const tara = s.state.values.Tara
+    expect(tara).toBeGreaterThan(9)
+    let fine = false
+    for (let i = 0; i < 400 && !s.active().includes('s3'); i++) {
+      s.run(0.1)
+      if (s.active().includes('s2')) fine = true
+    }
+    expect(fine).toBe(true)
+    const consigna = s.state.values.Consigna
+    expect(s.state.values.Peso - tara).toBeGreaterThanOrEqual(consigna - 0.5)
+    expect(s.state.values.Peso - tara).toBeLessThanOrEqual(consigna + 1)
+    s.run(8)
+    expect(s.active()).toEqual(['s0'])
+  })
+})

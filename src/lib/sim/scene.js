@@ -45,7 +45,7 @@ export const SCENE_TYPES = {
   tank: {
     label: 'Depósito',
     group: 'Proceso',
-    defaults: { fill: '', drain: '', low: '', high: '', empty: '', level: '', fillTime: 10, drainTime: 10, initial: 0, text: '' },
+    defaults: { fill: '', fillFine: '', drain: '', low: '', high: '', empty: '', level: '', fillTime: 10, drainTime: 10, initial: 0, text: '' },
   },
   motor: { label: 'Motor', group: 'Actuadores', defaults: { variable: '', reverse: '', pulses: '', text: '' } },
   display: { label: 'Visualizador', group: 'Señalización', defaults: { variable: '', text: '' } },
@@ -95,6 +95,7 @@ export const SCENE_VARS = {
   sink: [],
   tank: [
     ['fill', 'Válvula de llenado', 'out'],
+    ['fillFine', 'Llenado fino (opcional, 5 veces más lento)', 'out'],
     ['drain', 'Válvula de vaciado', 'out'],
     ['low', 'Sensor nivel bajo', 'in'],
     ['high', 'Sensor nivel alto', 'in'],
@@ -466,7 +467,8 @@ export function sceneStep(scene, state, values, dt) {
   // Depósitos: se llenan y vacían con sus válvulas.
   for (const e of elements) {
     if (e.type !== 'tank' || stuck(e)) continue
-    const filling = on(values, e.fill) ? dt / Math.max(0.1, Number(e.fillTime) || 10) : 0
+    // El llenado fino (dosificación) entra cinco veces más despacio que el normal.
+    const filling = (on(values, e.fill) ? 1 : 0) * (dt / Math.max(0.1, Number(e.fillTime) || 10)) + (on(values, e.fillFine) ? dt / (5 * Math.max(0.1, Number(e.fillTime) || 10)) : 0)
     const draining = on(values, e.drain) ? dt / Math.max(0.1, Number(e.drainTime) || 10) : 0
     next.level[e.id] = clamp((next.level[e.id] ?? 0) + filling - draining)
   }

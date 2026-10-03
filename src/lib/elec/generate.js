@@ -40,6 +40,7 @@ function outputDevice(name, scene) {
   for (const e of scene?.elements ?? []) {
     if (e.type === 'cylinder' && (e.extend === name || e.retract === name || e.vacuum === name)) return { type: 'valve', prefix: 'Y' }
     if (e.type === 'valve' && e.variable === name) return { type: 'valve', prefix: 'Y' }
+    if (e.type === 'tank' && [e.fill, e.fillFine, e.drain].includes(name)) return { type: 'valve', prefix: 'Y' }
     if ((e.type === 'lamp' || e.type === 'siren') && e.variable === name) return { type: 'lamp', prefix: 'H', color: e.color ?? 'green' }
     if (e.type === 'trafficlight' && [e.red, e.amber, e.green].includes(name)) return { type: 'lamp', prefix: 'H', color: e.red === name ? 'red' : e.amber === name ? 'amber' : 'green' }
     if (['motor', 'conveyor', 'diverter', 'heater'].includes(e.type) && [e.variable, e.motor, e.reverse, e.gate, e.heat].includes(name))
