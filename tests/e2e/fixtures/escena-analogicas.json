@@ -1,0 +1,163 @@
+{
+ "format": "grafcet-editor",
+ "version": 1,
+ "nodes": [
+  {
+   "id": "s0",
+   "type": "step",
+   "position": {
+    "x": 200,
+    "y": 0
+   },
+   "data": {
+    "label": "0",
+    "actions": [],
+    "initial": true
+   }
+  },
+  {
+   "id": "t1",
+   "type": "transition",
+   "position": {
+    "x": 200,
+    "y": 100
+   },
+   "data": {
+    "condition": "Consigna > 70"
+   }
+  },
+  {
+   "id": "s1",
+   "type": "step",
+   "position": {
+    "x": 200,
+    "y": 170
+   },
+   "data": {
+    "label": "1",
+    "actions": [
+     {
+      "text": "R",
+      "kind": "continuous"
+     }
+    ]
+   }
+  },
+  {
+   "id": "t2",
+   "type": "transition",
+   "position": {
+    "x": 200,
+    "y": 270
+   },
+   "data": {
+    "condition": "TS"
+   }
+  },
+  {
+   "id": "s2",
+   "type": "step",
+   "position": {
+    "x": 200,
+    "y": 340
+   },
+   "data": {
+    "label": "2",
+    "actions": []
+   }
+  },
+  {
+   "id": "t3",
+   "type": "transition",
+   "position": {
+    "x": 200,
+    "y": 440
+   },
+   "data": {
+    "condition": "Consigna < 30"
+   }
+  }
+ ],
+ "edges": [
+  {
+   "id": "s0-t1",
+   "source": "s0",
+   "target": "t1"
+  },
+  {
+   "id": "t1-s1",
+   "source": "t1",
+   "target": "s1"
+  },
+  {
+   "id": "s1-t2",
+   "source": "s1",
+   "target": "t2"
+  },
+  {
+   "id": "t2-s2",
+   "source": "t2",
+   "target": "s2"
+  },
+  {
+   "id": "s2-t3",
+   "source": "s2",
+   "target": "t3"
+  },
+  {
+   "id": "t3-s0",
+   "source": "t3",
+   "target": "s0"
+  }
+ ],
+ "plc": {
+  "scheme": "siemens",
+  "showAddresses": false,
+  "steps": {},
+  "variables": {
+   "Consigna": {
+    "type": "analogIn",
+    "signal": "0-10V",
+    "min": 0,
+    "max": 100,
+    "unit": "%"
+   },
+   "Temp": {
+    "type": "analogIn",
+    "signal": "4-20mA",
+    "min": 0,
+    "max": 200,
+    "unit": "°C"
+   }
+  },
+  "scene": {
+   "elements": [
+    {
+     "id": "pot",
+     "type": "potentiometer",
+     "x": 100,
+     "y": 100,
+     "rot": 0,
+     "variable": "Consigna",
+     "initial": 0.5,
+     "text": "Consigna"
+    },
+    {
+     "id": "cal",
+     "type": "heater",
+     "x": 260,
+     "y": 100,
+     "rot": 0,
+     "heat": "R",
+     "temperature": "Temp",
+     "thermostat": "TS",
+     "setpoint": 40,
+     "ambient": 20,
+     "maxTemp": 120,
+     "tau": 2,
+     "text": "Horno"
+    }
+   ]
+  }
+ }
+}

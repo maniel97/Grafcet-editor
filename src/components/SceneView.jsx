@@ -7,12 +7,17 @@ import {
   TANK,
   conveyorRect,
   cylinderPlate,
+  PIECE_COLORS,
+  SENSOR_KINDS,
   detectScene,
   limitZone,
+  measuredDistance,
+  weighed,
   sceneFaults,
   sceneSignals,
   sensorZone,
   sinkRect,
+  distanceBeam,
   worldRect,
 } from '../lib/sim/scene'
 
@@ -28,6 +33,7 @@ const COLORS = {
   black: '#1e293b',
   white: '#f8fafc',
   amber: '#f59e0b',
+  metal: '#94a3b8',
 }
 const COLOR_NAMES = { green: 'Verde', red: 'Rojo', yellow: 'Amarillo', blue: 'Azul', black: 'Negro', white: 'Blanco' }
 const INK = '#0f172a'
@@ -133,12 +139,94 @@ function LimitShape({ active }) {
     </g>
   )
 }
+// Detector de presencia: óptico (con haz), inductivo (cara azul), capacitivo (cara naranja) o de
+// color (tres leds). La zona de detección, roja cuando detecta.
 function SensorShape({ e, active }) {
+  const kind = e.kind ?? 'optical'
+  const zone = <rect x={10} y={-6} width={Number(e.range) || 60} height={12} fill={active ? '#ef4444' : '#94a3b8'} opacity={active ? 0.35 : 0.15} />
+  if (kind === 'optical') {
+    return (
+      <g>
+        {zone}
+        <rect x="-10" y="-8" width="20" height="16" rx="3" fill="#334155" />
+        <circle cx="10" cy="0" r="4" fill={active ? '#f87171' : '#64748b'} />
+      </g>
+    )
+  }
+  const face = { inductive: '#2563eb', capacitive: '#f97316', color: '#e2e8f0' }[kind]
   return (
     <g>
-      <rect x={10} y={-6} width={Number(e.range) || 60} height={12} fill={active ? '#ef4444' : '#94a3b8'} opacity={active ? 0.35 : 0.15} />
-      <rect x="-10" y="-8" width="20" height="16" rx="3" fill="#334155" />
-      <circle cx="10" cy="0" r="4" fill={active ? '#f87171' : '#64748b'} />
+      {zone}
+      <rect x="-16" y="-7" width="24" height="14" rx="2" fill="#475569" />
+      <line x1="-12" y1="-7" x2="-12" y2="7" stroke="#94a3b8" />
+      <line x1="-6" y1="-7" x2="-6" y2="7" stroke="#94a3b8" />
+      <rect x="6" y="-7" width="5" height="14" rx="1" fill={face} />
+      {kind === 'color' &&
+        ['#dc2626', '#16a34a', '#2563eb'].map((c, i) => <circle key={c} cx="8.5" cy={-4 + i * 4} r="1.5" fill={c} />)}
+      <circle cx="-2" cy="-10" r="2.5" fill={active ? '#ef4444' : '#cbd5e1'} />
+    </g>
+  )
+}
+function DistanceShape({ e, distance }) {
+  const range = Number(e.range) || 200
+  return (
+    <g>
+      <rect x="12" y="-6" width={range} height="12" fill="#a855f7" opacity="0.1" />
+      {distance !== null && <line x1="12" y1="0" x2={12 + distance} y2="0" stroke="#a855f7" strokeWidth="2" strokeDasharray="4 2" />}
+      <rect x="-12" y="-11" width="24" height="22" rx="3" fill="#334155" />
+      <circle cx="6" cy="-5" r="4" fill="#94a3b8" stroke="#1e293b" />
+      <circle cx="6" cy="5" r="4" fill="#94a3b8" stroke="#1e293b" />
+    </g>
+  )
+}
+function ScaleShape({ kg }) {
+  return (
+    <g>
+      <rect x="-40" y="-8" width="80" height="6" rx="2" fill="#64748b" />
+      <polygon points="-30,-2 30,-2 22,14 -22,14" fill="#cbd5e1" stroke={INK} />
+      <rect x="-20" y="16" width="40" height="15" rx="2" fill="#0f172a" />
+      <text x="16" y="27" textAnchor="end" fontSize="10" fontFamily="ui-monospace, Consolas, monospace" fill="#4ade80">
+        {String(Math.round(kg * 10) / 10).replace('.', ',')} kg
+      </text>
+    </g>
+  )
+}
+function PotentiometerShape({ value }) {
+  const angle = -135 + value * 270
+  const arc = (a) => [Math.sin((a * Math.PI) / 180) * 17, -Math.cos((a * Math.PI) / 180) * 17]
+  const [x0, y0] = arc(-135)
+  const [x1, y1] = arc(angle)
+  return (
+    <g>
+      <circle r="21" fill="#e2e8f0" stroke={INK} />
+      <path d={`M ${x0} ${y0} A 17 17 0 ${angle + 135 > 180 ? 1 : 0} 1 ${x1} ${y1}`} fill="none" stroke="#2563eb" strokeWidth="3" />
+      <circle r="11" fill="#334155" />
+      <line x1="0" y1="0" x2="0" y2="-10" stroke="white" strokeWidth="2.5" strokeLinecap="round" transform={`rotate(${angle})`} />
+      <text y="34" textAnchor="middle" fontSize="9" fill={INK}>
+        {Math.round(value * 100)} %
+      </text>
+    </g>
+  )
+}
+function HeaterShape({ e, temp, heating }) {
+  const ambient = Number(e.ambient ?? 20)
+  const hot = Math.min(1, Math.max(0, (temp - ambient) / Math.max(1, Number(e.maxTemp ?? 150) - ambient)))
+  return (
+    <g>
+      <rect x="-40" y="-24" width="80" height="48" rx="6" fill="#f97316" fillOpacity={0.08 + hot * 0.6} stroke={INK} strokeWidth="1.5" />
+      <polyline points="-30,6 -24,-4 -18,6 -12,-4 -6,6 0,-4 6,6 12,-4 18,6 24,-4 30,6" fill="none" stroke={heating ? '#dc2626' : '#64748b'} strokeWidth="2" />
+      <text y="-10" textAnchor="middle" fontSize="11" fontWeight="600" fill={INK}>
+        {Math.round(temp)} °C
+      </text>
+    </g>
+  )
+}
+function PieceShape({ p }) {
+  const metal = p.material === 'metal'
+  return (
+    <g pointerEvents="none" data-piece={p.id} data-material={p.material ?? 'plastic'}>
+      <rect x={p.x} y={p.y} width={p.w} height={p.h} rx="3" fill={COLORS[p.color] ?? COLORS.amber} stroke={metal ? '#334155' : INK} />
+      {metal && <line x1={p.x + 4} y1={p.y + p.h - 5} x2={p.x + p.w - 5} y2={p.y + 4} stroke="white" strokeWidth="2" opacity="0.6" />}
     </g>
   )
 }
@@ -243,6 +331,18 @@ function boundsOf(e, pos = 0) {
       const y = Math.min(z.y, e.y - 10)
       return { x, y, w: Math.max(z.x + z.w, e.x + 10) - x, h: Math.max(z.y + z.h, e.y + 10) - y }
     }
+    case 'distance': {
+      const z = distanceBeam(e)
+      const x = Math.min(z.x, e.x - 12)
+      const y = Math.min(z.y, e.y - 12)
+      return { x, y, w: Math.max(z.x + z.w, e.x + 12) - x, h: Math.max(z.y + z.h, e.y + 12) - y }
+    }
+    case 'scale':
+      return r(-40, -8, 80, 40)
+    case 'potentiometer':
+      return r(-22, -22, 44, 60)
+    case 'heater':
+      return r(-40, -24, 80, 48)
     case 'feeder':
       return r(-28, -56, 56, 80)
     case 'sink':
@@ -260,7 +360,9 @@ function boundsOf(e, pos = 0) {
 
 function labelOf(e) {
   const vars = (SCENE_VARS[e.type] ?? []).map(([key]) => e[key]).filter(Boolean)
-  return e.text || vars[0] || SCENE_TYPES[e.type].label
+  // Detector sin variable: su tipo, corto (los rótulos largos se solapan entre detectores juntos).
+  const fallback = e.type === 'sensor' ? { optical: 'Óptico', inductive: 'Inductivo', capacitive: 'Capacitivo', color: 'Color' }[e.kind ?? 'optical'] : null
+  return e.text || vars[0] || fallback || SCENE_TYPES[e.type].label
 }
 
 // --- Propiedades -------------------------------------------------------------------------------
@@ -338,7 +440,60 @@ function Properties({ element, variables, onChange, onDelete, onRotate }) {
           {number('time', 'Tiempo de recorrido (s)', 0.2, 0.1)}
         </>
       )}
-      {element.type === 'sensor' && number('range', 'Alcance (px)', 10, 10)}
+      {element.type === 'sensor' && (
+        <>
+          <label className="block">
+            <span className="text-slate-500">Tipo de detector</span>
+            <select
+              value={element.kind ?? 'optical'}
+              onChange={(ev) => set({ kind: ev.target.value, range: SENSOR_KINDS[ev.target.value].range })}
+              className={field}
+            >
+              {Object.entries(SENSOR_KINDS).map(([id, k]) => (
+                <option key={id} value={id}>
+                  {k.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          {element.kind === 'color' && (
+            <label className="block">
+              <span className="text-slate-500">Color que detecta</span>
+              <select value={element.color ?? 'amber'} onChange={(ev) => set({ color: ev.target.value })} className={field}>
+                {Object.entries(PIECE_COLORS).map(([id, name]) => (
+                  <option key={id} value={id}>
+                    {name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+          {number('range', 'Alcance (px)', 10, 10)}
+        </>
+      )}
+      {element.type === 'distance' && number('range', 'Alcance (px) = valor máximo', 20, 10)}
+      {element.type === 'potentiometer' && (
+        <label className="block">
+          <span className="text-slate-500">Posición al empezar (%)</span>
+          <input
+            type="number"
+            min="0"
+            max="100"
+            step="5"
+            value={Math.round((Number(element.initial) || 0) * 100)}
+            onChange={(ev) => set({ initial: Math.min(1, Math.max(0, Number(ev.target.value) / 100)) })}
+            className={field}
+          />
+        </label>
+      )}
+      {element.type === 'heater' && (
+        <>
+          {number('setpoint', 'Termostato: salta a (°C)', 0, 1)}
+          {number('ambient', 'Temperatura ambiente (°C)', -20, 1)}
+          {number('maxTemp', 'Temperatura máxima (°C)', 30, 5)}
+          {number('tau', 'Inercia: constante de tiempo (s)', 1, 1)}
+        </>
+      )}
       {element.type === 'tank' && (
         <>
           {number('fillTime', 'Llenado de vacío a lleno (s)', 0.5, 0.5)}
@@ -367,6 +522,26 @@ function Properties({ element, variables, onChange, onDelete, onRotate }) {
               <option value="mixed">Alternas (pequeña, grande…)</option>
             </select>
           </label>
+          <label className="block">
+            <span className="text-slate-500">Material</span>
+            <select value={element.material ?? 'plastic'} onChange={(ev) => set({ material: ev.target.value })} className={field}>
+              <option value="plastic">Plástico</option>
+              <option value="metal">Metal</option>
+              <option value="mixed">Alterno (plástico, metal…)</option>
+            </select>
+          </label>
+          {element.material !== 'metal' && (
+            <label className="block">
+              <span className="text-slate-500">Color del plástico</span>
+              <select value={element.color ?? 'amber'} onChange={(ev) => set({ color: ev.target.value })} className={field}>
+                {Object.entries(PIECE_COLORS).map(([id, name]) => (
+                  <option key={id} value={id}>
+                    {name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
           {!element.trigger && (
             <label className="flex items-center gap-1">
               <input type="checkbox" checked={Boolean(element.auto)} onChange={(ev) => set({ auto: ev.target.checked })} />
@@ -375,7 +550,7 @@ function Properties({ element, variables, onChange, onDelete, onRotate }) {
           )}
         </>
       )}
-      {element.type !== 'limit' && element.type !== 'sensor' && (
+      {!['limit', 'sensor', 'distance'].includes(element.type) && (
         <label className="block">
           <span className="text-slate-500">Rótulo</span>
           <input value={element.text ?? ''} onChange={(ev) => set({ text: ev.target.value })} placeholder="(el nombre de la variable)" className={field} />
@@ -450,7 +625,14 @@ const HINTS = {
   cylinder: 'Cilindro: sale con A+ y entra con A− (o con muelle). Lleva detectores a0/a1 o pisa finales de carrera; empuja las piezas.',
   conveyor: 'Cinta: con su motor en marcha lleva las piezas que tiene encima.',
   limit: 'Final de carrera: se acciona cuando lo pisa el vástago de un cilindro o una pieza.',
-  sensor: 'Detector de presencia: su haz ve las piezas (y los vástagos) que pasan por delante.',
+  'sensor:optical': 'Detector óptico (réflex): su haz ve cualquier pieza (y los vástagos) que pase por delante.',
+  'sensor:inductive': 'Detector inductivo: solo detecta metal y a poca distancia. Para separar piezas de metal de las de plástico.',
+  'sensor:capacitive': 'Detector capacitivo: detecta cualquier material (plástico, metal…) a poca distancia.',
+  'sensor:color': 'Detector de color: solo da 1 con piezas del color elegido. Para clasificar por colores.',
+  distance: 'Sensor de distancia (ultrasonidos): valor analógico proporcional a la distancia al primer objeto de su haz.',
+  scale: 'Báscula: valor analógico con el peso (kg) de las piezas que tiene encima; el metal pesa el triple.',
+  potentiometer: 'Potenciómetro: entrada analógica manual (consignas, velocidades…). En modo Usar, arrastra a izquierda o derecha.',
+  heater: 'Calentador: la resistencia sube la temperatura (analógica, °C) con inercia; termostato digital opcional.',
   feeder: 'Alimentador: suelta piezas solo, con una salida del grafcet o al pulsarlo en modo Usar.',
   sink: 'Recogida: retira y cuenta las piezas que caen dentro.',
   tank: 'Depósito: se llena y vacía con sus válvulas; sensores de nivel bajo y alto y nivel analógico.',
@@ -460,8 +642,9 @@ const HINTS = {
 const PREVIEW_DELAY = 450
 
 // Dibujo de muestra de un módulo (con sus valores por defecto y «en marcha»).
-function ModulePreview({ type }) {
-  const e = { id: 'preview', type, x: 0, y: 0, rot: 0, ...SCENE_TYPES[type].defaults }
+function ModulePreview({ item }) {
+  const { type } = item
+  const e = { id: 'preview', type, x: 0, y: 0, rot: 0, ...SCENE_TYPES[type].defaults, ...item.preset }
   const demo = { motor: 'M', variable: 'V', extend: 'E', fill: 'F', high: 'H', low: 'L' }
   const values = { M: 1, V: 1, E: 1, F: 1 }
   const shapes = {
@@ -478,19 +661,40 @@ function ModulePreview({ type }) {
     tank: <TankShape e={{ ...e, ...demo }} level={0.55} values={values} />,
     motor: <MotorShape angle={20} running />,
     display: <DisplayShape value={42} />,
+    distance: <DistanceShape e={{ ...e, range: 120 }} distance={70} />,
+    scale: <ScaleShape kg={3} />,
+    potentiometer: <PotentiometerShape value={0.65} />,
+    heater: <HeaterShape e={e} temp={85} heating />,
   }
-  const b = boundsOf(type === 'conveyor' ? { ...e, length: 160 } : e, 1)
+  const b = boundsOf(type === 'conveyor' ? { ...e, length: 160 } : type === 'distance' ? { ...e, range: 120 } : e, 1)
   const pad = 12
   return (
     <svg viewBox={`${b.x - pad} ${b.y - pad} ${b.w + pad * 2} ${b.h + pad * 2}`} className="mx-auto block max-h-28 w-full" aria-hidden="true">
       {shapes[type]}
       {type === 'conveyor' && <rect x="40" y="-28" width="28" height="28" rx="3" fill={COLORS.amber} stroke={INK} />}
       {type === 'feeder' && <rect x="-14" y="-14" width="28" height="28" rx="3" fill={COLORS.amber} stroke={INK} />}
+      {type === 'sensor' && <PieceShape p={{ id: 0, x: 22, y: -14, w: 28, h: 28, color: item.preset.kind === 'inductive' ? 'metal' : 'amber', material: item.preset.kind === 'inductive' ? 'metal' : 'plastic' }} />}
+      {type === 'distance' && <rect x="82" y="-14" width="28" height="28" rx="3" fill={COLORS.amber} stroke={INK} />}
+      {type === 'scale' && <rect x="-14" y="-36" width="28" height="28" rx="3" fill={COLORS.amber} stroke={INK} />}
     </svg>
   )
 }
 
-const PALETTE = Object.entries(SCENE_TYPES).reduce((groups, [type, t]) => ({ ...groups, [t.group]: [...(groups[t.group] ?? []), type] }), {})
+// Paleta: un módulo por tipo; los detectores de presencia, uno por tipo de detección.
+const SENSOR_PALETTE = { optical: 'Detector óptico', inductive: 'Detector inductivo', capacitive: 'Detector capacitivo', color: 'Detector de color' }
+const PALETTE_ITEMS = Object.entries(SCENE_TYPES).flatMap(([type, t]) =>
+  type === 'sensor'
+    ? Object.entries(SENSOR_KINDS).map(([kind, k]) => ({
+        key: `sensor:${kind}`,
+        type,
+        group: t.group,
+        label: SENSOR_PALETTE[kind],
+        preset: { kind, range: k.range },
+      }))
+    : [{ key: type, type, group: t.group, label: t.label, preset: {} }],
+)
+const PALETTE = PALETTE_ITEMS.reduce((groups, item) => ({ ...groups, [item.group]: [...(groups[item.group] ?? []), item] }), {})
+const PALETTE_BY_KEY = Object.fromEntries(PALETTE_ITEMS.map((i) => [i.key, i]))
 
 // Planta virtual en escena (lib/sim/scene.js), al estilo de PC_SIMU: se colocan los elementos
 // libremente, se les asignan las variables y, al simular, interactúan (el vástago pisa los finales
@@ -564,11 +768,11 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
   const rotateSelected = () => selectedElement && update({ ...selectedElement, rot: ((selectedElement.rot ?? 0) + 90) % 360 })
 
   // Nuevo elemento en el centro de lo que se ve.
-  const add = (type) => {
+  const add = (type, preset = {}) => {
     const el = scrollRef.current
     const x = snap(el ? (el.scrollLeft + el.clientWidth / 2) / zoom : W / 2)
     const y = snap(el ? (el.scrollTop + el.clientHeight / 2) / zoom : H / 2)
-    const element = { id: newId(), type, x, y, rot: 0, ...SCENE_TYPES[type].defaults }
+    const element = { id: newId(), type, x, y, rot: 0, ...SCENE_TYPES[type].defaults, ...preset }
     save([...elements, element])
     setSelected(element.id)
     setMode('edit')
@@ -594,6 +798,10 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
     return { x: p.x, y: p.y }
   }
 
+  // Potenciómetro: la posición del ratón respecto al mando (de −30 a +30 px) es el valor.
+  const [knobDrag, setKnobDrag] = useState(null)
+  const turnKnob = (ev, e) => onAction(e.id, `set:${Math.min(1, Math.max(0, (toScene(ev).x - e.x + 30) / 60))}`)
+
   // Accionar un mando (modo «Usar»).
   const operate = (e, phase) => {
     if (e.type === 'button') onAction(e.id, phase === 'down' ? 'press' : 'release')
@@ -605,7 +813,10 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
     ev.stopPropagation()
     if (mode === 'use') {
       ev.currentTarget.setPointerCapture?.(ev.pointerId)
-      if (operable(e)) operate(e, 'down')
+      if (e.type === 'potentiometer') {
+        setKnobDrag(e)
+        turnKnob(ev, e)
+      } else if (operable(e)) operate(e, 'down')
       else setSelected(e.id)
       return
     }
@@ -615,12 +826,14 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
     setDrag({ id: e.id, dx: p.x - e.x, dy: p.y - e.y, x: e.x, y: e.y })
   }
   const onPointerMove = (ev) => {
+    if (knobDrag) turnKnob(ev, knobDrag)
     if (!drag) return
     const p = toScene(ev)
     setDrag({ ...drag, x: snap(p.x - drag.dx), y: snap(p.y - drag.dy) })
   }
   const onPointerUp = (ev, e) => {
     if (mode === 'use') {
+      setKnobDrag(null)
       operate(e, 'up')
       return
     }
@@ -661,13 +874,21 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
         return <MotorShape angle={state.angle?.[e.id] ?? 0} running={isOn(values, e.variable)} />
       case 'display':
         return <DisplayShape value={values[e.variable]} />
+      case 'distance':
+        return <DistanceShape e={e} distance={measuredDistance(scene, state, e)} />
+      case 'scale':
+        return <ScaleShape kg={weighed(state, e)} />
+      case 'potentiometer':
+        return <PotentiometerShape value={state.knob?.[e.id] ?? Number(e.initial ?? 0.5)} />
+      case 'heater':
+        return <HeaterShape e={e} temp={state.temp?.[e.id] ?? Number(e.ambient ?? 20)} heating={isOn(values, e.heat)} />
       default:
         return null
     }
   }
   // Los mandos y pilotos no se giran (su rótulo se lee siempre).
-  const turns = (e) => !['button', 'switch', 'emergency', 'lamp', 'sink', 'feeder', 'tank', 'motor', 'display'].includes(e.type)
-  const operable = (e) => ['button', 'switch', 'emergency', 'feeder'].includes(e.type)
+  const turns = (e) => !['button', 'switch', 'emergency', 'lamp', 'sink', 'feeder', 'tank', 'motor', 'display', 'scale', 'potentiometer', 'heater'].includes(e.type)
+  const operable = (e) => ['button', 'switch', 'emergency', 'feeder', 'potentiometer'].includes(e.type)
 
   return (
     <section
@@ -748,7 +969,7 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
         <button type="button" onClick={() => setZoom((z) => Math.max(ZOOM_MIN, z - 0.1))} title="Alejar" className="rounded p-1 hover:bg-slate-100">
           <Minus size={13} />
         </button>
-        <span className="w-9 text-center tabular-nums">{Math.round(zoom * 100)} %</span>
+        <span className="w-11 text-center tabular-nums whitespace-nowrap">{Math.round(zoom * 100)} %</span>
         <button type="button" onClick={() => setZoom((z) => Math.min(ZOOM_MAX, z + 0.1))} title="Acercar" className="rounded p-1 hover:bg-slate-100">
           <Plus size={13} />
         </button>
@@ -779,19 +1000,19 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
             {Object.entries(PALETTE).map(([group, types]) => (
               <div key={group}>
                 <p className="mb-0.5 text-[10px] font-medium uppercase tracking-wide text-slate-400">{group}</p>
-                {types.map((type) => (
+                {types.map((item) => (
                   <button
-                    key={type}
+                    key={item.key}
                     type="button"
                     onClick={() => {
                       clearTimeout(previewTimer.current)
                       setPreview(null)
-                      add(type)
+                      add(item.type, item.preset)
                     }}
                     onMouseEnter={(ev) => {
                       const at = { x: ev.clientX, y: ev.clientY }
                       clearTimeout(previewTimer.current)
-                      previewTimer.current = setTimeout(() => setPreview({ type, ...at }), PREVIEW_DELAY)
+                      previewTimer.current = setTimeout(() => setPreview({ key: item.key, ...at }), PREVIEW_DELAY)
                     }}
                     onMouseMove={(ev) => setPreview((p) => (p ? { ...p, x: ev.clientX, y: ev.clientY } : p))}
                     onMouseLeave={() => {
@@ -800,7 +1021,7 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
                     }}
                     className="block w-full rounded px-1 py-0.5 text-left hover:bg-blue-50"
                   >
-                    + {SCENE_TYPES[type].label}
+                    + {item.label}
                   </button>
                 ))}
               </div>
@@ -851,7 +1072,7 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
               </g>
             ))}
             {state.pieces.map((p) => (
-              <rect key={p.id} data-piece={p.id} x={p.x} y={p.y} width={p.w} height={p.h} rx="3" fill={COLORS[p.color] ?? COLORS.amber} stroke={INK} pointerEvents="none" />
+              <PieceShape key={p.id} p={p} />
             ))}
             {/* Rótulos (sin girar) */}
             {shown.map((e) => {
@@ -884,15 +1105,15 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
       {preview && mode === 'edit' && (
         <div
           role="tooltip"
-          aria-label={`Vista previa: ${SCENE_TYPES[preview.type].label}`}
+          aria-label={`Vista previa: ${PALETTE_BY_KEY[preview.key].label}`}
           className="side-panel pointer-events-none fixed z-50 w-56 rounded-md border border-slate-200 bg-white p-2 text-xs text-slate-700 shadow-lg"
           style={{ left: Math.min(preview.x + 16, window.innerWidth - 240), top: Math.min(preview.y + 12, window.innerHeight - 220) }}
         >
-          <p className="mb-1 font-semibold">{SCENE_TYPES[preview.type].label}</p>
+          <p className="mb-1 font-semibold">{PALETTE_BY_KEY[preview.key].label}</p>
           <div className="paper rounded border border-slate-100 bg-white p-1">
-            <ModulePreview type={preview.type} />
+            <ModulePreview item={PALETTE_BY_KEY[preview.key]} />
           </div>
-          <p className="mt-1 text-slate-600">{HINTS[preview.type]}</p>
+          <p className="mt-1 text-slate-600">{HINTS[preview.key]}</p>
         </div>
       )}
       {mode === 'edit' && (

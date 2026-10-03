@@ -18,19 +18,31 @@ export const SCENE_TYPES = {
   cylinder: {
     label: 'Cilindro',
     group: 'Actuadores',
-    defaults: { extend: '', retract: '', retracted: '', extended: '', stroke: 100, time: 1, text: '' },
+    defaults: { extend: '', retract: '', retracted: '', extended: '', position: '', stroke: 100, time: 1, text: '' },
   },
   conveyor: { label: 'Cinta', group: 'Actuadores', defaults: { motor: '', length: 240, time: 4, text: '' } },
   limit: { label: 'Final de carrera', group: 'Detectores', defaults: { variable: '', contact: 'NO' } },
-  sensor: { label: 'Detector de presencia', group: 'Detectores', defaults: { variable: '', contact: 'NO', range: 60 } },
-  feeder: { label: 'Alimentador de piezas', group: 'Proceso', defaults: { trigger: '', auto: true, sizes: 'small', color: 'amber' } },
+  sensor: { label: 'Detector de presencia', group: 'Detectores', defaults: { variable: '', contact: 'NO', range: 60, kind: 'optical', color: 'amber' } },
+  distance: { label: 'Sensor de distancia', group: 'Detectores', defaults: { variable: '', range: 200, text: '' } },
+  scale: { label: 'Báscula', group: 'Detectores', defaults: { variable: '', text: '' } },
+  potentiometer: { label: 'Potenciómetro', group: 'Mandos', defaults: { variable: '', initial: 0.5, text: '' } },
+  heater: {
+    label: 'Calentador',
+    group: 'Proceso',
+    defaults: { heat: '', temperature: '', thermostat: '', setpoint: 60, ambient: 20, maxTemp: 150, tau: 20, text: '' },
+  },
+  feeder: {
+    label: 'Alimentador de piezas',
+    group: 'Proceso',
+    defaults: { trigger: '', auto: true, sizes: 'small', material: 'plastic', color: 'amber' },
+  },
   sink: { label: 'Recogida', group: 'Proceso', defaults: { text: '' } },
   tank: {
     label: 'Depósito',
     group: 'Proceso',
     defaults: { fill: '', drain: '', low: '', high: '', level: '', fillTime: 10, drainTime: 10, initial: 0, text: '' },
   },
-  motor: { label: 'Motor', group: 'Actuadores', defaults: { variable: '', reverse: '', text: '' } },
+  motor: { label: 'Motor', group: 'Actuadores', defaults: { variable: '', reverse: '', pulses: '', text: '' } },
   display: { label: 'Visualizador', group: 'Señalización', defaults: { variable: '', text: '' } },
 }
 
@@ -45,10 +57,19 @@ export const SCENE_VARS = {
     ['retract', 'Entra (A−; vacío = muelle)', 'out'],
     ['retracted', 'Detector dentro (a0)', 'in'],
     ['extended', 'Detector fuera (a1)', 'in'],
+    ['position', 'Posición (analógica, opcional)', 'analog'],
   ],
   conveyor: [['motor', 'Motor', 'out']],
   limit: [['variable', 'Entrada', 'in']],
   sensor: [['variable', 'Entrada', 'in']],
+  distance: [['variable', 'Distancia (analógica)', 'analog']],
+  scale: [['variable', 'Peso en kg (analógica)', 'analog']],
+  potentiometer: [['variable', 'Entrada analógica', 'analog']],
+  heater: [
+    ['heat', 'Resistencia', 'out'],
+    ['temperature', 'Temperatura en °C (analógica)', 'analog'],
+    ['thermostat', 'Termostato (opcional)', 'in'],
+  ],
   feeder: [['trigger', 'Orden de soltar pieza (opcional)', 'out']],
   sink: [],
   tank: [
@@ -61,6 +82,7 @@ export const SCENE_VARS = {
   motor: [
     ['variable', 'Marcha', 'out'],
     ['reverse', 'Giro inverso (opcional)', 'out'],
+    ['pulses', 'Encoder: 1 impulso por vuelta (opcional)', 'in'],
   ],
   display: [['variable', 'Valor', 'any']],
 }
@@ -70,6 +92,18 @@ export const TANK = { w: 90, h: 130, low: 0.1, high: 0.9 }
 
 const BODY = 80 // largo del cuerpo de un cilindro
 export const PIECE_SIZES = { small: [28, 28], large: [44, 44] }
+
+// Tipos de detector de presencia: qué ven (piezas y vástagos de los cilindros).
+//   óptico y capacitivo: cualquier pieza; inductivo: solo metal; de color: piezas de su color.
+export const SENSOR_KINDS = {
+  optical: { label: 'Óptico (réflex)', range: 60 },
+  inductive: { label: 'Inductivo (metal)', range: 20 },
+  capacitive: { label: 'Capacitivo', range: 20 },
+  color: { label: 'De color', range: 30 },
+}
+export const PIECE_COLORS = { amber: 'Ámbar', red: 'Rojo', blue: 'Azul', green: 'Verde', black: 'Negro' }
+// Masa de una pieza (kg), para la báscula: el metal pesa el triple.
+export const pieceMass = (p) => (p.w >= PIECE_SIZES.large[0] ? 2 : 1) * (p.material === 'metal' ? 3 : 1)
 
 // --- Geometría -----------------------------------------------------------------------------
 
@@ -102,6 +136,8 @@ const plateLocal = (e, pos) => [BODY + pos * (Number(e.stroke) || 100), -14, 8, 
 export const cylinderPlate = (e, pos) => worldRect(e, ...plateLocal(e, pos))
 export const limitZone = (e) => worldRect(e, -8, -22, 16, 14) // el rodillo, encima del anclaje
 export const sensorZone = (e) => worldRect(e, 10, -6, Number(e.range) || 60, 12) // el haz
+export const distanceBeam = (e) => worldRect(e, 12, -6, Number(e.range) || 200, 12)
+export const scaleRect = (e) => worldRect(e, -40, -8, 80, 16) // el plato
 export const conveyorRect = (e) => worldRect(e, 0, -15, Number(e.length) || 240, 30)
 export const sinkRect = (e) => worldRect(e, -30, -30, 60, 60)
 
@@ -115,20 +151,30 @@ export function sceneInit(scene) {
   const pos = {}
   const pressed = {}
   const level = {}
+  const knob = {}
+  const temp = {}
   for (const e of elementsOf(scene)) {
     if (e.type === 'cylinder') pos[e.id] = 0
     // La seta de emergencia está sin pulsar (contacto cerrado) al empezar.
     if (e.type === 'button' || e.type === 'switch' || e.type === 'emergency') pressed[e.id] = false
     if (e.type === 'tank') level[e.id] = clamp(Number(e.initial) || 0)
+    if (e.type === 'potentiometer') knob[e.id] = clamp(Number(e.initial ?? 0.5))
+    if (e.type === 'heater') temp[e.id] = Number(e.ambient ?? 20)
   }
-  return { pos, pressed, level, angle: {}, faults: {}, pieces: [], counts: {}, nextPiece: 1, fed: {} }
+  return { pos, pressed, level, knob, temp, angle: {}, faults: {}, pieces: [], counts: {}, nextPiece: 1, fed: {} }
 }
 
 // Pieza nueva en un alimentador (si su sitio está libre).
 function feed(state, e) {
+  const n = state.nextPiece - 1
   const sizes = e.sizes === 'mixed' ? ['small', 'large'] : [e.sizes in PIECE_SIZES ? e.sizes : 'small']
-  const [w, h] = PIECE_SIZES[sizes[(state.nextPiece - 1) % sizes.length]]
-  const piece = { id: state.nextPiece, x: e.x - w / 2, y: e.y - h / 2, w, h, color: e.color ?? 'amber' }
+  const [w, h] = PIECE_SIZES[sizes[n % sizes.length]]
+  // Material alterno: cambia cada dos piezas si los tamaños también alternan (salen todas las
+  // combinaciones: pequeña y grande, de plástico y de metal).
+  const step = e.sizes === 'mixed' ? Math.floor(n / 2) : n
+  const material = e.material === 'mixed' ? (step % 2 ? 'metal' : 'plastic') : e.material === 'metal' ? 'metal' : 'plastic'
+  const color = material === 'metal' ? 'metal' : (e.color ?? 'amber')
+  const piece = { id: state.nextPiece, x: e.x - w / 2, y: e.y - h / 2, w, h, color, material }
   if (state.pieces.some((p) => overlaps(p, piece))) return state
   return { ...state, pieces: [...state.pieces, piece], nextPiece: state.nextPiece + 1 }
 }
@@ -144,6 +190,7 @@ export function sceneStep(scene, state, values, dt) {
     pos: { ...state.pos },
     level: { ...state.level },
     angle: { ...state.angle },
+    temp: { ...state.temp },
     pieces: state.pieces.map((p) => ({ ...p })),
     counts: { ...state.counts },
     fed: { ...state.fed },
@@ -201,6 +248,16 @@ export function sceneStep(scene, state, values, dt) {
     next.level[e.id] = clamp((next.level[e.id] ?? 0) + filling - draining)
   }
 
+  // Calentadores: la temperatura tiende a la máxima con la resistencia encendida y a la ambiente
+  // apagada (primer orden, constante de tiempo tau).
+  for (const e of elements) {
+    if (e.type !== 'heater') continue
+    const ambient = Number(e.ambient ?? 20)
+    const target = on(values, e.heat) && !stuck(e) ? Number(e.maxTemp ?? 150) : ambient
+    const t = next.temp[e.id] ?? ambient
+    next.temp[e.id] = t + (target - t) * (1 - Math.exp(-dt / Math.max(0.5, Number(e.tau) || 20)))
+  }
+
   // Motores: solo giran (para verlo); una vuelta por segundo.
   for (const e of elements) {
     if (e.type !== 'motor' || stuck(e)) continue
@@ -219,10 +276,38 @@ export function sceneStep(scene, state, values, dt) {
   return next
 }
 
-// ¿Qué tiene delante un detector? (placas de los vástagos y piezas)
-function touching(scene, state, zone) {
-  if (state.pieces.some((p) => overlaps(zone, p))) return true
+// ¿Qué tiene delante un detector? (placas de los vástagos y piezas). `kind`: tipo de detector
+// de presencia (los finales de carrera los pisa cualquier cosa).
+function touching(scene, state, zone, sensor = null) {
+  const kind = sensor?.kind ?? 'optical'
+  const sees = (p) => (kind === 'inductive' ? p.material === 'metal' : kind === 'color' ? p.color === (sensor.color ?? 'amber') : true)
+  if (state.pieces.some((p) => sees(p) && overlaps(zone, p))) return true
+  // Los vástagos (metálicos) los ven todos menos el de color.
+  if (kind === 'color') return false
   return elementsOf(scene).some((c) => c.type === 'cylinder' && overlaps(zone, cylinderPlate(c, state.pos[c.id] ?? 0)))
+}
+
+// Distancia (px) del sensor de distancia al primer objeto de su haz; null si no hay ninguno.
+export function measuredDistance(scene, state, e) {
+  const beam = distanceBeam(e)
+  const range = Number(e.range) || 200
+  const rot = ((e.rot ?? 0) % 360 + 360) % 360
+  const along = (r) =>
+    rot === 90 ? r.y - (e.y + 12) : rot === 180 ? e.x - 12 - (r.x + r.w) : rot === 270 ? e.y - 12 - (r.y + r.h) : r.x - (e.x + 12)
+  const rects = [
+    ...state.pieces,
+    ...elementsOf(scene)
+      .filter((c) => c.type === 'cylinder')
+      .map((c) => cylinderPlate(c, state.pos[c.id] ?? 0)),
+  ].filter((r) => overlaps(beam, r))
+  if (!rects.length) return null
+  return Math.min(range, Math.max(0, Math.min(...rects.map(along))))
+}
+// Peso (kg) de las piezas sobre una báscula.
+export const weighed = (state, e) => {
+  const plate = scaleRect(e)
+  const zone = { ...plate, y: plate.y - 50, h: plate.h + 50 } // la pieza descansa encima del plato
+  return state.pieces.filter((p) => inside(center(p), zone)).reduce((sum, p) => sum + pieceMass(p), 0)
 }
 
 // Estado de cada elemento para dibujarlo y para las entradas: { [id]: true | false }.
@@ -232,7 +317,7 @@ export function sceneSignals(scene, state) {
   const broken = (e) => state.faults?.[e.id] === 'broken'
   for (const e of elementsOf(scene)) {
     if (e.type === 'limit') signals[e.id] = !broken(e) && touching(scene, state, limitZone(e))
-    if (e.type === 'sensor') signals[e.id] = !broken(e) && touching(scene, state, sensorZone(e))
+    if (e.type === 'sensor') signals[e.id] = !broken(e) && touching(scene, state, sensorZone(e), e)
     if (e.type === 'button' || e.type === 'switch' || e.type === 'emergency') signals[e.id] = Boolean(state.pressed[e.id])
   }
   return signals
@@ -258,6 +343,28 @@ export function sceneInputs(scene, state, analogRange = () => null) {
         const range = analogRange(e.level) ?? { min: 0, max: 100 }
         inputs[e.level] = Math.round((range.min + level * (range.max - range.min)) * 100) / 100
       }
+    }
+    // Analógicas: valor físico dentro del rango de la variable (o en sus unidades: °C, kg).
+    const scaled = (name, fraction) => {
+      const range = analogRange(name) ?? { min: 0, max: 100 }
+      inputs[name] = Math.round((range.min + clamp(fraction) * (range.max - range.min)) * 100) / 100
+    }
+    if (e.type === 'cylinder' && e.position) scaled(e.position, state.pos[e.id] ?? 0)
+    if (e.type === 'potentiometer' && e.variable) scaled(e.variable, state.knob?.[e.id] ?? 0.5)
+    if (e.type === 'distance' && e.variable) {
+      const d = fault(e) === 'broken' ? null : measuredDistance(scene, state, e)
+      scaled(e.variable, d === null ? 1 : d / (Number(e.range) || 200))
+    }
+    if (e.type === 'scale' && e.variable) inputs[e.variable] = fault(e) === 'broken' ? 0 : weighed(state, e)
+    if (e.type === 'heater') {
+      const t = Math.round((state.temp?.[e.id] ?? Number(e.ambient ?? 20)) * 10) / 10
+      if (e.temperature) inputs[e.temperature] = fault(e) === 'sensor:temperature' ? 0 : t
+      if (e.thermostat) inputs[e.thermostat] = t >= Number(e.setpoint ?? 60) ? 1 : 0
+    }
+    if (e.type === 'motor' && e.pulses) {
+      // Medio giro a 1 y medio a 0 (en los dos sentidos).
+      const angle = (((state.angle?.[e.id] ?? 0) % 360) + 360) % 360
+      inputs[e.pulses] = angle > 0 && angle < 180 ? 1 : 0
     }
     if (!(e.id in signals) || !e.variable) continue
     const nc = e.type === 'emergency' || e.contact === 'NC'
@@ -289,7 +396,11 @@ export function sceneFaults(e) {
       return [{ id: 'stuck', label: 'Atascado' }]
     case 'limit':
     case 'sensor':
+    case 'distance':
+    case 'scale':
       return [{ id: 'broken', label: 'Roto (no detecta)' }]
+    case 'heater':
+      return [{ id: 'stuck', label: 'Resistencia fundida' }, ...(e.temperature ? [{ id: 'sensor:temperature', label: 'Sonda de temperatura rota' }] : [])]
     case 'tank':
       return [
         { id: 'stuck', label: 'Válvulas atascadas' },
@@ -310,6 +421,7 @@ export function sceneAction(scene, state, id, action) {
   if (action === 'press' || action === 'release') return { ...state, pressed: { ...state.pressed, [id]: action === 'press' } }
   if (action === 'toggle') return { ...state, pressed: { ...state.pressed, [id]: !state.pressed[id] } }
   if (action === 'feed' && e.type === 'feeder') return feed(state, e)
+  if (action.startsWith('set:') && e.type === 'potentiometer') return { ...state, knob: { ...state.knob, [id]: clamp(Number(action.slice(4))) } }
   if (action.startsWith('fault:')) return { ...state, faults: { ...state.faults, [id]: action.slice('fault:'.length) || null } }
   return state
 }

@@ -235,3 +235,33 @@ test('escena: vista previa flotante de los módulos de la paleta', async ({ page
   await expect(page.getByRole('tooltip', { name: /Vista previa/ })).toHaveCount(0)
   expectNoErrors(errors)
 })
+
+test('escena: potenciómetro, calentador con termostato y detectores por tipo', async ({ page }) => {
+  const errors = await openEditor(page, 'escena-analogicas.json')
+  await page.getByRole('button', { name: /Simular/ }).click()
+  const view = page.getByRole('region', { name: 'Escena de la planta' })
+  await expect.poll(() => activeSteps(page)).toBe('s0')
+  // Girar el potenciómetro a la derecha: Consigna > 70 -> X1 calienta hasta que salta el termostato.
+  const pot = view.locator('[aria-label="Potenciómetro Consigna"]')
+  const b = await pot.boundingBox()
+  await page.mouse.move(b.x + b.width / 2, b.y + 22)
+  await page.mouse.down()
+  await page.mouse.move(b.x + b.width / 2 + 150, b.y + 22, { steps: 4 })
+  await page.mouse.up()
+  await expect(pot).toContainText('100 %')
+  await expect.poll(() => activeSteps(page)).toBe('s1')
+  await expect.poll(() => activeSteps(page), { timeout: 5000 }).toBe('s2') // TS: 40 °C alcanzados
+  await expect(view.locator('[aria-label="Calentador Horno"]')).toContainText('°C')
+
+  // Paleta: un módulo por tipo de detector, con su explicación.
+  await view.getByRole('radio', { name: /Editar/ }).click()
+  const palette = view.getByRole('navigation', { name: 'Elementos' })
+  for (const name of ['Detector óptico', 'Detector inductivo', 'Detector capacitivo', 'Detector de color']) {
+    await expect(palette.getByRole('button', { name: `+ ${name}` })).toBeVisible()
+  }
+  await palette.getByRole('button', { name: '+ Detector inductivo' }).hover()
+  await expect(page.getByRole('tooltip', { name: 'Vista previa: Detector inductivo' })).toContainText('solo detecta metal')
+  await palette.getByRole('button', { name: '+ Detector inductivo' }).click()
+  await expect(view.getByLabel('Propiedades del elemento').getByRole('combobox', { name: 'Tipo de detector' })).toHaveValue('inductive')
+  expectNoErrors(errors)
+})

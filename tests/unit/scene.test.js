@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { compile, evolve, initialState } from '../../src/lib/sim/engine'
 import { buildPlcModel } from '../../src/lib/plcModel'
 import { EMPTY_PLC } from '../../src/lib/addressing'
-import { detectScene, rotate, sceneAction, sceneFaults, sceneFromPlant, sceneInit, sceneInputNames, sceneInputs, sceneStep, worldRect } from '../../src/lib/sim/scene'
+import { detectScene, measuredDistance, rotate, sceneAction, sceneFaults, sceneFromPlant, sceneInit, sceneInputNames, sceneInputs, sceneStep, worldRect } from '../../src/lib/sim/scene'
 import { normalizeProject } from '../../src/lib/projectFile'
 import { advanceWorld, makeWorld } from '../../src/lib/sim/world'
 import { links, step, transition } from './helpers'
@@ -186,5 +186,92 @@ describe('escena: depósito, averías, detección y proyectos antiguos', () => {
     const project = normalizeProject({ nodes: [], edges: [], plc: { plant } })
     expect(project.plc.plant).toBeUndefined()
     expect(project.plc.scene.elements).toHaveLength(5)
+  })
+})
+
+describe('escena: detectores típicos y sensores analógicos', () => {
+  // Cinta parada con dos piezas: una de plástico ámbar y otra de metal.
+  const pieces = [
+    { id: 1, x: 100, y: 86, w: 28, h: 28, color: 'amber', material: 'plastic' },
+    { id: 2, x: 200, y: 86, w: 28, h: 28, color: 'metal', material: 'metal' },
+  ]
+  // Detector debajo de cada pieza, mirando hacia arriba.
+  const under = (kind, x, extra = {}) => ({ id: `${kind}${x}`, type: 'sensor', x, y: 130, rot: 270, variable: `${kind}${x}`, kind, range: 30, ...extra })
+
+  it('óptico y capacitivo ven todas las piezas; inductivo solo el metal; de color solo su color', () => {
+    const elements = ['optical', 'capacitive', 'inductive', 'color'].flatMap((kind) => [under(kind, 114), under(kind, 214)])
+    const scene = { elements }
+    const inputs = sceneInputs(scene, { ...sceneInit(scene), pieces })
+    expect(inputs).toEqual({
+      optical114: 1, optical214: 1,
+      capacitive114: 1, capacitive214: 1,
+      inductive114: 0, inductive214: 1,
+      color114: 1, color214: 0, // ámbar por defecto
+    })
+  })
+
+  it('el alimentador alterna tamaño y material (todas las combinaciones)', () => {
+    const scene = { elements: [{ id: 'f', type: 'feeder', x: 50, y: 50, sizes: 'mixed', material: 'mixed', color: 'red' }] }
+    let s = sceneInit(scene)
+    const made = []
+    for (let i = 0; i < 4; i++) {
+      s = sceneAction(scene, { ...s, pieces: [] }, 'f', 'feed')
+      made.push(`${s.pieces[0].w}-${s.pieces[0].material}-${s.pieces[0].color}`)
+    }
+    expect(made).toEqual(['28-plastic-red', '44-plastic-red', '28-metal-metal', '44-metal-metal'])
+  })
+
+  it('sensor de distancia: valor analógico proporcional a la distancia al primer objeto', () => {
+    const e = { id: 'd', type: 'distance', x: 0, y: 100, rot: 0, variable: 'Dist', range: 200 }
+    const scene = { elements: [e] }
+    const range = () => ({ min: 0, max: 1000 })
+    let s = sceneInit(scene)
+    expect(sceneInputs(scene, s, range)).toEqual({ Dist: 1000 }) // nada delante: el máximo
+    s = { ...s, pieces: [{ id: 1, x: 62, y: 86, w: 28, h: 28 }, { id: 2, x: 150, y: 86, w: 28, h: 28 }] }
+    expect(measuredDistance(scene, s, e)).toBe(50)
+    expect(sceneInputs(scene, s, range)).toEqual({ Dist: 250 })
+  })
+
+  it('báscula: peso de las piezas que tiene encima (el metal pesa más)', () => {
+    const scene = { elements: [{ id: 'b', type: 'scale', x: 100, y: 100, rot: 0, variable: 'Peso' }] }
+    const s = { ...sceneInit(scene), pieces: [{ id: 1, x: 72, y: 70, w: 28, h: 28, material: 'plastic' }, { id: 2, x: 100, y: 62, w: 44, h: 44, material: 'metal' }] }
+    expect(sceneInputs(scene, s)).toEqual({ Peso: 7 }) // 1 + 2·3
+  })
+
+  it('potenciómetro: valor manual dentro del rango de la variable', () => {
+    const scene = { elements: [{ id: 'p', type: 'potentiometer', x: 0, y: 0, variable: 'Consigna', initial: 0.5 }] }
+    const range = () => ({ min: 4, max: 20 })
+    let s = sceneInit(scene)
+    expect(sceneInputs(scene, s, range)).toEqual({ Consigna: 12 })
+    s = sceneAction(scene, s, 'p', 'set:0.25')
+    expect(sceneInputs(scene, s, range)).toEqual({ Consigna: 8 })
+  })
+
+  it('calentador: la temperatura sube con la resistencia y el termostato salta en la consigna', () => {
+    const scene = { elements: [{ id: 'h', type: 'heater', x: 0, y: 0, heat: 'R', temperature: 'T', thermostat: 'TS', setpoint: 60, ambient: 20, maxTemp: 120, tau: 10 }] }
+    let s = sceneInit(scene)
+    expect(sceneInputs(scene, s)).toEqual({ T: 20, TS: 0 })
+    s = run(scene, s, { R: 1 }, 10) // una constante de tiempo: 20 + 100·(1 − 1/e) ≈ 83 °C
+    expect(sceneInputs(scene, s).T).toBeCloseTo(83.2, 0)
+    expect(sceneInputs(scene, s).TS).toBe(1)
+    s = run(scene, s, {}, 30)
+    expect(sceneInputs(scene, s).T).toBeLessThan(25)
+    s = sceneAction(scene, s, 'h', 'fault:stuck')
+    s = run(scene, s, { R: 1 }, 10)
+    expect(sceneInputs(scene, s).T).toBeLessThan(25) // resistencia fundida
+  })
+
+  it('posición analógica del cilindro y encoder del motor', () => {
+    const scene = {
+      elements: [
+        { id: 'A', type: 'cylinder', x: 0, y: 0, rot: 0, extend: 'A+', position: 'PosA', stroke: 100, time: 1 },
+        { id: 'm', type: 'motor', x: 0, y: 0, variable: 'M', pulses: 'Enc' },
+      ],
+    }
+    const range = () => ({ min: 0, max: 100 })
+    let s = run(scene, sceneInit(scene), { 'A+': 1, M: 1 }, 0.25)
+    expect(sceneInputs(scene, s, range)).toEqual({ PosA: 25, Enc: 1 })
+    s = run(scene, s, { 'A+': 1, M: 1 }, 0.5)
+    expect(sceneInputs(scene, s, range)).toEqual({ PosA: 75, Enc: 0 })
   })
 })
