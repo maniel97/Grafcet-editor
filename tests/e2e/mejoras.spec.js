@@ -707,3 +707,20 @@ test('modo oscuro: las opciones de los desplegables se leen (fondo oscuro y text
   }
   expectNoErrors(errors)
 })
+
+test('Verificar: consejos de estudiante con su explicación', async ({ page }) => {
+  const errors = await openEditor(page)
+  await page.locator('.react-flow__node-transition').filter({ hasText: 'Paro' }).dblclick()
+  await page.getByPlaceholder('p. ej. a · b, ↑c, 5s/X2').fill('Marcha')
+  await page.keyboard.press('Escape')
+  await page.getByTitle('Verificar conformidad con IEC 60848').click()
+  const tips = page.getByRole('region', { name: 'Consejos' })
+  await expect(tips).toContainText('X1 se atraviesa sin detenerse')
+  // Un consejo no es un error: el grafcet sigue siendo conforme.
+  await expect(page.getByText('El grafcet es conforme')).toBeVisible()
+  await tips.getByRole('button', { name: '¿Por qué?' }).first().click()
+  await expect(tips).toContainText('evolución fugaz')
+  // Marca azul («i») en los elementos afectados.
+  await expect(page.locator('.react-flow__node-step').filter({ hasText: /^1/ }).locator('.bg-blue-500')).toHaveText('i')
+  expectNoErrors(errors)
+})

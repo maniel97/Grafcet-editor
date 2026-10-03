@@ -158,7 +158,7 @@ export default function GrafcetCanvas() {
   const openVariables = useCallback(() => setVariablesOpen(true), [])
   const { symbols, stepNodes, plcIssues, changePlc, tableShown, toggleTable, plcTable, plcView, exportCsv, highlight, setHighlight } =
     usePlcTable({ nodes, plc, setPlc, plcRef, takeSnapshot, onOpenDialog: openVariables })
-  const { issues, issueCounts, markedIssues } = useVerification({ nodes, edges, plcIssues, verifyOpen })
+  const { issues, issueCounts, markedIssues } = useVerification({ nodes, edges, plc, plcIssues, verifyOpen })
   const { copy, paste, duplicate } = useClipboard(takeSnapshot)
   const { menu, setMenu, closeMenu, onNodeContextMenu, onSelectionContextMenu, onPaneContextMenu, onEdgeContextMenu } =
     useCanvasContextMenu()
