@@ -14,6 +14,7 @@ import { nodeTypes } from '../nodes'
 import { NOTE_SIZE } from '../lib/notes'
 import { edgeTypes } from '../edges'
 import { useSimulation } from '../lib/sim/useSimulation'
+import { explainTransition } from '../lib/sim/explain'
 import { useSettings } from '../lib/settings'
 import { initialNodes, initialEdges, defaultEdgeOptions } from '../lib/initialDiagram'
 import { saveProject, loadProject, normalizeProject } from '../lib/projectFile'
@@ -142,6 +143,15 @@ export default function GrafcetCanvas() {
 
   // --- Piezas ----------------------------------------------------------------------------------
   const simulation = useSimulation(nodes, edges, plc, simulating)
+  // «¿Por qué no avanza?»: función estable que lee el estado más reciente (la tarjeta se refresca sola).
+  const simulationRef = useRef(simulation)
+  useEffect(() => {
+    simulationRef.current = simulation
+  })
+  const explainNow = useCallback((id) => {
+    const { compiled, sim } = simulationRef.current
+    return compiled && sim ? explainTransition(compiled, sim, id) : null
+  }, [])
   const { fitDrawn, fitWhenReady } = useFitDrawn(wrapperRef)
   const openVariables = useCallback(() => setVariablesOpen(true), [])
   const { symbols, stepNodes, plcIssues, changePlc, tableShown, toggleTable, plcTable, plcView, exportCsv, highlight, setHighlight } =
@@ -259,8 +269,9 @@ export default function GrafcetCanvas() {
       editingNoteId,
       setEditingNoteId,
       sim: simulating ? simulation.view : null,
+      explainTransition: simulating ? explainNow : null,
     }),
-    [takeSnapshot, markedIssues, plcView, plcTable, highlight, setHighlight, toggleTable, simulating, readOnly, connecting, editingNoteId, simulation.view],
+    [takeSnapshot, markedIssues, plcView, plcTable, highlight, setHighlight, toggleTable, simulating, readOnly, connecting, editingNoteId, simulation.view, explainNow],
   )
 
   // --- Edición -----------------------------------------------------------------------------------

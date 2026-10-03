@@ -4,6 +4,7 @@ import Chronogram from './Chronogram'
 import ScenarioControls from './ScenarioControls'
 import { chronogramCsv } from '../lib/sim/scenario'
 import { withMacros } from '../lib/sim/engine'
+import { firstFailure, waitingFor } from '../lib/sim/explain'
 import { downloadFile } from '../lib/projectFile'
 import { fileName, getProjectName } from '../lib/fileNames'
 import { svgMarkupSource } from '../lib/svgExport'
@@ -99,6 +100,8 @@ export default function SimulationPanel({ simulation, scenarios = [], onScenario
   const { compiled, sim, playing, setPlaying, speed, setSpeed, setInput, step, advance, reset } = simulation
 
   const inputs = useMemo(() => compiled?.variables.filter((v) => v.type === 'input') ?? [], [compiled])
+  // Lo que espera el grafcet ahora (transiciones validadas y lo que les falta).
+  const waiting = useMemo(() => (compiled && sim ? waitingFor(compiled, sim) : null), [compiled, sim])
   const [chronoExport, setChronoExport] = useState(null)
 
   // Teclas 1–9: cambian las primeras entradas (fuera de los campos de texto).
@@ -237,6 +240,43 @@ export default function SimulationPanel({ simulation, scenarios = [], onScenario
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto">
+        <Section title="Qué espera el grafcet" count={waiting.list.length}>
+          {waiting.stuck && (
+            <p className="rounded bg-red-50 p-2 text-xs text-red-700">
+              Ninguna transición está validada: el grafcet ya no puede evolucionar. Revisa los enlaces que salen de las etapas activas.
+            </p>
+          )}
+          <ul className="space-y-1" aria-label="Qué espera el grafcet">
+            {waiting.list.map((e) => {
+              const missing = e.receptivity && firstFailure(e.receptivity)
+              return (
+                <li key={e.id}>
+                  <button
+                    type="button"
+                    onClick={() => onFocusNode(e.id)}
+                    title="Ver la transición (pasa el ratón por ella para ver el detalle)"
+                    className="block w-full rounded px-1 py-0.5 text-left text-xs hover:bg-slate-50"
+                  >
+                    <span className="flex items-center gap-1.5">
+                      <span className={`h-2 w-2 shrink-0 rounded-full ${e.status === 'ready' ? 'bg-green-600' : e.status === 'error' ? 'bg-red-600' : 'bg-amber-500'}`} />
+                      <span className="font-mono">
+                        {e.steps.map((st) => st.variable).join(', ')} → «{e.condition || '—'}»
+                      </span>
+                    </span>
+                    <span className="block pl-3.5 text-slate-500">
+                      {e.status === 'ready'
+                        ? 'se franquea en el próximo ciclo'
+                        : missing
+                          ? `falta ${missing.text}${missing.detail ? `: ${missing.detail}` : ''}`
+                          : e.summary}
+                    </span>
+                  </button>
+                </li>
+              )
+            })}
+          </ul>
+        </Section>
+
         <Section title="Entradas" count={inputs.length}>
           {inputs.length === 0 && <p className="text-xs text-slate-400">No hay entradas: escribe receptividades como «Marcha».</p>}
           {inputs.map((v, i) => (

@@ -1,9 +1,10 @@
-import { useCallback } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import { Position, useNodeConnections, useStore } from '@xyflow/react'
 import GrafcetHandle from './GrafcetHandle'
 import IssueBadge from './IssueBadge'
 import QuickConnectButton, { LoopButton } from './QuickConnectButton'
 import ConditionText from '../components/ConditionText'
+import WhyCard from '../components/WhyCard'
 import { transitionOutput } from '../lib/grafcetRules'
 import { addressExpression } from '../lib/symbols'
 import { useEditor } from '../lib/editorContext'
@@ -13,7 +14,11 @@ const ALTERNATIVE_HINT = 'Para «volver O seguir»: clic derecho en la transici�
 
 // Transición Grafcet: barra horizontal con su receptividad a la derecha.
 export default function TransitionNode({ id, data, selected }) {
-  const { plcView, sim } = useEditor()
+  const { plcView, sim, explainTransition } = useEditor()
+  // Simulación: al pasar el ratón (o con la transición seleccionada), «¿por qué no avanza?».
+  const [hovered, setHovered] = useState(false)
+  const anchorRef = useRef(null)
+  const explain = useCallback(() => explainTransition?.(id) ?? null, [explainTransition, id])
   const highlight = useHighlightClass(id)
   // Simulación: validada (etapas anteriores activas) -> ámbar; además receptividad verdadera -> verde.
   const simState = sim?.ready.has(id) ? 'ready' : sim?.enabled.has(id) ? 'enabled' : null
@@ -36,7 +41,13 @@ export default function TransitionNode({ id, data, selected }) {
   )
 
   return (
-    <div className={`relative flex h-[24px] w-[56px] items-center justify-center ${highlight}`}>
+    <div
+      ref={anchorRef}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      className={`relative flex h-[24px] w-[56px] items-center justify-center ${highlight}`}
+    >
+      {explainTransition && (hovered || selected) && <WhyCard anchorRef={anchorRef} explain={explain} />}
       {/* Con bucle, una etapa debajo se activaría a la vez que la del bucle (divergencia en Y implícita). */}
       {/* Los botones flotantes solo existen en la transición seleccionada. */}
       {selected && (

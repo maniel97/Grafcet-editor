@@ -52,3 +52,28 @@ test('simulación: flanco con pulsador, memorizada, temporización y Y', async (
   await expect.poll(() => activeSteps(page)).toBe('s0')
   expectNoErrors(errors)
 })
+
+test('«¿por qué no avanza?»: qué espera el grafcet y tarjeta al pasar por una transición', async ({ page }) => {
+  const errors = await openEditor(page)
+  await page.getByRole('button', { name: /Simular/ }).click()
+  await expect.poll(() => activeSteps(page)).toBe('s0')
+  const waiting = page.getByRole('list', { name: 'Qué espera el grafcet' })
+  await expect(waiting).toContainText('X0 → «Marcha»')
+  await expect(waiting).toContainText('falta Marcha: vale 0')
+
+  // Tarjeta: la transición validada espera a Marcha; la siguiente no está validada.
+  await page.locator('.react-flow__node-transition').filter({ hasText: 'Marcha' }).hover()
+  const card = page.getByRole('tooltip', { name: 'Por qué' })
+  await expect(card).toContainText('Esperando')
+  await expect(card).toContainText('Validada, espera a Marcha (vale 0).')
+  await page.locator('.react-flow__node-transition').filter({ hasText: 'Paro' }).hover()
+  await expect(card).toContainText('No está validada: X1 no está activa.')
+
+  // En pausa, una entrada cambiada ya cuenta: «se franquea en el próximo ciclo».
+  await page.getByRole('button', { name: 'Pausa' }).click()
+  await page.getByRole('switch').first().click()
+  await expect(waiting).toContainText('se franquea en el próximo ciclo')
+  await page.mouse.move(5, 5)
+  await expect(card).toHaveCount(0)
+  expectNoErrors(errors)
+})

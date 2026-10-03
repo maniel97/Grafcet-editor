@@ -136,7 +136,7 @@ export function initialState(compiled) {
   }
 }
 
-function makeContext(compiled, values, active, activatedAt, time, prev) {
+export function makeContext(compiled, values, active, activatedAt, time, prev) {
   const stepActive = (label) => {
     const id = compiled.stepByLabel.get(String(label))
     const members = compiled.macroMembers?.get(id)
