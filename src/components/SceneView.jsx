@@ -266,6 +266,90 @@ function RampShape({ e }) {
     </g>
   )
 }
+function SirenShape({ on }) {
+  return (
+    <g>
+      <rect x="-18" y="-6" width="10" height="12" rx="2" fill="#475569" />
+      <polygon points="-8,-6 8,-16 8,16 -8,6" fill={on ? '#dc2626' : '#cbd5e1'} stroke={INK} />
+      {on && [12, 18].map((r) => <path key={r} d={`M ${r} -${r * 0.7} A ${r} ${r} 0 0 1 ${r} ${r * 0.7}`} fill="none" stroke="#dc2626" strokeWidth="2" />)}
+    </g>
+  )
+}
+function TrafficLightShape({ e, values }) {
+  const lights = [
+    ['red', '#dc2626', -24],
+    ['amber', '#f59e0b', 0],
+    ['green', '#16a34a', 24],
+  ]
+  return (
+    <g>
+      <rect x="-15" y="-38" width="30" height="76" rx="6" fill="#1e293b" />
+      {lights.map(([key, color, y]) => (
+        <circle key={key} cy={y} r="9" fill={isOn(values, e[key]) ? color : '#475569'} stroke="#0f172a" />
+      ))}
+      <rect x="-3" y="38" width="6" height="22" fill="#475569" />
+    </g>
+  )
+}
+function ValveShape({ open }) {
+  return (
+    <g>
+      <line x1="-24" y1="0" x2="-14" y2="0" stroke="#64748b" strokeWidth="6" />
+      <line x1="14" y1="0" x2="24" y2="0" stroke="#64748b" strokeWidth="6" />
+      <polygon points="-14,-10 14,10 14,-10 -14,10" fill={open ? '#3b82f6' : '#e2e8f0'} stroke={INK} strokeWidth="1.2" />
+      <line x1="0" y1="0" x2="0" y2="-14" stroke={INK} strokeWidth="1.5" />
+      <rect x="-8" y="-24" width="16" height="10" rx="2" fill={open ? ON : '#94a3b8'} stroke={INK} />
+    </g>
+  )
+}
+function PipeShape({ e, flowing, t }) {
+  const len = Number(e.length) || 160
+  return (
+    <g>
+      <line x1="0" y1="0" x2={len} y2="0" stroke={flowing ? '#3b82f6' : '#94a3b8'} strokeWidth="8" strokeLinecap="round" />
+      {flowing && <line x1="0" y1="0" x2={len} y2="0" stroke="#bfdbfe" strokeWidth="2" strokeDasharray="6 8" strokeDashoffset={-((t * 40) % 14)} />}
+    </g>
+  )
+}
+function BarrierShape({ e, pos }) {
+  const len = Number(e.length) || 140
+  return (
+    <g>
+      <g transform={`rotate(${-pos * 85} 0 -18)`}>
+        <rect x="0" y="-22" width={len} height="8" rx="3" fill="white" stroke={INK} />
+        {Array.from({ length: Math.floor(len / 24) }, (_, i) => (
+          <rect key={i} x={6 + i * 24} y="-22" width="12" height="8" fill="#dc2626" />
+        ))}
+      </g>
+      <rect x="-9" y="-28" width="18" height="44" rx="3" fill="#475569" />
+      <circle cx="0" cy="-18" r="3" fill="#cbd5e1" />
+    </g>
+  )
+}
+function LabelShape({ e }) {
+  return (
+    <text x="0" y="0" fontSize={Number(e.size) || 16} fontWeight="600" fill={INK}>
+      {e.text}
+    </text>
+  )
+}
+function ImageShape({ e }) {
+  const w = Number(e.width) || 300
+  const h = Number(e.height) || 200
+  return e.src ? (
+    <image href={e.src} x="0" y="0" width={w} height={h} preserveAspectRatio="xMidYMid meet" opacity="0.9" />
+  ) : (
+    <g>
+      <rect x="0" y="0" width={w} height={h} fill="#f8fafc" stroke="#94a3b8" strokeDasharray="6 4" />
+      <text x={w / 2} y={h / 2 - 4} textAnchor="middle" fontSize="13" fill="#64748b">
+        Imagen
+      </text>
+      <text x={w / 2} y={h / 2 + 12} textAnchor="middle" fontSize="10" fill="#94a3b8">
+        (elígela en sus propiedades)
+      </text>
+    </g>
+  )
+}
 function PieceShape({ p }) {
   const metal = p.material === 'metal'
   return (
@@ -390,6 +474,24 @@ function boundsOf(e, pos = 0) {
     }
     case 'ramp':
       return worldRect(e, 0, -20, Number(e.length) || 120, 40)
+    case 'siren':
+      return r(-20, -20, 44, 40)
+    case 'trafficlight':
+      return r(-16, -40, 32, 100)
+    case 'valve':
+      return worldRect(e, -26, -26, 52, 38)
+    case 'pipe':
+      return worldRect(e, -4, -6, (Number(e.length) || 160) + 8, 12)
+    case 'barrier': {
+      const len = Number(e.length) || 140
+      return r(-10, -24 - (pos > 0.01 ? len : 0), len + 12, 42 + (pos > 0.01 ? len : 0))
+    }
+    case 'label': {
+      const size = Number(e.size) || 16
+      return r(0, -size, Math.max(20, String(e.text ?? '').length * size * 0.6), size * 1.3)
+    }
+    case 'image':
+      return r(0, 0, Number(e.width) || 300, Number(e.height) || 200)
     case 'potentiometer':
       return r(-22, -22, 44, 60)
     case 'heater':
@@ -779,6 +881,42 @@ function Properties({ element, variables, onChange, onDelete, onRotate, onCreate
         </>
       )}
       {element.type === 'distance' && number('range', 'Alcance (px) = valor máximo', 20, 10)}
+      {element.type === 'siren' && (
+        <label className="flex items-center gap-1">
+          <input type="checkbox" checked={Boolean(element.sound)} onChange={(ev) => set({ sound: ev.target.checked })} />
+          Con sonido (al simular)
+        </label>
+      )}
+      {element.type === 'pipe' && number('length', 'Largo (px)', 20, 10)}
+      {element.type === 'barrier' && (
+        <>
+          {number('length', 'Largo del brazo (px)', 40, 10)}
+          {number('time', 'Tiempo en abrirse (s)', 0.2, 0.1)}
+        </>
+      )}
+      {element.type === 'label' && number('size', 'Tamaño de letra (px)', 8, 1)}
+      {element.type === 'image' && (
+        <>
+          <label className="block">
+            <span className="text-slate-500">Imagen (se reduce a 1200 px)</span>
+            <input
+              type="file"
+              accept="image/*"
+              aria-label="Elegir imagen"
+              onChange={async (ev) => {
+                const file = ev.target.files?.[0]
+                ev.target.value = ''
+                if (!file) return
+                const { src, width, height } = await loadImage(file)
+                set({ src, width, height })
+              }}
+              className="block w-full text-[11px]"
+            />
+          </label>
+          {number('width', 'Ancho (px)', 20, 10)}
+          {number('height', 'Alto (px)', 20, 10)}
+        </>
+      )}
       {(element.type === 'diverter' || element.type === 'ramp') && (
         <>
           {number('length', 'Largo (px)', 30, 10)}
@@ -950,6 +1088,13 @@ const HINTS = {
     'Pick & place: cilindro horizontal X y vertical Z montado en su vástago. Asigna a Z la ventosa (vacío) para coger la pieza que toca y llevarla con los dos vástagos.',
   diverter: 'Desviador: mientras su salida está activa, empuja las piezas de su zona hacia donde apunta la flecha (para sacarlas de una cinta).',
   ramp: 'Rampa: las piezas resbalan solas hasta su extremo (a la salida de una cinta, hacia una recogida…).',
+  siren: 'Sirena: avisa (con sonido, si se activa en sus propiedades) mientras su salida está activa.',
+  trafficlight: 'Semáforo: tres luces (rojo, ámbar y verde), cada una con su salida.',
+  valve: 'Electroválvula: abierta (azul) mientras su salida está activa. Para dibujar el circuito de un depósito.',
+  barrier: 'Barrera: se abre con su orden y se cierra con la suya o por su peso; finales de carrera de abierta y cerrada.',
+  pipe: 'Tubería: decoración; se pinta de azul, con el fluido moviéndose, mientras la variable elegida está activa.',
+  label: 'Rótulo: texto libre en la escena (nombre de la estación, zonas…).',
+  image: 'Imagen: una foto o un plano de fondo (se dibuja debajo de todo).',
   scale: 'Báscula: valor analógico con el peso (kg) de las piezas que tiene encima; el metal pesa el triple.',
   potentiometer: 'Potenciómetro: entrada analógica manual (consignas, velocidades…). En modo Usar, arrastra a izquierda o derecha.',
   heater: 'Calentador: la resistencia sube la temperatura (analógica, °C) con inercia; termostato digital opcional.',
@@ -1000,8 +1145,18 @@ function ModulePreview({ item }) {
     heater: <HeaterShape e={e} temp={85} heating />,
     diverter: <DiverterShape e={e} active />,
     ramp: <RampShape e={e} />,
+    siren: <SirenShape on />,
+    trafficlight: <TrafficLightShape e={{ ...e, green: 'V' }} values={values} />,
+    valve: <ValveShape open />,
+    pipe: <PipeShape e={{ ...e, length: 120 }} flowing t={0} />,
+    barrier: <BarrierShape e={e} pos={0.4} />,
+    label: <LabelShape e={{ ...e, text: 'Estación 1' }} />,
+    image: <ImageShape e={{ ...e, width: 160, height: 100 }} />,
   }
-  const b = boundsOf(type === 'conveyor' ? { ...e, length: 160 } : type === 'distance' ? { ...e, range: 120 } : e, 1)
+  const b = boundsOf(
+    type === 'conveyor' ? { ...e, length: 160 } : type === 'distance' ? { ...e, range: 120 } : type === 'pipe' ? { ...e, length: 120 } : type === 'image' ? { ...e, width: 160, height: 100 } : type === 'label' ? { ...e, text: 'Estación 1' } : e,
+    type === 'barrier' ? 0.4 : 1,
+  )
   const pad = 12
   return (
     <svg viewBox={`${b.x - pad} ${b.y - pad} ${b.w + pad * 2} ${b.h + pad * 2}`} className="mx-auto block max-h-28 w-full" aria-hidden="true">
@@ -1034,8 +1189,36 @@ const PALETTE_ITEMS = Object.entries(SCENE_TYPES).flatMap(([type, t]) =>
       : [{ key: type, type, group: t.group, label: t.label, preset: {} }],
 )
 const PALETTE = PALETTE_ITEMS.reduce((groups, item) => ({ ...groups, [item.group]: [...(groups[item.group] ?? []), item] }), {})
+// Imagen elegida para la escena: reducida (lado mayor ≤ 1200 px) para que el proyecto no pese
+// demasiado (se guarda dentro de él); PNG si es pequeña (conserva transparencias), si no JPEG.
+async function loadImage(file) {
+  const url = URL.createObjectURL(file)
+  try {
+    const img = await new Promise((resolve, reject) => {
+      const i = new Image()
+      i.onload = () => resolve(i)
+      i.onerror = reject
+      i.src = url
+    })
+    const k = Math.min(1, 1200 / Math.max(img.naturalWidth, img.naturalHeight))
+    const width = Math.round(img.naturalWidth * k)
+    const height = Math.round(img.naturalHeight * k)
+    const canvas = document.createElement('canvas')
+    canvas.width = width
+    canvas.height = height
+    canvas.getContext('2d').drawImage(img, 0, 0, width, height)
+    const png = file.type === 'image/png' && file.size < 400_000
+    const src = canvas.toDataURL(png ? 'image/png' : 'image/jpeg', 0.85)
+    // En la escena, a un tamaño cómodo (lo más ancho, 400 px).
+    const show = Math.min(1, 400 / width)
+    return { src, width: Math.round(width * show), height: Math.round(height * show) }
+  } finally {
+    URL.revokeObjectURL(url)
+  }
+}
+
 // Elementos por los que pasan las piezas: se dibujan debajo de todo.
-const UNDER = ['conveyor', 'sink', 'ramp', 'diverter']
+const UNDER = ['image', 'pipe', 'conveyor', 'sink', 'ramp', 'diverter']
 
 // Panel de control: los mandos y la señalización pueden ir en un panel fijo, aparte del
 // mecanismo (como el cuadro eléctrico real). e.place: 'desk' | 'machine' (por defecto, máquina).
@@ -1079,6 +1262,20 @@ function drawElement(e, { scene, state, values, time, signals }) {
       return <DiverterShape e={e} active={isOn(values, e.gate) && state.faults?.[e.id] !== 'stuck'} />
     case 'ramp':
       return <RampShape e={e} />
+    case 'siren':
+      return <SirenShape on={isOn(values, e.variable)} />
+    case 'trafficlight':
+      return <TrafficLightShape e={e} values={values} />
+    case 'valve':
+      return <ValveShape open={isOn(values, e.variable)} />
+    case 'pipe':
+      return <PipeShape e={e} flowing={isOn(values, e.variable)} t={time} />
+    case 'barrier':
+      return <BarrierShape e={e} pos={pos} />
+    case 'label':
+      return <LabelShape e={e} />
+    case 'image':
+      return <ImageShape e={e} />
     case 'scale':
       return <ScaleShape kg={weighed(state, e)} />
     case 'potentiometer':
@@ -1108,7 +1305,7 @@ export function SceneStatic({ scene, variables = [] }) {
     for (let i = 0; i < items.length; i += 2) lines.push(items.slice(i, i + 2).join(' · '))
     return lines
   }
-  const turns = (e) => !['button', 'switch', 'emergency', 'lamp', 'sink', 'feeder', 'tank', 'motor', 'display', 'scale', 'potentiometer', 'heater'].includes(e.type)
+  const turns = (e) => !['button', 'switch', 'emergency', 'lamp', 'sink', 'feeder', 'tank', 'motor', 'display', 'scale', 'potentiometer', 'heater', 'siren', 'trafficlight', 'label', 'image'].includes(e.type)
   const desk = elements.filter((e) => DESK_TYPES.includes(e.type) && e.place === 'desk')
   const machine = elements.filter((e) => !desk.includes(e))
   const boxes = machine.map((e) => boundsOf(placed(scene, state, e), 1))
@@ -1132,9 +1329,11 @@ export function SceneStatic({ scene, variables = [] }) {
           return (
             <g key={e.id}>
               <g transform={`translate(${e.x} ${e.y})${turns(e) ? ` rotate(${e.rot ?? 0})` : ''}`}>{drawElement(e, { scene, state, values: {}, time: 0, signals })}</g>
-              <text x={b.x + b.w / 2} y={b.y + b.h + 13} textAnchor="middle" fontSize="11" fill="#334155">
-                {labelOf(e)}
-              </text>
+              {e.type !== 'label' && !((e.type === 'image' || e.type === 'pipe') && !e.text) && (
+                <text x={b.x + b.w / 2} y={b.y + b.h + 13} textAnchor="middle" fontSize="11" fill="#334155">
+                  {labelOf(e)}
+                </text>
+              )}
               {io(e).map((line, i) => (
                 <text key={line} x={b.x + b.w / 2} y={b.y + b.h + 25 + i * 11} textAnchor="middle" fontSize="9" fontFamily="Courier New, monospace" fill="#2563eb">
                   {line}
@@ -1294,6 +1493,27 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
   }, [maximized, fitTick])
   const state = worldState ?? { pos: {}, pressed: {}, pieces: [], counts: {} }
   const signals = sceneSignals(scene ?? { elements: [] }, state)
+  // Sirenas con sonido: dos tonos mientras alguna está activa (Web Audio; sin él, en silencio).
+  const sounding = elements.some((e) => e.type === 'siren' && e.sound && isOn(values, e.variable))
+  useEffect(() => {
+    if (!sounding || typeof AudioContext === 'undefined') return
+    const ctx = new AudioContext()
+    const osc = ctx.createOscillator()
+    const gain = ctx.createGain()
+    osc.type = 'square'
+    osc.frequency.value = 880
+    gain.gain.value = 0.04
+    osc.connect(gain).connect(ctx.destination)
+    osc.start()
+    const id = setInterval(() => {
+      osc.frequency.value = osc.frequency.value === 880 ? 660 : 880
+    }, 400)
+    return () => {
+      clearInterval(id)
+      osc.stop()
+      ctx.close()
+    }
+  }, [sounding])
   const selectedElement = elements.find((e) => e.id === selected)
   const detected = mode === 'edit' ? detectScene(variables, scene) : []
   const io = sceneIO(scene, variables)
@@ -1449,9 +1669,14 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
   // escena, a la máquina.
   const add = (type, preset = {}, at = null, place = null) => {
     const el = scrollRef.current
-    const x = snap(at ? at.x : el ? (el.scrollLeft + el.clientWidth / 2) / zoom : W / 2)
-    const y = snap(at ? at.y : el ? (el.scrollTop + el.clientHeight / 2) / zoom : H / 2)
+    let x = snap(at ? at.x : el ? (el.scrollLeft + el.clientWidth / 2) / zoom : W / 2)
+    let y = snap(at ? at.y : el ? (el.scrollTop + el.clientHeight / 2) / zoom : H / 2)
     const where = place ?? (DESK_TYPES.includes(type) && !at ? 'desk' : null)
+    // Con un clic, si ya hay algo justo en el centro, un poco más abajo a la derecha (no se tapan).
+    while (!at && elements.some((e) => e.x === x && e.y === y && !isDesk(e))) {
+      x += 30
+      y += 30
+    }
     const element = { id: newId(), type, x, y, rot: 0, ...SCENE_TYPES[type].defaults, ...preset, ...(where ? { place: where } : {}) }
     save([...elements, element])
     setSelected(element.id)
@@ -1590,7 +1815,7 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
   const deskItems = elements.filter(isDesk)
   const draw = (e) => drawElement(e, { scene, state, values, time, signals })
   // Los mandos y pilotos no se giran (su rótulo se lee siempre).
-  const turns = (e) => !['button', 'switch', 'emergency', 'lamp', 'sink', 'feeder', 'tank', 'motor', 'display', 'scale', 'potentiometer', 'heater'].includes(e.type)
+  const turns = (e) => !['button', 'switch', 'emergency', 'lamp', 'sink', 'feeder', 'tank', 'motor', 'display', 'scale', 'potentiometer', 'heater', 'siren', 'trafficlight', 'label', 'image'].includes(e.type)
   const operable = (e) => ['button', 'switch', 'emergency', 'feeder', 'potentiometer'].includes(e.type)
 
   return (
@@ -1900,7 +2125,7 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
               </text>
             )}
             {/* Las cintas y recogidas, debajo de todo (las piezas van encima). */}
-            {[...machine].sort((a, b) => (UNDER.includes(a.type) ? -1 : 0) - (UNDER.includes(b.type) ? -1 : 0)).map((e) => (
+            {[...machine].sort((a, b) => (a.type === 'image' ? -2 : UNDER.includes(a.type) ? -1 : 0) - (b.type === 'image' ? -2 : UNDER.includes(b.type) ? -1 : 0)).map((e) => (
               <g
                 key={e.id}
                 data-element={e.type}
@@ -1924,6 +2149,8 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
             ))}
             {/* Rótulos (sin girar) */}
             {machine.map((e) => {
+              // Sin rótulo debajo: los de texto, y las imágenes y tuberías sin nombre propio.
+              if (e.type === 'label' || ((e.type === 'image' || e.type === 'pipe') && !e.text)) return null
               const b = boundsOf(e, state.pos[e.id] ?? 0)
               return (
                 <text key={`l-${e.id}`} x={b.x + b.w / 2} y={b.y + b.h + 13} textAnchor="middle" fontSize="11" fill="#334155" pointerEvents="none">

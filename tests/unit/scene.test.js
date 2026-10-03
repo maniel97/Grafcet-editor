@@ -418,3 +418,21 @@ describe('escena: alimentador con un pulsador de la planta', () => {
     expect(io.signals[0].dir).toBe('in')
   })
 })
+
+describe('escena: barrera', () => {
+  it('se abre con su orden, se cierra por su peso y da sus finales de carrera', () => {
+    const scene = { elements: [{ id: 'b', type: 'barrier', x: 0, y: 0, open: 'Abrir', close: '', opened: 'Arriba', closed: 'Abajo', time: 1 }] }
+    let s = sceneInit(scene)
+    expect(sceneInputs(scene, s)).toEqual({ Arriba: 0, Abajo: 1 })
+    s = run(scene, s, { Abrir: 1 }, 1.1)
+    expect(sceneInputs(scene, s)).toEqual({ Arriba: 1, Abajo: 0 })
+    s = run(scene, s, {}, 0.5)
+    expect(sceneInputs(scene, s)).toEqual({ Arriba: 0, Abajo: 0 }) // bajando
+    s = run(scene, s, {}, 0.6)
+    expect(sceneInputs(scene, s).Abajo).toBe(1)
+    s = sceneAction(scene, s, 'b', 'fault:stuck')
+    s = run(scene, s, { Abrir: 1 }, 1.1)
+    expect(sceneInputs(scene, s).Abajo).toBe(1) // atascada
+    expect(sceneFaults(scene.elements[0]).map((f) => f.label)).toEqual(['Atascada', 'Final Arriba roto', 'Final Abajo roto'])
+  })
+})

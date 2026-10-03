@@ -46,6 +46,13 @@ export const SCENE_TYPES = {
   display: { label: 'Visualizador', group: 'Señalización', defaults: { variable: '', text: '' } },
   diverter: { label: 'Desviador', group: 'Actuadores', defaults: { gate: '', length: 80, time: 0.5, text: '' } },
   ramp: { label: 'Rampa', group: 'Proceso', defaults: { length: 120, time: 1, text: '' } },
+  siren: { label: 'Sirena', group: 'Señalización', defaults: { variable: '', sound: false, text: '' } },
+  trafficlight: { label: 'Semáforo', group: 'Señalización', defaults: { red: '', amber: '', green: '', text: '' } },
+  valve: { label: 'Electroválvula', group: 'Actuadores', defaults: { variable: '', text: '' } },
+  barrier: { label: 'Barrera', group: 'Actuadores', defaults: { open: '', close: '', opened: '', closed: '', length: 140, time: 2, text: '' } },
+  pipe: { label: 'Tubería', group: 'Decoración', defaults: { variable: '', length: 160, text: '' } },
+  label: { label: 'Rótulo', group: 'Decoración', defaults: { text: 'Rótulo', size: 16 } },
+  image: { label: 'Imagen', group: 'Decoración', defaults: { src: '', width: 300, height: 200, text: '' } },
 }
 
 // Variables de cada tipo: [clave, etiqueta, 'in' (la escena la escribe) | 'out' (la lee)].
@@ -93,6 +100,22 @@ export const SCENE_VARS = {
   display: [['variable', 'Valor', 'any']],
   diverter: [['gate', 'Desviar (salida)', 'out']],
   ramp: [],
+  siren: [['variable', 'Salida', 'out']],
+  trafficlight: [
+    ['red', 'Rojo (salida)', 'out'],
+    ['amber', 'Ámbar (salida)', 'out'],
+    ['green', 'Verde (salida)', 'out'],
+  ],
+  valve: [['variable', 'Abrir (salida)', 'out']],
+  barrier: [
+    ['open', 'Abrir (salida)', 'out'],
+    ['close', 'Cerrar (salida; vacío = por su peso)', 'out'],
+    ['opened', 'Final abierta (entrada)', 'in'],
+    ['closed', 'Final cerrada (entrada)', 'in'],
+  ],
+  pipe: [['variable', 'Circula si… (opcional)', 'any']],
+  label: [],
+  image: [],
 }
 
 // Tamaño del depósito (anclaje: esquina superior izquierda) y de sus sensores de nivel.
@@ -181,6 +204,7 @@ export function sceneInit(scene) {
   for (const e of elementsOf(scene)) {
     // initial: 1 si el cilindro empieza con el vástago fuera.
     if (e.type === 'cylinder') pos[e.id] = Number(e.initial) ? 1 : 0
+    if (e.type === 'barrier') pos[e.id] = 0 // cerrada
     // La seta de emergencia está sin pulsar (contacto cerrado) al empezar.
     if (e.type === 'button' || e.type === 'switch' || e.type === 'emergency') pressed[e.id] = false
     if (e.type === 'tank') level[e.id] = clamp(Number(e.initial) || 0)
@@ -310,6 +334,15 @@ export function sceneStep(scene, state, values, dt) {
   }
   next.held = held
 
+  // Barreras: se abren (0 -> 1) con su orden y se cierran con la suya o, sin ella, por su peso.
+  for (const e of elements) {
+    if (e.type !== 'barrier' || stuck(e)) continue
+    const opening = on(values, e.open)
+    const closing = e.close ? on(values, e.close) : !opening
+    const dir = opening && !closing ? 1 : closing && !opening ? -1 : 0
+    if (dir) next.pos[e.id] = Math.round(clamp((next.pos[e.id] ?? 0) + (dir * dt) / Math.max(0.1, Number(e.time) || 2)) * 1e6) / 1e6
+  }
+
   // Depósitos: se llenan y vacían con sus válvulas.
   for (const e of elements) {
     if (e.type !== 'tank' || stuck(e)) continue
@@ -423,6 +456,11 @@ export function sceneInputs(scene, state, analogRange = () => null) {
     }
     if (e.type === 'cylinder' && e.position) scaled(e.position, state.pos[e.id] ?? 0)
     if (e.type === 'cylinder' && e.holding) inputs[e.holding] = state.held?.[e.id] ? 1 : 0
+    if (e.type === 'barrier') {
+      const pos = state.pos[e.id] ?? 0
+      if (e.opened) inputs[e.opened] = pos >= 0.999 && fault(e) !== 'sensor:opened' ? 1 : 0
+      if (e.closed) inputs[e.closed] = pos <= 0.001 && fault(e) !== 'sensor:closed' ? 1 : 0
+    }
     if (e.type === 'potentiometer' && e.variable) scaled(e.variable, state.knob?.[e.id] ?? 0.5)
     if (e.type === 'distance' && e.variable) {
       const d = fault(e) === 'broken' ? null : measuredDistance(scene, state, e)
@@ -469,6 +507,12 @@ export function sceneFaults(e) {
     case 'motor':
     case 'diverter':
       return [{ id: 'stuck', label: 'Atascado' }]
+    case 'barrier':
+      return [
+        { id: 'stuck', label: 'Atascada' },
+        ...(e.opened ? [{ id: 'sensor:opened', label: `Final ${e.opened} roto` }] : []),
+        ...(e.closed ? [{ id: 'sensor:closed', label: `Final ${e.closed} roto` }] : []),
+      ]
     case 'limit':
     case 'sensor':
     case 'distance':
@@ -582,6 +626,10 @@ const REQUIRED = {
   motor: ['variable'],
   display: ['variable'],
   diverter: ['gate'],
+  siren: ['variable'],
+  valve: ['variable'],
+  barrier: ['open'],
+  trafficlight: ['red', 'amber', 'green'],
 }
 
 // Resumen de las conexiones entre la escena y el grafcet (variables del modelo, con uses y

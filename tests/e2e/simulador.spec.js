@@ -780,3 +780,29 @@ test('generador de secuencias neumáticas: de «A+ B+ B− A−» a un grafcet q
   await expect.poll(() => activeSteps(page), { timeout: 8000 }).toBe('s0')
   expectNoErrors(errors)
 })
+
+test('escena: sirena, semáforo, electroválvula, barrera, tubería, rótulo e imagen', async ({ page }) => {
+  const errors = await openEditor(page)
+  await page.getByRole('button', { name: /Simular/ }).click()
+  await page.getByRole('button', { name: /Planta virtual/ }).click()
+  const view = page.getByRole('region', { name: 'Escena de la planta' })
+  await view.getByRole('radio', { name: /Editar/ }).click()
+  const svg = view.locator('svg[aria-label="Escena"]')
+  for (const [name, type] of [['Sirena', 'siren'], ['Semáforo', 'trafficlight'], ['Electroválvula', 'valve'], ['Barrera', 'barrier'], ['Tubería', 'pipe'], ['Rótulo', 'label'], ['Imagen', 'image']]) {
+    await view.getByRole('button', { name: `+ ${name}`, exact: true }).click()
+    await expect(svg.locator(`[data-element="${type}"]`)).toHaveCount(1)
+  }
+  const props = view.getByLabel('Propiedades del elemento')
+  // Imagen: se elige un archivo y se dibuja.
+  const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAFklEQVR42mP8z8DwnwEJMDKgCZD8BAAs2gT9nN+hTQAAAABJRU5ErkJggg==', 'base64')
+  await props.getByLabel('Elegir imagen').setInputFiles({ name: 'plano.png', mimeType: 'image/png', buffer: png })
+  await expect(svg.locator('[data-element="image"] image')).toHaveAttribute('href', /^data:image\/png;base64,/)
+  // Rótulo: su texto en la escena.
+  await svg.locator('[data-element="label"]').click()
+  await props.getByRole('textbox', { name: 'Rótulo' }).fill('Estación de prueba')
+  await expect(svg.locator('[data-element="label"]')).toContainText('Estación de prueba')
+  // Sirena: con la opción de sonido.
+  await svg.locator('[data-element="siren"]').click()
+  await expect(props.getByRole('checkbox', { name: /Con sonido/ })).not.toBeChecked()
+  expectNoErrors(errors)
+})
