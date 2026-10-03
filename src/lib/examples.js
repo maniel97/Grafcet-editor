@@ -29,9 +29,147 @@ function cycle(items, x = 200) {
   return { nodes, edges: links(pairs) }
 }
 
+// Niveles de los ejemplos (de lo más sencillo a lo más completo): el diálogo los agrupa así.
+export const LEVELS = [
+  { id: 1, title: 'Primeros pasos' },
+  { id: 2, title: 'Secuencias' },
+  { id: 3, title: 'Elegir y hacer a la vez' },
+  { id: 4, title: 'Estructurar el automatismo' },
+  { id: 5, title: 'Proceso e integración' },
+]
+
 export const EXAMPLES = [
   {
+    id: 'marcha-paro',
+    level: 1,
+    title: 'Marcha y paro de un motor',
+    description: 'La primera etapa y la primera transición: arrancar con Marcha y parar con un pulsador normalmente cerrado.',
+    tags: ['Lineal', 'Contacto NC', 'Planta'],
+    build() {
+      const { nodes, edges } = cycle([{ actions: [] }, 'Marcha', { actions: ['Motor', 'Piloto'] }, '!Paro'])
+      nodes.push(
+        note(
+          'nota',
+          520,
+          0,
+          '# Marcha y paro de un motor\n**Nivel 1.** Lo más básico: una etapa de reposo (0) y una de trabajo (1) con acciones continuas.\n\n- **Paro** es un pulsador **NC** (normalmente cerrado), como en los cuadros reales: sin pulsar da 1, así que la transición es `!Paro` (se cumple al pulsarlo).\n- Entradas: `Marcha` (NA), `Paro` (NC)\n- Salidas: `Motor`, `Piloto`\n\nPruébalo: **Simular** y usa los pulsadores del pupitre.',
+          { width: 320, height: 300 },
+        ),
+      )
+      const scene = {
+        elements: [
+          { id: 'motor', type: 'motor', x: 220, y: 120, rot: 0, variable: 'Motor', reverse: '', pulses: '', text: 'Motor' },
+          { id: 'marcha', type: 'button', x: 0, y: 0, rot: 0, variable: 'Marcha', contact: 'NO', color: 'green', text: 'Marcha', place: 'desk' },
+          { id: 'paro', type: 'button', x: 0, y: 0, rot: 0, variable: 'Paro', contact: 'NC', color: 'red', text: 'Paro', place: 'desk' },
+          { id: 'piloto', type: 'lamp', x: 0, y: 0, rot: 0, variable: 'Piloto', color: 'green', text: 'En marcha', place: 'desk' },
+        ],
+      }
+      return { nodes, edges, plc: { scene } }
+    },
+  },
+  {
+    id: 'contador',
+    level: 1,
+    title: 'Contar pulsaciones',
+    description: 'Flancos y acciones memorizadas: a la tercera pulsación se enciende una luz.',
+    tags: ['Flanco', 'Contador', 'Divergencia en O', 'Planta'],
+    build() {
+      const nodes = [
+        step('s0', '0', 200, 0, [{ text: 'C:=0', kind: 'stored-on' }], { initial: true }),
+        trans('t1', 'Marcha', 200, 100),
+        step('s1', '1', 200, 170),
+        // Elección excluyente: contar (C < 2) o la tercera pulsación (C >= 2).
+        trans('t2', '↑P · C < 2', 200, 270),
+        trans('t4', '↑P · C >= 2', 440, 270),
+        step('s2', '2', 200, 340, [{ text: 'C:=C+1', kind: 'stored-on' }]),
+        trans('t3', '1', 200, 440),
+        step('s3', '3', 440, 340, ['Luz']),
+        trans('t5', 'Reset', 440, 440),
+        note(
+          'nota',
+          640,
+          0,
+          '# Contar pulsaciones\n**Nivel 1.** Cada pulsación de `P` suma 1 al contador `C` (acción memorizada al activar la etapa 2). A la tercera, se enciende `Luz`.\n\n- `↑P` es un **flanco**: solo cuenta el instante en que se pulsa, no mientras se mantiene.\n- La etapa 2 dura un instante (receptividad `1`): su acción es memorizada, así que se ejecuta igual.\n- Entradas: `Marcha`, `P`, `Reset` · Salida: `Luz` · Contador: `C`\n\nPruébalo: **Simular**, Marcha y pulsa P tres veces; el visualizador muestra C.',
+          { width: 330, height: 360 },
+        ),
+      ]
+      const edges = links([
+        ['s0', 't1'],
+        ['t1', 's1'],
+        ['s1', 't2'],
+        ['s1', 't4'],
+        ['t2', 's2'],
+        ['s2', 't3'],
+        ['t3', 's1'],
+        ['t4', 's3'],
+        ['s3', 't5'],
+        ['t5', 's0'],
+      ])
+      const scene = {
+        elements: [
+          { id: 'marcha', type: 'button', x: 0, y: 0, rot: 0, variable: 'Marcha', contact: 'NO', color: 'green', text: 'Marcha', place: 'desk' },
+          { id: 'p', type: 'button', x: 0, y: 0, rot: 0, variable: 'P', contact: 'NO', color: 'black', text: 'P', place: 'desk' },
+          { id: 'reset', type: 'button', x: 0, y: 0, rot: 0, variable: 'Reset', contact: 'NO', color: 'blue', text: 'Reset', place: 'desk' },
+          { id: 'c', type: 'display', x: 0, y: 0, rot: 0, variable: 'C', text: 'C', place: 'desk' },
+          { id: 'luz', type: 'lamp', x: 0, y: 0, rot: 0, variable: 'Luz', color: 'yellow', text: 'Luz', place: 'desk' },
+        ],
+      }
+      return { nodes, edges, plc: { scene } }
+    },
+  },
+  {
+    id: 'garaje',
+    level: 2,
+    title: 'Puerta de garaje',
+    description: 'Secuencia con temporización y seguridad: la fotocélula vuelve a abrir la puerta si hay un obstáculo.',
+    tags: ['Divergencia en O', 'Temporización', 'Seguridad', 'Planta'],
+    build() {
+      const nodes = [
+        step('s0', '0', 200, 0, [], { initial: true }),
+        trans('t1', 'Abrir · Cerrada', 200, 100),
+        step('s1', '1', 200, 170, ['Subir', 'Luz']),
+        trans('t2', 'Abierta', 200, 270),
+        step('s2', '2', 200, 340, ['Luz']),
+        trans('t3', '5s/X2 · !Foto', 200, 440),
+        step('s3', '3', 200, 510, ['Bajar', 'Luz']),
+        // Elección excluyente: terminar de cerrar o, con obstáculo, volver a abrir.
+        trans('t4', 'Cerrada · !Foto', 200, 610),
+        trans('t5', 'Foto', 440, 610),
+        note(
+          'nota',
+          640,
+          0,
+          '# Puerta de garaje\n**Nivel 2.** Abre con **Abrir**, espera 5 s abierta y cierra. Si la **fotocélula** ve un obstáculo mientras cierra, vuelve a abrir (seguridad).\n\n- La puerta es un cilindro vertical: sube (`Subir`) y baja (`Bajar`), con `Abierta` y `Cerrada` como finales de carrera.\n- Entradas: `Abrir`, `Abierta`, `Cerrada`, `Foto` · Salidas: `Subir`, `Bajar`, `Luz`\n\nPruébalo: **Simular**, pulsa Abrir y, mientras baja, pulsa el alimentador para poner un coche en la puerta.',
+          { width: 330, height: 340 },
+        ),
+      ]
+      const edges = links([
+        ['s0', 't1'],
+        ['t1', 's1'],
+        ['s1', 't2'],
+        ['t2', 's2'],
+        ['s2', 't3'],
+        ['t3', 's3'],
+        ['s3', 't4'],
+        ['s3', 't5'],
+        ['t4', 's0'],
+        ['t5', 's1'],
+      ])
+      const scene = {
+        elements: [
+          { id: 'puerta', type: 'cylinder', x: 300, y: 260, rot: 270, extend: 'Subir', retract: 'Bajar', retracted: 'Cerrada', extended: 'Abierta', stroke: 120, time: 2, text: 'Puerta' },
+          { id: 'coche', type: 'feeder', x: 300, y: 300, rot: 0, trigger: '', auto: false, spacing: 0, sizes: 'large', material: 'metal', color: 'amber' },
+          { id: 'foto', type: 'sensor', x: 200, y: 300, rot: 0, variable: 'Foto', contact: 'NO', range: 200, kind: 'optical', color: 'amber' },
+          { id: 'abrir', type: 'button', x: 0, y: 0, rot: 0, variable: 'Abrir', contact: 'NO', color: 'green', text: 'Abrir', place: 'desk' },
+          { id: 'luz', type: 'lamp', x: 0, y: 0, rot: 0, variable: 'Luz', color: 'yellow', text: 'Luz de aviso', place: 'desk' },
+        ],
+      }
+      return { nodes, edges, plc: { scene } }
+    },
+  },
+  {
     id: 'taladradora',
+    level: 2,
     title: 'Taladradora',
     description: 'Secuencia lineal con temporización: bajar taladrando, repasar 2 s y subir.',
     tags: ['Lineal', 'Temporización', 'Bucle', 'Planta'],
@@ -69,6 +207,7 @@ export const EXAMPLES = [
   },
   {
     id: 'cilindros',
+    level: 2,
     title: 'Cilindros A+ B+ A− B−',
     description: 'Secuencia neumática clásica con finales de carrera a0/a1 y b0/b1.',
     tags: ['Lineal', 'Neumática', 'Planta'],
@@ -120,6 +259,7 @@ export const EXAMPLES = [
   },
   {
     id: 'pickplace',
+    level: 2,
     title: 'Pick & place',
     description: 'Dos cilindros (X horizontal, Z vertical montado en su vástago) y una ventosa: coger una pieza y dejarla en otro sitio.',
     tags: ['Lineal', 'Neumática', 'Planta'],
@@ -165,6 +305,7 @@ export const EXAMPLES = [
   },
   {
     id: 'clasificadora',
+    level: 3,
     title: 'Clasificadora por material',
     description: 'Cinta, detector inductivo y desviador: el metal sale a un lado y el plástico sigue hasta el final.',
     tags: ['Divergencia en O', 'Temporización', 'Planta'],
@@ -214,6 +355,7 @@ export const EXAMPLES = [
   },
   {
     id: 'semaforo',
+    level: 1,
     title: 'Semáforo',
     description: 'Ciclo cerrado solo con temporizaciones: rojo 10 s, verde 8 s, ámbar 3 s.',
     tags: ['Temporización', 'Bucle', 'Planta'],
@@ -235,6 +377,7 @@ export const EXAMPLES = [
   },
   {
     id: 'mezcladora',
+    level: 3,
     title: 'Mezcladora',
     description: 'Divergencia en O (producción o limpieza) y en Y (llenado simultáneo de dos depósitos).',
     // La rama de limpieza va a la izquierda: su bucle vuelve por la izquierda sin cruzar las demás.
@@ -320,6 +463,7 @@ export const EXAMPLES = [
   },
   {
     id: 'emergencia',
+    level: 4,
     title: 'Paro de emergencia (forzado)',
     description: 'Dos grafcets parciales: el de seguridad G1 fuerza al de producción G2 a parar y a reiniciarse.',
     tags: ['Grafcets parciales', 'Forzado'],
@@ -366,6 +510,7 @@ export const EXAMPLES = [
   },
   {
     id: 'macroetapa',
+    level: 4,
     title: 'Dosificadora (macroetapa)',
     description: 'La macroetapa M1 se detalla en su expansión, de la etapa de entrada E1 a la de salida S1.',
     tags: ['Macroetapa', 'Temporización'],

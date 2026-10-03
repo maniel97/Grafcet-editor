@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { BookOpen, History, RotateCcw, Trash2, X } from 'lucide-react'
-import { EXAMPLES } from '../lib/examples'
+import { EXAMPLES, LEVELS } from '../lib/examples'
 import { listRecent, removeRecent } from '../lib/recent'
 
 const TABS = [
@@ -58,27 +58,36 @@ export default function ProjectsDialog({ initialTab = 'examples', onOpenExample,
 
       <div className="max-h-[65vh] overflow-y-auto px-5 py-4">
         {tab === 'examples' ? (
-          <ul className="grid gap-3 sm:grid-cols-2">
-            {EXAMPLES.map((ex) => (
-              <li key={ex.id}>
-                <button
-                  type="button"
-                  onClick={() => onOpenExample(ex)}
-                  className="flex h-full w-full flex-col gap-1 rounded-lg border border-slate-200 p-3 text-left hover:border-blue-400 hover:bg-blue-50"
-                >
-                  <span className="font-medium">{ex.title}</span>
-                  <span className="text-sm text-slate-600">{ex.description}</span>
-                  <span className="mt-auto flex flex-wrap gap-1 pt-1">
-                    {ex.tags.map((tag) => (
-                      <span key={tag} className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600">
-                        {tag}
-                      </span>
-                    ))}
-                  </span>
-                </button>
-              </li>
+          <div className="space-y-4">
+            {LEVELS.filter((level) => EXAMPLES.some((ex) => ex.level === level.id)).map((level) => (
+              <section key={level.id} aria-label={`Nivel ${level.id}: ${level.title}`}>
+                <h3 className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-500">
+                  Nivel {level.id} · {level.title}
+                </h3>
+                <ul className="grid gap-3 sm:grid-cols-2">
+                  {EXAMPLES.filter((ex) => ex.level === level.id).map((ex) => (
+                    <li key={ex.id}>
+                      <button
+                        type="button"
+                        onClick={() => onOpenExample(ex)}
+                        className="flex h-full w-full flex-col gap-1 rounded-lg border border-slate-200 p-3 text-left hover:border-blue-400 hover:bg-blue-50"
+                      >
+                        <span className="font-medium">{ex.title}</span>
+                        <span className="text-sm text-slate-600">{ex.description}</span>
+                        <span className="mt-auto flex flex-wrap gap-1 pt-1">
+                          {ex.tags.map((tag) => (
+                            <span key={tag} className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600">
+                              {tag}
+                            </span>
+                          ))}
+                        </span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </section>
             ))}
-          </ul>
+          </div>
         ) : (
           <>
             <p className="mb-3 text-sm text-slate-600">

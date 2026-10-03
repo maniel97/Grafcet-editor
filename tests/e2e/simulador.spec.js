@@ -601,3 +601,52 @@ test('escena: guardar una selección en «Mis grupos», colocarla, exportar e im
   await expect(groups.getByRole('status')).toContainText('Importados 1 grupos')
   expectNoErrors(errors)
 })
+
+test('ejemplos de nivel 1 y 2: marcha/paro NC, contador y puerta de garaje', async ({ page }) => {
+  const errors = await openEditor(page)
+  const desk = () => page.getByRole('region', { name: 'Pupitre de mando' })
+  const press = async (label) => {
+    const b = await desk().locator(`[aria-label="${label}"]`).boundingBox()
+    await page.mouse.move(b.x + b.width / 2, b.y + b.height / 3)
+    await page.mouse.down()
+    await page.waitForTimeout(120)
+    await page.mouse.up()
+    await page.waitForTimeout(120)
+  }
+  const noteFits = async () => page.locator('.react-flow__node-note [data-note-body]').first().evaluate((el) => el.scrollHeight <= el.clientHeight + 2)
+
+  // Nivel 1: Paro es NC (sin pulsar da 1).
+  await openExample(page, /Marcha y paro de un motor/)
+  expect(await noteFits()).toBe(true)
+  await page.getByRole('button', { name: /Simular/ }).click()
+  await press('Pulsador Marcha')
+  await expect.poll(() => activeSteps(page)).toBe('s1')
+  await press('Pulsador Paro')
+  await expect.poll(() => activeSteps(page)).toBe('s0')
+  await page.getByRole('button', { name: /Detener/ }).click()
+
+  // Nivel 1: a la tercera pulsación, la luz.
+  await openExample(page, /Contar pulsaciones/)
+  expect(await noteFits()).toBe(true)
+  await page.getByRole('button', { name: /Simular/ }).click()
+  await press('Pulsador Marcha')
+  for (let i = 0; i < 2; i++) await press('Pulsador P')
+  await expect(desk().locator('[aria-label="Visualizador C"]')).toContainText('2')
+  await press('Pulsador P')
+  await expect.poll(() => activeSteps(page)).toBe('s3')
+  await page.getByRole('button', { name: /Detener/ }).click()
+
+  // Nivel 2: con un coche en la puerta mientras baja, vuelve a abrir.
+  await openExample(page, /Puerta de garaje/)
+  expect(await noteFits()).toBe(true)
+  await page.getByRole('button', { name: /Simular/ }).click()
+  await page.getByLabel('Velocidad').selectOption('2') // a ×2, bajar dura 1 s
+  await press('Pulsador Abrir')
+  await expect.poll(() => activeSteps(page), { timeout: 8000, intervals: [100] }).toBe('s3')
+  await page.getByRole('region', { name: 'Escena de la planta' }).locator('[data-element="feeder"]').click()
+  // Vuelve a abrir (etapa 1 -> 2) y, con el coche delante, se queda abierta.
+  await expect.poll(() => activeSteps(page), { intervals: [100] }).toBe('s2')
+  await page.waitForTimeout(3500)
+  expect(await activeSteps(page)).toBe('s2')
+  expectNoErrors(errors)
+})
