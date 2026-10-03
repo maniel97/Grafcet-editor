@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Background, BackgroundVariant, ConnectionMode, ReactFlow, ReactFlowProvider, useReactFlow, useViewport } from '@xyflow/react'
-import { AlertTriangle, Download, Minus, Plus, Maximize2, Minimize2, MousePointer2, Hand, Scan, Trash2, WandSparkles, X, Zap } from 'lucide-react'
+import { AlertTriangle, Download, Gauge, Minus, Plus, Wrench, Maximize2, Minimize2, MousePointer2, Hand, Scan, Trash2, WandSparkles, X, Zap } from 'lucide-react'
 import ElecNode from './ElecNode'
 import { ElecSymbol } from './ElecSymbols'
 import { potentialColor } from './elecColors'
@@ -13,6 +13,7 @@ import ExportDialog from '../ExportDialog'
 import { svgMarkupSource } from '../../lib/svgExport'
 import { fileName } from '../../lib/fileNames'
 import { generatePlcWiring } from '../../lib/elec/generate'
+import { voltageBetween } from '../../lib/elec/solve'
 import { ELEC_TEMPLATES, insertTemplate } from '../../lib/elec/templates'
 import { WIRE_COLORS, WIRE_SECTIONS, junctions as findJunctions, nextTerminalNumber, sectionWidth, wireNumbers } from '../../lib/elec/wiring'
 
@@ -268,6 +269,14 @@ function Inner({ schematic, onChange, elecState, onAction, variables = [], build
   const [dragPos, setDragPos] = useState({})
   const [message, setMessage] = useState(null)
   const [exporting, setExporting] = useState(null) // fuente del diálogo de exportación
+  // Herramientas al simular: polímetro (dos puntas) y averías (menú sobre aparato o cable).
+  const [tool, setTool] = useState(null) // null | 'meter' | 'faults'
+  const [probes, setProbes] = useState([]) // ['componente:borne', …] (2 como mucho)
+  const [faultMenu, setFaultMenu] = useState(null) // { id, wire, x, y }
+  if (!elecState && (tool || probes.length)) {
+    setTool(null)
+    setProbes([])
+  }
   const [width, setWidth] = useState(loadWidth)
   const resizing = useRef(null)
   const [preview, setPreview] = useState(null) // { item, x, y }
@@ -439,6 +448,9 @@ function Inner({ schematic, onChange, elecState, onAction, variables = [], build
   const joints = useMemo(() => findJunctions(sch), [sch])
   const wireLabels = useMemo(() => (sch.wireNumbers ? wireNumbers(sch) : {}), [sch])
   // Referencias cruzadas con hoja y columna (de todo el esquema, no solo de esta hoja).
+  // Polímetro: cada clic en un borne pone una punta (la tercera vuelve a empezar).
+  const probe = useCallback((c, t) => setProbes((p) => (p.length >= 2 ? [`${c}:${t}`] : [...p.filter((x) => x !== `${c}:${t}`), `${c}:${t}`])), [])
+  const openFaultMenu = useCallback((id, x, y, wire = false) => setFaultMenu({ id, x, y, wire }), [])
   const xrefMap = useMemo(() => crossReferenceMap(sch, contactNumbers(allComponents)), [sch, allComponents])
   const timers = useMemo(() => new Set(components.filter((c) => c.type === 'coil' && (c.kind === 'ton' || c.kind === 'tof')).map((c) => c.tag)), [components])
   const act = useCallback((id, action) => onAction?.(id, action), [onAction])
@@ -458,6 +470,11 @@ function Inner({ schematic, onChange, elecState, onAction, variables = [], build
           mode,
           onAction: act,
           junctions: Object.fromEntries(Object.keys(joints).filter((k) => k.startsWith(`${c.id}:`)).map((k) => [k.slice(c.id.length + 1), true])),
+          tool: mode === 'use' ? tool : null,
+          probes: probes.filter((p) => p.startsWith(`${c.id}:`)).map((p) => p.slice(c.id.length + 1)),
+          firstProbe: probes[0],
+          onProbe: probe,
+          onFaultMenu: openFaultMenu,
         },
         selected: selected.includes(c.id),
         draggable: mode === 'edit',
@@ -468,7 +485,7 @@ function Inner({ schematic, onChange, elecState, onAction, variables = [], build
         // llegan en cada paso de la simulación hasta volver a medirlos).
         measured: (({ w, h }) => ({ width: w, height: h }))(sizeOf(c)),
       })),
-    [components, dragPos, view, numbers, xrefMap, timers, mode, act, selected, joints],
+    [components, dragPos, view, numbers, xrefMap, timers, mode, act, selected, joints, tool, probes, probe, openFaultMenu],
   )
   // Marco de la hoja (detrás de todo).
   const cols = frameColumns(sch)
@@ -512,8 +529,9 @@ function Inner({ schematic, onChange, elecState, onAction, variables = [], build
           selectable: mode === 'edit',
           // Al simular, el color de su potencial (con tensión); si no, el que se le haya dado.
           style: {
-            stroke: sel ? '#2563eb' : p ? potentialColor(p) : (WIRE_COLORS[w.color]?.stroke ?? potentialColor('')),
+            stroke: view?.faults?.[w.id] ? '#dc2626' : sel ? '#2563eb' : p ? potentialColor(p) : (WIRE_COLORS[w.color]?.stroke ?? potentialColor('')),
             strokeWidth: Math.max(sectionWidth(w.section), p ? 2.4 : 0),
+            ...(view?.faults?.[w.id] ? { strokeDasharray: '6 4' } : {}),
           },
           ...(wireLabels[w.id]
             ? {
@@ -664,6 +682,29 @@ function Inner({ schematic, onChange, elecState, onAction, variables = [], build
             ))}
           </div>
         )}
+        {elecState && mode === 'use' && (
+          <>
+            {[
+              ['meter', 'Polímetro', Gauge, 'Medir la tensión entre dos bornes: pulsa un borne (punta roja) y otro (punta negra)'],
+              ['faults', 'Averías', Wrench, 'Provocar averías: pulsa un aparato o un cable; o una avería al azar, oculta, para buscarla'],
+            ].map(([id, label, Icon, title]) => (
+              <button
+                key={id}
+                type="button"
+                aria-pressed={tool === id}
+                title={title}
+                onClick={() => {
+                  setTool((t) => (t === id ? null : id))
+                  setProbes([])
+                  setFaultMenu(null)
+                }}
+                className={`flex items-center gap-1 rounded border px-2 py-0.5 ${tool === id ? 'border-red-300 bg-red-50 text-red-800' : 'border-slate-300 hover:bg-slate-100'}`}
+              >
+                <Icon size={12} /> {label}
+              </button>
+            ))}
+          </>
+        )}
         <label
           className="flex items-center gap-1 rounded border border-slate-300 px-2 py-0.5"
           title="El esquema se simula siempre. Conectado, el autómata y la planta usan sus cables: las entradas del autómata son las de sus bornes, sus salidas cierran los bornes Q y la planta se mueve con las bobinas y motores enlazados"
@@ -750,6 +791,62 @@ function Inner({ schematic, onChange, elecState, onAction, variables = [], build
           <X size={14} />
         </button>
       </header>
+      {elecState && mode === 'use' && tool === 'meter' && (
+        <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 bg-slate-50 px-3 py-1 text-xs" role="status" aria-label="Lectura del polímetro">
+          <Gauge size={13} />
+          {probes.length < 2 ? (
+            <span className="text-slate-600">{probes.length ? 'Pulsa el segundo borne (punta negra).' : 'Pulsa un borne para poner la punta roja.'}</span>
+          ) : (
+            (() => {
+              const [a, b] = probes
+              const reading = voltageBetween(view?.pot?.[a], view?.pot?.[b])
+              const analog = view?.analog?.[a] ?? view?.analog?.[b]
+              const name = (k) => {
+                const [cid, t] = k.split(':')
+                const c = allComponents.find((x) => x.id === cid)
+                return `${showTag(c?.tag ?? c?.ref ?? '') || ELEC_TYPES[c?.type]?.label || ''}:${t}`
+              }
+              return (
+                <span>
+                  <span className="text-red-700">{name(a)}</span> ↔ <span className="font-medium">{name(b)}</span>:{' '}
+                  <strong className="font-mono text-sm">{reading.text}</strong>
+                  {analog && <span className="ml-2 font-mono text-blue-700">{`(señal: ${analog.value} ${analog.unit})`}</span>}
+                </span>
+              )
+            })()
+          )}
+        </div>
+      )}
+      {elecState && mode === 'use' && tool === 'faults' && (
+        <div className="flex flex-wrap items-center gap-1 border-b border-slate-200 bg-red-50/60 px-3 py-1 text-xs" aria-label="Averías">
+          <Wrench size={13} />
+          <span className="text-slate-600">Pulsa un aparato o un cable para averiarlo.</span>
+          <button type="button" onClick={() => onAction(null, 'random-fault')} className="rounded border border-slate-300 bg-white px-2 py-0.5 hover:bg-slate-100">
+            Avería al azar (oculta)
+          </button>
+          {view?.hiddenFaults && (
+            <button type="button" onClick={() => onAction(null, 'reveal')} className="rounded border border-slate-300 bg-white px-2 py-0.5 hover:bg-slate-100">
+              Mostrar la avería
+            </button>
+          )}
+          <button type="button" onClick={() => onAction(null, 'repair-all')} className="rounded border border-slate-300 bg-white px-2 py-0.5 hover:bg-slate-100">
+            Reparar todo
+          </button>
+          {view?.hiddenFaults && <span className="font-medium text-red-700">Hay una avería oculta: búscala con el polímetro.</span>}
+        </div>
+      )}
+      {faultMenu && (
+        <FaultMenu
+          menu={faultMenu}
+          component={allComponents.find((c) => c.id === faultMenu.id)}
+          current={view?.faults?.[faultMenu.id]}
+          onPick={(f) => {
+            onAction(faultMenu.id, `fault:${f}`)
+            setFaultMenu(null)
+          }}
+          onClose={() => setFaultMenu(null)}
+        />
+      )}
       {(short || view?.oscillating || message || hiddenWarning) && (
         <div className="space-y-0.5 border-b border-slate-200 px-3 py-1 text-xs" role="status">
           {short && (
@@ -833,6 +930,11 @@ function Inner({ schematic, onChange, elecState, onAction, variables = [], build
             // Con un manejador de clic, React Flow deja pasar el ratón a los nodos aunque (al simular)
             // no se puedan seleccionar ni arrastrar: así se pulsan los pulsadores.
             onNodeClick={() => {}}
+            onEdgeClick={(e, edge) => {
+              if (mode !== 'use' || tool !== 'faults') return
+              e.stopPropagation()
+              openFaultMenu(edge.id, e.clientX, e.clientY, true)
+            }}
             connectionMode={ConnectionMode.Loose}
             connectionLineStyle={{ stroke: '#2563eb', strokeWidth: 2 }}
             snapToGrid
@@ -943,6 +1045,46 @@ function Inner({ schematic, onChange, elecState, onAction, variables = [], build
 }
 
 const field = 'mt-0.5 w-full rounded border border-slate-300 px-1.5 py-0.5'
+
+// Menú de averías de un aparato o de un cable (junto al ratón).
+function FaultMenu({ menu, component, current, onPick, onClose }) {
+  const loads = ['coil', 'valve', 'lamp', 'buzzer', 'brake', 'motor3', 'motor6']
+  const contacts = ['pushbutton', 'switch', 'limit', 'litbutton', 'contact', 'emergency', 'doorswitch', 'maincontacts']
+  const options = menu.wire
+    ? [['cut', 'Cable cortado']]
+    : loads.includes(component?.type)
+      ? [['open', component?.type === 'lamp' ? 'Lámpara fundida' : component?.type?.startsWith('motor') ? 'Motor quemado (devanado cortado)' : 'Bobina cortada']]
+      : contacts.includes(component?.type)
+        ? [
+            ['open', 'Contacto quemado (no cierra)'],
+            ['welded', 'Contacto soldado (no abre)'],
+          ]
+        : component?.type === 'terminal'
+          ? [['open', 'Borna floja (no hace contacto)']]
+          : []
+  return (
+    <div
+      role="menu"
+      aria-label="Avería"
+      className="fixed z-50 w-60 rounded-md border border-slate-200 bg-white p-1 text-xs shadow-lg"
+      style={{ left: Math.min(menu.x + 8, window.innerWidth - 250), top: Math.min(menu.y + 8, window.innerHeight - 160) }}
+      onMouseLeave={onClose}
+    >
+      <p className="px-2 py-1 font-semibold">{menu.wire ? 'Cable' : `${ELEC_TYPES[component?.type]?.label ?? ''} ${showTag(component?.tag ?? component?.ref ?? '')}`}</p>
+      {options.length === 0 && <p className="px-2 py-1 text-slate-500">Este aparato no tiene averías simulables.</p>}
+      {options.map(([f, label]) => (
+        <button key={f} type="button" role="menuitem" onClick={() => onPick(f)} className={`block w-full rounded px-2 py-1 text-left hover:bg-red-50 ${current === f ? 'font-semibold text-red-700' : ''}`}>
+          {label}
+        </button>
+      ))}
+      {current && (
+        <button type="button" role="menuitem" onClick={() => onPick('')} className="block w-full rounded px-2 py-1 text-left text-green-700 hover:bg-green-50">
+          Reparar
+        </button>
+      )}
+    </div>
+  )
+}
 
 // Propiedades de un cable: color (IEC 60445) y sección.
 function WireProperties({ wire, number, onChange, onDelete }) {

@@ -25,9 +25,52 @@ const PROTECTIONS = new Set(['breaker', 'motorprotector', 'fuse', 'rcd'])
 const MANUAL = new Set([...PROTECTIONS, 'mainswitch'])
 const TIMED = new Set(['ton', 'tof', 'flash'])
 const ORDER = { L1: 0, L2: 1, L3: 2 }
+// Contactos que pueden quedar soldados (cerrados siempre), por tipo.
+const WELDABLE = {
+  pushbutton: (ts) => [[ts[0].id, ts[1].id]],
+  switch: (ts) => [[ts[0].id, ts[1].id]],
+  limit: (ts) => [[ts[0].id, ts[1].id]],
+  litbutton: () => [['13', '14']],
+  contact: () => [['a', 'b']],
+  emergency: (ts) => (ts.length > 2 ? [['11', '12'], ['21', '22']] : [['11', '12']]),
+  doorswitch: () => [['11', '12'], ['21', '22']],
+  maincontacts: () => [['1', '2'], ['3', '4'], ['5', '6']],
+}
+// Lo que puede averiarse, para una avería al azar: contactos (quemados o soldados), cargas
+// (cortadas o fundidas) y cables (cortados).
+const CONTACTS = new Set(Object.keys(WELDABLE))
+const LOADS = new Set(['coil', 'valve', 'lamp', 'buzzer', 'brake', 'motor3', 'motor6'])
+
+// Una avería al azar (rand: () => 0..1): { id, fault }.
+export function randomFault(schematic, rand = Math.random) {
+  const options = []
+  for (const c of components(schematic)) {
+    if (CONTACTS.has(c.type)) options.push({ id: c.id, fault: 'open' }, { id: c.id, fault: 'welded' })
+    if (LOADS.has(c.type)) options.push({ id: c.id, fault: 'open' })
+  }
+  for (const w of schematic?.wires ?? []) options.push({ id: w.id, fault: 'cut' })
+  return options.length ? options[Math.floor(rand() * options.length) % options.length] : null
+}
+
+// Lo que marca un polímetro entre dos puntos (potenciales del esquema; null = sin tensión).
+// { value, unit: 'V~' | 'V DC' | null, text }.
+export function voltageBetween(a, b) {
+  const phase = (p) => POTENTIALS[p]?.kind === 'phase'
+  if (!a || !b) return { value: 0, unit: null, text: '0 V (sin tensión o circuito abierto)' }
+  if (a === b) return { value: 0, unit: null, text: '0 V (mismo potencial)' }
+  const pair = new Set([a, b])
+  if (pair.has('L+') && pair.has('M')) return { value: 24, unit: 'V DC', text: '24 V DC' }
+  if (isSecondary(a) && isSecondary(b) && a.split(':')[1] === b.split(':')[1]) return { value: 24, unit: 'V~', text: '24 V~' }
+  if ((phase(a) && b === 'N') || (phase(b) && a === 'N') || (phase(a) && b === 'PE') || (phase(b) && a === 'PE')) return { value: 230, unit: 'V~', text: '230 V~' }
+  if (phase(a) && phase(b) && ['L1', 'L2', 'L3'].includes(a) && ['L1', 'L2', 'L3'].includes(b)) return { value: 400, unit: 'V~', text: '400 V~' }
+  if ((a === 'N' && b === 'PE') || (a === 'PE' && b === 'N') || (a === 'M' && b === 'PE') || (a === 'PE' && b === 'M')) return { value: 0, unit: null, text: '0 V' }
+  return { value: null, unit: null, text: 'Sin referencia común (circuitos distintos)' }
+}
 
 export function elecInit() {
-  return { pressed: {}, latched: {}, opened: {}, tripped: {}, pos: {}, coils: {}, timers: {}, counts: {}, impulse: {}, safety: {}, safetyReset: {}, knob: {}, view: null }
+  // faults: averías provocadas { [componente o cable]: 'open' | 'welded' | 'cut' }; hidden: si se
+  // han puesto al azar sin decir dónde (para practicar el diagnóstico con el polímetro).
+  return { pressed: {}, latched: {}, opened: {}, tripped: {}, pos: {}, coils: {}, timers: {}, counts: {}, impulse: {}, safety: {}, safetyReset: {}, knob: {}, faults: {}, hidden: false, view: null }
 }
 
 const components = (schematic) => schematic?.components ?? []
@@ -37,9 +80,25 @@ const components = (schematic) => schematic?.components ?? []
 // 0-1-2 pasa a la posición siguiente; el potenciómetro, +25 %; disparar o rearmar (relé
 // térmico, guardamotor por sobrecarga); probar el diferencial.
 export function elecAction(schematic, state, id, action) {
+  const s = { ...elecInit(), ...(state ?? {}) }
+  // Averías (de un aparato o de un cable): 'fault:open' (quemado, cortado, fundido), 'fault:welded'
+  // (contacto soldado), 'fault:cut' (cable cortado) o 'fault:' (reparar).
+  if (action.startsWith?.('fault:')) {
+    const faults = { ...s.faults }
+    const value = action.slice('fault:'.length)
+    if (value) faults[id] = value
+    else delete faults[id]
+    return { ...s, faults, hidden: Object.keys(faults).length ? s.hidden : false }
+  }
+  // Avería al azar, sin decir dónde; mostrarla; repararlo todo.
+  if (action === 'random-fault') {
+    const pick = randomFault(schematic)
+    return pick ? { ...s, faults: { [pick.id]: pick.fault }, hidden: true } : s
+  }
+  if (action === 'reveal') return { ...s, hidden: false }
+  if (action === 'repair-all') return { ...s, faults: {}, hidden: false }
   const c = components(schematic).find((x) => x.id === id)
   if (!c) return state
-  const s = { ...elecInit(), ...(state ?? {}) }
   if (action === 'press' || action === 'release') return { ...s, pressed: { ...s.pressed, [id]: action === 'press' } }
   if (action === 'toggle') {
     if (['switch', 'emergency', 'changeover', 'crossover', 'doorswitch', 'lightcurtain'].includes(c.type)) return { ...s, latched: { ...s.latched, [id]: !s.latched[id] } }
@@ -106,10 +165,13 @@ export function phaseOrder(a, b, c) {
 function network(schematic, ctx) {
   const { find, union } = unionFind()
   const sources = []
-  for (const w of schematic?.wires ?? []) union(key(w.from.c, w.from.t), key(w.to.c, w.to.t))
+  const faults = ctx.faults ?? {}
+  for (const w of schematic?.wires ?? []) if (faults[w.id] !== 'cut') union(key(w.from.c, w.from.t), key(w.to.c, w.to.t))
   for (const c of components(schematic)) {
     const ts = terminalsOf(c)
-    const closePair = (a, b) => union(key(c.id, a), key(c.id, b))
+    // Un contacto quemado (o una borna floja) no cierra; uno soldado no abre (abajo).
+    const closePair = (a, b) => faults[c.id] !== 'open' && union(key(c.id, a), key(c.id, b))
+    if (faults[c.id] === 'welded') for (const [a, b] of WELDABLE[c.type]?.(ts) ?? []) union(key(c.id, a), key(c.id, b))
     const source = (t, p) => sources.push([key(c.id, t), p])
     switch (c.type) {
       case 'rail':
@@ -285,7 +347,7 @@ export function elecStep(schematic, state, { physical = {}, analog = {}, plcOut 
     return false
   }
   const settle = (devices) => {
-    const ctx = { activated, position: (c) => s.pos[c.id] ?? 0, deviceOn: deviceOnWith(devices), closed, plcOut, devices }
+    const ctx = { activated, position: (c) => s.pos[c.id] ?? 0, deviceOn: deviceOnWith(devices), closed, plcOut, devices, faults: s.faults }
     return network(schematic, ctx)
   }
   // Lo que depende de sí mismo, hasta que nada cambia (con un límite: si oscila, se avisa).
@@ -298,7 +360,8 @@ export function elecStep(schematic, state, { physical = {}, analog = {}, plcOut 
       const pot = (c, t) => net.potentialOf(key(c.id, t))
       const same = (c, a, b) => net.find(key(c.id, a)) === net.find(key(c.id, b))
       const next = {}
-      for (const c of coilsList) next[c.tag] = powered(pot(c, 'A1'), pot(c, 'A2'))
+      // Una bobina cortada no se excita aunque tenga tensión.
+      for (const c of coilsList) next[c.tag] = powered(pot(c, 'A1'), pot(c, 'A2')) && s.faults[c.id] !== 'open'
       // Enclavamiento mecánico: de dos contactores enclavados, solo entra uno (el que ya estaba).
       for (const c of coilsList) {
         const other = c.interlock && byTag.get(c.interlock)
@@ -474,6 +537,9 @@ export function elecStep(schematic, state, { physical = {}, analog = {}, plcOut 
     beacons,
     knob: s.knob,
     analog: {},
+    // Las averías se ven (salvo si se pusieron ocultas para practicar).
+    faults: s.hidden ? {} : s.faults,
+    hiddenFaults: s.hidden && Object.keys(s.faults).length > 0,
   }
   const after = { ...s, tripped, coils: devices, timers, impulse, counts, safety, safetyReset }
   const deviceOn = deviceOnWith(devices, timers, impulse, counts)
@@ -485,7 +551,7 @@ export function elecStep(schematic, state, { physical = {}, analog = {}, plcOut 
     }
     if (['coil', 'valve', 'lamp', 'buzzer', 'brake'].includes(c.type)) {
       const [a, b] = terminalsOf(c)
-      loads[c.id] = c.type === 'coil' ? Boolean(devices[c.tag]) : powered(pot(c.id, a.id), pot(c.id, b.id))
+      loads[c.id] = c.type === 'coil' ? Boolean(devices[c.tag]) : powered(pot(c.id, a.id), pot(c.id, b.id)) && s.faults[c.id] !== 'open'
       if (c.signal) actuators[c.signal] = loads[c.id] ? 1 : 0
     }
     if (c.type === 'litbutton') {
@@ -506,7 +572,7 @@ export function elecStep(schematic, state, { physical = {}, analog = {}, plcOut 
     if (c.type === 'softstarter') loads[c.id] = Boolean(devices[`SS:${c.id}`])
     if (c.type === 'counter') loads[c.id] = Boolean(devices[`C:${c.tag}`])
     if (c.type === 'motor3' || c.type === 'motor6') {
-      const m = motorState(c, (t) => pot(c.id, t), (t) => root(c.id, t))
+      const m = s.faults[c.id] === 'open' ? { running: false, dir: 0, mode: null, warning: null } : motorState(c, (t) => pot(c.id, t), (t) => root(c.id, t))
       const speed = speedByRoot.get(root(c.id, c.type === 'motor6' ? 'U1' : 'U')) ?? 1
       motors[c.id] = { ...m, speed: m.running ? speed : 0 }
       if (c.signal) actuators[c.signal] = m.running ? speed : 0

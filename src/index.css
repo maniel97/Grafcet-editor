@@ -39,6 +39,16 @@ body,
 .react-flow__handle.elec-handle:not(.connectable) {
   opacity: 0;
 }
+/* Polímetro: los bornes se ven y se pueden pulsar para poner las puntas. */
+.react-flow__handle.elec-handle.elec-probe {
+  opacity: 1;
+  width: 10px;
+  height: 10px;
+  cursor: crosshair;
+  border-color: #dc2626;
+  pointer-events: all;
+  z-index: 5;
+}
 
 /* Conectores (src/nodes/GrafcetHandle.jsx). Solo se muestran al pasar por el nodo, al
    seleccionarlo o durante una conexión: en Grafcet una etapa sin enlace de entrada (p. ej. la

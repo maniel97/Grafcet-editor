@@ -29,12 +29,14 @@ const HINTS = {
 // data: { c, view, numbers: [arriba, abajo] (contactos auxiliares), xref: [{ kind, numbers }],
 //         timed, mode: 'edit' | 'use', onAction(id, action) }
 export default function ElecNode({ data }) {
-  const { c, view, numbers, xref, where, timed, mode, onAction, junctions } = data
+  const { c, view, numbers, xref, where, timed, mode, onAction, junctions, tool, probes, onProbe, onFaultMenu } = data
   const { w, h } = sizeOf(c)
   const terminals = terminalsOf(c)
   const use = mode === 'use'
-  const momentary = use && MOMENTARY.has(c.type)
-  const toggle = use && TOGGLES.has(c.type)
+  // Con el polímetro o las averías, el clic es para la herramienta, no para accionar.
+  const momentary = use && !tool && MOMENTARY.has(c.type)
+  const toggle = use && !tool && TOGGLES.has(c.type)
+  const fault = view?.faults?.[c.id]
   const label = ELEC_TYPES[c.type]?.label ?? c.type
   const tag = c.type === 'contact' || c.type === 'maincontacts' ? c.ref : c.tag
   const rail = c.type === 'rail'
@@ -57,7 +59,16 @@ export default function ElecNode({ data }) {
       onPointerDown={momentary ? (e) => (e.stopPropagation(), onAction(c.id, 'press')) : undefined}
       onPointerUp={momentary ? () => onAction(c.id, 'release') : undefined}
       onPointerLeave={momentary ? () => onAction(c.id, 'release') : undefined}
-      onClick={toggle ? (e) => (e.stopPropagation(), onAction(c.id, 'toggle')) : undefined}
+      onClick={
+        tool === 'faults' && !rail
+          ? (e) => {
+              e.stopPropagation()
+              onFaultMenu?.(c.id, e.clientX, e.clientY)
+            }
+          : toggle
+            ? (e) => (e.stopPropagation(), onAction(c.id, 'toggle'))
+            : undefined
+      }
     >
       <svg width={w} height={h} overflow="visible" className="absolute left-0 top-0">
         {/* Zona de clic: toda la caja. */}
@@ -72,6 +83,11 @@ export default function ElecNode({ data }) {
               {text}
             </text>
           )
+        })}
+        {/* Puntas del polímetro: roja (la primera) y negra. */}
+        {terminals.map((t) => {
+          const i = probes?.indexOf(t.id) ?? -1
+          return i >= 0 ? <circle key={`p${t.id}`} cx={t.x} cy={t.y} r="6" fill={i === 0 ? '#dc2626' : '#0f172a'} stroke="white" strokeWidth="1.5" /> : null
         })}
         {/* Puntos de unión: borne con dos o más cables, o toma de un embarrado. */}
         {terminals.map((t) => junctions?.[t.id] && <circle key={`j${t.id}`} cx={t.x} cy={t.y} r="3.2" fill={INK} />)}
@@ -96,6 +112,7 @@ export default function ElecNode({ data }) {
           {view?.motors?.[c.id]?.mode && <div className="text-green-700">{view.motors[c.id].mode}</div>}
           {view?.motors?.[c.id]?.warning && <div className="text-amber-700">{view.motors[c.id].warning}</div>}
           {view?.tripped?.[c.id] && <div className="font-semibold text-red-700">{c.type === 'fuse' ? 'Fundido' : 'Disparado'}</div>}
+          {fault && <div className="font-semibold text-red-700">{fault === 'welded' ? 'Avería: soldado' : ['coil', 'valve', 'lamp', 'buzzer', 'brake', 'motor3', 'motor6'].includes(c.type) ? 'Avería: cortado' : c.type === 'terminal' ? 'Avería: borna floja' : 'Avería: quemado'}</div>}
           {c.type === 'counter' && <div className="text-slate-600">{`Preselección ${c.preset ?? 1}`}</div>}
           {c.type === 'coil' && c.kind === 'flash' && <div className="text-slate-600">{`Intermitente ${c.preset ?? 1} s`}</div>}
           {c.type === 'coil' && c.kind === 'impulse' && <div className="text-slate-600">Telerruptor</div>}
@@ -137,8 +154,22 @@ export default function ElecNode({ data }) {
           type="source"
           position={t.side === 'top' ? Position.Top : Position.Bottom}
           isConnectable={mode === 'edit'}
-          className={`elec-handle ${rail ? 'elec-handle-rail' : ''}`}
-          style={{ left: t.x, top: t.y, transform: 'translate(-50%, -50%)' }}
+          className={`elec-handle ${rail ? 'elec-handle-rail' : ''} ${tool === 'meter' ? 'elec-probe' : ''}`}
+          onClick={
+            tool === 'meter'
+              ? (e) => {
+                  e.stopPropagation()
+                  onProbe?.(c.id, t.id)
+                }
+              : undefined
+          }
+          style={{
+            left: t.x,
+            top: t.y,
+            transform: 'translate(-50%, -50%)',
+            // Con una punta del polímetro: roja (la primera) o negra.
+            ...(probes?.includes(t.id) ? { background: probes.indexOf(t.id) === 0 && data.firstProbe === `${c.id}:${t.id}` ? '#dc2626' : '#0f172a', borderColor: 'white' } : {}),
+          }}
           title={rail ? `${c.potential}` : t.id}
         />
       ))}
