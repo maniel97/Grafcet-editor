@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { expect, test } from '@playwright/test'
-import { download, expectNoErrors, openEditor, saveFromDialog } from './helpers'
+import { download, expectNoErrors, openEditor, openVariables, saveFromDialog } from './helpers'
 
 test('paso a ladder: esquema, exportaciones, ST y AWL', async ({ page }) => {
   const errors = await openEditor(page, 'ladder-completo.json')
@@ -108,8 +108,7 @@ test('STL S7-200 (Micro/WIN): pestaña, archivo .awl en ANSI y tabla de símbolo
 
 test('S7-200: CPU sugerida, módulos y direcciones según la configuración', async ({ page }) => {
   const errors = await openEditor(page, 'ladder-completo.json')
-  await page.getByTitle(/Tabla de variables: direcciones/).click()
-  const dialog = page.getByRole('dialog', { name: 'Tabla de variables' })
+  const dialog = await openVariables(page)
   await dialog.getByLabel('Formato de direcciones').selectOption('s7200')
   const config = dialog.getByLabel('Configuración S7-200')
   await expect(config).toContainText('El proyecto usa 6 entradas y 3 salidas digitales')

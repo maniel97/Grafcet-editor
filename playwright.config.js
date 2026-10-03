@@ -31,7 +31,9 @@ export default defineConfig({
   },
   // Servidor propio para las pruebas: se arranca limpio y se cierra al terminar.
   webServer: {
-    command: `npx vite --port ${PORT} --strictPort --force`,
+    // Vite directamente con node (sin npm/npx): así no se imprime el aviso «npm warn ... allow-scripts»
+    // de la configuración global de npm en cada arranque.
+    command: `node node_modules/vite/bin/vite.js --port ${PORT} --strictPort --force`,
     url: `http://localhost:${PORT}`,
     reuseExistingServer: false,
     timeout: 60_000,

@@ -12,7 +12,7 @@ export default defineConfig({
   timeout: 180_000,
   webServer: {
     ...base.webServer,
-    command: 'npm run build && npx vite preview --port 5199 --strictPort',
+    command: 'node node_modules/vite/bin/vite.js build && node node_modules/vite/bin/vite.js preview --port 5199 --strictPort',
     timeout: 120_000,
   },
 })

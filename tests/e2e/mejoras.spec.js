@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { expect, test } from '@playwright/test'
-import { download, expectNoErrors, openEditor, saveFromDialog } from './helpers'
+import { download, expectNoErrors, openEditor, openExample, openExport, openVariables, saveFromDialog } from './helpers'
 
 // Carga un proyecto desde un objeto (sin archivo en disco).
 export async function loadProject(page, project) {
@@ -178,8 +178,7 @@ test.describe('pantalla táctil', () => {
 
 test('variables de etapa E1 en vez de X1: tabla, lienzo, simulación y ladder', async ({ page }) => {
   const errors = await openEditor(page)
-  await page.getByTitle(/Tabla de variables: direcciones/).click()
-  const dialog = page.getByRole('dialog', { name: 'Tabla de variables' })
+  const dialog = await openVariables(page)
   await expect(dialog.getByRole('cell', { name: /^X0/ })).toBeVisible()
   await dialog.getByLabel('Nombre de las variables de etapa').selectOption('E')
   await expect(dialog.getByRole('cell', { name: /^E0/ })).toBeVisible()
@@ -209,14 +208,12 @@ test('nombre del proyecto: archivos, ejemplos, pie del PDF y autoguardado', asyn
 
   const saved = await download(page, () => page.getByTitle(/Guardar proyecto/).click())
   expect(saved.suggestedFilename()).toBe('prensa-hidraulica.json')
-  await page.getByRole('button', { name: /Exportar/ }).click()
-  await page.getByRole('menuitem', { name: /PNG/ }).click()
+  await openExport(page, 'PNG')
   const png = await saveFromDialog(page, 'png')
   expect(png.suggestedFilename()).toBe('prensa-hidraulica.png')
 
   // Pie del PDF propuesto con el nombre.
-  await page.getByRole('button', { name: /Exportar/ }).click()
-  await page.getByRole('menuitem', { name: /PDF/ }).click()
+  await openExport(page, 'PDF')
   await expect(page.getByLabel('Título del pie de página')).toHaveValue('Prensa hidráulica')
   await page.keyboard.press('Escape')
 
@@ -226,9 +223,7 @@ test('nombre del proyecto: archivos, ejemplos, pie del PDF y autoguardado', asyn
   await expect(page.getByLabel('Nombre del proyecto')).toHaveValue('Prensa hidráulica')
 
   // Un ejemplo toma su nombre.
-  await page.getByTitle('Abrir un proyecto, un ejemplo o un trabajo anterior').click()
-  await page.getByRole('menuitem', { name: /Ejemplos/ }).click()
-  await page.getByRole('button', { name: /Semáforo/ }).click()
+  await openExample(page, /Semáforo/)
   await expect(page.getByLabel('Nombre del proyecto')).toHaveValue('Semáforo')
   expectNoErrors(errors)
 })
@@ -402,9 +397,7 @@ test('marcos: encerrar la selección, renombrar, mover con el contenido y forzad
 
 test('referencias de enlace: cortar un bucle largo, verlo con origen y destino, y unirlo', async ({ page }) => {
   const errors = await openEditor(page)
-  await page.getByTitle('Abrir un proyecto, un ejemplo o un trabajo anterior').click()
-  await page.getByRole('menuitem', { name: /Ejemplos/ }).click()
-  await page.getByRole('button', { name: /Taladradora/ }).click()
+  await openExample(page, /Taladradora/)
   const loop = page.locator('[data-testid="rf__edge-t4-s0"]')
   const openMenu = async () => {
     const box = await loop.locator('.react-flow__edge-interaction').boundingBox()
@@ -478,8 +471,7 @@ test('buscar (Ctrl+F), renombrar una variable y renumerar una etapa con sus refe
   await expect(page.getByRole('search')).toHaveCount(0)
 
   // Renombrar Marcha -> Inicio desde la tabla de variables.
-  await page.getByTitle(/Tabla de variables: direcciones/).click()
-  const dialog = page.getByRole('dialog', { name: 'Tabla de variables' })
+  const dialog = await openVariables(page)
   await dialog.getByRole('tab', { name: /Variables/ }).click()
   await dialog.getByLabel('Renombrar Marcha').click()
   await dialog.getByLabel('Nuevo nombre de la variable').fill('Paro')
@@ -541,8 +533,7 @@ test('autocompletado en receptividades y aviso de erratas', async ({ page }) => 
 test('modo oscuro: el papel de la vista previa de exportación y su cajetín siguen en blanco y negro', async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('grafcet-editor:settings', JSON.stringify({ theme: 'dark' })))
   const errors = await openEditor(page)
-  await page.getByRole('button', { name: /Exportar/ }).click()
-  await page.getByRole('menuitem', { name: /PDF/ }).click()
+  await openExport(page, 'PDF')
   const dialog = page.getByRole('dialog', { name: 'Exportar', exact: true })
   await dialog.getByLabel('Incluir cajetín').check()
   const css = (loc, prop) => loc.evaluate((el, p) => getComputedStyle(el)[p], prop)
@@ -581,8 +572,7 @@ test('analógicas: tipo detectado, rango en la tabla, deslizador en la simulaci�
   await page.getByPlaceholder('p. ej. a · b, ↑c, 5s/X2').fill('Temperatura >= 60')
   await page.keyboard.press('Escape')
 
-  await page.getByTitle(/Tabla de variables: direcciones/).click()
-  const dialog = page.getByRole('dialog', { name: 'Tabla de variables' })
+  const dialog = await openVariables(page)
   await dialog.getByRole('tab', { name: /Variables/ }).click()
   const row = dialog.getByRole('row', { name: /^Temperatura/ })
   await expect(row.getByRole('combobox').first()).toHaveValue('analogIn')
@@ -701,8 +691,7 @@ test('idioma: inglés en la barra y los menús, recordado al recargar, y vuelta 
 test('modo oscuro: las opciones de los desplegables se leen (fondo oscuro y texto claro)', async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('grafcet-editor:settings', JSON.stringify({ theme: 'dark' })))
   const errors = await openEditor(page)
-  await page.getByTitle(/Tabla de variables: direcciones/).click()
-  const dialog = page.getByRole('dialog', { name: 'Tabla de variables' })
+  const dialog = await openVariables(page)
   await dialog.getByRole('tab', { name: /Variables/ }).click()
   const lum = (css) => {
     const m = css.match(/[\d.]+/g).map(Number)

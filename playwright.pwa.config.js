@@ -12,7 +12,7 @@ export default defineConfig({
   use: { ...base.use, baseURL: 'http://localhost:5198' },
   webServer: {
     ...base.webServer,
-    command: 'npm run build && npx vite preview --port 5198 --strictPort',
+    command: 'node node_modules/vite/bin/vite.js build && node node_modules/vite/bin/vite.js preview --port 5198 --strictPort',
     url: 'http://localhost:5198',
     timeout: 120_000,
   },

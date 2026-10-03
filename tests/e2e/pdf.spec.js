@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 import { readFileSync } from 'node:fs'
-import { download, expectNoErrors, openEditor } from './helpers'
+import { download, expectNoErrors, openEditor, openExport } from './helpers'
 
 // Tamaño de la página del PDF guardado, en puntos (1 mm = 72/25.4 pt), leído del /MediaBox.
 function pdfPageSize(path) {
@@ -11,8 +11,7 @@ const pt = (mm) => Math.round((mm * 72) / 25.4)
 
 test('PDF: elegir tamaño y orientación, vista previa y página guardada coinciden', async ({ page }, testInfo) => {
   const errors = await openEditor(page)
-  await page.getByRole('button', { name: /Exportar/ }).click()
-  await page.getByRole('menuitem', { name: /PDF/ }).click()
+  await openExport(page, 'PDF')
 
   const dialog = page.getByRole('dialog', { name: 'Exportar', exact: true })
   const preview = dialog.getByLabel('Vista previa de la página')
@@ -42,8 +41,7 @@ test('PDF: elegir tamaño y orientación, vista previa y página guardada coinci
   await expect(dialog).toHaveCount(0)
 
   // Recuerda las opciones al volver a abrirlo.
-  await page.getByRole('button', { name: /Exportar/ }).click()
-  await page.getByRole('menuitem', { name: /PDF/ }).click()
+  await openExport(page, 'PDF')
   await expect(page.getByRole('dialog', { name: 'Exportar', exact: true }).getByLabel('A3', { exact: true })).toBeChecked()
   await expect(page.getByLabel('Vista previa de la página')).toHaveAttribute('data-page', 'a3-landscape')
   expectNoErrors(errors)
@@ -52,8 +50,7 @@ test('PDF: elegir tamaño y orientación, vista previa y página guardada coinci
 test('PDF: sin pie de página y la selección no aparece en la captura', async ({ page }) => {
   const errors = await openEditor(page)
   await page.locator('.react-flow__node[data-id="s1"]').click() // seleccionada (azul)
-  await page.getByRole('button', { name: /Exportar/ }).click()
-  await page.getByRole('menuitem', { name: /PDF/ }).click()
+  await openExport(page, 'PDF')
   const dialog = page.getByRole('dialog', { name: 'Exportar', exact: true })
   await expect(dialog.getByLabel('Vista previa de la página')).toBeVisible()
   // Mientras se captura se quita la selección, y se restaura después.
@@ -74,8 +71,7 @@ test('PDF vectorial (por defecto): texto real sin imagen; desmarcado, imagen', a
     await file.saveAs(path)
     return readFileSync(path, 'latin1')
   }
-  await page.getByRole('button', { name: /Exportar/ }).click()
-  await page.getByRole('menuitem', { name: /PDF/ }).click()
+  await openExport(page, 'PDF')
   await expect(page.getByLabel(/^Vectorial/)).toBeChecked()
   const vector = await save('vectorial.pdf')
   expect(vector).not.toContain('/Subtype /Image')
@@ -83,8 +79,7 @@ test('PDF vectorial (por defecto): texto real sin imagen; desmarcado, imagen', a
   expect(vector).toMatch(/Marcha[^)]*\) Tj/)
   expect(vector).toMatch(/Emergencia[^)]*\) Tj/)
 
-  await page.getByRole('button', { name: /Exportar/ }).click()
-  await page.getByRole('menuitem', { name: /PDF/ }).click()
+  await openExport(page, 'PDF')
   await page.getByLabel(/^Vectorial/).uncheck()
   const raster = await save('imagen.pdf')
   expect(raster).toContain('/Subtype /Image')
@@ -95,8 +90,7 @@ test('PDF vectorial (por defecto): texto real sin imagen; desmarcado, imagen', a
 test('cajetín opcional: desactivado por defecto, datos en el proyecto y en cada página', async ({ page }, testInfo) => {
   const errors = await openEditor(page)
   const openPdf = async () => {
-    await page.getByRole('button', { name: /Exportar/ }).click()
-    await page.getByRole('menuitem', { name: /PDF/ }).click()
+    await openExport(page, 'PDF')
     return page.getByRole('dialog', { name: 'Exportar', exact: true })
   }
   let dialog = await openPdf()
@@ -124,8 +118,7 @@ test('cajetín opcional: desactivado por defecto, datos en el proyecto y en cada
 
 test('zoom en la vista previa de exportación', async ({ page }) => {
   const errors = await openEditor(page)
-  await page.getByRole('button', { name: /Exportar/ }).click()
-  await page.getByRole('menuitem', { name: /PDF/ }).click()
+  await openExport(page, 'PDF')
   const dialog = page.getByRole('dialog', { name: 'Exportar', exact: true })
   const preview = dialog.getByLabel('Vista previa de la página')
   const width = async () => (await preview.boundingBox()).width
@@ -153,8 +146,7 @@ test('los textos de ayuda de la tabla del lienzo no salen al exportar (queda el 
   await expect(table).toContainText('comentario') // en el lienzo, sí
   const rowsBefore = await table.boundingBox()
 
-  await page.getByRole('button', { name: /Exportar/ }).click()
-  await page.getByRole('menuitem', { name: /PDF/ }).click()
+  await openExport(page, 'PDF')
   const dialog = page.getByRole('dialog', { name: 'Exportar', exact: true })
   const file = await download(page, () => dialog.getByRole('button', { name: 'Guardar PDF' }).click())
   const path = testInfo.outputPath('sin-ayudas.pdf')
@@ -175,8 +167,7 @@ test('PDF de todas las hojas: cada hoja en su página, con su nombre en el pie',
   await tabs.getByLabel('Añadir hoja').click()
   await page.locator('.react-flow__pane').click({ button: 'right', position: { x: 400, y: 300 } })
   await page.getByRole('menuitem', { name: 'Etapa aquí' }).click()
-  await page.getByRole('button', { name: /Exportar/ }).click()
-  await page.getByRole('menuitem', { name: /PDF/ }).click()
+  await openExport(page, 'PDF')
   const dialog = page.getByRole('dialog', { name: 'Exportar', exact: true })
   await dialog.getByLabel('Todas las hojas').check()
   await expect(dialog.getByLabel('Páginas')).toContainText('Página 1 de 2')

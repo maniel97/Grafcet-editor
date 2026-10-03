@@ -44,3 +44,25 @@ export async function saveFromDialog(page, format) {
   await expect(dialog.getByRole('button', { name: `Guardar ${format.toUpperCase()}` })).toBeEnabled()
   return download(page, () => dialog.getByRole('button', { name: `Guardar ${format.toUpperCase()}` }).click())
 }
+
+// Pasos que se repiten en muchas pruebas.
+
+// Abre un ejemplo (Abrir > Ejemplos…). `name`: texto o expresión del botón del ejemplo.
+export async function openExample(page, name) {
+  await page.getByTitle('Abrir un proyecto, un ejemplo o un trabajo anterior').click()
+  await page.getByRole('menuitem', { name: /Ejemplos/ }).click()
+  await page.getByRole('button', { name }).click()
+}
+
+// Abre el diálogo de exportación en un formato ('PNG', 'SVG' o 'PDF') y lo devuelve.
+export async function openExport(page, format) {
+  await page.getByRole('button', { name: /Exportar/ }).click()
+  await page.getByRole('menuitem', { name: new RegExp(format) }).click()
+  return page.getByRole('dialog', { name: 'Exportar', exact: true })
+}
+
+// Abre la tabla de variables y devuelve el diálogo.
+export async function openVariables(page) {
+  await page.getByTitle(/Tabla de variables: direcciones/).click()
+  return page.getByRole('dialog', { name: 'Tabla de variables' })
+}

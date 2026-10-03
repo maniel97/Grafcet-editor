@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react'
-import { getNodesBounds, useReactFlow } from '@xyflow/react'
+import { useReactFlow } from '@xyflow/react'
 import { VARIABLES_TABLE_ID } from '../nodes'
 import {
   addVariable,
@@ -22,7 +22,8 @@ import { fileName } from '../lib/fileNames'
 // - la tabla dibujada en el lienzo (mostrar/ocultar) y sus operaciones (`plcTable`, por contexto);
 // - las direcciones a mostrar en el diagrama (`plcView`) y la exportación a CSV.
 export function usePlcTable({ nodes, plc, setPlc, plcRef, takeSnapshot, onOpenDialog }) {
-  const { setNodes, getNode, updateNodeData } = useReactFlow()
+  // getNodesBounds del hook (no la función suelta): la de React Flow recomendada, sin avisos.
+  const { setNodes, getNode, updateNodeData, getNodesBounds } = useReactFlow()
 
   const contentKey = diagramContentKey(nodes)
   // eslint-disable-next-line react-hooks/exhaustive-deps -- se recalcula solo al cambiar el contenido
@@ -54,7 +55,7 @@ export function usePlcTable({ nodes, plc, setPlc, plcRef, takeSnapshot, onOpenDi
         return [...nds, { id: VARIABLES_TABLE_ID, type: 'variables', position, data: { showComments: true }, deletable: false }]
       })
     },
-    [takeSnapshot, setNodes],
+    [takeSnapshot, setNodes, getNodesBounds],
   )
 
   // Nodos resaltados al pasar el ratón por una fila de la tabla del lienzo.

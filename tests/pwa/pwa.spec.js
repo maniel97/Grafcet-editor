@@ -29,7 +29,7 @@ test('instalable, sin conexión y con aviso de versión nueva', async ({ page, c
 
   // Versión nueva: se compila otra vez (otro número) y la página avisa sin recargar sola.
   const before = await page.evaluate(() => navigator.serviceWorker.controller.scriptURL)
-  execSync('npm run build', { stdio: 'ignore' })
+  execSync('node node_modules/vite/bin/vite.js build', { stdio: 'ignore' })
   await page.reload()
   const banner = page.getByRole('status').filter({ hasText: 'Hay una versión nueva del editor' })
   await expect(banner).toBeVisible({ timeout: 30_000 })

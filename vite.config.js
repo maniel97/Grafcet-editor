@@ -19,14 +19,23 @@ export default defineConfig({
     ? // Versión portable (scripts/build-portable.mjs): un solo paquete, recursos como datos.
       {
         outDir: 'dist-portable',
+        // Un solo archivo con todo: grande a propósito.
+        chunkSizeWarningLimit: 6000,
         assetsInlineLimit: () => true,
         cssCodeSplit: false,
         modulePreload: false,
         rollupOptions: { output: { inlineDynamicImports: true } },
       }
-    : { manifest: 'asset-manifest.json', ...(process.env.PERF_NO_MINIFY ? { minify: false } : {}) },
+    : {
+        manifest: 'asset-manifest.json',
+        // El bloque principal (React + React Flow) ronda 1 MB; lo que se carga bajo demanda va aparte.
+        chunkSizeWarningLimit: 1600,
+        ...(process.env.PERF_NO_MINIFY ? { minify: false } : {}),
+      },
   // Pruebas unitarias (npm test). Las de navegador van aparte con Playwright (tests/e2e).
   test: {
     include: ['tests/unit/**/*.test.js'],
+    // Guarda en disco el código ya transformado: las siguientes ejecuciones arrancan antes.
+    fsModuleCache: true,
   },
 })

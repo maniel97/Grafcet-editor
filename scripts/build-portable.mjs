@@ -8,7 +8,7 @@ import { readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 
 const out = 'dist-portable'
-execSync('npx vite build', { stdio: 'inherit', env: { ...process.env, PORTABLE: '1' } })
+execSync('node node_modules/vite/bin/vite.js build', { stdio: 'inherit', env: { ...process.env, PORTABLE: '1' } })
 
 let html = readFileSync(join(out, 'index.html'), 'utf8')
 const read = (href) => readFileSync(join(out, href.replace(/^\.\//, '')), 'utf8')

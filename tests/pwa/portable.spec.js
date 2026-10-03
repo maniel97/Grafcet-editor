@@ -5,7 +5,7 @@ import { resolve } from 'node:path'
 
 test('versión portable: un solo HTML que funciona abierto como archivo, sin servidor', async ({ page }) => {
   test.setTimeout(180_000)
-  execSync('npm run build:portable', { stdio: 'ignore' })
+  execSync('node scripts/build-portable.mjs', { stdio: 'ignore' })
   const errors = []
   page.on('pageerror', (e) => errors.push(e.message))
   page.on('console', (m) => m.type() === 'error' && errors.push(m.text()))
