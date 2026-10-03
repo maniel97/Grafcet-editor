@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { activeSteps, expectNoErrors, openEditor, openExample } from './helpers'
+import { activeSteps, expectNoErrors, openEditor, openExample, openVariables } from './helpers'
 
 test('simulación del ejemplo: entradas, salidas, pausa y paso a paso', async ({ page }) => {
   const errors = await openEditor(page)
@@ -139,9 +139,13 @@ test('escena de la planta: colocar mandos y piloto, asignar variables y accionar
   const props = view.getByLabel('Propiedades del elemento')
 
   await palette.getByRole('button', { name: '+ Pulsador' }).click()
-  await props.getByRole('combobox', { name: 'Entrada' }).selectOption('Marcha')
+  const pick = async (name, value) => {
+    await props.getByRole('combobox', { name }).fill(value)
+    await props.getByRole('combobox', { name }).press('Enter')
+  }
+  await pick('Entrada', 'Marcha')
   await palette.getByRole('button', { name: '+ Pulsador' }).click()
-  await props.getByRole('combobox', { name: 'Entrada' }).selectOption('Paro')
+  await pick('Entrada', 'Paro')
   await props.getByRole('combobox', { name: 'Color' }).selectOption('red')
   // El segundo pulsador encima del primero: se aparta arrastrándolo.
   const second = view.locator('[aria-label="Pulsador Paro"]')
@@ -151,7 +155,7 @@ test('escena de la planta: colocar mandos y piloto, asignar variables y accionar
   await page.mouse.move(box.x + box.width / 2 + 120, box.y + box.height / 2, { steps: 4 })
   await page.mouse.up()
   await palette.getByRole('button', { name: '+ Piloto' }).click()
-  await props.getByRole('combobox', { name: 'Salida' }).selectOption({ index: 1 })
+  await pick('Salida', await props.locator('datalist option').first().getAttribute('value'))
   // Las entradas de la escena ya no se tocan desde el panel.
   await expect(page.getByRole('switch')).toHaveCount(0)
 
@@ -387,5 +391,38 @@ test('escena: zoom con la rueda, centrado en el puntero', async ({ page }) => {
   expect(Math.abs(a.y + a.height / 2 - at.y)).toBeLessThan(25)
   await page.mouse.wheel(0, 600) // alejar
   await expect.poll(async () => parseInt(await zoomText())).toBeLessThan(parseInt(before))
+  expectNoErrors(errors)
+})
+
+test('escena: escribir una variable nueva en un elemento la añade a la tabla', async ({ page }) => {
+  const errors = await openEditor(page)
+  await page.getByRole('button', { name: /Simular/ }).click()
+  await page.getByRole('button', { name: /Planta virtual/ }).click()
+  const view = page.getByRole('region', { name: 'Escena de la planta' })
+  await view.getByRole('radio', { name: /Editar/ }).click()
+  const props = view.getByLabel('Propiedades del elemento')
+  await view.getByRole('button', { name: '+ Pulsador' }).click()
+  const field = props.getByRole('combobox', { name: 'Entrada' })
+
+  // Nombre nuevo: aviso de que se creará y, al confirmar, entrada nueva en la tabla y en el panel.
+  await field.fill('Rearme')
+  await expect(props).toContainText('Nueva: se añadirá a la tabla como entrada.')
+  await field.press('Enter')
+  await expect(view.locator('[aria-label="Pulsador Rearme"]')).toHaveCount(1)
+  await expect(page.getByText('Rearme', { exact: true }).first()).toBeVisible()
+
+  // Errata: pregunta antes de crear.
+  await view.getByRole('button', { name: '+ Pulsador' }).click()
+  await field.fill('Marhca')
+  await field.press('Enter')
+  await expect(props.getByRole('status')).toContainText('¿Querías decir Marcha?')
+  await props.getByRole('button', { name: 'Marcha', exact: true }).click()
+  await expect(view.locator('[aria-label="Pulsador Marcha"]')).toHaveCount(1)
+
+  // La variable nueva está en la tabla de variables (al terminar de simular).
+  await page.getByRole('button', { name: /Detener/ }).click()
+  const dialog = await openVariables(page)
+  await dialog.getByRole('tab', { name: /Variables/ }).click()
+  await expect(dialog.getByRole('row', { name: /^Rearme/ })).toBeVisible()
   expectNoErrors(errors)
 })

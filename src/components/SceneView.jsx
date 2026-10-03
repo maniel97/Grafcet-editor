@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
+import { closest } from '../lib/autocomplete'
 import { Copy, Hand, Maximize2, Minimize2, Minus, MousePointer2, Plus, RotateCw, Scan, Trash2, WandSparkles, X } from 'lucide-react'
 import {
   PIECE_SIZES,
@@ -369,7 +370,87 @@ function labelOf(e) {
 
 // --- Propiedades -------------------------------------------------------------------------------
 
-function Properties({ element, variables, onChange, onDelete, onRotate }) {
+// Tipo de la variable nueva según el campo: lo que la escena escribe es una entrada, lo que lee
+// una salida; las analógicas, entradas analógicas; el visualizador, una marca.
+const NEW_TYPE = { in: 'input', out: 'output', analog: 'analogIn', any: 'memory' }
+const TYPE_NAMES = { input: 'entrada', output: 'salida', analogIn: 'entrada analógica', memory: 'marca' }
+
+// Campo de variable: se elige de la tabla o se escribe un nombre nuevo, que se añade a la tabla
+// con el tipo adecuado. Si se parece mucho a uno que ya existe, pregunta antes («¿Querías decir…?»).
+function VariableField({ label, value, options, allNames, dir, onPick, onCreate }) {
+  const [draft, setDraft] = useState(value ?? '')
+  const [typo, setTypo] = useState(null) // { name, suggestion }
+  const listId = useId()
+  const commit = () => {
+    const name = draft.trim()
+    if (name === (value ?? '')) return
+    if (!name || allNames.includes(name)) {
+      setTypo(null)
+      onPick(name)
+      return
+    }
+    const suggestion = closest(name, allNames)
+    if (suggestion) {
+      setTypo({ name, suggestion })
+      return
+    }
+    onCreate(name, NEW_TYPE[dir])
+    onPick(name)
+  }
+  const fresh = draft.trim() && !allNames.includes(draft.trim())
+  return (
+    <div>
+      <label className="block">
+        <span className="text-slate-500">{label}</span>
+        <input
+          value={draft}
+          list={listId}
+          placeholder="— (elige o escribe)"
+          onChange={(ev) => {
+            setDraft(ev.target.value)
+            setTypo(null)
+            // Elegida de la lista: se aplica al momento.
+            if (options.includes(ev.target.value)) onPick(ev.target.value)
+          }}
+          onBlur={commit}
+          onKeyDown={(ev) => {
+            if (ev.key === 'Enter') commit()
+            if (ev.key === 'Escape') setDraft(value ?? '')
+          }}
+          className="w-full rounded border border-slate-300 px-1 py-0.5 font-mono"
+        />
+        <datalist id={listId}>
+          {options.map((n) => (
+            <option key={n} value={n} />
+          ))}
+        </datalist>
+      </label>
+      {typo ? (
+        <p className="mt-0.5 text-[11px] text-amber-700" role="status">
+          «{typo.name}» no existe. ¿Querías decir{' '}
+          <button type="button" className="font-mono font-medium underline" onClick={() => onPick(typo.suggestion)}>
+            {typo.suggestion}
+          </button>
+          ?{' '}
+          <button
+            type="button"
+            className="underline"
+            onClick={() => {
+              onCreate(typo.name, NEW_TYPE[dir])
+              onPick(typo.name)
+            }}
+          >
+            Crear «{typo.name}»
+          </button>
+        </p>
+      ) : (
+        fresh && <p className="mt-0.5 text-[11px] text-blue-700">Nueva: se añadirá a la tabla como {TYPE_NAMES[NEW_TYPE[dir]]}.</p>
+      )}
+    </div>
+  )
+}
+
+function Properties({ element, variables, onChange, onDelete, onRotate, onCreateVariable }) {
   const names = (dir) =>
     variables
       .filter((v) =>
@@ -397,17 +478,17 @@ function Properties({ element, variables, onChange, onDelete, onRotate }) {
         </button>
       </div>
       {(SCENE_VARS[element.type] ?? []).map(([key, label, dir]) => (
-        <label key={key} className="block">
-          <span className="text-slate-500">{label}</span>
-          <select value={element[key] ?? ''} onChange={(ev) => set({ [key]: ev.target.value })} className={field}>
-            <option value="">—</option>
-            {[...new Set([...names(dir), ...(element[key] ? [element[key]] : [])])].map((n) => (
-              <option key={n} value={n}>
-                {n}
-              </option>
-            ))}
-          </select>
-        </label>
+        <VariableField
+          // Con el valor en la clave: al cambiar desde fuera (deshacer…), el campo empieza de nuevo.
+          key={`${element.id}-${key}-${element[key] ?? ''}`}
+          label={label}
+          value={element[key]}
+          options={names(dir)}
+          allNames={variables.map((v) => v.name)}
+          dir={dir}
+          onPick={(name) => set({ [key]: name })}
+          onCreate={onCreateVariable}
+        />
       ))}
       {['button', 'switch', 'limit', 'sensor'].includes(element.type) && (
         <label className="block">
@@ -709,7 +790,8 @@ const PALETTE_BY_KEY = Object.fromEntries(PALETTE_ITEMS.map((i) => [i.key, i]))
 // onHistory({ canUndo, canRedo, undo, redo, copy, cut, paste, duplicate, selectAll, remove } | null): en
 // modo Editar, los botones y atajos de edición de siempre (deshacer, rehacer, copiar, pegar…)
 // actúan sobre la escena, con su propio historial.
-export default function SceneView({ scene, onChange, worldState, values, time, variables, onAction, onHistory, maximized, onToggleMaximize, onClose }) {
+// onCreateVariable(name, type): añade una variable nueva a la tabla (escrita en un elemento).
+export default function SceneView({ scene, onChange, worldState, values, time, variables, onAction, onHistory, onCreateVariable, maximized, onToggleMaximize, onClose }) {
   const elements = scene?.elements ?? []
   const [mode, setMode] = useState('use')
   // Selección: ids de los elementos (Ctrl+clic añade o quita; recuadro con el ratón).
@@ -1329,7 +1411,14 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
         {selectedElement && (
           <aside className="w-48 shrink-0 overflow-y-auto border-l border-slate-200 p-2">
             {mode === 'edit' ? (
-              <Properties element={selectedElement} variables={variables} onChange={update} onDelete={() => remove(selectedElement.id)} onRotate={rotateSelected} />
+              <Properties
+                element={selectedElement}
+                variables={variables}
+                onChange={update}
+                onDelete={() => remove(selectedElement.id)}
+                onRotate={rotateSelected}
+                onCreateVariable={onCreateVariable}
+              />
             ) : (
               <Faults element={selectedElement} fault={state.faults?.[selectedElement.id]} onAction={onAction} />
             )}

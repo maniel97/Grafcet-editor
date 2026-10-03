@@ -883,6 +883,9 @@ export default function GrafcetCanvas() {
                 variables={simulation.compiled.variables}
                 onAction={simulation.sceneDo}
                 onHistory={setSceneHistory}
+                onCreateVariable={(name, type) =>
+                  setPlc((p) => ({ ...p, variables: { ...p.variables, [name]: { ...(p.variables?.[name] ?? {}), type } } }))
+                }
                 maximized={sceneView === 'full'}
                 onToggleMaximize={() => setSceneView((v) => (v === 'full' ? 'split' : 'full'))}
                 onClose={() => setSceneView(null)}
