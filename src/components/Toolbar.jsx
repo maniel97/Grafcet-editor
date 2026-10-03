@@ -1,6 +1,7 @@
 import InitialStepIcon from './InitialStepIcon'
 import ExportMenu from './ExportMenu'
 import ToolbarDropdown from './ToolbarDropdown'
+import { t } from '../lib/i18n'
 import {
   Square,
   Minus,
@@ -33,15 +34,15 @@ function ToolButton({ icon: Icon, label, onClick, disabled, title, active, badge
       type="button"
       onClick={onClick}
       disabled={disabled}
-      title={title ?? label}
-      aria-label={iconOnly ? label : undefined}
+      title={t(title ?? label)}
+      aria-label={iconOnly ? t(label) : undefined}
       aria-pressed={active}
       className={`relative flex shrink-0 items-center gap-2 rounded-md py-2 pl-2.5 text-sm text-slate-700 hover:bg-slate-100 active:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent ${
         active ? 'bg-slate-100' : ''
       } ${badge ? 'pr-5' : 'pr-2.5'}`}
     >
       <Icon size={18} />
-      {!iconOnly && <span className={labelClass(primary)}>{label}</span>}
+      {!iconOnly && <span className={labelClass(primary)}>{t(label)}</span>}
       {badge}
     </button>
   )

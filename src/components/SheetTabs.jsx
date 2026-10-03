@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Plus, X } from 'lucide-react'
+import { t } from '../lib/i18n'
 
 // Pestañas de hojas (abajo del lienzo): cambiar de hoja, añadir, renombrar (doble clic) y borrar.
 export default function SheetTabs({ sheets, current, counts, onSelect, onAdd, onRename, onDelete, readOnly }) {
@@ -10,7 +11,7 @@ export default function SheetTabs({ sheets, current, counts, onSelect, onAdd, on
     setEditing(null)
   }
   return (
-    <div className="editor-only absolute bottom-3 left-16 z-10 flex max-w-[60%] items-center gap-0.5 overflow-x-auto rounded-md border border-slate-200 bg-white p-0.5 text-xs shadow-sm" role="tablist" aria-label="Hojas">
+    <div className="editor-only absolute bottom-3 left-16 z-10 flex max-w-[60%] items-center gap-0.5 overflow-x-auto rounded-md border border-slate-200 bg-white p-0.5 text-xs shadow-sm" role="tablist" aria-label={t('Hojas')}>
       {sheets.map((s) =>
         editing === s.id ? (
           <input
@@ -49,8 +50,8 @@ export default function SheetTabs({ sheets, current, counts, onSelect, onAdd, on
             {sheets.length > 1 && !readOnly && (
               <button
                 type="button"
-                aria-label={`Borrar ${s.name}`}
-                title="Borrar la hoja y su contenido"
+                aria-label={t(`Borrar ${s.name}`)}
+                title={t('Borrar la hoja y su contenido')}
                 onClick={() => onDelete(s.id)}
                 className="mr-0.5 rounded p-0.5 opacity-0 hover:bg-red-500 hover:text-white group-hover:opacity-100"
               >
@@ -61,7 +62,7 @@ export default function SheetTabs({ sheets, current, counts, onSelect, onAdd, on
         ),
       )}
       {!readOnly && (
-        <button type="button" onClick={onAdd} aria-label="Añadir hoja" title="Añadir hoja" className="rounded p-1 text-slate-600 hover:bg-slate-100">
+        <button type="button" onClick={onAdd} aria-label={t('Añadir hoja')} title={t('Añadir hoja')} className="rounded p-1 text-slate-600 hover:bg-slate-100">
           <Plus size={13} />
         </button>
       )}

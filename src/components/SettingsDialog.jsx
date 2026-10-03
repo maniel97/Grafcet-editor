@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { RotateCcw, X } from 'lucide-react'
 import { DIAGRAM_FONT, FONTS, UI_SCALES, THEMES } from '../lib/settings'
+import { LANGUAGES, t } from '../lib/i18n'
 
 const sectionTitle = 'text-xs font-medium uppercase tracking-wide text-slate-500'
 
@@ -33,7 +34,7 @@ export default function SettingsDialog({ settings, onChange, onReset, onClose })
 
       <div className="max-h-[70vh] space-y-6 overflow-y-auto px-5 py-4">
         <fieldset className="space-y-2">
-          <legend className={sectionTitle}>Tipo de letra</legend>
+          <legend className={sectionTitle}>{t('Tipo de letra')}</legend>
           <div className="grid gap-2 sm:grid-cols-2">
             {FONTS.map((font) => {
               const active = settings.fontId === font.id
@@ -63,7 +64,28 @@ export default function SettingsDialog({ settings, onChange, onReset, onClose })
         </fieldset>
 
         <fieldset className="space-y-2">
-          <legend className={sectionTitle}>Tema</legend>
+          <legend className={sectionTitle}>{t('Idioma')}</legend>
+          <select
+            aria-label="Idioma"
+            className="rounded-md border border-slate-300 px-2 py-1 text-sm"
+            value={settings.lang ?? 'es'}
+            onChange={(e) => onChange({ lang: e.target.value })}
+          >
+            {LANGUAGES.map((l) => (
+              <option key={l.id} value={l.id}>
+                {l.label}
+              </option>
+            ))}
+          </select>
+          <p className="text-xs text-slate-500">
+            {settings.lang && settings.lang !== 'es'
+              ? 'Translation in progress: some texts are still in Spanish. / Traduction en cours. / Tradução em curso.'
+              : 'La barra, los menús y las opciones; el resto se irá traduciendo.'}
+          </p>
+        </fieldset>
+
+        <fieldset className="space-y-2">
+          <legend className={sectionTitle}>{t('Tema')}</legend>
           <div className="flex flex-wrap gap-1">
             {THEMES.map((theme) => (
               <button
@@ -77,7 +99,7 @@ export default function SettingsDialog({ settings, onChange, onReset, onClose })
                     : 'border-slate-300 text-slate-700 hover:bg-slate-100'
                 }`}
               >
-                {theme.label}
+                {t(theme.label)}
               </button>
             ))}
           </div>
@@ -85,7 +107,7 @@ export default function SettingsDialog({ settings, onChange, onReset, onClose })
         </fieldset>
 
         <fieldset className="space-y-2">
-          <legend className={sectionTitle}>Tamaño de la interfaz</legend>
+          <legend className={sectionTitle}>{t('Tamaño de la interfaz')}</legend>
           <div className="flex flex-wrap gap-1">
             {UI_SCALES.map((scale) => (
               <button
@@ -107,7 +129,7 @@ export default function SettingsDialog({ settings, onChange, onReset, onClose })
         </fieldset>
 
         <fieldset className="space-y-2">
-          <legend className={sectionTitle}>Texto del diagrama</legend>
+          <legend className={sectionTitle}>{t('Texto del diagrama')}</legend>
           <div className="flex items-center gap-3">
             <input
               type="range"

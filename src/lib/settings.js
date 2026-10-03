@@ -10,6 +10,7 @@ import '@fontsource/lexend/400.css'
 import '@fontsource/lexend/600.css'
 import '@fontsource/opendyslexic/400.css'
 import '@fontsource/opendyslexic/700.css'
+import { setLanguage } from './i18n'
 
 export const FONTS = [
   { id: 'inter', label: 'Inter (predeterminada)', stack: "'Inter', system-ui, sans-serif" },
@@ -35,7 +36,7 @@ export const THEMES = [
   { id: 'dark', label: 'Oscuro' },
 ]
 
-export const DEFAULT_SETTINGS = { fontId: 'inter', uiScale: 100, diagramFontSize: 14, theme: 'auto' }
+export const DEFAULT_SETTINGS = { fontId: 'inter', uiScale: 100, diagramFontSize: 14, theme: 'auto', lang: 'es' }
 
 const darkQuery = () => globalThis.matchMedia?.('(prefers-color-scheme: dark)')
 const resolveTheme = (theme) => (theme === 'auto' ? (darkQuery()?.matches ? 'dark' : 'light') : theme)
@@ -54,7 +55,8 @@ function readStored() {
 // Aplica los ajustes como variables CSS en <html>.
 // El tamaño de la interfaz escala la fuente raíz (todo lo medido en rem); el diagrama
 // usa px fijos y solo cambia su texto a través de --diagram-font-size.
-function apply({ fontId, uiScale, diagramFontSize, theme }) {
+function apply({ fontId, uiScale, diagramFontSize, theme, lang }) {
+  setLanguage(lang)
   const root = document.documentElement
   const font = FONTS.find((f) => f.id === fontId) ?? FONTS[0]
   root.style.setProperty('--app-font', font.stack)

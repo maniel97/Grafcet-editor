@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { t } from '../lib/i18n'
 
 // Menú flotante genérico en coordenadas de pantalla. Se cierra con Esc, al hacer clic fuera
 // o al elegir una opción. Se recoloca para no salirse de la ventana.
@@ -46,7 +47,7 @@ export default function ContextMenu({ x, y, title, items, onClose }) {
       onContextMenu={(e) => e.preventDefault()}
       className="fixed z-50 min-w-56 rounded-lg border border-slate-200 bg-white py-1 text-sm shadow-xl"
     >
-      {title && <div className="px-3 pb-1 pt-1.5 text-xs font-medium uppercase tracking-wide text-slate-400">{title}</div>}
+      {title && <div className="px-3 pb-1 pt-1.5 text-xs font-medium uppercase tracking-wide text-slate-400">{t(title)}</div>}
       {items.map((item, i) =>
         item === 'separator' ? (
           <div key={i} className="my-1 h-px bg-slate-100" />
@@ -64,8 +65,8 @@ export default function ContextMenu({ x, y, title, items, onClose }) {
             }`}
           >
             {item.icon && <item.icon size={16} className={item.danger ? '' : 'text-slate-500'} />}
-            <span className="flex-1">{item.label}</span>
-            {item.hint && <span className="text-xs text-slate-400">{item.hint}</span>}
+            <span className="flex-1">{t(item.label)}</span>
+            {item.hint && <span className="text-xs text-slate-400">{t(item.hint)}</span>}
           </button>
         ),
       )}

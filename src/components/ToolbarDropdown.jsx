@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { ChevronDown } from 'lucide-react'
+import { t } from '../lib/i18n'
 
 // Botón de la barra con un submenú desplegable (Abrir, Exportar...). El submenú se coloca con
 // posición fija bajo el botón: la barra tiene desplazamiento horizontal y lo recortaría si fuera
@@ -56,7 +57,7 @@ export default function ToolbarDropdown({ icon: Icon, label, title, menuLabel, i
         type="button"
         onClick={() => setOpen((o) => !o)}
         disabled={disabled}
-        title={title}
+        title={t(title)}
         aria-haspopup="menu"
         aria-expanded={open}
         className={`flex shrink-0 items-center gap-1.5 rounded-md py-2 pl-2.5 pr-2 text-sm text-slate-700 hover:bg-slate-100 active:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-40 ${
@@ -64,14 +65,14 @@ export default function ToolbarDropdown({ icon: Icon, label, title, menuLabel, i
         }`}
       >
         <Icon size={18} />
-        <span className={labelClass}>{label}</span>
+        <span className={labelClass}>{t(label)}</span>
         <ChevronDown size={14} className={`transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
       {open && pos && (
         <div
           ref={menuRef}
           role="menu"
-          aria-label={menuLabel}
+          aria-label={t(menuLabel)}
           style={{ top: pos.top, left: pos.left, width: pos.width }}
           className="fixed z-50 rounded-lg border border-slate-200 bg-white py-1 text-sm shadow-xl"
         >
@@ -89,8 +90,8 @@ export default function ToolbarDropdown({ icon: Icon, label, title, menuLabel, i
             >
               <f.icon size={18} className="mt-0.5 shrink-0 text-slate-500" />
               <span>
-                <span className="block font-medium text-slate-800">{f.label}</span>
-                <span className="block text-xs text-slate-500">{f.hint}</span>
+                <span className="block font-medium text-slate-800">{t(f.label)}</span>
+                <span className="block text-xs text-slate-500">{t(f.hint)}</span>
               </span>
             </button>
           ))}

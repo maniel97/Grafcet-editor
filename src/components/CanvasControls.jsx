@@ -1,5 +1,6 @@
 import { Panel, useReactFlow } from '@xyflow/react'
 import { Lock, LockOpen, Scan, ZoomIn, ZoomOut } from 'lucide-react'
+import { t } from '../lib/i18n'
 
 function ControlButton({ icon: Icon, label, onClick, active, disabled }) {
   return (
@@ -7,8 +8,8 @@ function ControlButton({ icon: Icon, label, onClick, active, disabled }) {
       type="button"
       onClick={onClick}
       disabled={disabled}
-      title={label}
-      aria-label={label}
+      title={t(label)}
+      aria-label={t(label)}
       aria-pressed={active}
       className={`flex h-8 w-8 items-center justify-center border-b border-slate-200 last:border-b-0 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40 ${
         active ? 'bg-amber-50 text-amber-700' : 'text-slate-700'
