@@ -366,3 +366,26 @@ test('escena: desplazar la vista arrastrando con la rueda pulsada', async ({ pag
   expect(after[1] - before[1]).toBeGreaterThan(30)
   expectNoErrors(errors)
 })
+
+test('escena: zoom con la rueda, centrado en el puntero', async ({ page }) => {
+  const errors = await openEditor(page)
+  await openExample(page, /Cilindros A\+ B\+/)
+  await page.getByRole('button', { name: /Simular/ }).click()
+  const view = page.getByRole('region', { name: 'Escena de la planta' })
+  const zoomText = () => view.getByText(/^\d+ %$/).first().innerText()
+  const cyl = view.locator('[data-element="cylinder"]').first()
+  const b = await cyl.boundingBox()
+  const at = { x: b.x + b.width / 2, y: b.y + b.height / 2 }
+  const before = await zoomText()
+  await page.mouse.move(at.x, at.y)
+  await page.mouse.wheel(0, -300) // acercar
+  await expect.poll(zoomText).not.toBe(before)
+  expect(parseInt(await zoomText())).toBeGreaterThan(parseInt(before))
+  // El cilindro sigue bajo el puntero.
+  const a = await cyl.boundingBox()
+  expect(Math.abs(a.x + a.width / 2 - at.x)).toBeLessThan(25)
+  expect(Math.abs(a.y + a.height / 2 - at.y)).toBeLessThan(25)
+  await page.mouse.wheel(0, 600) // alejar
+  await expect.poll(async () => parseInt(await zoomText())).toBeLessThan(parseInt(before))
+  expectNoErrors(errors)
+})

@@ -762,6 +762,34 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
     el.scrollTop = Math.max(0, pendingScroll.current.top)
     pendingScroll.current = null
   })
+  // Rueda del ratón: zoom centrado en el puntero (como en el lienzo del grafcet). Escucha no
+  // pasiva para poder evitar el desplazamiento normal de la página.
+  const zoomRef = useRef(zoom)
+  useEffect(() => {
+    zoomRef.current = zoom
+  }, [zoom])
+  useEffect(() => {
+    const el = scrollRef.current
+    if (!el) return
+    const onWheel = (ev) => {
+      ev.preventDefault()
+      const current = zoomRef.current
+      const next = Math.round(Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, current * Math.exp(-ev.deltaY * 0.0015))) * 100) / 100
+      if (next === current) return
+      const rect = el.getBoundingClientRect()
+      const ox = ev.clientX - rect.left
+      const oy = ev.clientY - rect.top
+      // El punto de la escena bajo el puntero se queda bajo el puntero.
+      const px = (el.scrollLeft + ox) / current
+      const py = (el.scrollTop + oy) / current
+      pendingScroll.current = { left: px * next - ox, top: py * next - oy }
+      zoomRef.current = next
+      setZoom(next)
+    }
+    el.addEventListener('wheel', onWheel, { passive: false })
+    return () => el.removeEventListener('wheel', onWheel)
+  }, [])
+
   // Ajuste automático al abrir, al soltar el separador y al pasar a pantalla completa o volver.
   const fitRef = useRef(fit)
   useEffect(() => {
@@ -1324,7 +1352,7 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
       )}
       {mode === 'edit' && (
         <p className="border-t border-slate-200 px-2 py-1 text-[11px] text-slate-500">
-          Arrastra módulos de la paleta · rueda pulsada: desplazar · Ctrl+clic o recuadro: varios · R gira · Supr borra · Ctrl+C/V/D copia, pega, duplica · deshacer y rehacer: los de siempre · asigna las variables en el panel de la derecha. Piezas de {PIECE_SIZES.small[0]} y{' '}
+          Arrastra módulos de la paleta · rueda: zoom · rueda pulsada: desplazar · Ctrl+clic o recuadro: varios · R gira · Supr borra · Ctrl+C/V/D copia, pega, duplica · deshacer y rehacer: los de siempre · asigna las variables en el panel de la derecha. Piezas de {PIECE_SIZES.small[0]} y{' '}
           {PIECE_SIZES.large[0]} px.
         </p>
       )}
