@@ -3,6 +3,9 @@
 // Coordenadas en la cuadrícula del editor: etapa -> transición +100 px, transición -> etapa +70 px.
 
 import { NOTE_SIZE } from './notes'
+import { EMPTY_PLC, autoAssign } from './addressing'
+import { projectVariables } from './symbols'
+import { EXAMPLE_COMMENTS } from './exampleComments'
 
 const step = (id, label, x, y, actions = [], extra = {}) => ({ id, type: 'step', position: { x, y }, data: { label, actions, ...extra } })
 const trans = (id, condition, x, y) => ({ id, type: 'transition', position: { x, y }, data: { condition } })
@@ -1015,3 +1018,33 @@ export const EXAMPLES = [
     },
   },
 ]
+
+// Tabla de variables dibujada en el lienzo (nodes/VariablesTableNode.jsx).
+const TABLE_ID = 'variables-table'
+const TABLE_GAP = 520 // de la tabla al grafcet (la tabla, con sus comentarios, ronda 460 px)
+
+// Todos los ejemplos, documentados: cada variable y cada etapa con su comentario
+// (lib/exampleComments.js), direcciones como con «Rellenar vacías» y la tabla de variables en el
+// lienzo, a la izquierda del grafcet.
+export function documented(project, comments = {}) {
+  const plc = { ...EMPTY_PLC, ...project.plc }
+  const variables = { ...plc.variables }
+  for (const [name, comment] of Object.entries(comments.variables ?? {})) variables[name] = { ...variables[name], comment }
+  const steps = { ...plc.steps }
+  const stepNodes = project.nodes.filter((n) => n.type === 'step')
+  for (const n of stepNodes) {
+    const comment = comments.steps?.[n.data.label]
+    if (comment) steps[n.id] = { ...steps[n.id], comment }
+  }
+  const filled = autoAssign({ ...plc, variables, steps }, stepNodes, projectVariables(project.nodes, variables))
+  const drawing = project.nodes.filter((n) => ['step', 'transition', 'frame'].includes(n.type))
+  const left = Math.min(...drawing.map((n) => n.position.x))
+  const top = Math.min(...drawing.map((n) => n.position.y))
+  const table = { id: TABLE_ID, type: 'variables', position: { x: left - TABLE_GAP, y: top }, data: { showComments: true }, deletable: false }
+  return { ...project, nodes: [...project.nodes, table], plc: filled }
+}
+
+for (const example of EXAMPLES) {
+  const build = example.build
+  example.build = () => documented(build(), EXAMPLE_COMMENTS[example.id])
+}

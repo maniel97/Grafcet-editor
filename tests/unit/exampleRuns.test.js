@@ -67,3 +67,40 @@ describe('ejemplos analógicos', () => {
     expect(Math.max(...levels)).toBeLessThan(83)
   })
 })
+
+describe('ejemplos documentados: tabla de variables, direcciones y comentarios', async () => {
+  const { validatePlc } = await import('../../src/lib/addressing')
+  const { projectVariables } = await import('../../src/lib/symbols')
+  const { generateLadder } = await import('../../src/lib/ladder/generate')
+  const { toS7200 } = await import('../../src/lib/ladder/exportS7200')
+  const { makeCpuRunner } = await import('../../src/lib/plc/cpuRun')
+  for (const example of EXAMPLES) {
+    it(example.title, () => {
+      const project = normalizeProject(example.build())
+      const { nodes, edges, plc } = project
+      // La tabla en el lienzo, a la izquierda de todo el grafcet.
+      const table = nodes.find((n) => n.type === 'variables')
+      const drawing = nodes.filter((n) => ['step', 'transition', 'frame'].includes(n.type))
+      expect(table.position.x).toBeLessThan(Math.min(...drawing.map((n) => n.position.x)) - 400)
+      // Cada variable y cada etapa con dirección y comentario.
+      const model = buildPlcModel(nodes, edges, plc)
+      for (const v of model.variables) {
+        if (v.type === 'timer') continue // los temporizadores t/Xn los calcula el programa
+        expect(v.address, `${v.name}: dirección`).toMatch(/\S/)
+        expect(v.comment, `${v.name}: comentario`).toMatch(/\S/)
+      }
+      for (const s of model.steps) {
+        expect(s.address, `${s.variable}: dirección`).toMatch(/\S/)
+        expect(plc.steps[s.id]?.comment, `${s.variable}: comentario`).toMatch(/\S/)
+      }
+      // Sin direcciones repetidas ni fuera de su zona.
+      const stepNodes = nodes.filter((n) => n.type === 'step')
+      expect(validatePlc(plc, stepNodes, projectVariables(nodes, plc.variables))).toEqual([])
+      // Las direcciones funcionan: el STL S7-200 generado corre en la CPU simulada sin avisos.
+      const text = toS7200(generateLadder(nodes, edges, plc), plc, { title: '' }).text
+      const { errors, warnings } = makeCpuRunner(text, model.variables)
+      expect(errors.map((e) => e.message)).toEqual([])
+      expect(warnings).toEqual([])
+    })
+  }
+})
