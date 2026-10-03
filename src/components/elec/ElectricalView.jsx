@@ -3,7 +3,7 @@ import { Background, BackgroundVariant, ConnectionMode, ReactFlow, ReactFlowProv
 import { AlertTriangle, Minus, Plus, Maximize2, Minimize2, MousePointer2, Hand, Scan, Trash2, WandSparkles, X, Zap } from 'lucide-react'
 import ElecNode from './ElecNode'
 import { ElecSymbol } from './ElecSymbols'
-import { INK, POTENTIAL_COLORS } from './elecColors'
+import { potentialColor } from './elecColors'
 import { ELEC_TYPES, GRID, POTENTIALS, contactNumbers, crossReferences, nextTag, showTag, sizeOf, terminalsOf } from '../../lib/elec/catalog'
 import { generatePlcWiring } from '../../lib/elec/generate'
 import { ELEC_TEMPLATES, insertTemplate } from '../../lib/elec/templates'
@@ -38,7 +38,21 @@ const newId = (p) => `${p}${Date.now().toString(36)}${Math.random().toString(36)
 const PALETTE = [
   {
     group: 'Alimentación',
-    items: Object.keys(POTENTIALS).map((p) => ({ key: `rail:${p}`, type: 'rail', label: `Embarrado ${p}`, preset: { potential: p } })),
+    items: [
+      ...Object.keys(POTENTIALS).map((p) => ({ key: `rail:${p}`, type: 'rail', label: `Embarrado ${p}`, preset: { potential: p } })),
+      { key: 'transformer', type: 'transformer', label: 'Transformador de mando', preset: {} },
+    ],
+  },
+  {
+    group: 'Vivienda',
+    items: [
+      { key: 'changeover', type: 'changeover', label: 'Conmutador', preset: {} },
+      { key: 'crossover', type: 'crossover', label: 'Cruzamiento', preset: {} },
+      { key: 'coil:impulse', type: 'coil', label: 'Telerruptor', preset: { kind: 'impulse' }, prefix: 'KL' },
+      { key: 'coil:stair', type: 'coil', label: 'Minutero de escalera', preset: { kind: 'tof', preset: 30 }, prefix: 'KT' },
+      { key: 'lamp:home', type: 'lamp', label: 'Lámpara (punto de luz)', preset: { color: 'amber' }, prefix: 'E' },
+      { key: 'socket', type: 'socket', label: 'Base de enchufe', preset: {} },
+    ],
   },
   ...['Mando', 'Potencia', 'Autómata'].map((group) => ({
     group,
@@ -51,7 +65,15 @@ const PALETTE = [
               { key: 'coil:relay', type, label: 'Relé auxiliar (bobina)', preset: { kind: 'relay' }, prefix: 'KA' },
               { key: 'coil:ton', type, label: 'Temporizador a la conexión', preset: { kind: 'ton', preset: 3 }, prefix: 'KT' },
               { key: 'coil:tof', type, label: 'Temporizador a la desconexión', preset: { kind: 'tof', preset: 3 }, prefix: 'KT' },
+              { key: 'coil:flash', type, label: 'Relé intermitente', preset: { kind: 'flash', preset: 1 }, prefix: 'KF' },
             ]
+          : type === 'limit'
+            ? [
+                { key: 'limit', type, label: 'Final de carrera', preset: { kind: 'limit' } },
+                { key: 'limit:float', type, label: 'Flotador (nivel)', preset: { kind: 'float' } },
+                { key: 'limit:pressure', type, label: 'Presostato', preset: { kind: 'pressure' } },
+                { key: 'limit:thermostat', type, label: 'Termostato', preset: { kind: 'thermostat' } },
+              ]
           : [{ key: type, type, label: t.label, preset: {} }],
       ),
   })),
@@ -73,6 +95,16 @@ const HINTS = {
   motor3: 'Motor trifásico U V W: el orden de las fases da el sentido de giro.',
   motor6: 'Motor con las seis puntas: arranque estrella-triángulo.',
   plc: 'Autómata: entradas I (con 1M a M) y salidas Q por relé (1L común).',
+  selector3: 'Conmutador de 3 posiciones: en 1 cierra 13-14 y en 2, 23-24 (p. ej. manual / 0 / automático).',
+  sensor3: 'Detector de proximidad de 3 hilos: BN (+), BU (−) y BK (salida). PNP da + a la entrada; NPN, −. Necesita su alimentación.',
+  counter: 'Contador: cuenta los impulsos en A1-A2; al llegar a la preselección cambian sus contactos. R1-R2 lo pone a cero.',
+  buzzer: 'Timbre o zumbador: suena mientras tiene tensión.',
+  fuse: 'Fusible (en seccionador portafusibles): se funde con un cortocircuito; se repone con un clic. También se abre a mano.',
+  rcd: 'Diferencial: salta con una derivación a tierra (fase con PE), no con un cortocircuito fase-neutro. Botón T de prueba.',
+  transformer: 'Transformador de mando (230/24 V): el secundario S1-S2 es un circuito aparte, con tensión mientras el primario la tiene.',
+  changeover: 'Conmutador de vivienda: el común C pasa de 1 a 2. Dos conmutadores: encender desde dos sitios.',
+  crossover: 'Cruzamiento: une A1-B1 y A2-B2 o los cruza. Entre dos conmutadores: encender desde tres o más sitios.',
+  socket: 'Base de enchufe (fase, neutro y tierra).',
 }
 
 // Referencia de cada aparato (identificador IEC 81346 y bornes).
@@ -93,6 +125,16 @@ const NORMS = {
   motor3: 'Identificador -M · bornes U, V, W.',
   motor6: 'Identificador -M · U1 V1 W1 / U2 V2 W2.',
   plc: 'Identificador -A · entradas I con común 1M; salidas por relé Q con común 1L.',
+  selector3: 'Identificador -S · 13-14 (posición 1) y 23-24 (posición 2).',
+  sensor3: 'Identificador -B · cables BN marrón (+), BU azul (−), BK negro (salida), IEC 60947-5-2.',
+  counter: 'Identificador -KC · A1-A2 (impulsos), R1-R2 (puesta a cero).',
+  buzzer: 'Identificador -H · X1-X2.',
+  fuse: 'Identificador -F · 1-2 (3-4, 5-6).',
+  rcd: 'Identificador -Q · fase 1-2, neutro 3-4; 30 mA en viviendas (REBT ITC-BT-25).',
+  transformer: 'Identificador -T · primario P1-P2, secundario S1-S2 (24 V~: muy baja tensión de seguridad).',
+  changeover: 'Identificador -S · común C, viajeros 1 y 2.',
+  crossover: 'Identificador -S · A1 A2 / B1 B2.',
+  socket: 'Identificador -X · L, N y PE.',
 }
 
 // Vista previa de un aparato de la paleta: su símbolo (con sus bornes) tal como queda en el esquema.
@@ -210,12 +252,29 @@ function Inner({ schematic, onChange, elecState, onAction, variables = [], build
     const coils = components.filter((c) => c.type === 'coil')
     const ref =
       item.type === 'contact' ? coils[0]?.tag ?? 'KM1' : item.type === 'maincontacts' ? coils.find((c) => c.kind === 'contactor')?.tag ?? 'KM1' : undefined
-    // Sin caer encima de otro (al añadir con clic, todos irían al mismo sitio).
+    // Sin caer encima de otro: al añadir con clic, el primer hueco libre hacia la derecha (y, si no,
+    // en la fila de abajo), contando con el rótulo a su derecha.
     let x = snap(center.x)
     let y = snap(center.y)
-    while (!at && components.some((o) => o.x === x && o.y === y)) {
-      x += 2 * GRID
-      y += 2 * GRID
+    if (!at) {
+      const probe = { type: item.type, ...t.defaults, ...item.preset }
+      const { w, h } = sizeOf(probe)
+      const box = (o) => {
+        const sz = sizeOf(o)
+        return { x: o.x, y: o.y, w: sz.w + (o.type === 'rail' ? 0 : 100), h: sz.h }
+      }
+      const hits = (px, py) => components.some((o) => {
+        const b = box(o)
+        return px < b.x + b.w && b.x < px + w + 100 && py < b.y + b.h + 20 && b.y < py + h + 20
+      })
+      const x0 = x
+      for (let i = 0; i < 200 && hits(x, y); i++) {
+        x += 7 * GRID
+        if (x > x0 + 1200) {
+          x = x0
+          y += 6 * GRID
+        }
+      }
     }
     const c = {
       id: newId('e'),
@@ -334,7 +393,7 @@ function Inner({ schematic, onChange, elecState, onAction, variables = [], build
           type: 'step',
           selected: sel,
           selectable: mode === 'edit',
-          style: { stroke: sel ? '#2563eb' : p ? (POTENTIAL_COLORS[p] ?? INK) : INK, strokeWidth: p ? 2.6 : 1.6 },
+          style: { stroke: sel ? '#2563eb' : potentialColor(p ?? ''), strokeWidth: p ? 2.6 : 1.6 },
           data: { potential: p ?? null },
         }
       }),
@@ -682,10 +741,12 @@ const field = 'mt-0.5 w-full rounded border border-slate-300 px-1.5 py-0.5'
 // Propiedades del componente seleccionado.
 function Properties({ c, components, variables, onChange, onDelete }) {
   const t = ELEC_TYPES[c.type]
-  const isLoad = ['coil', 'valve', 'lamp', 'motor3', 'motor6'].includes(c.type)
-  const isContact = ['pushbutton', 'switch', 'limit', 'emergency'].includes(c.type)
+  const isLoad = ['coil', 'valve', 'lamp', 'motor3', 'motor6', 'buzzer'].includes(c.type)
+  const isContact = ['pushbutton', 'switch', 'limit', 'emergency', 'sensor3'].includes(c.type)
   const signals = variables.filter((v) => (isLoad ? v.type === 'output' : v.type !== 'output'))
-  const refs = components.filter((x) => (c.type === 'maincontacts' ? x.type === 'coil' : ['coil', 'thermal', 'motorprotector', 'breaker'].includes(x.type)) && x.tag)
+  const refs = components.filter(
+    (x) => (c.type === 'maincontacts' ? x.type === 'coil' : ['coil', 'counter', 'thermal', 'motorprotector', 'breaker', 'rcd', 'fuse'].includes(x.type)) && x.tag,
+  )
   const text = (key, label, props = {}) => (
     <label className="block">
       <span className="text-slate-500">{label}</span>
@@ -719,7 +780,38 @@ function Properties({ c, components, variables, onChange, onDelete }) {
           {text('length', 'Largo (px)', { type: 'number', min: 40, step: 20 })}
         </>
       )}
-      {(isContact && c.type !== 'emergency') || c.type === 'contact'
+      {c.type === 'limit' &&
+        select('kind', 'Tipo', [
+          ['limit', 'Final de carrera'],
+          ['float', 'Flotador (nivel)'],
+          ['pressure', 'Presostato'],
+          ['thermostat', 'Termostato'],
+        ])}
+      {c.type === 'sensor3' && (
+        <>
+          {select('output', 'Salida', [
+            ['PNP', 'PNP (da + a la entrada)'],
+            ['NPN', 'NPN (da − a la entrada)'],
+          ])}
+          {select('kind', 'Detecta', [
+            ['inductive', 'Inductivo (metal)'],
+            ['capacitive', 'Capacitivo'],
+            ['optical', 'Óptico'],
+          ])}
+        </>
+      )}
+      {c.type === 'counter' && text('preset', 'Preselección (impulsos)', { type: 'number', min: 1, step: 1 })}
+      {c.type === 'buzzer' &&
+        select('kind', 'Tipo', [
+          ['bell', 'Timbre'],
+          ['buzzer', 'Zumbador'],
+        ])}
+      {c.type === 'fuse' &&
+        select('poles', 'Polos', [
+          ['1', 'Unipolar'],
+          ['3', 'Tripolar'],
+        ])}
+      {(isContact && !['emergency', 'sensor3'].includes(c.type)) || c.type === 'contact'
         ? select('contact', 'Contacto', [
             ['NO', 'NA (normalmente abierto)'],
             ['NC', 'NC (normalmente cerrado)'],
@@ -733,9 +825,12 @@ function Properties({ c, components, variables, onChange, onDelete }) {
             ['contactor', 'Contactor'],
             ['relay', 'Relé auxiliar'],
             ['ton', 'Temporizador a la conexión'],
-            ['tof', 'Temporizador a la desconexión'],
+            ['tof', 'Temporizador a la desconexión (o minutero)'],
+            ['flash', 'Relé intermitente'],
+            ['impulse', 'Telerruptor'],
           ])}
           {(c.kind === 'ton' || c.kind === 'tof') && text('preset', 'Tiempo (s)', { type: 'number', min: 0, step: 0.5 })}
+          {c.kind === 'flash' && text('preset', 'Semiperiodo (s)', { type: 'number', min: 0.1, step: 0.1 })}
         </>
       )}
       {c.type === 'lamp' &&

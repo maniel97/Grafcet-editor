@@ -1,7 +1,8 @@
 // Esquema de conexiones del autómata a partir de la tabla de variables (lo que se monta en el
 // cuadro): fuente de 24 V (L+ arriba, M abajo), el autómata con sus bornes y, en cada entrada y
 // salida con dirección, el aparato que le corresponde según la planta:
-//  - entradas: pulsador / interruptor / seta (con su contacto NA o NC) o final de carrera;
+//  - entradas: pulsador / interruptor / seta (con su contacto NA o NC), final de carrera, flotador,
+//    termostato o detector de proximidad de 3 hilos (PNP, alimentado desde la fuente del autómata);
 //  - salidas: electroválvula (cilindros), piloto (luces, sirenas, semáforos) o contactor (motores,
 //    cintas…) o relé (lo demás).
 // Cada aparato queda enlazado con su señal de la planta (pulsarlo en la planta acciona su
@@ -21,10 +22,15 @@ function inputDevice(name, scene) {
     if (e.type === 'emergency') return { type: 'emergency', prefix: 'S' }
     if (e.type === 'button') return { type: 'pushbutton', prefix: 'S', contact: e.contact === 'NC' ? 'NC' : 'NO' }
     if (e.type === 'switch') return { type: 'switch', prefix: 'S', contact: e.contact === 'NC' ? 'NC' : 'NO' }
-    if (e.type === 'limit' || e.type === 'sensor') return { type: 'limit', prefix: 'B', contact: e.contact === 'NC' ? 'NC' : 'NO' }
+    if (e.type === 'limit') return { type: 'limit', prefix: 'B', contact: e.contact === 'NC' ? 'NC' : 'NO', kind: 'limit' }
+    if (e.type === 'sensor') return { type: 'sensor3', prefix: 'B', output: 'PNP', kind: ['inductive', 'capacitive'].includes(e.kind) ? e.kind : 'optical' }
   }
-  const sensor = (scene?.elements ?? []).some((e) => ['retracted', 'extended', 'low', 'high', 'empty', 'opened', 'closed', 'holding'].some((k) => e[k] === name))
-  return sensor ? { type: 'limit', prefix: 'B', contact: 'NO' } : { type: 'pushbutton', prefix: 'S', contact: 'NO' }
+  for (const e of scene?.elements ?? []) {
+    if (e.type === 'tank' && [e.low, e.high, e.empty].includes(name)) return { type: 'limit', prefix: 'B', contact: 'NO', kind: 'float' }
+    if (e.type === 'heater' && e.thermostat === name) return { type: 'limit', prefix: 'B', contact: 'NO', kind: 'thermostat' }
+  }
+  const sensor = (scene?.elements ?? []).some((e) => ['retracted', 'extended', 'opened', 'closed', 'holding'].some((k) => e[k] === name))
+  return sensor ? { type: 'limit', prefix: 'B', contact: 'NO', kind: 'limit' } : { type: 'pushbutton', prefix: 'S', contact: 'NO' }
 }
 
 // Aparato de una salida.
@@ -75,11 +81,29 @@ export function generatePlcWiring(variables, scene, existing = { components: [],
     const d = inputDevice(v.name, scene)
     const nc = d.type === 'emergency' || d.contact === 'NC'
     const x = PLC_X + 40 + i * PITCH
-    const c = { id: id('in'), type: d.type, x, y: PLC_Y + offset - 140, tag: nextTag(all, d.prefix), signal: v.name, text: v.comment || v.name, ...(d.contact ? { contact: d.contact } : {}) }
+    const c = {
+      id: id('in'),
+      type: d.type,
+      x,
+      y: PLC_Y + offset - 140,
+      tag: nextTag(all, d.prefix),
+      signal: v.name,
+      text: v.comment || v.name,
+      ...(d.contact ? { contact: d.contact } : {}),
+      ...(d.kind ? { kind: d.kind } : {}),
+      ...(d.output ? { output: d.output } : {}),
+    }
     all.push(c)
     components.push(c)
-    wire(top.id, tap(x + 20), c.id, nc ? '11' : '13')
-    wire(c.id, nc ? '12' : '14', plc.id, t.id)
+    if (d.type === 'sensor3') {
+      // BN al +24 V, BU al 0 V de la fuente del autómata y BK (salida) a la entrada.
+      wire(top.id, tap(x + 20), c.id, 'BN')
+      wire(c.id, 'BU', plc.id, 'M')
+      wire(c.id, 'BK', plc.id, t.id)
+    } else {
+      wire(top.id, tap(x + 20), c.id, nc ? '11' : '13')
+      wire(c.id, nc ? '12' : '14', plc.id, t.id)
+    }
   })
   outs.forEach((v, i) => {
     const t = at(terminalAddress(v.address))

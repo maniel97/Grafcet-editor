@@ -208,6 +208,145 @@ export const ELEC_TEMPLATES = [
   },
 ]
 
+// Instalaciones de interior: L y N arriba, PE abajo; el diferencial -Q1 y el magnetotérmico -Q2
+// protegen el circuito (alimentación común de las plantillas de vivienda).
+function dwelling(b, width = 520) {
+  b.add('L', 'rail', 0, 0, { potential: 'L', length: width })
+  b.add('N', 'rail', 0, 20, { potential: 'N', length: width })
+  b.add('PE', 'rail', 0, 560, { potential: 'PE', length: width })
+  b.add('Q1', 'rcd', 20, 60, { tag: 'Q1', text: 'Diferencial 30 mA' })
+  b.wire('L', tap(40), 'Q1', '1')
+  b.wire('N', tap(80), 'Q1', '3')
+  b.add('Q2', 'breaker', 20, 180, { tag: 'Q2', poles: 1, text: 'PIA 10 A' })
+  b.wire('Q1', '2', 'Q2', '1')
+  // Fase protegida: Q2:2; neutro: Q1:4.
+  return { phase: ['Q2', '2'], neutral: ['Q1', '4'] }
+}
+const lampTo = (b, name, x, y, neutral, tag = 'E1') => {
+  b.add(name, 'lamp', x, y, { tag, color: 'amber', text: 'Punto de luz' })
+  b.wire(name, 'X2', ...neutral)
+  return [name, 'X1']
+}
+
+ELEC_TEMPLATES.push(
+  {
+    id: 'punto-luz',
+    title: 'Punto de luz con interruptor',
+    description: 'Vivienda: diferencial (Q1) y PIA (Q2), interruptor S1 y lámpara E1. Prueba el diferencial con su botón T.',
+    build(ox, oy, prefix) {
+      const b = builder(ox, oy, prefix)
+      const { phase, neutral } = dwelling(b)
+      b.add('S1', 'switch', 220, 300, { tag: 'S1', contact: 'NO', text: 'Interruptor' })
+      b.wire(...phase, 'S1', '13')
+      b.wire('S1', '14', ...lampTo(b, 'E1', 220, 420, neutral))
+      return b
+    },
+  },
+  {
+    id: 'conmutada',
+    title: 'Conmutada (dos puntos)',
+    description: 'La lámpara se enciende y apaga desde dos sitios: dos conmutadores unidos por los dos hilos «viajeros».',
+    build(ox, oy, prefix) {
+      const b = builder(ox, oy, prefix)
+      const { phase, neutral } = dwelling(b)
+      b.add('S1', 'changeover', 180, 300, { tag: 'S1', text: 'Conmutador 1' })
+      b.add('S2', 'changeover', 340, 300, { tag: 'S2', text: 'Conmutador 2' })
+      b.wire(...phase, 'S1', 'C')
+      b.wire('S1', '1', 'S2', '1')
+      b.wire('S1', '2', 'S2', '2')
+      b.wire('S2', 'C', ...lampTo(b, 'E1', 480, 420, neutral))
+      return b
+    },
+  },
+  {
+    id: 'cruzamiento',
+    title: 'Cruzamiento (tres puntos)',
+    description: 'Dos conmutadores en los extremos y un cruzamiento en medio: cualquiera de los tres cambia la lámpara.',
+    build(ox, oy, prefix) {
+      const b = builder(ox, oy, prefix)
+      const { phase, neutral } = dwelling(b, 700)
+      b.add('S1', 'changeover', 180, 300, { tag: 'S1', text: 'Conmutador 1' })
+      b.add('S2', 'crossover', 340, 300, { tag: 'S2', text: 'Cruzamiento' })
+      b.add('S3', 'changeover', 500, 300, { tag: 'S3', text: 'Conmutador 2' })
+      b.wire(...phase, 'S1', 'C')
+      b.wire('S1', '1', 'S2', 'A1')
+      b.wire('S1', '2', 'S2', 'A2')
+      b.wire('S2', 'B1', 'S3', '1')
+      b.wire('S2', 'B2', 'S3', '2')
+      b.wire('S3', 'C', ...lampTo(b, 'E1', 640, 420, neutral))
+      return b
+    },
+  },
+  {
+    id: 'telerruptor',
+    title: 'Telerruptor',
+    description: 'Varios pulsadores en paralelo: cada pulsación del telerruptor KL1 cambia la lámpara.',
+    build(ox, oy, prefix) {
+      const b = builder(ox, oy, prefix)
+      const { phase, neutral } = dwelling(b, 700)
+      const buttons = ['S1', 'S2', 'S3']
+      buttons.forEach((n, i) => {
+        b.add(n, 'pushbutton', 180 + i * 120, 300, { tag: n, contact: 'NO', text: `Pulsador ${i + 1}` })
+        b.wire(...phase, n, '13')
+      })
+      b.add('KL1', 'coil', 180, 420, { tag: 'KL1', kind: 'impulse', text: 'Telerruptor' })
+      for (const n of buttons) b.wire(n, '14', 'KL1', 'A1')
+      b.wire('KL1', 'A2', ...neutral)
+      b.add('KL1c', 'contact', 560, 300, { ref: 'KL1', contact: 'NO' })
+      b.wire(...phase, 'KL1c', 'a')
+      b.wire('KL1c', 'b', ...lampTo(b, 'E1', 560, 420, neutral))
+      return b
+    },
+  },
+  {
+    id: 'minutero',
+    title: 'Minutero de escalera',
+    description: 'Un pulsador cualquiera enciende la escalera; el minutero KT1 la apaga sola a los 30 s.',
+    build(ox, oy, prefix) {
+      const b = builder(ox, oy, prefix)
+      const { phase, neutral } = dwelling(b, 700)
+      for (const [i, n] of ['S1', 'S2'].entries()) {
+        b.add(n, 'pushbutton', 180 + i * 120, 300, { tag: n, contact: 'NO', text: `Planta ${i + 1}` })
+        b.wire(...phase, n, '13')
+      }
+      b.add('KT1', 'coil', 180, 420, { tag: 'KT1', kind: 'tof', preset: 30, text: 'Minutero' })
+      b.wire('S1', '14', 'KT1', 'A1')
+      b.wire('S2', '14', 'KT1', 'A1')
+      b.wire('KT1', 'A2', ...neutral)
+      b.add('KT1c', 'contact', 480, 300, { ref: 'KT1', contact: 'NO' })
+      b.wire(...phase, 'KT1c', 'a')
+      b.wire('KT1c', 'b', ...lampTo(b, 'E1', 480, 420, neutral))
+      return b
+    },
+  },
+  {
+    id: 'mando-24v',
+    title: 'Mando a 24 V~ con transformador',
+    description: 'El transformador T1 (protegido con el fusible F1) da 24 V~ al mando: marcha-paro de KM1 a tensión de seguridad.',
+    build(ox, oy, prefix) {
+      const b = builder(ox, oy, prefix)
+      b.add('L', 'rail', 0, 0, { potential: 'L', length: 300 })
+      b.add('N', 'rail', 0, 20, { potential: 'N', length: 300 })
+      b.add('F1', 'fuse', 20, 60, { tag: 'F1', poles: 1, text: 'Fusible 2 A' })
+      b.wire('L', tap(40), 'F1', '1')
+      b.add('T1', 'transformer', 20, 180, { tag: 'T1', text: '230/24 V' })
+      b.wire('F1', '2', 'T1', 'P1')
+      b.wire('N', tap(80), 'T1', 'P2')
+      b.add('S0', 'pushbutton', 20, 320, { tag: 'S0', contact: 'NC', text: 'Paro' })
+      b.wire('T1', 'S1', 'S0', '11')
+      b.add('S1', 'pushbutton', 20, 420, { tag: 'S1', contact: 'NO', text: 'Marcha' })
+      b.add('KM1h', 'contact', 160, 420, { ref: 'KM1', contact: 'NO' })
+      b.wire('S0', '12', 'S1', '13')
+      b.wire('S0', '12', 'KM1h', 'a')
+      b.wire('KM1h', 'b', 'S1', '14')
+      b.add('KM1', 'coil', 20, 540, { tag: 'KM1', kind: 'contactor', text: 'Contactor (24 V~)' })
+      b.wire('S1', '14', 'KM1', 'A1')
+      b.wire('KM1', 'A2', 'T1', 'S2')
+      return b
+    },
+  },
+)
+
 // Inserta una plantilla debajo de lo que ya haya (o en el origen).
 export function insertTemplate(template, existing = { components: [] }) {
   const list = existing.components ?? []

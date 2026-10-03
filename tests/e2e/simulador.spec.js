@@ -1018,3 +1018,28 @@ test('esquema eléctrico: vista previa en la paleta, separador redimensionable y
   await expect(view.getByText(/^\d+ %$/)).not.toHaveText('100 %')
   expectNoErrors(errors)
 })
+
+test('esquema eléctrico: vivienda (conmutada) y botón de prueba del diferencial', async ({ page }) => {
+  const errors = await openEditor(page)
+  await page.getByRole('button', { name: 'Esquema eléctrico' }).click()
+  const view = page.getByRole('region', { name: 'Esquema eléctrico' })
+  await view.getByLabel('Insertar montaje').selectOption('conmutada')
+  await view.getByRole('button', { name: 'Pantalla completa' }).click()
+  await page.getByRole('button', { name: /Simular/ }).click()
+  const lamp = view.locator('[data-elec="lamp"][data-tag="E1"]')
+  await expect(lamp).toHaveAttribute('data-on', /^[01]$/) // ya simulando
+  const before = await lamp.getAttribute('data-on')
+  await view.locator('[data-elec="changeover"][data-tag="S1"]').click()
+  await expect(lamp).not.toHaveAttribute('data-on', before)
+  await view.locator('[data-elec="changeover"][data-tag="S2"]').click()
+  await expect(lamp).toHaveAttribute('data-on', before)
+  if (before === '0') await view.locator('[data-elec="changeover"][data-tag="S1"]').click()
+  await expect(lamp).toHaveAttribute('data-on', '1')
+  // Botón T: salta el diferencial y la lámpara se apaga; un clic en él lo rearma.
+  await view.getByRole('button', { name: 'Probar -Q1' }).click()
+  await expect(lamp).toHaveAttribute('data-on', '0')
+  await expect(view.locator('[data-elec="rcd"]')).toContainText('Disparado')
+  await view.locator('[data-elec="rcd"]').click({ position: { x: 10, y: 10 } })
+  await expect(lamp).toHaveAttribute('data-on', '1')
+  expectNoErrors(errors)
+})

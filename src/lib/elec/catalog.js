@@ -23,12 +23,20 @@ export const POTENTIALS = {
   L3: { label: 'L3', kind: 'phase' },
   PE: { label: 'PE (tierra)', kind: 'earth' },
 }
+// Secundario de un transformador: un potencial propio de cada transformador (sec:<id>:1 / :2).
+export const isSecondary = (p) => typeof p === 'string' && p.startsWith('sec:')
 // Embarrados de abajo (los cables salen hacia arriba).
 export const LOWER_RAILS = new Set(['M', 'N', 'PE'])
 
 const two = (top, bottom, h = 80) => [
   { id: top, x: 20, y: 0, side: 'top' },
   { id: bottom, x: 20, y: h, side: 'bottom' },
+]
+const twoPoles = (h = 80) => [
+  { id: '1', x: 20, y: 0, side: 'top' },
+  { id: '2', x: 20, y: h, side: 'bottom' },
+  { id: '3', x: 60, y: 0, side: 'top' },
+  { id: '4', x: 60, y: h, side: 'bottom' },
 ]
 const threePoles = (h = 80) =>
   [0, 1, 2].flatMap((i) => [
@@ -68,7 +76,44 @@ export const ELEC_TYPES = {
   pushbutton: { label: 'Pulsador', group: 'Mando', prefix: 'S', defaults: { contact: 'NO', signal: '', text: '' }, size: () => ({ w: 40, h: 80 }), terminals: (c) => (c.contact === 'NC' ? two('11', '12') : two('13', '14')) },
   switch: { label: 'Interruptor / selector', group: 'Mando', prefix: 'S', defaults: { contact: 'NO', signal: '', text: '' }, size: () => ({ w: 40, h: 80 }), terminals: (c) => (c.contact === 'NC' ? two('11', '12') : two('13', '14')) },
   emergency: { label: 'Seta de emergencia', group: 'Mando', prefix: 'S', defaults: { signal: '', text: 'Emergencia' }, size: () => ({ w: 40, h: 80 }), terminals: () => two('11', '12') },
-  limit: { label: 'Final de carrera / detector', group: 'Mando', prefix: 'B', defaults: { contact: 'NO', signal: '', text: '' }, size: () => ({ w: 40, h: 80 }), terminals: (c) => (c.contact === 'NC' ? two('11', '12') : two('13', '14')) },
+  // kind: limit (final de carrera), float (flotador), pressure (presostato), thermostat (termostato).
+  limit: { label: 'Final de carrera / detector', group: 'Mando', prefix: 'B', defaults: { kind: 'limit', contact: 'NO', signal: '', text: '' }, size: () => ({ w: 40, h: 80 }), terminals: (c) => (c.contact === 'NC' ? two('11', '12') : two('13', '14')) },
+  // Conmutador de 3 posiciones (0-1-2): en 1 cierra 13-14; en 2, 23-24.
+  selector3: {
+    label: 'Conmutador 0-1-2',
+    group: 'Mando',
+    prefix: 'S',
+    defaults: { text: '' },
+    size: () => ({ w: 80, h: 80 }),
+    terminals: () => [
+      { id: '13', x: 20, y: 0, side: 'top' },
+      { id: '14', x: 20, y: 80, side: 'bottom' },
+      { id: '23', x: 60, y: 0, side: 'top' },
+      { id: '24', x: 60, y: 80, side: 'bottom' },
+    ],
+  },
+  // Detector de proximidad de 3 hilos: BN (+), BU (−) y BK (salida, PNP a + o NPN a −).
+  sensor3: {
+    label: 'Detector de 3 hilos (PNP/NPN)',
+    group: 'Mando',
+    prefix: 'B',
+    defaults: { output: 'PNP', kind: 'inductive', signal: '', text: '' },
+    size: () => ({ w: 80, h: 80 }),
+    terminals: () => [
+      { id: 'BN', x: 20, y: 0, side: 'top' },
+      { id: 'BK', x: 40, y: 80, side: 'bottom' },
+      { id: 'BU', x: 60, y: 0, side: 'top' },
+    ],
+  },
+  counter: {
+    label: 'Contador',
+    group: 'Mando',
+    prefix: 'KC',
+    defaults: { preset: 3, text: '' },
+    size: () => ({ w: 80, h: 80 }),
+    terminals: () => [...two('A1', 'A2'), { id: 'R1', x: 60, y: 0, side: 'top' }, { id: 'R2', x: 60, y: 80, side: 'bottom' }],
+  },
+  buzzer: { label: 'Timbre / zumbador', group: 'Mando', prefix: 'H', defaults: { kind: 'bell', signal: '', text: '' }, size: () => ({ w: 40, h: 80 }), terminals: () => two('X1', 'X2') },
   contact: { label: 'Contacto auxiliar', group: 'Mando', prefix: '', defaults: { ref: 'KM1', contact: 'NO' }, size: () => ({ w: 40, h: 80 }), terminals: () => two('a', 'b') },
   coil: {
     label: 'Bobina (contactor, relé, temporizador)',
@@ -80,6 +125,25 @@ export const ELEC_TYPES = {
   },
   valve: { label: 'Electroválvula', group: 'Mando', prefix: 'Y', defaults: { signal: '', text: '' }, size: () => ({ w: 40, h: 80 }), terminals: () => two('A1', 'A2') },
   lamp: { label: 'Piloto', group: 'Mando', prefix: 'H', defaults: { color: 'green', signal: '', text: '' }, size: () => ({ w: 40, h: 80 }), terminals: () => two('X1', 'X2') },
+  // Fusible (con seccionador portafusibles: se abre a mano y, fundido, se repone).
+  fuse: { label: 'Fusible / seccionador', group: 'Potencia', prefix: 'F', defaults: { poles: 1, text: '' }, size: (c) => ({ w: Number(c.poles) === 3 ? 120 : 40, h: 80 }), terminals: (c) => (Number(c.poles) === 3 ? threePoles() : two('1', '2')) },
+  // Diferencial (fase y neutro): salta con una derivación a tierra o con su botón de prueba.
+  rcd: { label: 'Diferencial', group: 'Potencia', prefix: 'Q', defaults: { text: '' }, size: () => ({ w: 80, h: 80 }), terminals: () => twoPoles() },
+  // Transformador de mando: el secundario es un circuito aparte (S1-S2) mientras el primario
+  // (P1-P2) tiene tensión.
+  transformer: {
+    label: 'Transformador de mando',
+    group: 'Alimentación',
+    prefix: 'T',
+    defaults: { text: '230/24 V' },
+    size: () => ({ w: 80, h: 100 }),
+    terminals: () => [
+      { id: 'P1', x: 20, y: 0, side: 'top' },
+      { id: 'P2', x: 60, y: 0, side: 'top' },
+      { id: 'S1', x: 20, y: 100, side: 'bottom' },
+      { id: 'S2', x: 60, y: 100, side: 'bottom' },
+    ],
+  },
   breaker: { label: 'Magnetotérmico', group: 'Potencia', prefix: 'Q', defaults: { poles: 3, text: '' }, size: (c) => ({ w: Number(c.poles) === 1 ? 40 : 120, h: 80 }), terminals: (c) => (Number(c.poles) === 1 ? two('1', '2') : threePoles()) },
   motorprotector: { label: 'Guardamotor', group: 'Potencia', prefix: 'Q', defaults: { text: '' }, size: () => ({ w: 120, h: 80 }), terminals: () => threePoles() },
   thermal: { label: 'Relé térmico', group: 'Potencia', prefix: 'F', defaults: { text: '' }, size: () => ({ w: 120, h: 80 }), terminals: () => threePoles() },
@@ -101,6 +165,44 @@ export const ELEC_TYPES = {
     terminals: () => [
       ...['U1', 'V1', 'W1'].map((id, i) => ({ id, x: 20 + 40 * i, y: 0, side: 'top' })),
       ...['W2', 'U2', 'V2'].map((id, i) => ({ id, x: 20 + 40 * i, y: 120, side: 'bottom' })),
+    ],
+  },
+  // Instalaciones de interior.
+  changeover: {
+    label: 'Conmutador (vivienda)',
+    group: 'Vivienda',
+    prefix: 'S',
+    defaults: { text: '' },
+    size: () => ({ w: 80, h: 80 }),
+    terminals: () => [
+      { id: 'C', x: 40, y: 0, side: 'top' },
+      { id: '1', x: 20, y: 80, side: 'bottom' },
+      { id: '2', x: 60, y: 80, side: 'bottom' },
+    ],
+  },
+  crossover: {
+    label: 'Cruzamiento (vivienda)',
+    group: 'Vivienda',
+    prefix: 'S',
+    defaults: { text: '' },
+    size: () => ({ w: 80, h: 80 }),
+    terminals: () => [
+      { id: 'A1', x: 20, y: 0, side: 'top' },
+      { id: 'A2', x: 60, y: 0, side: 'top' },
+      { id: 'B1', x: 20, y: 80, side: 'bottom' },
+      { id: 'B2', x: 60, y: 80, side: 'bottom' },
+    ],
+  },
+  socket: {
+    label: 'Base de enchufe',
+    group: 'Vivienda',
+    prefix: 'X',
+    defaults: { text: '' },
+    size: () => ({ w: 80, h: 60 }),
+    terminals: () => [
+      { id: 'L', x: 20, y: 0, side: 'top' },
+      { id: 'N', x: 40, y: 0, side: 'top' },
+      { id: 'PE', x: 60, y: 0, side: 'top' },
     ],
   },
   plc: {

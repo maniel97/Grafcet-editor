@@ -5,7 +5,7 @@ import { ELEC_TYPES, POTENTIALS, showTag, sizeOf, terminalsOf } from '../../lib/
 
 // Lo que se acciona con el ratón al simular (modo Usar).
 const MOMENTARY = new Set(['pushbutton'])
-const TOGGLES = new Set(['switch', 'emergency', 'breaker', 'motorprotector', 'thermal'])
+const TOGGLES = new Set(['switch', 'emergency', 'breaker', 'motorprotector', 'thermal', 'fuse', 'rcd', 'selector3', 'changeover', 'crossover'])
 const HINTS = {
   pushbutton: 'Mantén pulsado para accionarlo',
   switch: 'Clic: conmutar',
@@ -13,6 +13,11 @@ const HINTS = {
   breaker: 'Clic: abrir o cerrar (rearmar si ha saltado)',
   motorprotector: 'Clic: abrir o cerrar (rearmar si ha saltado)',
   thermal: 'Clic: provocar una sobrecarga o rearmarlo',
+  fuse: 'Clic: abrir o cerrar el portafusibles (reponer si se ha fundido)',
+  rcd: 'Clic: abrir o cerrar (rearmar si ha saltado) · T: botón de prueba',
+  selector3: 'Clic: siguiente posición (0 → 1 → 2)',
+  changeover: 'Clic: conmutar',
+  crossover: 'Clic: conmutar',
 }
 
 // Componente del esquema eléctrico en el lienzo (React Flow): símbolo, bornes (handles) y rótulos.
@@ -74,11 +79,15 @@ export default function ElecNode({ data }) {
           <div className="font-semibold">{showTag(tag)}</div>
           {c.text && <div className="text-[10px] text-slate-600">{c.text}</div>}
           {c.type === 'coil' && (c.kind === 'ton' || c.kind === 'tof') && <div className="text-slate-600">{`${c.kind === 'ton' ? 'Conexión' : 'Desconexión'} ${c.preset ?? 0} s`}</div>}
+          {c.type === 'sensor3' && <div className="text-slate-600">{`${{ inductive: 'Inductivo', capacitive: 'Capacitivo', optical: 'Óptico' }[c.kind] ?? ''} ${c.output ?? 'PNP'}`}</div>}
           {xref?.length > 0 && <div className="font-mono text-[9px] text-slate-500">{xref.map((x) => x.numbers.join('-')).join(' · ')}</div>}
           {c.signal && <div className="font-mono text-[9px] text-blue-700">↔ {c.signal}</div>}
           {view?.motors?.[c.id]?.mode && <div className="text-green-700">{view.motors[c.id].mode}</div>}
           {view?.motors?.[c.id]?.warning && <div className="text-amber-700">{view.motors[c.id].warning}</div>}
-          {view?.tripped?.[c.id] && <div className="font-semibold text-red-700">Disparado</div>}
+          {view?.tripped?.[c.id] && <div className="font-semibold text-red-700">{c.type === 'fuse' ? 'Fundido' : 'Disparado'}</div>}
+          {c.type === 'counter' && <div className="text-slate-600">{`Preselección ${c.preset ?? 1}`}</div>}
+          {c.type === 'coil' && c.kind === 'flash' && <div className="text-slate-600">{`Intermitente ${c.preset ?? 1} s`}</div>}
+          {c.type === 'coil' && c.kind === 'impulse' && <div className="text-slate-600">Telerruptor</div>}
         </div>
       )}
       {c.type === 'plc' && (
@@ -87,6 +96,21 @@ export default function ElecNode({ data }) {
         </div>
       )}
       {rail && <span className="sr-only">{POTENTIALS[c.potential]?.label}</span>}
+      {/* Diferencial: botón de prueba (T), al simular. */}
+      {use && c.type === 'rcd' && (
+        <button
+          type="button"
+          title="Botón de prueba del diferencial"
+          aria-label={`Probar ${showTag(c.tag)}`}
+          onClick={(e) => {
+            e.stopPropagation()
+            onAction(c.id, 'test')
+          }}
+          className="absolute left-[33px] top-[48px] h-4 w-4 rounded-sm border border-slate-700 bg-amber-100 text-[9px] font-bold leading-none text-slate-900 hover:bg-amber-300"
+        >
+          T
+        </button>
+      )}
       {terminals.map((t) => (
         <Handle
           key={t.id}

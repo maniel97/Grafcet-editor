@@ -30,6 +30,12 @@ export function Contact({ x = 20, y0 = 0, y1 = 80, nc = false, closed = nc, actu
       {actuator === 'switch' && <path d={`M ${x - 20} ${mid.y - 6} L ${x - 24} ${mid.y - 6} L ${x - 24} ${mid.y} M ${x - 20} ${mid.y + 6} L ${x - 24} ${mid.y + 6}`} strokeWidth="1.5" />}
       {actuator === 'limit' && <path d={`M ${x - 20} ${mid.y} L ${x - 26} ${mid.y - 6} L ${x - 26} ${mid.y + 6} Z`} strokeWidth="1.5" />}
       {actuator === 'timer' && <path d={`M ${x - 22} ${mid.y - 7} A 7 7 0 0 1 ${x - 22} ${mid.y + 7}`} strokeWidth="1.5" />}
+      {actuator === 'float' && <circle cx={x - 27} cy={mid.y} r="6" strokeWidth="1.5" />}
+      {(actuator === 'pressure' || actuator === 'thermostat') && (
+        <text x={x - 27} y={mid.y + 4} textAnchor="middle" fontSize="11" fontWeight="700" fill={INK} stroke="none">
+          {actuator === 'pressure' ? 'P' : 'θ'}
+        </text>
+      )}
     </g>
   )
 }
@@ -132,6 +138,148 @@ function Plc({ c, s }) {
   )
 }
 
+// Fusible (con la cuchilla del seccionador portafusibles si está abierto; fundido, en rojo).
+function Fuse({ x = 20, open, blown }) {
+  return (
+    <g fill="none" stroke={INK} strokeWidth="2">
+      <line x1={x} y1="0" x2={x} y2="22" />
+      {open ? <line x1={x} y1="22" x2={x - 12} y2="56" /> : <rect x={x - 6} y="22" width="12" height="36" fill={blown ? '#fecaca' : 'white'} />}
+      {!open && <line x1={x} y1="22" x2={x} y2="58" strokeWidth="1.2" />}
+      {blown && <path d={`M ${x - 7} 30 L ${x + 7} 50 M ${x + 7} 30 L ${x - 7} 50`} stroke="#dc2626" strokeWidth="1.5" />}
+      <line x1={x} y1="58" x2={x} y2="80" />
+    </g>
+  )
+}
+
+// Diferencial: dos polos con el toroide y el botón de prueba (T).
+function Rcd({ closed }) {
+  return (
+    <g>
+      <Contact x={20} closed={closed} fixedMark="breaker" />
+      <Contact x={60} closed={closed} fixedMark="breaker" />
+      <line x1="13" y1="42" x2="53" y2="42" stroke={INK} strokeDasharray="3 3" strokeWidth="1" />
+      <ellipse cx="40" cy="66" rx="26" ry="5" fill="none" stroke={INK} strokeWidth="1.3" />
+      <text x="40" y="78" textAnchor="middle" fontSize="7" fill={INK}>
+        I∆n
+      </text>
+    </g>
+  )
+}
+
+function Transformer({ on }) {
+  return (
+    <g fill="none" stroke={INK} strokeWidth="2">
+      <path d="M 20 0 L 20 18 L 40 18 M 60 0 L 60 18 L 40 18" />
+      <circle cx="40" cy="38" r="16" fill={on ? '#fef3c7' : 'white'} />
+      <circle cx="40" cy="62" r="16" fill={on ? '#fed7aa' : 'white'} fillOpacity="0.8" />
+      <path d="M 40 82 L 20 82 L 20 100 M 40 82 L 60 82 L 60 100" />
+    </g>
+  )
+}
+
+// Conmutador 0-1-2: dos contactos y el mando de tres posiciones.
+function Selector3({ pos = 0 }) {
+  return (
+    <g>
+      <Contact x={20} closed={pos === 1} />
+      <Contact x={60} closed={pos === 2} />
+      <line x1="13" y1="44" x2="53" y2="44" stroke={INK} strokeDasharray="3 2" strokeWidth="1.2" />
+      {['0', '1', '2'].map((t, i) => (
+        <text key={t} x={2 + i * 9} y="76" fontSize="8" fontWeight={pos === i ? 700 : 400} fill={pos === i ? '#16a34a' : '#64748b'}>
+          {t}
+        </text>
+      ))}
+    </g>
+  )
+}
+
+// Detector de proximidad de 3 hilos (cuadrado con rombo), con los colores de sus cables.
+function Sensor3({ c, active }) {
+  return (
+    <g strokeWidth="2" fill="none">
+      <line x1="20" y1="0" x2="20" y2="24" stroke="#92400e" />
+      <line x1="60" y1="0" x2="60" y2="24" stroke="#2563eb" />
+      <line x1="40" y1="56" x2="40" y2="80" stroke="#111827" />
+      <rect x="10" y="24" width="60" height="32" fill={active ? '#bbf7d0' : 'white'} stroke={INK} />
+      <path d="M 24 40 L 31 33 L 38 40 L 31 47 Z" stroke={INK} strokeWidth="1.3" />
+      <text x="54" y="44" textAnchor="middle" fontSize="9" fontWeight="700" fill={INK} stroke="none">
+        {c.output === 'NPN' ? 'NPN' : 'PNP'}
+      </text>
+    </g>
+  )
+}
+
+function Counter({ count, on }) {
+  return (
+    <g fill="none" stroke={INK} strokeWidth="2">
+      <line x1="20" y1="0" x2="20" y2="28" />
+      <line x1="20" y1="52" x2="20" y2="80" />
+      <line x1="60" y1="0" x2="60" y2="28" />
+      <line x1="60" y1="52" x2="60" y2="80" />
+      <rect x="6" y="28" width="68" height="24" fill={on ? '#bbf7d0' : 'white'} />
+      <text x="40" y="45" textAnchor="middle" fontSize="12" fontWeight="700" fill={INK} stroke="none" fontFamily="ui-monospace, monospace">
+        {count ?? 0}
+      </text>
+      <text x="66" y="38" textAnchor="middle" fontSize="7" fill={INK} stroke="none">
+        R
+      </text>
+    </g>
+  )
+}
+
+function Buzzer({ kind, on }) {
+  return (
+    <g fill="none" stroke={INK} strokeWidth="2">
+      <line x1="20" y1="0" x2="20" y2="30" />
+      <line x1="20" y1="50" x2="20" y2="80" />
+      {kind === 'buzzer' ? (
+        <path d="M 6 30 L 34 30 L 34 50 L 6 50 Z M 10 40 L 30 40" fill={on ? '#fde68a' : 'white'} />
+      ) : (
+        <path d="M 6 50 A 14 14 0 0 1 34 50 Z" fill={on ? '#fde68a' : 'white'} />
+      )}
+      {on && <path d="M 38 32 Q 44 40 38 48" stroke="#f59e0b" />}
+    </g>
+  )
+}
+
+function Changeover({ on }) {
+  return (
+    <g fill="none" stroke={INK} strokeWidth="2" strokeLinecap="round">
+      <line x1="40" y1="0" x2="40" y2="26" />
+      <path d={on ? 'M 40 26 L 58 54' : 'M 40 26 L 22 54'} stroke="#16a34a" strokeWidth="2.4" />
+      <line x1="20" y1="54" x2="20" y2="80" />
+      <line x1="60" y1="54" x2="60" y2="80" />
+      <line x1="14" y1="54" x2="26" y2="54" strokeWidth="1.3" />
+      <line x1="54" y1="54" x2="66" y2="54" strokeWidth="1.3" />
+    </g>
+  )
+}
+
+function Crossover({ on }) {
+  return (
+    <g fill="none" stroke={INK} strokeWidth="2" strokeLinecap="round">
+      <line x1="20" y1="0" x2="20" y2="26" />
+      <line x1="60" y1="0" x2="60" y2="26" />
+      <line x1="20" y1="54" x2="20" y2="80" />
+      <line x1="60" y1="54" x2="60" y2="80" />
+      {on ? <path d="M 20 26 L 60 54 M 60 26 L 20 54" stroke="#16a34a" strokeWidth="2.2" /> : <path d="M 20 26 L 20 54 M 60 26 L 60 54" stroke="#16a34a" strokeWidth="2.2" />}
+    </g>
+  )
+}
+
+function Socket() {
+  return (
+    <g fill="none" stroke={INK} strokeWidth="2">
+      <path d="M 20 0 L 20 24 M 40 0 L 40 24 M 60 0 L 60 18" />
+      <path d="M 12 24 L 48 24 A 18 18 0 0 1 12 24" fill="white" />
+      <path d="M 54 18 L 66 18" />
+      <text x="62" y="34" fontSize="8" fill={INK} stroke="none">
+        PE
+      </text>
+    </g>
+  )
+}
+
 // Dibujo de un componente. view: estado de la simulación (lib/elec/solve.js: view) o null.
 export function ElecSymbol({ c, view }) {
   const closed = view?.closed?.[c.id]
@@ -147,7 +295,35 @@ export function ElecSymbol({ c, view }) {
     case 'emergency':
       return <Contact nc closed={closed ?? true} actuator="emergency" />
     case 'limit':
-      return <Contact nc={c.contact === 'NC'} closed={closed ?? c.contact === 'NC'} actuator="limit" />
+      return <Contact nc={c.contact === 'NC'} closed={closed ?? c.contact === 'NC'} actuator={['float', 'pressure', 'thermostat'].includes(c.kind) ? c.kind : 'limit'} />
+    case 'selector3':
+      return <Selector3 pos={view?.pos?.[c.id] ?? 0} />
+    case 'sensor3':
+      return <Sensor3 c={c} active={view?.closed?.[c.id]} />
+    case 'counter':
+      return <Counter count={view?.counts?.[c.tag]} on={view?.loads?.[c.id]} />
+    case 'buzzer':
+      return <Buzzer kind={c.kind} on={view?.loads?.[c.id]} />
+    case 'fuse':
+      return Number(c.poles) === 3 ? (
+        <g>
+          {[20, 60, 100].map((x) => (
+            <Fuse key={x} x={x} open={view?.opened?.[c.id]} blown={view?.tripped?.[c.id]} />
+          ))}
+        </g>
+      ) : (
+        <Fuse open={view?.opened?.[c.id]} blown={view?.tripped?.[c.id]} />
+      )
+    case 'rcd':
+      return <Rcd closed={closed ?? true} />
+    case 'transformer':
+      return <Transformer on={view?.loads?.[c.id]} />
+    case 'changeover':
+      return <Changeover on={closed} />
+    case 'crossover':
+      return <Crossover on={closed} />
+    case 'socket':
+      return <Socket />
     case 'contact':
       return <Contact nc={c.contact === 'NC'} closed={closed ?? c.contact === 'NC'} actuator={c.timed ? 'timer' : null} />
     case 'coil':
