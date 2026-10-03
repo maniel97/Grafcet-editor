@@ -16,6 +16,7 @@ import {
   overlaps,
   placed,
   sceneIO,
+  sceneInit,
   weighed,
   sceneFaults,
   sceneSignals,
@@ -1033,6 +1034,135 @@ const UNDER = ['conveyor', 'sink', 'ramp', 'diverter']
 const DESK_TYPES = ['button', 'switch', 'emergency', 'potentiometer', 'lamp', 'display']
 const isDesk = (e) => DESK_TYPES.includes(e.type) && e.place === 'desk'
 
+
+// Dibujo de un elemento en un estado dado (lo usan la escena interactiva y la estática).
+function drawElement(e, { scene, state, values, time, signals }) {
+  const pos = state.pos[e.id] ?? 0
+  switch (e.type) {
+    case 'button':
+      return <ButtonShape e={e} pressed={signals[e.id]} />
+    case 'switch':
+      return <SwitchShape pressed={signals[e.id]} />
+    case 'emergency':
+      return <EmergencyShape pressed={signals[e.id]} />
+    case 'lamp':
+      return <LampShape e={e} lit={isOn(values, e.variable)} />
+    case 'cylinder':
+      return <CylinderShape e={e} pos={pos} values={values} />
+    case 'conveyor':
+      return <ConveyorShape e={e} running={isOn(values, e.motor)} t={time} />
+    case 'limit':
+      return <LimitShape active={signals[e.id]} />
+    case 'sensor':
+      return <SensorShape e={e} active={signals[e.id]} />
+    case 'feeder':
+      return <FeederShape />
+    case 'sink':
+      return <SinkShape count={state.counts[e.id] ?? 0} />
+    case 'tank':
+      return <TankShape e={e} level={state.level?.[e.id] ?? (Number(e.initial) || 0)} values={values} />
+    case 'motor':
+      return <MotorShape angle={state.angle?.[e.id] ?? 0} running={isOn(values, e.variable)} />
+    case 'display':
+      return <DisplayShape value={values[e.variable]} />
+    case 'distance':
+      return <DistanceShape e={e} distance={measuredDistance(scene, state, e)} />
+    case 'diverter':
+      return <DiverterShape e={e} active={isOn(values, e.gate) && state.faults?.[e.id] !== 'stuck'} />
+    case 'ramp':
+      return <RampShape e={e} />
+    case 'scale':
+      return <ScaleShape kg={weighed(state, e)} />
+    case 'potentiometer':
+      return <PotentiometerShape value={state.knob?.[e.id] ?? Number(e.initial ?? 0.5)} />
+    case 'heater':
+      return <HeaterShape e={e} temp={state.temp?.[e.id] ?? Number(e.ambient ?? 20)} heating={isOn(values, e.heat)} />
+    default:
+      return null
+  }
+}
+
+// Escena estática (sin interacción), en su estado inicial y encuadrada: para el dossier.
+// Con rótulos y, debajo, las variables de cada elemento con su dirección. Los del pupitre, en una
+// fila aparte debajo de la máquina.
+export function SceneStatic({ scene, variables = [] }) {
+  const elements = scene?.elements ?? []
+  const state = sceneInit(scene)
+  const signals = sceneSignals(scene ?? { elements: [] }, state)
+  const address = new Map(variables.map((v) => [v.name, v.address]))
+  // Variables con su dirección, de dos en dos por línea (como en la escena interactiva).
+  const io = (e) => {
+    const items = (SCENE_VARS[e.type] ?? [])
+      .map(([key]) => e[key])
+      .filter(Boolean)
+      .map((n) => (address.get(n) ? `${n} ${address.get(n)}` : n))
+    const lines = []
+    for (let i = 0; i < items.length; i += 2) lines.push(items.slice(i, i + 2).join(' · '))
+    return lines
+  }
+  const turns = (e) => !['button', 'switch', 'emergency', 'lamp', 'sink', 'feeder', 'tank', 'motor', 'display', 'scale', 'potentiometer', 'heater'].includes(e.type)
+  const desk = elements.filter((e) => DESK_TYPES.includes(e.type) && e.place === 'desk')
+  const machine = elements.filter((e) => !desk.includes(e))
+  const boxes = machine.map((e) => boundsOf(placed(scene, state, e), 1))
+  const minX = Math.min(0, ...boxes.map((b) => b.x)) - 20
+  const minY = Math.min(0, ...boxes.map((b) => b.y)) - 20
+  const maxX = Math.max(200, ...boxes.map((b) => b.x + b.w)) + 40
+  const machineBottom = Math.max(100, ...boxes.map((b) => b.y + b.h + 34 + 11 * Math.max(0, io(machine[boxes.indexOf(b)]).length - 1))) + 10
+  // Ancho: también el de las líneas de variables (≈ 5,5 px por carácter a 9 px).
+  const textRight = Math.max(0, ...machine.map((e, i) => boxes[i].x + boxes[i].w / 2 + Math.max(0, ...io(e).map((l) => l.length)) * 2.8))
+  const deskY = machineBottom + 30
+  const width = Math.max(maxX - minX, textRight + 20 - minX, desk.length * 100 + 40)
+  const height = deskY - minY + (desk.length ? 110 : 0)
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width={width} height={height} viewBox={`${minX} ${minY} ${width} ${height}`} fontFamily="Inter, Helvetica, Arial, sans-serif">
+      <rect x={minX} y={minY} width={width} height={height} fill="white" />
+      {[...machine]
+        .sort((a, b) => (UNDER.includes(a.type) ? -1 : 0) - (UNDER.includes(b.type) ? -1 : 0))
+        .map((raw) => {
+          const e = placed(scene, state, raw)
+          const b = boundsOf(e, state.pos[e.id] ?? 0)
+          return (
+            <g key={e.id}>
+              <g transform={`translate(${e.x} ${e.y})${turns(e) ? ` rotate(${e.rot ?? 0})` : ''}`}>{drawElement(e, { scene, state, values: {}, time: 0, signals })}</g>
+              <text x={b.x + b.w / 2} y={b.y + b.h + 13} textAnchor="middle" fontSize="11" fill="#334155">
+                {labelOf(e)}
+              </text>
+              {io(e).map((line, i) => (
+                <text key={line} x={b.x + b.w / 2} y={b.y + b.h + 25 + i * 11} textAnchor="middle" fontSize="9" fontFamily="Courier New, monospace" fill="#2563eb">
+                  {line}
+                </text>
+              ))}
+            </g>
+          )
+        })}
+      {desk.length > 0 && (
+        <g>
+          <rect x={minX + 10} y={deskY - 20} width={width - 20} height="110" rx="4" fill="#cbd5e1" />
+          <text x={minX + 18} y={deskY - 6} fontSize="10" fontWeight="600" fill="#334155">
+            Pupitre de mando
+          </text>
+          {desk.map((e, i) => {
+            const x = minX + 60 + i * 100
+            return (
+              <g key={e.id}>
+                <g transform={`translate(${x} ${deskY + 30})`}>{drawElement({ ...e, x: 0, y: 0 }, { scene, state, values: {}, time: 0, signals })}</g>
+                <text x={x} y={deskY + 72} textAnchor="middle" fontSize="10" fill="#334155">
+                  {labelOf(e)}
+                </text>
+                {io(e).map((line, i) => (
+                  <text key={line} x={x} y={deskY + 83 + i * 10} textAnchor="middle" fontSize="8.5" fontFamily="Courier New, monospace" fill="#2563eb">
+                    {line}
+                  </text>
+                ))}
+              </g>
+            )
+          })}
+        </g>
+      )}
+    </svg>
+  )
+}
+
 // Arrastrar un módulo de la paleta a la escena (tipo de dato propio del arrastre).
 const DRAG_TYPE = 'application/x-grafcet-scene'
 const PALETTE_BY_KEY = Object.fromEntries(PALETTE_ITEMS.map((i) => [i.key, i]))
@@ -1450,51 +1580,7 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
   // Los cilindros montados en el vástago de otro, donde están ahora.
   const machine = shown.filter((e) => !isDesk(e)).map((e) => (e.type === 'cylinder' ? placed(scene ?? { elements: [] }, state, e) : e))
   const deskItems = elements.filter(isDesk)
-  const draw = (e) => {
-    const pos = state.pos[e.id] ?? 0
-    switch (e.type) {
-      case 'button':
-        return <ButtonShape e={e} pressed={signals[e.id]} />
-      case 'switch':
-        return <SwitchShape pressed={signals[e.id]} />
-      case 'emergency':
-        return <EmergencyShape pressed={signals[e.id]} />
-      case 'lamp':
-        return <LampShape e={e} lit={isOn(values, e.variable)} />
-      case 'cylinder':
-        return <CylinderShape e={e} pos={pos} values={values} />
-      case 'conveyor':
-        return <ConveyorShape e={e} running={isOn(values, e.motor)} t={time} />
-      case 'limit':
-        return <LimitShape active={signals[e.id]} />
-      case 'sensor':
-        return <SensorShape e={e} active={signals[e.id]} />
-      case 'feeder':
-        return <FeederShape />
-      case 'sink':
-        return <SinkShape count={state.counts[e.id] ?? 0} />
-      case 'tank':
-        return <TankShape e={e} level={state.level?.[e.id] ?? (Number(e.initial) || 0)} values={values} />
-      case 'motor':
-        return <MotorShape angle={state.angle?.[e.id] ?? 0} running={isOn(values, e.variable)} />
-      case 'display':
-        return <DisplayShape value={values[e.variable]} />
-      case 'distance':
-        return <DistanceShape e={e} distance={measuredDistance(scene, state, e)} />
-      case 'diverter':
-        return <DiverterShape e={e} active={isOn(values, e.gate) && state.faults?.[e.id] !== 'stuck'} />
-      case 'ramp':
-        return <RampShape e={e} />
-      case 'scale':
-        return <ScaleShape kg={weighed(state, e)} />
-      case 'potentiometer':
-        return <PotentiometerShape value={state.knob?.[e.id] ?? Number(e.initial ?? 0.5)} />
-      case 'heater':
-        return <HeaterShape e={e} temp={state.temp?.[e.id] ?? Number(e.ambient ?? 20)} heating={isOn(values, e.heat)} />
-      default:
-        return null
-    }
-  }
+  const draw = (e) => drawElement(e, { scene, state, values, time, signals })
   // Los mandos y pilotos no se giran (su rótulo se lee siempre).
   const turns = (e) => !['button', 'switch', 'emergency', 'lamp', 'sink', 'feeder', 'tank', 'motor', 'display', 'scale', 'potentiometer', 'heater'].includes(e.type)
   const operable = (e) => ['button', 'switch', 'emergency', 'feeder', 'potentiometer'].includes(e.type)

@@ -55,6 +55,7 @@ const VariablesDialog = lazy(() => import('./VariablesDialog'))
 const ExportDialog = lazy(() => import('./ExportDialog'))
 const GemmaDialog = lazy(() => import('./GemmaDialog'))
 const PneumaticDialog = lazy(() => import('./PneumaticDialog'))
+const DossierDialog = lazy(() => import('./DossierDialog'))
 const ProjectsDialog = lazy(() => import('./ProjectsDialog'))
 
 // Mientras se descarga una parte diferida (normalmente un instante).
@@ -736,7 +737,21 @@ export default function GrafcetCanvas() {
             />
           </Suspense>
         )}
-        {exportFormat && (
+        {exportFormat === 'dossier' && (
+          <Suspense fallback={<Loading />}>
+            <DossierDialog
+              nodes={nodes}
+              edges={edges}
+              plc={plc}
+              issues={issues}
+              projectName={projectName}
+              source={exportSource}
+              onChange={(dossier) => setPlc((p) => ({ ...p, dossier }))}
+              onClose={() => setExportFormat(null)}
+            />
+          </Suspense>
+        )}
+        {exportFormat && exportFormat !== 'dossier' && (
           <Suspense fallback={<Loading />}>
             <ExportDialog
               source={exportSource}

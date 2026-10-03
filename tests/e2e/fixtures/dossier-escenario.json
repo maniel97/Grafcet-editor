@@ -1,0 +1,116 @@
+{
+ "format": "grafcet-editor",
+ "version": 1,
+ "name": "Motor",
+ "nodes": [
+  {
+   "id": "s0",
+   "type": "step",
+   "position": {
+    "x": 200,
+    "y": 0
+   },
+   "data": {
+    "label": "0",
+    "initial": true,
+    "actions": []
+   }
+  },
+  {
+   "id": "t1",
+   "type": "transition",
+   "position": {
+    "x": 200,
+    "y": 100
+   },
+   "data": {
+    "condition": "Marcha"
+   }
+  },
+  {
+   "id": "s1",
+   "type": "step",
+   "position": {
+    "x": 200,
+    "y": 170
+   },
+   "data": {
+    "label": "1",
+    "actions": [
+     {
+      "text": "Motor",
+      "kind": "continuous"
+     }
+    ]
+   }
+  },
+  {
+   "id": "t2",
+   "type": "transition",
+   "position": {
+    "x": 200,
+    "y": 270
+   },
+   "data": {
+    "condition": "Paro"
+   }
+  }
+ ],
+ "edges": [
+  {
+   "id": "s0-t1",
+   "source": "s0",
+   "target": "t1"
+  },
+  {
+   "id": "t1-s1",
+   "source": "t1",
+   "target": "s1"
+  },
+  {
+   "id": "s1-t2",
+   "source": "s1",
+   "target": "t2"
+  },
+  {
+   "id": "t2-s0",
+   "source": "t2",
+   "target": "s0"
+  }
+ ],
+ "plc": {
+  "scheme": "siemens",
+  "showAddresses": false,
+  "steps": {},
+  "variables": {},
+  "scenarios": [
+   {
+    "id": "sc1",
+    "name": "Arranque y paro",
+    "duration": 4,
+    "events": [
+     {
+      "t": 0.5,
+      "name": "Marcha",
+      "value": 1
+     },
+     {
+      "t": 1,
+      "name": "Marcha",
+      "value": 0
+     },
+     {
+      "t": 3,
+      "name": "Paro",
+      "value": 1
+     },
+     {
+      "t": 3.5,
+      "name": "Paro",
+      "value": 0
+     }
+    ]
+   }
+  ]
+ }
+}

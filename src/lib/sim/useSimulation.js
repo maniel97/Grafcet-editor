@@ -10,7 +10,7 @@ const MAX_LOG = 200
 const MAX_SAMPLES = 4000
 
 // Señales binarias que se registran para el cronograma: etapas, entradas y salidas.
-function sampleOf(compiled, state) {
+export function sampleOf(compiled, state) {
   const sample = {}
   const active = withMacros(compiled, state.active)
   for (const s of compiled.steps) sample[s.variable] = active.has(s.id) ? 1 : 0

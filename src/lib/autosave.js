@@ -30,7 +30,8 @@ export function useAutosave(nodes, edges, plc, name) {
   useEffect(() => {
     pending.current = { nodes, edges, plc, name }
     const timer = setTimeout(() => {
-      save(pending.current)
+      // Ya guardado (p. ej. al ocultarse la página antes de que venciera el plazo): nada que hacer.
+      if (pending.current) save(pending.current)
       pending.current = null
     }, DELAY_MS)
     return () => clearTimeout(timer)

@@ -27,7 +27,7 @@ for (const width of [1500, 1280, 1100]) {
     const exportBtn = page.getByRole('button', { name: /Exportar/ })
     const menu = page.getByRole('menu', { name: 'Formatos de exportación' })
     await exportBtn.click()
-    await expect(menu.getByRole('menuitem')).toHaveCount(3)
+    await expect(menu.getByRole('menuitem')).toHaveCount(4) // PNG, SVG, PDF y dossier
     await page.keyboard.press('Escape')
     await expect(menu).toHaveCount(0)
     await exportBtn.click()
