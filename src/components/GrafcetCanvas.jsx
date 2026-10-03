@@ -44,6 +44,7 @@ import SheetRefs from './SheetRefs'
 import { crossSheetRefs, sheetOf, sheetsOf, visibleEdges, visibleNodes } from '../lib/sheets'
 import { EMPTY_GEMMA, generateConduction } from '../lib/gemma'
 import { clearSharedHash, decodeProject, sharedData } from '../lib/share'
+import { applySymbols } from '../lib/plc/symbolTable'
 
 // Partes que no hacen falta al abrir el editor: se descargan la primera vez que se usan, para que
 // la carga inicial sea más ligera (importa sobre todo publicado en internet).
@@ -994,6 +995,9 @@ export default function GrafcetCanvas() {
                 simulation={simulation}
                 scenarios={plc.scenarios}
                 onScenariosChange={(update) => setPlc((p) => ({ ...p, scenarios: update(p.scenarios ?? []) }))}
+                cpuConfig={plc.cpu}
+                onCpuChange={(cpu) => setPlc((p) => ({ ...p, cpu }))}
+                onApplySymbols={(symbols) => setPlc((p) => ({ ...p, variables: applySymbols(p.variables, symbols) }))}
                 exportProps={titleBlockProps}
                 onFocusNode={focusNode}
                 onClose={() => setSimulating(false)}

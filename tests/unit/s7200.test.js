@@ -1,91 +1,21 @@
 import { describe, expect, it } from 'vitest'
 import { EXAMPLES } from '../../src/lib/examples'
 import { generateLadder } from '../../src/lib/ladder/generate'
-import { encodeAnsi, s7200Symbols, symbolName, timerBase, toS7200 } from '../../src/lib/ladder/exportS7200'
+import { encodeAnsi, s7200Symbols, symbolName, toS7200 } from '../../src/lib/ladder/exportS7200'
 import { autoAssign, EMPTY_PLC } from '../../src/lib/addressing'
 import { projectVariables } from '../../src/lib/symbols'
 import { buildPlcModel } from '../../src/lib/plcModel'
 import { compile, evolve, initialState, withMacros } from '../../src/lib/sim/engine'
 import { toRaw } from '../../src/lib/analog'
+import { createCpu, parseProgram } from '../../src/lib/plc/s7200cpu'
 
 const CRLF = '\r\n'
 
-// CPU S7-200 mínima: ejecuta el STL generado ciclo a ciclo (pila lógica, S/R, flancos, TON, palabras).
+// La CPU S7-200 simulada de la aplicación (lib/plc/s7200cpu.js) ejecutando el STL generado.
 function cpu(text) {
-  const lines = text.split(CRLF)
-  const start = lines.indexOf('BEGIN') + 1
-  const end = lines.indexOf('END_ORGANIZATION_BLOCK')
-  const program = lines.slice(start, end).filter((l) => l && !l.startsWith('//'))
-  const bits = new Map()
-  const words = new Map()
-  const timers = new Map()
-  const edges = new Map()
-  let first = true
-  const bit = (a) => (a === 'SM0.0' ? true : a === 'SM0.1' ? first : /^T\d+$/.test(a) ? !!timers.get(a)?.q : !!bits.get(a))
-  const word = (a) => (/^[+-]?\d+$/.test(a) ? Number(a) : (words.get(a) ?? 0))
-  const cmp = (op, a, b) => ({ '>': a > b, '<': a < b, '>=': a >= b, '<=': a <= b, '=': a === b, '<>': a !== b })[op]
-  const scan = (dt) => {
-    let stack = []
-    program.forEach((line, pc) => {
-      if (line.startsWith('Network')) {
-        stack = []
-        return
-      }
-      const op = line.slice(0, 6).trim()
-      const args = line
-        .slice(7)
-        .split(',')
-        .map((x) => x.trim())
-      const top = () => stack[stack.length - 1]
-      const setTop = (v) => (stack[stack.length - 1] = v)
-      let m
-      if (op === 'LD') stack.push(bit(args[0]))
-      else if (op === 'LDN') stack.push(!bit(args[0]))
-      else if (op === 'A') setTop(top() && bit(args[0]))
-      else if (op === 'AN') setTop(top() && !bit(args[0]))
-      else if (op === 'O') setTop(top() || bit(args[0]))
-      else if (op === 'ON') setTop(top() || !bit(args[0]))
-      else if (op === 'ALD') {
-        const a = stack.pop()
-        setTop(top() && a)
-      } else if (op === 'OLD') {
-        const a = stack.pop()
-        setTop(top() || a)
-      } else if (op === 'NOT') setTop(!top())
-      else if (op === 'EU' || op === 'ED') {
-        const now = top()
-        const before = edges.get(pc) ?? false
-        edges.set(pc, now)
-        setTop(op === 'EU' ? now && !before : !now && before)
-      } else if ((m = /^(LDW|AW|OW)(.+)$/.exec(op))) {
-        const v = cmp(m[2], word(args[0]), word(args[1]))
-        if (m[1] === 'LDW') stack.push(v)
-        else setTop(m[1] === 'AW' ? top() && v : top() || v)
-      } else if (op === '=') bits.set(args[0], top())
-      else if (op === 'S') {
-        if (top()) bits.set(args[0], true)
-      } else if (op === 'R') {
-        if (top()) bits.set(args[0], false)
-      } else if (op === 'TON') {
-        const t = timers.get(args[0]) ?? { acc: 0, q: false }
-        const base = timerBase(Number(args[0].slice(1)))
-        if (top()) t.acc += dt
-        else t.acc = 0
-        t.q = top() && t.acc >= Number(args[1]) * base - 1e-9
-        timers.set(args[0], t)
-      } else if (op === 'MOVW') {
-        if (top()) words.set(args[1], word(args[0]))
-      } else if (['+I', '-I', '*I', '/I'].includes(op)) {
-        if (top()) {
-          const a = word(args[1])
-          const b = word(args[0])
-          words.set(args[1], op === '+I' ? a + b : op === '-I' ? a - b : op === '*I' ? a * b : Math.trunc(a / b))
-        }
-      } else throw new Error(`Instrucción no soportada en la prueba: ${line}`)
-    })
-    first = false
-  }
-  return { scan, bits, words }
+  const { blocks, errors } = parseProgram(text)
+  if (errors.length) throw errors[0]
+  return createCpu({ blocks })
 }
 
 // Compara simulador y CPU con la misma secuencia de entradas: [instante, {entradas}].

@@ -4,6 +4,9 @@ import { compile, evolve, initialState, inspect, withMacros } from './engine'
 import { recordEvent } from './scenario'
 import { sceneAction } from './scene'
 import { advanceWorld, makeWorld } from './world'
+import { SCAN, advanceCpu, makeCpuRunner } from '../plc/cpuRun'
+import { generateLadder } from '../ladder/generate'
+import { toS7200 } from '../ladder/exportS7200'
 
 const TICK_MS = 50
 const MAX_LOG = 200
@@ -40,6 +43,24 @@ export function useSimulation(nodes, edges, plc, enabled) {
   )
   const world = useMemo(() => makeWorld(enabled ? scene : null, analogRange), [enabled, scene, analogRange])
 
+  // Modo «Autómata» (plc.cpu.enabled): la lógica la pone un programa S7-200 (el generado del grafcet
+  // o uno de Micro/WIN) en la CPU simulada, en lugar del grafcet. Solo se rehace (y la CPU vuelve a
+  // empezar) si cambian el programa o las direcciones, no al mover la planta.
+  const cpuConfig = plc.cpu
+  const cpuText = useMemo(() => {
+    if (!enabled || !cpuConfig?.enabled) return null
+    if (cpuConfig.source === 'file') return cpuConfig.text ?? ''
+    return toS7200(generateLadder(nodes, edges, plc), plc, { title: '' }).text
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [enabled, cpuConfig, nodes, edges, plc.variables, plc.steps, plc.scheme])
+  const addressKey = compiled ? compiled.variables.map((v) => `${v.name}=${v.address}:${v.type}`).join('|') : ''
+  const cpuSetup = useMemo(
+    () => (cpuText === null || !compiled ? null : makeCpuRunner(cpuText, compiled.variables)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [cpuText, addressKey],
+  )
+  const cpuRunner = cpuSetup?.runner ?? null
+
   // { state, inputs, log, samples, recording: [eventos] | null, playback: { scenario, next } | null,
   //   world: estado de la escena de la planta }
   const [sim, setSim] = useState(null)
@@ -58,13 +79,22 @@ export function useSimulation(nodes, edges, plc, enabled) {
       // Reproduciendo un escenario: se aplican sus cambios de entradas en su instante y se para al final.
       const playback = current.playback
       const until = playback ? Math.min(time, playback.scenario.duration ?? time) : time
-      const { state, inputs, world: worldState, next: nextEvent, events } = advanceWorld(
-        compiled,
-        // Elementos añadidos durante la simulación: parten de su estado inicial.
-        { state: current.state, inputs: current.inputs, world: world.init(current.world) },
-        until,
-        { world, scenario: playback?.scenario, next: playback?.next ?? 0, options },
-      )
+      // Elementos añadidos durante la simulación: parten de su estado inicial.
+      const from = { state: current.state, inputs: current.inputs, world: world.init(current.world) }
+      let cpuError = null
+      let result
+      if (cpuSetup) {
+        // Autómata: un ciclo con «Paso»; si el programa falla, la CPU se para (STOP) con el motivo.
+        if (!cpuRunner || current.cpuError) return
+        const target = options?.singleStep ? current.state.time + SCAN : until
+        const r = advanceCpu(cpuRunner, from, target, { world, scenario: playback?.scenario, next: playback?.next ?? 0 })
+        cpuError = r.error
+        if (cpuError) setPlaying(false)
+        result = { ...r, events: [] }
+      } else {
+        result = advanceWorld(compiled, from, until, { world, scenario: playback?.scenario, next: playback?.next ?? 0, options })
+      }
+      const { state, inputs, world: worldState, next: nextEvent, events } = result
       const finished = playback && until >= (playback.scenario.duration ?? Infinity)
       if (finished) setPlaying(false)
       const variable = (id) => compiled.steps.find((s) => s.id === id)?.variable
@@ -84,15 +114,16 @@ export function useSimulation(nodes, edges, plc, enabled) {
       const last = current.samples[current.samples.length - 1]
       const samples =
         last && sameSample(last.values, sample) ? current.samples : [...current.samples, { t: time, values: sample }].slice(-MAX_SAMPLES)
-      const next = { ...current, state, inputs, world: worldState, log, samples, playback: playback && !finished ? { ...playback, next: nextEvent } : null }
+      const next = { ...current, cpuError, state, inputs, world: worldState, log, samples, playback: playback && !finished ? { ...playback, next: nextEvent } : null }
       simRef.current = next
       setSim(next)
     },
-    [compiled, world],
+    [compiled, world, cpuSetup, cpuRunner],
   )
 
   const reset = useCallback(() => {
     if (!compiled) return
+    cpuRunner?.cpu.reset()
     const state = initialState(compiled)
     const inputs = {}
     for (const v of compiled.variables) {
@@ -103,12 +134,21 @@ export function useSimulation(nodes, edges, plc, enabled) {
     Object.assign(inputs, world.inputs(worldState))
     const first = { state, inputs, world: worldState, log: [], samples: [], recording: null, playback: null }
     simRef.current = first
-    // Evolución inicial (p. ej. receptividades "1" desde la situación inicial).
-    const { state: settled } = evolve(compiled, state, inputs, 0)
+    // Evolución inicial (p. ej. receptividades "1" desde la situación inicial). Con el autómata,
+    // ninguna etapa: las salidas las da el programa.
+    const settled = cpuSetup ? { ...state, active: new Set(), activatedAt: new Map(), values: { ...state.values, ...inputs } } : evolve(compiled, state, inputs, 0).state
     const ready = { ...first, state: settled, samples: [{ t: 0, values: sampleOf(compiled, settled) }] }
     simRef.current = ready
     setSim(ready)
-  }, [compiled, world])
+  }, [compiled, world, cpuSetup, cpuRunner])
+
+  // Al cambiar de lógica o de programa, la simulación vuelve a empezar.
+  const cpuKeyRef = useRef(cpuSetup)
+  useEffect(() => {
+    if (cpuKeyRef.current === cpuSetup) return
+    cpuKeyRef.current = cpuSetup
+    if (simRef.current) reset()
+  }, [cpuSetup, reset])
 
   // Arranque y parada de la simulación.
   useEffect(() => {
@@ -219,6 +259,8 @@ export function useSimulation(nodes, edges, plc, enabled) {
   const stableView = useMemo(() => view, [viewKey])
 
   return {
+    // Autómata: { errors, warnings } del programa y el error de ejecución (si se ha parado).
+    cpu: cpuSetup ? { errors: cpuSetup.errors, warnings: cpuSetup.warnings, error: sim?.cpuError ?? null, source: cpuConfig?.source ?? 'generated', text: cpuText } : null,
     compiled,
     sim,
     view: stableView,

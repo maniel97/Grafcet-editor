@@ -1904,6 +1904,7 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
               <g
                 key={e.id}
                 data-element={e.type}
+                data-pos={e.type === 'cylinder' ? (state.pos[e.id] ?? 0).toFixed(2) : undefined}
                 aria-label={`${SCENE_TYPES[e.type].label} ${labelOf(e)}`}
                 style={{ cursor: mode === 'edit' ? 'move' : operable(e) ? 'pointer' : 'default' }}
                 onPointerDown={(ev) => onPointerDown(ev, e)}

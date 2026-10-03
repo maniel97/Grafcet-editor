@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { AlertTriangle, ChevronDown, ChevronRight, Factory, Pause, Play, RotateCcw, SkipForward, Square, Timer } from 'lucide-react'
 import Chronogram from './Chronogram'
 import ScenarioControls from './ScenarioControls'
+import CpuControls from './CpuControls'
 import { chronogramCsv } from '../lib/sim/scenario'
 import { withMacros } from '../lib/sim/engine'
 import { firstFailure, waitingFor } from '../lib/sim/explain'
@@ -96,7 +97,7 @@ function chronogramSource(samples, signals, now) {
 const fmtTime = (t) => (t < 60 ? `${t.toFixed(1)} s` : `${Math.floor(t / 60)} min ${(t % 60).toFixed(1)} s`)
 
 // Panel de control de la simulación.
-export default function SimulationPanel({ simulation, scenarios = [], onScenariosChange, sceneOpen, onToggleScene, exportProps, onFocusNode, onClose }) {
+export default function SimulationPanel({ simulation, scenarios = [], onScenariosChange, cpuConfig, onCpuChange, onApplySymbols, sceneOpen, onToggleScene, exportProps, onFocusNode, onClose }) {
   const { compiled, sim, playing, setPlaying, speed, setSpeed, setInput, step, advance, reset } = simulation
 
   // Las entradas que gobierna la planta virtual no se cambian a mano.
@@ -244,6 +245,8 @@ export default function SimulationPanel({ simulation, scenarios = [], onScenario
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto">
+        <CpuControls config={cpuConfig} status={simulation.cpu} onChange={onCpuChange} onApplySymbols={onApplySymbols} />
+        {!simulation.cpu && (
         <Section title="Qué espera el grafcet" count={waiting.list.length}>
           {waiting.stuck && (
             <p className="rounded bg-red-50 p-2 text-xs text-red-700">
@@ -280,6 +283,7 @@ export default function SimulationPanel({ simulation, scenarios = [], onScenario
             })}
           </ul>
         </Section>
+        )}
 
         <div className="border-b border-slate-100 px-4 py-2">
           <button
@@ -401,6 +405,7 @@ export default function SimulationPanel({ simulation, scenarios = [], onScenario
           </Section>
         )}
 
+        {!simulation.cpu && (
         <Section title="Etapas activas" count={activeSteps.length}>
           <div className="flex flex-wrap gap-1">
             {activeSteps.length === 0 && <span className="text-xs text-slate-400">Ninguna</span>}
@@ -416,6 +421,7 @@ export default function SimulationPanel({ simulation, scenarios = [], onScenario
             ))}
           </div>
         </Section>
+        )}
 
         <Section title="Escenarios de prueba" count={scenarios.length}>
           <ScenarioControls simulation={simulation} scenarios={scenarios} onChange={onScenariosChange} />
