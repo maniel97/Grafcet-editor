@@ -441,6 +441,55 @@ const FIT_MARGIN = 30
 
 let created = 0
 const newId = () => `e${Date.now().toString(36)}${(created++).toString(36)}`
+// Vista previa de la paleta: el módulo «en acción» y para qué sirve.
+const HINTS = {
+  button: 'Pulsador: da 1 mientras lo mantienes pulsado (o 0 si es NC). Para Marcha, Paro, Rearme…',
+  switch: 'Interruptor: se queda en la posición elegida. Para selectores Manual/Automático, pieza colocada…',
+  emergency: 'Seta de emergencia: contacto NC enclavado; al pulsarla da 0 hasta que se rearma.',
+  lamp: 'Piloto: se enciende con una salida del grafcet.',
+  cylinder: 'Cilindro: sale con A+ y entra con A− (o con muelle). Lleva detectores a0/a1 o pisa finales de carrera; empuja las piezas.',
+  conveyor: 'Cinta: con su motor en marcha lleva las piezas que tiene encima.',
+  limit: 'Final de carrera: se acciona cuando lo pisa el vástago de un cilindro o una pieza.',
+  sensor: 'Detector de presencia: su haz ve las piezas (y los vástagos) que pasan por delante.',
+  feeder: 'Alimentador: suelta piezas solo, con una salida del grafcet o al pulsarlo en modo Usar.',
+  sink: 'Recogida: retira y cuenta las piezas que caen dentro.',
+  tank: 'Depósito: se llena y vacía con sus válvulas; sensores de nivel bajo y alto y nivel analógico.',
+  motor: 'Motor: gira mientras su salida está activa (al revés con la salida de giro inverso).',
+  display: 'Visualizador: muestra el valor de una variable (contador, analógica…).',
+}
+const PREVIEW_DELAY = 450
+
+// Dibujo de muestra de un módulo (con sus valores por defecto y «en marcha»).
+function ModulePreview({ type }) {
+  const e = { id: 'preview', type, x: 0, y: 0, rot: 0, ...SCENE_TYPES[type].defaults }
+  const demo = { motor: 'M', variable: 'V', extend: 'E', fill: 'F', high: 'H', low: 'L' }
+  const values = { M: 1, V: 1, E: 1, F: 1 }
+  const shapes = {
+    button: <ButtonShape e={e} pressed={false} />,
+    switch: <SwitchShape pressed />,
+    emergency: <EmergencyShape pressed={false} />,
+    lamp: <LampShape e={e} lit />,
+    cylinder: <CylinderShape e={{ ...e, ...demo, retracted: 'a0', extended: 'a1' }} pos={0.6} values={values} />,
+    conveyor: <ConveyorShape e={{ ...e, length: 160 }} running t={0} />,
+    limit: <LimitShape active />,
+    sensor: <SensorShape e={e} active />,
+    feeder: <FeederShape />,
+    sink: <SinkShape count={3} />,
+    tank: <TankShape e={{ ...e, ...demo }} level={0.55} values={values} />,
+    motor: <MotorShape angle={20} running />,
+    display: <DisplayShape value={42} />,
+  }
+  const b = boundsOf(type === 'conveyor' ? { ...e, length: 160 } : e, 1)
+  const pad = 12
+  return (
+    <svg viewBox={`${b.x - pad} ${b.y - pad} ${b.w + pad * 2} ${b.h + pad * 2}`} className="mx-auto block max-h-28 w-full" aria-hidden="true">
+      {shapes[type]}
+      {type === 'conveyor' && <rect x="40" y="-28" width="28" height="28" rx="3" fill={COLORS.amber} stroke={INK} />}
+      {type === 'feeder' && <rect x="-14" y="-14" width="28" height="28" rx="3" fill={COLORS.amber} stroke={INK} />}
+    </svg>
+  )
+}
+
 const PALETTE = Object.entries(SCENE_TYPES).reduce((groups, [type, t]) => ({ ...groups, [t.group]: [...(groups[t.group] ?? []), type] }), {})
 
 // Planta virtual en escena (lib/sim/scene.js), al estilo de PC_SIMU: se colocan los elementos
@@ -459,6 +508,10 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
   const [width, setWidth] = useState(loadWidth)
   const resizing = useRef(null)
   const [fitTick, setFitTick] = useState(0) // se reajusta al terminar de arrastrar el separador
+  // Vista previa flotante de un módulo de la paleta (junto al ratón, tras un momento encima).
+  const [preview, setPreview] = useState(null)
+  const previewTimer = useRef(null)
+  useEffect(() => () => clearTimeout(previewTimer.current), [])
 
   // Ajustar: zoom y desplazamiento para ver todos los elementos (y las piezas), con margen.
   const pendingScroll = useRef(null)
@@ -727,7 +780,26 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
               <div key={group}>
                 <p className="mb-0.5 text-[10px] font-medium uppercase tracking-wide text-slate-400">{group}</p>
                 {types.map((type) => (
-                  <button key={type} type="button" onClick={() => add(type)} className="block w-full rounded px-1 py-0.5 text-left hover:bg-blue-50">
+                  <button
+                    key={type}
+                    type="button"
+                    onClick={() => {
+                      clearTimeout(previewTimer.current)
+                      setPreview(null)
+                      add(type)
+                    }}
+                    onMouseEnter={(ev) => {
+                      const at = { x: ev.clientX, y: ev.clientY }
+                      clearTimeout(previewTimer.current)
+                      previewTimer.current = setTimeout(() => setPreview({ type, ...at }), PREVIEW_DELAY)
+                    }}
+                    onMouseMove={(ev) => setPreview((p) => (p ? { ...p, x: ev.clientX, y: ev.clientY } : p))}
+                    onMouseLeave={() => {
+                      clearTimeout(previewTimer.current)
+                      setPreview(null)
+                    }}
+                    className="block w-full rounded px-1 py-0.5 text-left hover:bg-blue-50"
+                  >
                     + {SCENE_TYPES[type].label}
                   </button>
                 ))}
@@ -809,6 +881,20 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
           </aside>
         )}
       </div>
+      {preview && mode === 'edit' && (
+        <div
+          role="tooltip"
+          aria-label={`Vista previa: ${SCENE_TYPES[preview.type].label}`}
+          className="side-panel pointer-events-none fixed z-50 w-56 rounded-md border border-slate-200 bg-white p-2 text-xs text-slate-700 shadow-lg"
+          style={{ left: Math.min(preview.x + 16, window.innerWidth - 240), top: Math.min(preview.y + 12, window.innerHeight - 220) }}
+        >
+          <p className="mb-1 font-semibold">{SCENE_TYPES[preview.type].label}</p>
+          <div className="paper rounded border border-slate-100 bg-white p-1">
+            <ModulePreview type={preview.type} />
+          </div>
+          <p className="mt-1 text-slate-600">{HINTS[preview.type]}</p>
+        </div>
+      )}
       {mode === 'edit' && (
         <p className="border-t border-slate-200 px-2 py-1 text-[11px] text-slate-500">
           Arrastra para mover · R gira · Supr borra · asigna las variables en el panel de la derecha. Piezas de {PIECE_SIZES.small[0]} y{' '}
