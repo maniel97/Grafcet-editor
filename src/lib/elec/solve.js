@@ -1,13 +1,14 @@
 // Simulación del esquema eléctrico (plc.electrical, lib/elec/catalog.js). Sin tensiones ni
-// intensidades: conducción sí/no, como en los esquemas de mando.
-//  1. Los cables y los contactos cerrados unen bornes en redes; los embarrados (y la fuente del
-//     autómata, y el secundario de los transformadores con el primario alimentado) dan a su red un
-//     potencial (L+, M, L, N, L1…).
-//  2. Una carga (bobina, electroválvula, piloto, timbre) está alimentada si sus dos bornes tienen
+// intensidades: conducción sí/no, como en los esquemas de mando (y, aparte, el valor de las
+// señales analógicas: mA o V, que van por su red).
+//  1. Los cables y los contactos cerrados unen bornes en redes; los embarrados, la fuente del
+//     autómata, las fuentes de 24 V y el secundario de los transformadores (con su entrada
+//     alimentada) dan a su red un potencial (L+, M, L, N, L1…).
+//  2. Una carga (bobina, electroválvula, piloto, timbre…) está alimentada si sus dos bornes tienen
 //     potenciales que forman circuito (L+/M, fase/neutro, dos fases distintas o los dos bornes del
 //     secundario de un mismo transformador).
-//  3. Las bobinas (y transformadores y detectores, que necesitan su alimentación) cambian lo que
-//     dependa de ellas y se repite hasta que nada cambia.
+//  3. Lo que depende de sí mismo (bobinas, transformadores, fuentes, alimentación de detectores,
+//     relés de seguridad, variadores…) se repite hasta que nada cambia.
 //  4. Una red con dos potenciales distintos es un cortocircuito: dispara la protección que lo corta
 //     (magnetotérmico, guardamotor o fusible; si es una derivación a tierra, el diferencial); sin
 //     protección, se avisa y todo queda sin tensión.
@@ -21,32 +22,40 @@ const PAIRS = [
   ['5', '6'],
 ]
 const PROTECTIONS = new Set(['breaker', 'motorprotector', 'fuse', 'rcd'])
+const MANUAL = new Set([...PROTECTIONS, 'mainswitch'])
 const TIMED = new Set(['ton', 'tof', 'flash'])
+const ORDER = { L1: 0, L2: 1, L3: 2 }
 
 export function elecInit() {
-  return { pressed: {}, latched: {}, opened: {}, tripped: {}, pos: {}, coils: {}, timers: {}, counts: {}, impulse: {}, view: null }
+  return { pressed: {}, latched: {}, opened: {}, tripped: {}, pos: {}, coils: {}, timers: {}, counts: {}, impulse: {}, safety: {}, safetyReset: {}, knob: {}, view: null }
 }
 
 const components = (schematic) => schematic?.components ?? []
 
 // Acciones del usuario en la simulación: pulsar / soltar; conmutar (interruptores, setas,
-// conmutadores, cruzamientos, protecciones, fusibles…); el conmutador 0-1-2 pasa a la posición
-// siguiente; disparar o rearmar (relé térmico, guardamotor por sobrecarga); probar el diferencial.
+// conmutadores, puertas, cortinas, protecciones, fusibles, interruptor general…); el conmutador
+// 0-1-2 pasa a la posición siguiente; el potenciómetro, +25 %; disparar o rearmar (relé
+// térmico, guardamotor por sobrecarga); probar el diferencial.
 export function elecAction(schematic, state, id, action) {
   const c = components(schematic).find((x) => x.id === id)
   if (!c) return state
   const s = { ...elecInit(), ...(state ?? {}) }
   if (action === 'press' || action === 'release') return { ...s, pressed: { ...s.pressed, [id]: action === 'press' } }
   if (action === 'toggle') {
-    if (['switch', 'emergency', 'changeover', 'crossover'].includes(c.type)) return { ...s, latched: { ...s.latched, [id]: !s.latched[id] } }
+    if (['switch', 'emergency', 'changeover', 'crossover', 'doorswitch', 'lightcurtain'].includes(c.type)) return { ...s, latched: { ...s.latched, [id]: !s.latched[id] } }
     if (c.type === 'selector3') return { ...s, pos: { ...s.pos, [id]: ((s.pos[id] ?? 0) + 1) % 3 } }
-    if (PROTECTIONS.has(c.type)) {
+    if (c.type === 'potentiometer') {
+      const now = s.knob[id] ?? Number(c.initial ?? 0.5)
+      return { ...s, knob: { ...s.knob, [id]: now >= 0.999 ? 0 : Math.min(1, Math.round((now + 0.25) * 4) / 4) } }
+    }
+    if (MANUAL.has(c.type)) {
       // Disparada (o fundido): se rearma (o se repone) y queda cerrada; si no, se abre o se cierra.
       if (s.tripped[id]) return { ...s, tripped: { ...s.tripped, [id]: false }, opened: { ...s.opened, [id]: false } }
       return { ...s, opened: { ...s.opened, [id]: !s.opened[id] } }
     }
     if (c.type === 'thermal') return { ...s, tripped: { ...s.tripped, [id]: !s.tripped[id] } }
   }
+  if (action.startsWith?.('set:') && c.type === 'potentiometer') return { ...s, knob: { ...s.knob, [id]: Math.min(1, Math.max(0, Number(action.slice(4)) || 0)) } }
   if (action === 'overload' && (c.type === 'thermal' || c.type === 'motorprotector')) return { ...s, tripped: { ...s.tripped, [id]: true } }
   if (action === 'test' && c.type === 'rcd' && !s.opened[id]) return { ...s, tripped: { ...s.tripped, [id]: true } }
   return s
@@ -86,6 +95,13 @@ function isShort(set) {
   return set.has('PE') && live.some((p) => p !== 'N' && p !== 'M')
 }
 
+// Fases de tres bornes en orden (para motores, variadores y relés de control de fases):
+// { distinct, dir: 1 (L1-L2-L3) | -1 (invertidas) | 0 }.
+export function phaseOrder(a, b, c) {
+  const distinct = [a, b, c].every((p) => p in ORDER) && new Set([a, b, c]).size === 3
+  return { distinct, dir: distinct ? ((ORDER[b] - ORDER[a] + 3) % 3 === 1 ? 1 : -1) : 0 }
+}
+
 // Red eléctrica con el estado actual: { find, potentials: Map(raíz -> Set), potentialOf, shorted }.
 function network(schematic, ctx) {
   const { find, union } = unionFind()
@@ -94,21 +110,36 @@ function network(schematic, ctx) {
   for (const c of components(schematic)) {
     const ts = terminalsOf(c)
     const closePair = (a, b) => union(key(c.id, a), key(c.id, b))
+    const source = (t, p) => sources.push([key(c.id, t), p])
     switch (c.type) {
       case 'rail':
         for (const t of ts) {
           union(key(c.id, t.id), key(c.id, ts[0].id))
-          sources.push([key(c.id, t.id), c.potential])
+          source(t.id, c.potential)
         }
         break
       case 'pushbutton':
       case 'switch':
       case 'limit':
-      case 'emergency': {
-        const nc = c.type === 'emergency' || c.contact === 'NC'
+      case 'litbutton': {
+        const nc = c.contact === 'NC'
         if (ctx.activated(c) !== nc) closePair(ts[0].id, ts[1].id)
         break
       }
+      case 'emergency':
+      case 'doorswitch':
+        if (!ctx.activated(c)) {
+          closePair('11', '12')
+          if (c.type === 'doorswitch' || Number(c.channels) === 2) closePair('21', '22')
+        }
+        break
+      case 'lightcurtain':
+        // Libre y alimentada: sus salidas OSSD dan +24 V.
+        if (!ctx.activated(c) && ctx.devices[`LC:${c.id}`]) {
+          closePair('+24', 'OSSD1')
+          closePair('+24', 'OSSD2')
+        }
+        break
       case 'selector3':
         if (ctx.position(c) === 1) closePair('13', '14')
         if (ctx.position(c) === 2) closePair('23', '24')
@@ -135,7 +166,8 @@ function network(schematic, ctx) {
       case 'breaker':
       case 'motorprotector':
       case 'fuse':
-        if (ctx.closed(c)) for (const [a, b] of Number(c.poles) === 1 && c.type !== 'motorprotector' ? [['1', '2']] : PAIRS) closePair(a, b)
+      case 'mainswitch':
+        if (ctx.closed(c)) for (const [a, b] of Number(c.poles) === 1 && (c.type === 'breaker' || c.type === 'fuse') ? [['1', '2']] : PAIRS) closePair(a, b)
         break
       case 'rcd':
         if (ctx.closed(c)) for (const [a, b] of PAIRS.slice(0, 2)) closePair(a, b)
@@ -147,10 +179,44 @@ function network(schematic, ctx) {
         if (ctx.deviceOn(c.ref)) for (const [a, b] of PAIRS) closePair(a, b)
         break
       case 'transformer':
-        if (ctx.devices[`T:${c.id}`]) sources.push([key(c.id, 'S1'), `sec:${c.id}:1`], [key(c.id, 'S2'), `sec:${c.id}:2`])
+        if (ctx.devices[`T:${c.id}`]) {
+          source('S1', `sec:${c.id}:1`)
+          source('S2', `sec:${c.id}:2`)
+        }
+        break
+      case 'psu':
+        if (ctx.devices[`G:${c.id}`]) {
+          source('L+', 'L+')
+          source('M', 'M')
+        }
+        break
+      case 'safetyrelay':
+        if (ctx.devices[`KS:${c.tag}`]) {
+          closePair('13', '14')
+          closePair('23', '24')
+        } else closePair('41', '42')
+        break
+      case 'vfd': {
+        if (ctx.devices[`VS:${c.id}`]) {
+          source('+24', 'L+')
+          source('GND', 'M')
+        }
+        const dir = ctx.devices[`V:${c.id}`]
+        if (dir) {
+          // Salida al motor: L1-L2-L3 (o con dos fases cambiadas, marcha atrás).
+          source('U', 'L1')
+          source('V', dir > 0 ? 'L2' : 'L3')
+          source('W', dir > 0 ? 'L3' : 'L2')
+          closePair('R1', 'R2')
+        }
+        break
+      }
+      case 'softstarter':
+        if (ctx.devices[`SS:${c.id}`]) for (const [a, b] of [['L1', 'T1'], ['L2', 'T2'], ['L3', 'T3']]) closePair(a, b)
         break
       case 'plc':
-        sources.push([key(c.id, 'L+'), 'L+'], [key(c.id, 'M'), 'M'])
+        source('L+', 'L+')
+        source('M', 'M')
         for (const t of ts) if (t.id.startsWith('Q') && ctx.plcOut[t.id]) closePair('1L', t.id)
         break
       default:
@@ -175,9 +241,13 @@ function network(schematic, ctx) {
   return { find, potentials, potentialOf, shorted }
 }
 
-// Avanza el esquema `dt` segundos. physical: { señal: activado } (pulsadores y detectores de la
-// planta); plcOut: { Q0.0: bool }. Devuelve { state, plcIn: { I0.0: bool }, actuators: { señal: 0/1 } }.
-export function elecStep(schematic, state, { physical = {}, plcOut = {} } = {}, dt = 0) {
+// Avanza el esquema `dt` segundos.
+//  physical: { señal: activado } (pulsadores y detectores de la planta);
+//  analog: { señal: 0..1 } (valor de las analógicas de la planta, en tanto por uno de su rango);
+//  plcOut: { Q0.0: bool }; plcOutAnalog: { AQW0: { value, unit } } (salidas analógicas).
+// Devuelve { state, plcIn: { I0.0: bool }, plcInAnalog: { AIW0: { value, unit } | null },
+//            actuators: { señal: 0..1 } }.
+export function elecStep(schematic, state, { physical = {}, analog = {}, plcOut = {}, plcOutAnalog = {} } = {}, dt = 0) {
   const s = { ...elecInit(), ...(state ?? {}) }
   const list = components(schematic)
   const byTag = new Map(list.filter((c) => c.tag).map((c) => [c.tag, c]))
@@ -188,31 +258,34 @@ export function elecStep(schematic, state, { physical = {}, plcOut = {} } = {}, 
   const activated = (c) => Boolean(s.pressed[c.id] || s.latched[c.id] || (c.signal && physical[c.signal]))
   const timer = (tag) => s.timers[tag] ?? { on: 0, off: Infinity }
   // Salida de una bobina temporizada o especial, con su alimentación actual.
-  const coilQ = (c, energized) => {
-    const t = timer(c.tag)
+  const coilQ = (c, energized, timers = s.timers, impulse = s.impulse) => {
+    const t = timers[c.tag] ?? { on: 0, off: Infinity }
     const preset = Number(c.preset) || 0
     if (c.kind === 'ton') return energized && t.on >= preset
     if (c.kind === 'tof') return energized || t.off < preset
     if (c.kind === 'flash') return energized && Math.floor(t.on / Math.max(0.1, preset || 1)) % 2 === 0
-    if (c.kind === 'impulse') return Boolean(s.impulse[c.tag])
+    if (c.kind === 'impulse') return Boolean(impulse[c.tag])
     return energized
   }
+  // ¿Está «encendido» el aparato con este identificador? (lo que miran sus contactos auxiliares)
+  const deviceOnWith = (devices, timers = s.timers, impulse = s.impulse, counts = s.counts) => (tag) => {
+    const d = byTag.get(tag)
+    if (!d) return false
+    if (d.type === 'coil') return coilQ(d, Boolean(devices[tag]), timers, impulse)
+    if (d.type === 'counter') return (counts[tag] ?? 0) >= (Number(d.preset) || 1)
+    if (d.type === 'thermal') return Boolean(tripped[d.id])
+    if (MANUAL.has(d.type)) return closed(d)
+    if (d.type === 'safetyrelay') return Boolean(devices[`KS:${tag}`])
+    if (d.type === 'phasemonitor') return Boolean(devices[`PM:${tag}`])
+    if (d.type === 'vfd') return Boolean(devices[`V:${d.id}`])
+    if (d.type === 'softstarter') return Boolean(devices[`SS:${d.id}`]) && (timers[tag]?.on ?? 0) >= (Number(d.ramp) || 0)
+    return false
+  }
   const settle = (devices) => {
-    const deviceOn = (tag) => {
-      const d = byTag.get(tag)
-      if (!d) return false
-      if (d.type === 'coil') return coilQ(d, Boolean(devices[tag]))
-      if (d.type === 'counter') return (s.counts[tag] ?? 0) >= (Number(d.preset) || 1)
-      if (d.type === 'thermal') return Boolean(tripped[d.id])
-      if (PROTECTIONS.has(d.type)) return closed(d)
-      if (d.type === 'selector3') return false
-      return false
-    }
-    const ctx = { activated, position: (c) => s.pos[c.id] ?? 0, deviceOn, closed, plcOut, devices }
+    const ctx = { activated, position: (c) => s.pos[c.id] ?? 0, deviceOn: deviceOnWith(devices), closed, plcOut, devices }
     return network(schematic, ctx)
   }
-  // Lo que depende de sí mismo (bobinas, transformadores, alimentación de los detectores), hasta
-  // que nada cambia (con un límite: un circuito que oscila se avisa).
+  // Lo que depende de sí mismo, hasta que nada cambia (con un límite: si oscila, se avisa).
   const solve = () => {
     let devices = { ...s.coils }
     let net
@@ -220,15 +293,41 @@ export function elecStep(schematic, state, { physical = {}, plcOut = {} } = {}, 
     for (let i = 0; ; i++) {
       net = settle(devices)
       const pot = (c, t) => net.potentialOf(key(c.id, t))
+      const same = (c, a, b) => net.find(key(c.id, a)) === net.find(key(c.id, b))
       const next = {}
       for (const c of coilsList) next[c.tag] = powered(pot(c, 'A1'), pot(c, 'A2'))
+      // Enclavamiento mecánico: de dos contactores enclavados, solo entra uno (el que ya estaba).
+      for (const c of coilsList) {
+        const other = c.interlock && byTag.get(c.interlock)
+        if (other && next[c.tag] && next[other.tag]) next[devices[c.tag] ? other.tag : c.tag] = false
+      }
       for (const c of list) {
         if (c.type === 'transformer') next[`T:${c.id}`] = powered(pot(c, 'P1'), pot(c, 'P2'))
+        if (c.type === 'psu') next[`G:${c.id}`] = powered(pot(c, 'L'), pot(c, 'N'))
         if (c.type === 'sensor3') next[`S:${c.id}`] = powered(pot(c, 'BN'), pot(c, 'BU'))
+        if (c.type === 'lightcurtain') next[`LC:${c.id}`] = powered(pot(c, '+24'), pot(c, '0V'))
+        if (c.type === 'softstarter') next[`SS:${c.id}`] = powered(pot(c, 'A1'), pot(c, 'A2')) && phaseOrder(pot(c, 'L1'), pot(c, 'L2'), pot(c, 'L3')).distinct
+        if (c.type === 'phasemonitor') next[`PM:${c.tag}`] = phaseOrder(pot(c, 'L1'), pot(c, 'L2'), pot(c, 'L3')).dir === 1
+        if (c.type === 'vfd') {
+          const supplied = phaseOrder(pot(c, 'L1'), pot(c, 'L2'), pot(c, 'L3')).distinct
+          next[`VS:${c.id}`] = supplied
+          const fwd = pot(c, 'DI1') === 'L+'
+          const rev = pot(c, 'DI2') === 'L+'
+          next[`V:${c.id}`] = supplied && fwd !== rev ? (fwd ? 1 : -1) : 0
+        }
+        if (c.type === 'safetyrelay') {
+          const supplied = powered(pot(c, 'A1'), pot(c, 'A2'))
+          const ch1 = same(c, 'S11', 'S12') || pot(c, 'S12') === 'L+'
+          const ch2 = same(c, 'S21', 'S22') || pot(c, 'S22') === 'L+'
+          const reset = same(c, 'S33', 'S34') || pot(c, 'S34') === 'L+'
+          // Se activa con los dos canales cerrados y el flanco del rearme; se mantiene mientras
+          // sigan cerrados (y con alimentación).
+          next[`KS:${c.tag}`] = supplied && ch1 && ch2 && Boolean(s.safety[c.tag] || (reset && !s.safetyReset[c.tag]))
+        }
       }
-      const same = Object.keys({ ...next, ...devices }).every((k) => Boolean(next[k]) === Boolean(devices[k]))
-      devices = next
-      if (same) break
+      const done = Object.keys({ ...next, ...devices }).every((k) => k.startsWith('C:') || Boolean(next[k]) === Boolean(devices[k]))
+      devices = { ...next, ...Object.fromEntries(Object.entries(devices).filter(([k]) => k.startsWith('C:'))) }
+      if (done) break
       if (i > 12) {
         oscillating = true
         break
@@ -268,9 +367,10 @@ export function elecStep(schematic, state, { physical = {}, plcOut = {} } = {}, 
   if (dead) short = 'Cortocircuito sin protección: pon un magnetotérmico o un fusible (o corrige el cableado)'
 
   const pot = (c, t) => (dead ? null : r.net.potentialOf(key(c, t)))
+  const root = (c, t) => r.net.find(key(c, t))
   const devices = dead ? {} : r.devices
-  // Temporizadores (tiempo alimentado o desde que se quitó), telerruptores (cambian con cada
-  // impulso) y contadores (cuentan cada impulso; R1-R2 los pone a cero).
+  // Temporizadores (y rampas), telerruptores (cambian con cada impulso) y contadores (cuentan
+  // cada impulso; R1-R2 los pone a cero).
   const timers = { ...s.timers }
   const impulse = { ...s.impulse }
   for (const c of coilsList) {
@@ -281,6 +381,11 @@ export function elecStep(schematic, state, { physical = {}, plcOut = {} } = {}, 
     }
     if (c.kind === 'impulse' && on && !s.coils[c.tag]) impulse[c.tag] = !impulse[c.tag]
   }
+  for (const c of list) {
+    if (c.type !== 'softstarter' || !c.tag) continue
+    const t = timer(c.tag)
+    timers[c.tag] = devices[`SS:${c.id}`] ? { on: t.on + dt, off: 0 } : { on: 0, off: t.off + dt }
+  }
   const counts = { ...s.counts }
   for (const c of counters) {
     const pulse = powered(pot(c.id, 'A1'), pot(c.id, 'A2'))
@@ -288,75 +393,148 @@ export function elecStep(schematic, state, { physical = {}, plcOut = {} } = {}, 
     else if (pulse && !s.coils[`C:${c.tag}`]) counts[c.tag] = (counts[c.tag] ?? 0) + 1
     devices[`C:${c.tag}`] = pulse
   }
+  // Relés de seguridad: se recuerda si están activados y el rearme (para su flanco).
+  const safety = {}
+  const safetyReset = {}
+  const safetyView = {}
+  for (const c of list) {
+    if (c.type !== 'safetyrelay' || !c.tag) continue
+    const same = (a, b) => !dead && root(c.id, a) === root(c.id, b)
+    const ch1 = same('S11', 'S12') || pot(c.id, 'S12') === 'L+'
+    const ch2 = same('S21', 'S22') || pot(c.id, 'S22') === 'L+'
+    safety[c.tag] = Boolean(devices[`KS:${c.tag}`])
+    safetyReset[c.tag] = same('S33', 'S34') || pot(c.id, 'S34') === 'L+'
+    safetyView[c.id] = { ch1, ch2, supplied: powered(pot(c.id, 'A1'), pot(c.id, 'A2')), discrepancy: ch1 !== ch2 }
+  }
+
+  // Señales analógicas: cada fuente (transmisor alimentado, potenciómetro, salida analógica del
+  // autómata) pone su valor en su red; las entradas lo leen.
+  const analogNets = new Map()
+  const putAnalog = (c, t, value, unit) => !dead && analogNets.set(root(c, t), { value: Math.round(value * 1000) / 1000, unit })
+  for (const c of list) {
+    if (c.type === 'transmitter') {
+      const pct = Math.min(1, Math.max(0, Number(analog[c.signal] ?? 0)))
+      if (c.output === '0-10V') {
+        if (powered(pot(c.id, '+'), pot(c.id, '0V'))) putAnalog(c.id, 'OUT', 10 * pct, 'V')
+      } else if (pot(c.id, '+') === 'L+') putAnalog(c.id, '−', 4 + 16 * pct, 'mA')
+    }
+    if (c.type === 'potentiometer') putAnalog(c.id, 'W', 10 * (s.knob[c.id] ?? Number(c.initial ?? 0.5)), 'V')
+    if (c.type === 'plc') for (const t of terminalsOf(c)) if (t.id.startsWith('AQW') && plcOutAnalog[t.id]) putAnalog(c.id, t.id, plcOutAnalog[t.id].value, plcOutAnalog[t.id].unit)
+  }
+  const analogAt = (c, t) => (dead ? null : (analogNets.get(root(c, t)) ?? null))
+
+  // Velocidad de los motores: la del variador (o la rampa del arrancador suave) que los alimenta.
+  const speedByRoot = new Map()
+  const vfdView = {}
+  const softView = {}
+  for (const c of list) {
+    if (c.type === 'vfd') {
+      const dir = devices[`V:${c.id}`] ?? 0
+      const ai = analogAt(c.id, 'AI1')
+      const hz = !dir ? 0 : ai?.unit === 'V' ? Math.round(Math.min(10, Math.max(0, ai.value)) * 5 * 10) / 10 : pot(c.id, 'DI3') === 'L+' ? Number(c.speed2) || 25 : 50
+      vfdView[c.id] = { hz, dir }
+      if (dir && !dead) speedByRoot.set(root(c.id, 'U'), hz / 50)
+    }
+    if (c.type === 'softstarter') {
+      const on = Boolean(devices[`SS:${c.id}`])
+      const ramp = Math.max(0.1, Number(c.ramp) || 3)
+      const pct = on ? Math.min(1, (timers[c.tag]?.on ?? 0) / ramp) : 0
+      softView[c.id] = { pct, on }
+      if (on && !dead) speedByRoot.set(root(c.id, 'T1'), Math.max(0.05, pct))
+    }
+  }
 
   // Resultado para dibujar y para la planta y el autómata.
   const loads = {}
   const actuators = {}
   const plcIn = {}
+  const plcInAnalog = {}
   const motors = {}
-  const view = { pot: {}, loads, motors, closed: {}, short, oscillating: r.oscillating, plcIn, plcOut, tripped, pos: s.pos, counts, opened: s.opened }
-  const after = { ...s, tripped, coils: devices, timers, impulse, counts }
-  const qOf = (d) => {
-    // Salida de un aparato con su estado ya actualizado (para dibujar sus contactos).
-    if (d.type === 'coil') {
-      const t = timers[d.tag] ?? { on: 0, off: Infinity }
-      const preset = Number(d.preset) || 0
-      const on = Boolean(devices[d.tag])
-      if (d.kind === 'ton') return on && t.on >= preset
-      if (d.kind === 'tof') return on || t.off < preset
-      if (d.kind === 'flash') return on && Math.floor(t.on / Math.max(0.1, preset || 1)) % 2 === 0
-      if (d.kind === 'impulse') return Boolean(impulse[d.tag])
-      return on
-    }
-    if (d.type === 'counter') return (counts[d.tag] ?? 0) >= (Number(d.preset) || 1)
-    if (d.type === 'thermal') return Boolean(tripped[d.id])
-    if (PROTECTIONS.has(d.type)) return closed(d)
-    return false
+  const beacons = {}
+  const view = {
+    pot: {},
+    loads,
+    motors,
+    closed: {},
+    short,
+    oscillating: r.oscillating,
+    plcIn,
+    plcInAnalog,
+    plcOut,
+    tripped,
+    pos: s.pos,
+    counts,
+    opened: s.opened,
+    safety: safetyView,
+    vfd: vfdView,
+    soft: softView,
+    beacons,
+    knob: s.knob,
+    analog: {},
   }
+  const after = { ...s, tripped, coils: devices, timers, impulse, counts, safety, safetyReset }
+  const deviceOn = deviceOnWith(devices, timers, impulse, counts)
   for (const c of list) {
-    for (const t of terminalsOf(c)) view.pot[key(c.id, t.id)] = pot(c.id, t.id)
-    if (['coil', 'valve', 'lamp', 'buzzer'].includes(c.type)) {
+    for (const t of terminalsOf(c)) {
+      view.pot[key(c.id, t.id)] = pot(c.id, t.id)
+      const a = analogAt(c.id, t.id)
+      if (a) view.analog[key(c.id, t.id)] = a
+    }
+    if (['coil', 'valve', 'lamp', 'buzzer', 'brake'].includes(c.type)) {
       const [a, b] = terminalsOf(c)
       loads[c.id] = c.type === 'coil' ? Boolean(devices[c.tag]) : powered(pot(c.id, a.id), pot(c.id, b.id))
       if (c.signal) actuators[c.signal] = loads[c.id] ? 1 : 0
     }
-    if (c.type === 'transformer') loads[c.id] = Boolean(devices[`T:${c.id}`])
+    if (c.type === 'litbutton') {
+      loads[c.id] = powered(pot(c.id, 'X1'), pot(c.id, 'X2'))
+      if (c.light) actuators[c.light] = loads[c.id] ? 1 : 0
+    }
+    if (c.type === 'beacon') {
+      const lit = (t) => powered(pot(c.id, t), pot(c.id, 'X0'))
+      beacons[c.id] = { red: lit('X1'), amber: lit('X2'), green: lit('X3'), buzzer: lit('X4') }
+      loads[c.id] = Object.values(beacons[c.id]).some(Boolean)
+      for (const k of ['red', 'amber', 'green', 'buzzer']) if (c[k]) actuators[c[k]] = beacons[c.id][k] ? 1 : 0
+    }
+    if (['transformer', 'psu'].includes(c.type)) loads[c.id] = Boolean(devices[`${c.type === 'psu' ? 'G' : 'T'}:${c.id}`])
+    if (c.type === 'lightcurtain') loads[c.id] = Boolean(devices[`LC:${c.id}`]) && !activated(c)
+    if (c.type === 'safetyrelay') loads[c.id] = Boolean(devices[`KS:${c.tag}`])
+    if (c.type === 'phasemonitor') loads[c.id] = Boolean(devices[`PM:${c.tag}`])
+    if (c.type === 'vfd') loads[c.id] = Boolean(devices[`V:${c.id}`])
+    if (c.type === 'softstarter') loads[c.id] = Boolean(devices[`SS:${c.id}`])
     if (c.type === 'counter') loads[c.id] = Boolean(devices[`C:${c.tag}`])
     if (c.type === 'motor3' || c.type === 'motor6') {
-      const m = motorState(c, (t) => pot(c.id, t), (t) => r.net.find(key(c.id, t)))
-      motors[c.id] = m
-      if (c.signal) actuators[c.signal] = m.running ? 1 : 0
+      const m = motorState(c, (t) => pot(c.id, t), (t) => root(c.id, t))
+      const speed = speedByRoot.get(root(c.id, c.type === 'motor6' ? 'U1' : 'U')) ?? 1
+      motors[c.id] = { ...m, speed: m.running ? speed : 0 }
+      if (c.signal) actuators[c.signal] = m.running ? speed : 0
       if (c.reverse) actuators[c.reverse] = m.running && m.dir < 0 ? 1 : 0
     }
     if (c.type === 'plc') {
-      for (const t of terminalsOf(c)) if (t.id.startsWith('I')) plcIn[t.id] = powered(pot(c.id, t.id), pot(c.id, '1M'))
+      for (const t of terminalsOf(c)) {
+        if (t.id.startsWith('I')) plcIn[t.id] = powered(pot(c.id, t.id), pot(c.id, '1M'))
+        if (t.id.startsWith('AIW')) plcInAnalog[t.id] = analogAt(c.id, t.id)
+      }
     }
-    if (['pushbutton', 'switch', 'limit', 'emergency', 'changeover', 'crossover'].includes(c.type)) {
-      const nc = c.type === 'emergency' || c.contact === 'NC'
+    if (['pushbutton', 'switch', 'limit', 'emergency', 'changeover', 'crossover', 'litbutton', 'doorswitch', 'lightcurtain'].includes(c.type)) {
+      const nc = ['emergency', 'doorswitch', 'lightcurtain'].includes(c.type) || c.contact === 'NC'
       view.closed[c.id] = activated(c) !== nc
     }
     if (c.type === 'sensor3') view.closed[c.id] = activated(c) && Boolean(devices[`S:${c.id}`])
-    if (c.type === 'contact') {
-      const d = byTag.get(c.ref)
-      view.closed[c.id] = Boolean(d && qOf(d)) !== (c.contact === 'NC')
-    }
+    if (c.type === 'contact') view.closed[c.id] = deviceOn(c.ref) !== (c.contact === 'NC')
     if (c.type === 'maincontacts') view.closed[c.id] = Boolean(devices[c.ref])
-    if (PROTECTIONS.has(c.type)) view.closed[c.id] = closed(c)
+    if (MANUAL.has(c.type)) view.closed[c.id] = closed(c)
   }
-  return { state: { ...after, view }, plcIn, actuators }
+  return { state: { ...after, view }, plcIn, plcInAnalog, actuators }
 }
 
 // Motor trifásico: gira con las tres fases distintas; el sentido, por el orden de las fases.
 // Estrella-triángulo: en estrella si U2, V2 y W2 están unidos; en triángulo si cada devanado
 // queda entre dos fases.
-const ORDER = { L1: 0, L2: 1, L3: 2 }
 function motorState(c, potOf, rootOf) {
   const sixWire = c.type === 'motor6'
   const [u, v, w] = (sixWire ? ['U1', 'V1', 'W1'] : ['U', 'V', 'W']).map(potOf)
-  const phases = [u, v, w]
-  const distinct = phases.every((p) => p in ORDER) && new Set(phases).size === 3
-  const dir = distinct ? ((ORDER[v] - ORDER[u] + 3) % 3 === 1 ? 1 : -1) : 0
-  const count = phases.filter((p) => p in ORDER).length
+  const { distinct, dir } = phaseOrder(u, v, w)
+  const count = [u, v, w].filter((p) => p in ORDER).length
   if (!sixWire) {
     return { running: distinct, dir, mode: null, warning: count && !distinct ? 'Le falta una fase' : null }
   }
@@ -369,3 +547,4 @@ function motorState(c, potOf, rootOf) {
   const mode = distinct && star ? 'estrella' : distinct && delta ? 'triángulo' : null
   return { running: Boolean(mode), dir: mode ? dir : 0, mode, warning: count && !mode ? 'Sin conexión válida (ni estrella ni triángulo)' : null }
 }
+

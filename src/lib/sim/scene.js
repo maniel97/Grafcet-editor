@@ -298,6 +298,12 @@ function fall(scene, state, held, dt) {
 }
 
 const on = (values, name) => Boolean(name) && Number(values[name] ?? 0) !== 0
+// Fracción de velocidad de un motor (1 si va a tope; menos con un variador o en la rampa de un
+// arrancador suave).
+const fraction = (values, name) => {
+  const v = Number(values[name] ?? 0)
+  return v > 0 && v < 1 ? v : 1
+}
 const clamp = (x) => Math.min(1, Math.max(0, x))
 const elementsOf = (scene) => scene?.elements ?? []
 
@@ -370,7 +376,8 @@ export function sceneStep(scene, state, values, dt) {
   const movers = []
   for (const e of elements) {
     if (stuck(e)) continue
-    if (e.type === 'conveyor' && on(values, e.motor)) movers.push([e, conveyorRect(e), Number(e.length) || 240, Number(e.time) || 4])
+    // Con un variador, la cinta va más despacio (la señal del motor es la fracción de velocidad).
+    if (e.type === 'conveyor' && on(values, e.motor)) movers.push([e, conveyorRect(e), (Number(e.length) || 240) * fraction(values, e.motor), Number(e.time) || 4])
     if (e.type === 'diverter' && on(values, e.gate)) movers.push([e, diverterRect(e), Number(e.length) || 80, Number(e.time) || 0.5])
     if (e.type === 'ramp') movers.push([e, rampRect(e), Number(e.length) || 120, Number(e.time) || 1])
   }
@@ -473,7 +480,7 @@ export function sceneStep(scene, state, values, dt) {
   for (const e of elements) {
     if (e.type !== 'motor' || stuck(e)) continue
     const dir = on(values, e.variable) ? (on(values, e.reverse) ? -1 : 1) : 0
-    if (dir) next.angle[e.id] = ((next.angle[e.id] ?? 0) + dir * 360 * dt) % 360
+    if (dir) next.angle[e.id] = ((next.angle[e.id] ?? 0) + dir * 360 * dt * fraction(values, e.variable)) % 360
   }
 
   if (scene?.gravity) fall(scene, next, new Set(Object.values(next.held).map((h) => h.id)), dt)

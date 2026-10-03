@@ -133,7 +133,7 @@ export const ELEC_TEMPLATES = [
   {
     id: 'inversion',
     title: 'Inversión de giro con enclavamiento',
-    description: 'KM1 gira a derechas y KM2 a izquierdas (cruza L1 y L3). Los contactos 21-22 impiden que entren a la vez.',
+    description: 'KM1 gira a derechas y KM2 a izquierdas (cruza L1 y L3). Enclavamiento eléctrico (contactos 21-22) y mecánico: nunca entran a la vez.',
     build(ox, oy, prefix) {
       const b = builder(ox, oy, prefix)
       power(b, { second: true })
@@ -143,11 +143,11 @@ export const ELEC_TEMPLATES = [
       b.wire('F2', '6', 'M1', 'W')
       controlStart(b, 340, 620)
       const right = startStop(b, 340, 'S0', '12', 'S1', 'KM1', [['KM2i', 'KM2']])
-      b.add('KM1', 'coil', 340, 500, { tag: 'KM1', kind: 'contactor', text: 'Derechas' })
+      b.add('KM1', 'coil', 340, 500, { tag: 'KM1', kind: 'contactor', text: 'Derechas', interlock: 'KM2' })
       b.wire(...right, 'KM1', 'A1')
       b.wire('KM1', 'A2', 'N', tap(360, 320))
       const left = startStop(b, 640, 'S0', '12', 'S2', 'KM2', [['KM1i', 'KM1']])
-      b.add('KM2', 'coil', 640, 500, { tag: 'KM2', kind: 'contactor', text: 'Izquierdas' })
+      b.add('KM2', 'coil', 640, 500, { tag: 'KM2', kind: 'contactor', text: 'Izquierdas', interlock: 'KM1' })
       b.wire(...left, 'KM2', 'A1')
       b.wire('KM2', 'A2', 'N', tap(660, 320))
       return b
@@ -342,6 +342,161 @@ ELEC_TEMPLATES.push(
       b.add('KM1', 'coil', 20, 540, { tag: 'KM1', kind: 'contactor', text: 'Contactor (24 V~)' })
       b.wire('S1', '14', 'KM1', 'A1')
       b.wire('KM1', 'A2', 'T1', 'S2')
+      return b
+    },
+  },
+)
+
+// Industria: cabecera de máquina, seguridad, variador, arrancador suave y freno.
+ELEC_TEMPLATES.push(
+  {
+    id: 'cabecera',
+    title: 'Cabecera de máquina',
+    description: 'Interruptor general -Q0, relé de control de fases -KF1 (piloto si las fases están bien) y fuente de 24 V DC -G1 para el mando.',
+    build(ox, oy, prefix) {
+      const b = builder(ox, oy, prefix)
+      for (const [i, p] of ['L1', 'L2', 'L3', 'N'].entries()) b.add(p, 'rail', 0, i * 20, { potential: p, length: 520 })
+      b.add('Q0', 'mainswitch', 20, 100, { tag: 'Q0', text: 'Interruptor general' })
+      b.wire('L1', tap(40), 'Q0', '1')
+      b.wire('L2', tap(80), 'Q0', '3')
+      b.wire('L3', tap(120), 'Q0', '5')
+      b.add('KF1', 'phasemonitor', 20, 240, { tag: 'KF1', text: 'Control de fases' })
+      b.wire('Q0', '2', 'KF1', 'L1')
+      b.wire('Q0', '4', 'KF1', 'L2')
+      b.wire('Q0', '6', 'KF1', 'L3')
+      b.add('G1', 'psu', 260, 240, { tag: 'G1' })
+      b.wire('Q0', '2', 'G1', 'L')
+      b.wire('N', tap(320), 'G1', 'N')
+      b.add('KF1c', 'contact', 420, 360, { ref: 'KF1', contact: 'NO' })
+      b.add('H1', 'lamp', 420, 480, { tag: 'H1', color: 'white', text: 'Tensión y fases correctas' })
+      b.wire('G1', 'L+', 'KF1c', 'a')
+      b.wire('KF1c', 'b', 'H1', 'X1')
+      b.wire('H1', 'X2', 'G1', 'M')
+      return b
+    },
+  },
+  {
+    id: 'seguridad',
+    title: 'Parada de emergencia (categoría 3)',
+    description: 'Seta y puerta de doble canal al relé de seguridad -KS1; rearme S2; dos contactores redundantes. Abrir un canal para; vuelve solo con el rearme.',
+    build(ox, oy, prefix) {
+      const b = builder(ox, oy, prefix)
+      b.add('L+', 'rail', 0, 0, { potential: 'L+', length: 760 })
+      b.add('M', 'rail', 0, 640, { potential: 'M', length: 760 })
+      b.add('KS1', 'safetyrelay', 300, 380, { tag: 'KS1', text: 'Relé de seguridad' })
+      b.wire('L+', tap(310), 'KS1', 'A1')
+      b.wire('KS1', 'A2', 'M', tap(310))
+      b.add('S1', 'emergency', 20, 60, { tag: 'S1', channels: 2, text: 'Seta de emergencia' })
+      b.add('B1', 'doorswitch', 20, 200, { tag: 'B1', text: 'Puerta del resguardo' })
+      b.wire('KS1', 'S11', 'S1', '11')
+      b.wire('S1', '12', 'B1', '11')
+      b.wire('B1', '12', 'KS1', 'S12')
+      b.wire('KS1', 'S21', 'S1', '21')
+      b.wire('S1', '22', 'B1', '21')
+      b.wire('B1', '22', 'KS1', 'S22')
+      b.add('S2', 'pushbutton', 160, 200, { tag: 'S2', contact: 'NO', text: 'Rearme' })
+      b.wire('KS1', 'S33', 'S2', '13')
+      b.wire('S2', '14', 'KS1', 'S34')
+      b.add('KM1', 'coil', 560, 520, { tag: 'KM1', kind: 'contactor', text: 'Contactor 1' })
+      b.add('KM2', 'coil', 640, 520, { tag: 'KM2', kind: 'contactor', text: 'Contactor 2' })
+      b.wire('L+', tap(450), 'KS1', '13')
+      b.wire('KS1', '14', 'KM1', 'A1')
+      b.wire('KM1', 'A2', 'M', tap(580))
+      b.wire('L+', tap(470), 'KS1', '23')
+      b.wire('KS1', '24', 'KM2', 'A1')
+      b.wire('KM2', 'A2', 'M', tap(660))
+      b.add('H1', 'lamp', 720, 520, { tag: 'H1', color: 'red', text: 'Parada de emergencia' })
+      b.wire('L+', tap(490), 'KS1', '41')
+      b.wire('KS1', '42', 'H1', 'X1')
+      b.wire('H1', 'X2', 'M', tap(740))
+      return b
+    },
+  },
+  {
+    id: 'variador',
+    title: 'Variador de frecuencia',
+    description: 'Cinta con variador -T1: S1 adelante, S2 atrás, S3 segunda velocidad (25 Hz) y, con S4, consigna del potenciómetro -R1. La baliza se pone verde en marcha.',
+    build(ox, oy, prefix) {
+      const b = builder(ox, oy, prefix)
+      for (const [i, p] of ['L1', 'L2', 'L3'].entries()) b.add(p, 'rail', 0, i * 20, { potential: p, length: 760 })
+      b.add('Q1', 'motorprotector', 20, 100, { tag: 'Q1', text: 'Guardamotor' })
+      b.wire('L1', tap(40), 'Q1', '1')
+      b.wire('L2', tap(80), 'Q1', '3')
+      b.wire('L3', tap(120), 'Q1', '5')
+      b.add('T1', 'vfd', 20, 260, { tag: 'T1', speed2: 25, text: 'Variador' })
+      b.wire('Q1', '2', 'T1', 'L1')
+      b.wire('Q1', '4', 'T1', 'L2')
+      b.wire('Q1', '6', 'T1', 'L3')
+      b.add('M1', 'motor3', 20, 460, { tag: 'M1', text: 'Motor de la cinta' })
+      b.wire('T1', 'U', 'M1', 'U')
+      b.wire('T1', 'V', 'M1', 'V')
+      b.wire('T1', 'W', 'M1', 'W')
+      const switches = [
+        ['S1', 'DI1', 'Adelante'],
+        ['S2', 'DI2', 'Atrás'],
+        ['S3', 'DI3', '2ª velocidad'],
+      ]
+      switches.forEach(([n, di, text], i) => {
+        b.add(n, 'switch', 320 + i * 120, 100, { tag: n, contact: 'NO', text })
+        b.wire('T1', '+24', n, '13')
+        b.wire(n, '14', 'T1', di)
+      })
+      b.add('R1', 'potentiometer', 680, 60, { tag: 'R1', initial: 0.5, text: 'Consigna 0-10 V' })
+      b.add('S4', 'switch', 680, 200, { tag: 'S4', contact: 'NO', text: 'Consigna externa' })
+      b.wire('R1', 'W', 'S4', '13')
+      b.wire('S4', '14', 'T1', 'AI1')
+      b.add('P1', 'beacon', 360, 420, { tag: 'P1', text: 'Baliza' })
+      b.wire('T1', 'R1', 'P1', 'X3')
+      b.wire('T1', '+24', 'T1', 'R2')
+      b.wire('P1', 'X0', 'T1', 'GND')
+      return b
+    },
+  },
+  {
+    id: 'arrancador-suave',
+    title: 'Arrancador suave',
+    description: 'El arrancador -T1 sube la tensión del motor en una rampa (3 s): la cinta arranca sin tirones. S1 da la orden.',
+    build(ox, oy, prefix) {
+      const b = builder(ox, oy, prefix)
+      for (const [i, p] of ['L1', 'L2', 'L3', 'N'].entries()) b.add(p, 'rail', 0, i * 20, { potential: p, length: 520 })
+      b.add('Q1', 'breaker', 20, 120, { tag: 'Q1', poles: 3, text: 'Protección' })
+      b.wire('L1', tap(40), 'Q1', '1')
+      b.wire('L2', tap(80), 'Q1', '3')
+      b.wire('L3', tap(120), 'Q1', '5')
+      b.add('T1', 'softstarter', 20, 260, { tag: 'T1', ramp: 3, text: 'Arrancador suave' })
+      b.wire('Q1', '2', 'T1', 'L1')
+      b.wire('Q1', '4', 'T1', 'L2')
+      b.wire('Q1', '6', 'T1', 'L3')
+      b.add('M1', 'motor3', 20, 420, { tag: 'M1', text: 'Motor' })
+      b.wire('T1', 'T1', 'M1', 'U')
+      b.wire('T1', 'T2', 'M1', 'V')
+      b.wire('T1', 'T3', 'M1', 'W')
+      b.add('S1', 'switch', 160, 120, { tag: 'S1', contact: 'NO', text: 'Marcha' })
+      b.wire('Q1', '2', 'S1', '13')
+      b.wire('S1', '14', 'T1', 'A1')
+      b.wire('T1', 'A2', 'N', tap(180))
+      return b
+    },
+  },
+  {
+    id: 'freno',
+    title: 'Motor con freno',
+    description: 'El freno -MB1 va conectado a los bornes del motor: con KM1 dentro, se suelta; al parar, frena.',
+    build(ox, oy, prefix) {
+      const b = builder(ox, oy, prefix)
+      power(b)
+      b.add('M1', 'motor3', 0, 440, { tag: 'M1', text: 'Motor' })
+      b.wire('F2', '2', 'M1', 'U')
+      b.wire('F2', '4', 'M1', 'V')
+      b.wire('F2', '6', 'M1', 'W')
+      b.add('MB1', 'brake', 180, 440, { tag: 'MB1', text: 'Freno' })
+      b.wire('F2', '2', 'MB1', 'A1')
+      b.wire('F2', '4', 'MB1', 'A2')
+      controlStart(b, 340, 620)
+      const last = startStop(b, 340, 'S0', '12', 'S1', 'KM1')
+      b.add('KM1', 'coil', 340, 480, { tag: 'KM1', kind: 'contactor', text: 'Motor' })
+      b.wire(...last, 'KM1', 'A1')
+      b.wire('KM1', 'A2', 'N', tap(360, 320))
       return b
     },
   },

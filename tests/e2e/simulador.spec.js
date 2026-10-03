@@ -1043,3 +1043,33 @@ test('esquema eléctrico: vivienda (conmutada) y botón de prueba del diferencia
   await expect(lamp).toHaveAttribute('data-on', '1')
   expectNoErrors(errors)
 })
+
+test('esquema eléctrico: parada de emergencia con relé de seguridad (rearme, seta y puerta)', async ({ page }) => {
+  const errors = await openEditor(page)
+  await page.getByRole('button', { name: 'Esquema eléctrico' }).click()
+  const view = page.getByRole('region', { name: 'Esquema eléctrico' })
+  await view.getByLabel('Insertar montaje').selectOption('seguridad')
+  await view.getByRole('button', { name: 'Pantalla completa' }).click()
+  await page.getByRole('button', { name: /Simular/ }).click()
+  const km1 = view.locator('[data-elec="coil"][data-tag="KM1"]')
+  const hold = async (tag) => {
+    const b = await view.locator(`[data-elec="pushbutton"][data-tag="${tag}"]`).boundingBox()
+    await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2)
+    await page.mouse.down()
+    await page.waitForTimeout(200)
+    await page.mouse.up()
+  }
+  await expect(km1).toHaveAttribute('data-on', '0')
+  await hold('S2') // rearme
+  await expect(km1).toHaveAttribute('data-on', '1')
+  await view.locator('[data-elec="emergency"]').click() // seta
+  await expect(km1).toHaveAttribute('data-on', '0')
+  await view.locator('[data-elec="emergency"]').click() // se desenclava: no arranca solo
+  await page.waitForTimeout(300)
+  await expect(km1).toHaveAttribute('data-on', '0')
+  await hold('S2')
+  await expect(km1).toHaveAttribute('data-on', '1')
+  await view.locator('[data-elec="doorswitch"]').click() // se abre la puerta
+  await expect(km1).toHaveAttribute('data-on', '0')
+  expectNoErrors(errors)
+})

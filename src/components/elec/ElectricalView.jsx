@@ -41,6 +41,18 @@ const PALETTE = [
     items: [
       ...Object.keys(POTENTIALS).map((p) => ({ key: `rail:${p}`, type: 'rail', label: `Embarrado ${p}`, preset: { potential: p } })),
       { key: 'transformer', type: 'transformer', label: 'Transformador de mando', preset: {} },
+      { key: 'mainswitch', type: 'mainswitch', label: 'Interruptor general', preset: {}, prefix: 'Q' },
+      { key: 'psu', type: 'psu', label: 'Fuente 24 V DC', preset: {} },
+      { key: 'phasemonitor', type: 'phasemonitor', label: 'Relé de control de fases', preset: {} },
+    ],
+  },
+  {
+    group: 'Seguridad',
+    items: [
+      { key: 'safetyrelay', type: 'safetyrelay', label: 'Relé de seguridad', preset: {} },
+      { key: 'emergency:2', type: 'emergency', label: 'Seta de doble canal', preset: { channels: 2 } },
+      { key: 'doorswitch', type: 'doorswitch', label: 'Interruptor de puerta', preset: {} },
+      { key: 'lightcurtain', type: 'lightcurtain', label: 'Cortina fotoeléctrica', preset: {} },
     ],
   },
   {
@@ -57,7 +69,7 @@ const PALETTE = [
   ...['Mando', 'Potencia', 'Autómata'].map((group) => ({
     group,
     items: Object.entries(ELEC_TYPES)
-      .filter(([, t]) => t.group === group)
+      .filter(([type, t]) => t.group === group && !['mainswitch', 'psu', 'phasemonitor'].includes(type))
       .flatMap(([type, t]) =>
         type === 'coil'
           ? [
@@ -105,6 +117,19 @@ const HINTS = {
   changeover: 'Conmutador de vivienda: el común C pasa de 1 a 2. Dos conmutadores: encender desde dos sitios.',
   crossover: 'Cruzamiento: une A1-B1 y A2-B2 o los cruza. Entre dos conmutadores: encender desde tres o más sitios.',
   socket: 'Base de enchufe (fase, neutro y tierra).',
+  mainswitch: 'Interruptor general (seccionador de corte en carga): corta toda la máquina; se puede bloquear con candado para el mantenimiento.',
+  psu: 'Fuente de alimentación: con 230 V~ en L-N da 24 V DC (L+ y M) para el mando, los detectores y el autómata.',
+  phasemonitor: 'Relé de control de fases: su contacto (-KF1) cierra solo con las tres fases presentes y en orden L1-L2-L3 (evita el giro al revés).',
+  safetyrelay: 'Relé de seguridad: con los dos canales cerrados (S11-S12 y S21-S22, o salidas OSSD) y el rearme S33-S34, cierra 13-14 y 23-24. Si un canal abre, para; vuelve solo con un nuevo rearme.',
+  doorswitch: 'Interruptor de puerta de seguridad: dos contactos NC que abren al abrir el resguardo.',
+  lightcurtain: 'Cortina fotoeléctrica: libre y alimentada, sus salidas OSSD1 y OSSD2 dan +24 V; al cortar el haz, se apagan.',
+  vfd: 'Variador de frecuencia: DI1 adelante, DI2 atrás, DI3 2ª velocidad, AI1 consigna 0-10 V (manda sobre las velocidades). R1-R2 cierra con el motor en marcha. Sus +24/GND alimentan las entradas.',
+  softstarter: 'Arrancador suave: con A1-A2 alimentado sube la tensión del motor en una rampa; su contacto (por su identificador) cierra al acabarla.',
+  brake: 'Freno del motor (electrofreno): suelta con tensión y frena sin ella. Se conecta a los bornes del motor o con su propio contactor.',
+  beacon: 'Columna de señalización: rojo (X1), ámbar (X2), verde (X3) y zumbador (X4) con el común X0.',
+  litbutton: 'Pulsador luminoso: contacto 13-14 y piloto X1-X2 en el mismo aparato.',
+  transmitter: 'Transmisor analógico: 4-20 mA a 2 hilos (+ a 24 V, − a la entrada) o 0-10 V a 3 hilos. Enlázalo con la analógica de la planta (nivel, temperatura…).',
+  potentiometer: 'Potenciómetro de consigna: su cursor W da de 0 a 10 V (p. ej. a la entrada AI1 de un variador).',
 }
 
 // Referencia de cada aparato (identificador IEC 81346 y bornes).
@@ -135,6 +160,19 @@ const NORMS = {
   changeover: 'Identificador -S · común C, viajeros 1 y 2.',
   crossover: 'Identificador -S · A1 A2 / B1 B2.',
   socket: 'Identificador -X · L, N y PE.',
+  mainswitch: 'Identificador -Q0 · obligatorio en toda máquina (IEC 60204-1, 5.3), con bloqueo.',
+  psu: 'Identificador -G · L, N / L+, M (muy baja tensión de protección, PELV).',
+  phasemonitor: 'Identificador -KF · L1, L2, L3.',
+  safetyrelay: 'Identificador -KS · ISO 13849-1: categoría 3 / PL d con doble canal y contactores redundantes.',
+  doorswitch: 'Identificador -B · ISO 14119 (dispositivos de enclavamiento de resguardos).',
+  lightcurtain: 'Identificador -B · IEC 61496 (equipos de protección electrosensibles).',
+  vfd: 'Identificador -T · L1-L3 / U-V-W; mando DI1-DI3, AI1 (0-10 V), relé R1-R2.',
+  softstarter: 'Identificador -T · 1L1-3L2-5L3 / 2T1-4T2-6T3 (aquí L1-L3 / T1-T3), mando A1-A2.',
+  brake: 'Identificador -MB · A1-A2.',
+  beacon: 'Identificador -P · colores IEC 60204-1 (rojo: peligro, ámbar: anormal, verde: normal).',
+  litbutton: 'Identificador -S · 13-14 y X1-X2.',
+  transmitter: 'Identificador -B · 4-20 mA (2 hilos) o 0-10 V (3 hilos).',
+  potentiometer: 'Identificador -R · cursor W (0-10 V).',
 }
 
 // Vista previa de un aparato de la paleta: su símbolo (con sus bornes) tal como queda en el esquema.
@@ -741,9 +779,12 @@ const field = 'mt-0.5 w-full rounded border border-slate-300 px-1.5 py-0.5'
 // Propiedades del componente seleccionado.
 function Properties({ c, components, variables, onChange, onDelete }) {
   const t = ELEC_TYPES[c.type]
-  const isLoad = ['coil', 'valve', 'lamp', 'motor3', 'motor6', 'buzzer'].includes(c.type)
-  const isContact = ['pushbutton', 'switch', 'limit', 'emergency', 'sensor3'].includes(c.type)
-  const signals = variables.filter((v) => (isLoad ? v.type === 'output' : v.type !== 'output'))
+  const isLoad = ['coil', 'valve', 'lamp', 'motor3', 'motor6', 'buzzer', 'brake'].includes(c.type)
+  const isContact = ['pushbutton', 'switch', 'limit', 'emergency', 'sensor3', 'litbutton', 'doorswitch', 'lightcurtain', 'transmitter'].includes(c.type)
+  const signals = variables.filter((v) =>
+    c.type === 'transmitter' ? v.type === 'analogIn' : isLoad ? v.type === 'output' : v.type !== 'output' && v.type !== 'analogIn' && v.type !== 'analogOut',
+  )
+  const outputs = variables.filter((v) => v.type === 'output')
   const refs = components.filter(
     (x) => (c.type === 'maincontacts' ? x.type === 'coil' : ['coil', 'counter', 'thermal', 'motorprotector', 'breaker', 'rcd', 'fuse'].includes(x.type)) && x.tag,
   )
@@ -801,6 +842,40 @@ function Properties({ c, components, variables, onChange, onDelete }) {
         </>
       )}
       {c.type === 'counter' && text('preset', 'Preselección (impulsos)', { type: 'number', min: 1, step: 1 })}
+      {c.type === 'emergency' &&
+        select('channels', 'Canales', [
+          ['1', 'Uno (11-12)'],
+          ['2', 'Doble canal (11-12 y 21-22)'],
+        ])}
+      {c.type === 'transmitter' &&
+        select('output', 'Señal', [
+          ['4-20mA', '4-20 mA (2 hilos)'],
+          ['0-10V', '0-10 V (3 hilos)'],
+        ])}
+      {c.type === 'potentiometer' && text('initial', 'Posición al empezar (0 a 1)', { type: 'number', min: 0, max: 1, step: 0.05 })}
+      {c.type === 'vfd' && text('speed2', '2ª velocidad (Hz)', { type: 'number', min: 1, max: 50, step: 1 })}
+      {c.type === 'softstarter' && text('ramp', 'Rampa (s)', { type: 'number', min: 0.5, step: 0.5 })}
+      {c.type === 'coil' &&
+        (c.kind ?? 'contactor') === 'contactor' &&
+        select('interlock', 'Enclavamiento mecánico con', [
+          ['', '(ninguno)'],
+          ...components.filter((x) => x.type === 'coil' && x.tag && x.tag !== c.tag && (x.kind ?? 'contactor') === 'contactor').map((x) => [x.tag, showTag(x.tag)]),
+        ])}
+      {c.type === 'beacon' &&
+        ['red', 'amber', 'green', 'buzzer'].map((k) => (
+          <label key={k} className="block">
+            <span className="text-slate-500">{`${{ red: 'Rojo', amber: 'Ámbar', green: 'Verde', buzzer: 'Zumbador' }[k]} mueve en la planta`}</span>
+            <select value={c[k] ?? ''} onChange={(e) => onChange({ [k]: e.target.value })} className={field}>
+              {[['', '(sin enlazar)'], ...outputs.map((v) => [v.name, v.name])].map(([value, t]) => (
+                <option key={value} value={value}>
+                  {t}
+                </option>
+              ))}
+            </select>
+          </label>
+        ))}
+      {c.type === 'litbutton' &&
+        select('light', 'Su piloto mueve en la planta', [['', '(sin enlazar)'], ...outputs.map((v) => [v.name, v.name])])}
       {c.type === 'buzzer' &&
         select('kind', 'Tipo', [
           ['bell', 'Timbre'],
@@ -811,7 +886,7 @@ function Properties({ c, components, variables, onChange, onDelete }) {
           ['1', 'Unipolar'],
           ['3', 'Tripolar'],
         ])}
-      {(isContact && !['emergency', 'sensor3'].includes(c.type)) || c.type === 'contact'
+      {(isContact && !['emergency', 'sensor3', 'doorswitch', 'lightcurtain', 'transmitter', 'litbutton'].includes(c.type)) || c.type === 'contact'
         ? select('contact', 'Contacto', [
             ['NO', 'NA (normalmente abierto)'],
             ['NC', 'NC (normalmente cerrado)'],
@@ -850,9 +925,12 @@ function Properties({ c, components, variables, onChange, onDelete }) {
         <>
           {text('inputs', 'Entradas', { type: 'number', min: 1, max: 24 })}
           {text('outputs', 'Salidas', { type: 'number', min: 1, max: 16 })}
+          {text('analogIn', 'Entradas analógicas (AIW)', { type: 'number', min: 0, max: 8 })}
+          {text('analogOut', 'Salidas analógicas (AQW)', { type: 'number', min: 0, max: 4 })}
         </>
       )}
-      {(isContact || isLoad) && signalSelect('signal', isLoad ? 'Mueve en la planta' : 'Lo acciona en la planta')}
+      {(isContact || isLoad) &&
+        signalSelect('signal', c.type === 'transmitter' ? 'Mide en la planta (analógica)' : isLoad ? 'Mueve en la planta' : c.type === 'doorswitch' ? 'Puerta abierta en la planta' : 'Lo acciona en la planta')}
       {(c.type === 'motor3' || c.type === 'motor6') && signalSelect('reverse', 'Giro inverso en la planta')}
       {c.type !== 'rail' && text('text', 'Descripción')}
       <button type="button" onClick={onDelete} className="flex items-center gap-1 rounded border border-red-200 px-2 py-0.5 text-red-700 hover:bg-red-50">

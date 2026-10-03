@@ -51,7 +51,26 @@ function outputDevice(name, scene) {
 export function generatePlcWiring(variables, scene, existing = { components: [], wires: [] }) {
   const all = [...(existing.components ?? [])]
   const offset = all.length ? Math.ceil((Math.max(...all.map((c) => c.y)) + 300) / GRID) * GRID : 0
-  const plc = { id: `plc-${Date.now().toString(36)}`, type: 'plc', x: PLC_X, y: PLC_Y + offset, tag: nextTag(all, 'A'), inputs: 14, outputs: 10, text: 'Autómata' }
+  // Analógicas con dirección: el autómata lleva sus bornes AIW / AQW (con esas direcciones).
+  const analogAddr = (type, area) =>
+    variables
+      .filter((v) => v.type === type)
+      .map((v) => terminalAddress(v.address))
+      .filter((a) => a.startsWith(area))
+  const aiAddrs = [...new Set(analogAddr('analogIn', 'AIW'))]
+  const aqAddrs = [...new Set(analogAddr('analogOut', 'AQW'))]
+  const plc = {
+    id: `plc-${Date.now().toString(36)}`,
+    type: 'plc',
+    x: PLC_X,
+    y: PLC_Y + offset,
+    tag: nextTag(all, 'A'),
+    inputs: 14,
+    outputs: 10,
+    ...(aiAddrs.length ? { analogIn: aiAddrs.length, aiAddrs } : {}),
+    ...(aqAddrs.length ? { analogOut: aqAddrs.length, aqAddrs } : {}),
+    text: 'Autómata',
+  }
   all.push(plc)
   const terms = plcTerminals(plc)
   const at = (id) => terms.find((t) => t.id === id)
@@ -63,8 +82,9 @@ export function generatePlcWiring(variables, scene, existing = { components: [],
 
   const ins = variables.filter((v) => v.type === 'input' && at(terminalAddress(v.address)))
   const outs = variables.filter((v) => v.type === 'output' && at(terminalAddress(v.address)))
-  const skipped = variables.filter((v) => (v.type === 'input' || v.type === 'output') && !at(terminalAddress(v.address))).map((v) => v.name)
-  const width = Math.max(Math.max(...terms.map((t) => t.x)) + 40, Math.max(ins.length, outs.length) * PITCH + 40)
+  const ains = variables.filter((v) => v.type === 'analogIn' && at(terminalAddress(v.address)))
+  const skipped = variables.filter((v) => (v.type === 'input' || v.type === 'output' || v.type === 'analogIn') && !at(terminalAddress(v.address))).map((v) => v.name)
+  const width = Math.max(Math.max(...terms.map((t) => t.x)) + 40, Math.max(ins.length + ains.length, outs.length) * PITCH + 40)
 
   // Fuente de 24 V: L+ arriba, M abajo (embarrados con tomas cada 20 px desde x = PLC_X).
   const top = { id: id('rail'), type: 'rail', x: PLC_X, y: PLC_Y + offset - 200, potential: 'L+', length: width }
@@ -104,6 +124,31 @@ export function generatePlcWiring(variables, scene, existing = { components: [],
       wire(top.id, tap(x + 20), c.id, nc ? '11' : '13')
       wire(c.id, nc ? '12' : '14', plc.id, t.id)
     }
+  })
+  // Entradas analógicas: transmisor de 4-20 mA (2 hilos: + a L+, − a la entrada) o de 0-10 V
+  // (3 hilos: +, 0V y OUT a la entrada), según la señal de la variable; el común AM a M.
+  if (ains.length) wire(plc.id, 'AM', bottom.id, tap(PLC_X + at('AM').x))
+  ains.forEach((v, k) => {
+    const t = at(terminalAddress(v.address))
+    const volts = v.analog?.signal === '0-10V'
+    const x = PLC_X + 40 + (ins.length + k) * PITCH
+    const c = {
+      id: id('ain'),
+      type: 'transmitter',
+      x,
+      y: PLC_Y + offset - 140,
+      tag: nextTag(all, 'B'),
+      output: volts ? '0-10V' : '4-20mA',
+      signal: v.name,
+      text: v.comment || v.name,
+    }
+    all.push(c)
+    components.push(c)
+    wire(top.id, tap(x + 20), c.id, '+')
+    if (volts) {
+      wire(c.id, '0V', plc.id, 'M')
+      wire(c.id, 'OUT', plc.id, t.id)
+    } else wire(c.id, '−', plc.id, t.id)
   })
   outs.forEach((v, i) => {
     const t = at(terminalAddress(v.address))

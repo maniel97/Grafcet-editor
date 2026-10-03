@@ -1,7 +1,7 @@
 // Símbolos IEC 60617 del esquema eléctrico (lib/elec/catalog.js), dibujados en la caja del
 // componente (origen arriba a la izquierda; bornes en la cuadrícula de 20 px). `s` es el estado de
 // la simulación para ese componente (o null al editar).
-import { plcTerminals } from '../../lib/elec/catalog'
+import { plcTerminals, sizeOf, terminalsOf } from '../../lib/elec/catalog'
 
 import { INK, POTENTIAL_COLORS } from './elecColors'
 
@@ -128,6 +128,11 @@ function Plc({ c, s }) {
               {t.id}
             </text>
             {(t.id.startsWith('I') || t.id.startsWith('Q')) && <circle cx={t.x} cy={top ? 40 : 84} r="3.5" fill={lit ? LIVE : '#cbd5e1'} />}
+            {t.id.startsWith('AIW') && s?.plcInAnalog?.[t.id] && (
+              <text x={t.x} y="44" textAnchor="middle" fontSize="8" fill="#1d4ed8">
+                {`${s.plcInAnalog[t.id].value.toFixed(1)} ${s.plcInAnalog[t.id].unit}`}
+              </text>
+            )}
           </g>
         )
       })}
@@ -280,6 +285,142 @@ function Socket() {
   )
 }
 
+// Caja con un rótulo dentro (aparatos electrónicos: fuente, variador, relé de seguridad…).
+function Box({ x = 4, y = 16, w, h, label, sub, on }) {
+  return (
+    <g>
+      <rect x={x} y={y} width={w} height={h} rx="3" fill={on ? '#dcfce7' : '#f8fafc'} stroke={INK} strokeWidth="2" />
+      <text x={x + w / 2} y={y + h / 2 + (sub ? -2 : 4)} textAnchor="middle" fontSize="11" fontWeight="700" fill={INK}>
+        {label}
+      </text>
+      {sub && (
+        <text x={x + w / 2} y={y + h / 2 + 12} textAnchor="middle" fontSize="9" fill="#334155">
+          {sub}
+        </text>
+      )}
+    </g>
+  )
+}
+// Bornes de una caja: línea desde el borne hasta la caja, con su nombre dentro.
+function Leads({ terms, top, bottom }) {
+  return (
+    <g>
+      {terms.map((t) => (
+        <g key={t.id}>
+          <line x1={t.x} y1={t.y} x2={t.x} y2={t.side === 'top' ? top : bottom} stroke={INK} strokeWidth="1.6" />
+          <text x={t.x} y={t.side === 'top' ? top + 10 : bottom - 4} textAnchor="middle" fontSize="7.5" fontFamily="ui-monospace, monospace" fill={INK}>
+            {t.id}
+          </text>
+        </g>
+      ))}
+    </g>
+  )
+}
+
+function DoorSwitch({ open }) {
+  return (
+    <g>
+      <Contact x={20} nc closed={!open} />
+      <Contact x={60} nc closed={!open} />
+      <line x1="20" y1="44" x2="60" y2="44" stroke={INK} strokeDasharray="3 2" strokeWidth="1.2" />
+      {/* Lengüeta del resguardo */}
+      <path d="M 66 34 L 76 34 L 76 54 L 66 54" fill="none" stroke={INK} strokeWidth="1.5" />
+    </g>
+  )
+}
+
+function LightCurtain({ ok, broken }) {
+  return (
+    <g fill="none" stroke={INK} strokeWidth="2">
+      <path d="M 20 0 L 20 16 M 80 0 L 80 16 M 40 84 L 40 100 M 60 84 L 60 100" />
+      <rect x="8" y="16" width="14" height="68" fill="#e2e8f0" />
+      <rect x="78" y="16" width="14" height="68" fill="#e2e8f0" />
+      {[26, 38, 50, 62, 74].map((y) => (
+        <line key={y} x1="22" y1={y} x2="78" y2={y} stroke={ok ? '#ef4444' : '#cbd5e1'} strokeWidth="1" strokeDasharray={broken ? '4 3' : undefined} />
+      ))}
+    </g>
+  )
+}
+
+function Beacon({ lights }) {
+  const colors = [
+    ['red', '#ef4444', 'X1'],
+    ['amber', '#f59e0b', 'X2'],
+    ['green', '#22c55e', 'X3'],
+  ]
+  return (
+    <g>
+      {[20, 40, 60, 80].map((x) => (
+        <line key={x} x1={x} y1="0" x2={x} y2="14" stroke={INK} strokeWidth="1.6" />
+      ))}
+      <path d="M 100 120 L 100 104" stroke={INK} strokeWidth="1.6" />
+      {colors.map(([k, color], i) => (
+        <rect key={k} x="34" y={14 + i * 22} width="32" height="20" rx="4" fill={lights?.[k] ? color : '#f1f5f9'} stroke={INK} strokeWidth="1.5" />
+      ))}
+      <rect x="34" y="80" width="32" height="12" fill={lights?.buzzer ? '#fde68a' : '#e2e8f0'} stroke={INK} strokeWidth="1.5" />
+      <rect x="28" y="92" width="44" height="12" rx="2" fill="#475569" />
+      <path d="M 72 98 L 100 98 L 100 104" fill="none" stroke={INK} strokeWidth="1.2" />
+    </g>
+  )
+}
+
+function LitButton({ c, closed, lit }) {
+  return (
+    <g>
+      <Contact x={20} closed={closed} actuator="push" />
+      <g fill="none" stroke={INK} strokeWidth="2">
+        <line x1="60" y1="0" x2="60" y2="28" />
+        <line x1="60" y1="52" x2="60" y2="80" />
+        <circle cx="60" cy="40" r="11" fill={lit ? ({ green: '#22c55e', red: '#ef4444', amber: '#f59e0b', white: '#f8fafc', blue: '#3b82f6' }[c.color] ?? '#22c55e') : 'white'} />
+        <path d="M 52 32 L 68 48 M 68 32 L 52 48" strokeWidth="1.3" />
+      </g>
+      <line x1="10" y1="40" x2="49" y2="40" stroke={INK} strokeDasharray="3 2" strokeWidth="1" />
+    </g>
+  )
+}
+
+function Transmitter({ c }) {
+  const volts = c.output === '0-10V'
+  return (
+    <g fill="none" stroke={INK} strokeWidth="2">
+      <line x1="20" y1="0" x2="20" y2="22" />
+      {volts && <line x1="60" y1="0" x2="60" y2="22" />}
+      <line x1="40" y1="58" x2="40" y2="80" />
+      <circle cx="40" cy="40" r="18" fill="white" />
+      <text x="40" y="38" textAnchor="middle" fontSize="8" fontWeight="700" fill={INK} stroke="none">
+        {volts ? '0-10V' : '4-20'}
+      </text>
+      <text x="40" y="48" textAnchor="middle" fontSize="7" fill={INK} stroke="none">
+        {volts ? 'V' : 'mA'}
+      </text>
+    </g>
+  )
+}
+
+function Potentiometer({ value }) {
+  return (
+    <g fill="none" stroke={INK} strokeWidth="2">
+      <rect x="10" y="30" width="60" height="16" fill="white" />
+      <path d="M 40 60 L 40 80 M 40 60 L 34 50 M 40 60 L 46 50" />
+      <path d={`M ${12 + 56 * (value ?? 0.5)} 26 L ${12 + 56 * (value ?? 0.5)} 50`} stroke="#2563eb" strokeWidth="2.5" />
+      <text x="40" y="22" textAnchor="middle" fontSize="9" fill={INK} stroke="none">
+        {`${Math.round((value ?? 0.5) * 100)} %`}
+      </text>
+    </g>
+  )
+}
+
+function Brake({ on }) {
+  return (
+    <g fill="none" stroke={INK} strokeWidth="2">
+      <line x1="20" y1="0" x2="20" y2="30" />
+      <line x1="20" y1="50" x2="20" y2="80" />
+      <rect x="6" y="30" width="28" height="20" fill={on ? '#bbf7d0' : '#fecaca'} />
+      <path d="M 10 40 L 30 40" strokeWidth="1.3" />
+    </g>
+  )
+}
+
 // Dibujo de un componente. view: estado de la simulación (lib/elec/solve.js: view) o null.
 export function ElecSymbol({ c, view }) {
   const closed = view?.closed?.[c.id]
@@ -293,7 +434,15 @@ export function ElecSymbol({ c, view }) {
     case 'switch':
       return <Contact nc={c.contact === 'NC'} closed={closed ?? c.contact === 'NC'} actuator="switch" />
     case 'emergency':
-      return <Contact nc closed={closed ?? true} actuator="emergency" />
+      return Number(c.channels) === 2 ? (
+        <g>
+          <Contact nc closed={closed ?? true} actuator="emergency" />
+          <Contact x={60} nc closed={closed ?? true} />
+          <line x1="20" y1="44" x2="60" y2="44" stroke={INK} strokeDasharray="3 2" strokeWidth="1.2" />
+        </g>
+      ) : (
+        <Contact nc closed={closed ?? true} actuator="emergency" />
+      )
     case 'limit':
       return <Contact nc={c.contact === 'NC'} closed={closed ?? c.contact === 'NC'} actuator={['float', 'pressure', 'thermostat'].includes(c.kind) ? c.kind : 'limit'} />
     case 'selector3':
@@ -324,6 +473,60 @@ export function ElecSymbol({ c, view }) {
       return <Crossover on={closed} />
     case 'socket':
       return <Socket />
+    case 'mainswitch':
+      return (
+        <g>
+          <ThreePoles closed={closed ?? true} />
+          {/* Mando giratorio del interruptor general (con candado) */}
+          <circle cx="112" cy="42" r="6" fill="#facc15" stroke={INK} strokeWidth="1.5" />
+          <line x1="93" y1="42" x2="106" y2="42" stroke={INK} strokeDasharray="3 2" strokeWidth="1" />
+        </g>
+      )
+    case 'psu':
+    case 'phasemonitor':
+    case 'vfd':
+    case 'softstarter':
+    case 'safetyrelay': {
+      const { w, h } = sizeOf(c)
+      const top = c.type === 'phasemonitor' ? 14 : 16
+      const bottom = h - 16
+      const terms = terminalsOf(c)
+      const sub =
+        c.type === 'vfd'
+          ? view?.vfd?.[c.id]?.dir
+            ? `${view.vfd[c.id].hz} Hz ${view.vfd[c.id].dir > 0 ? '→' : '←'}`
+            : 'parado'
+          : c.type === 'softstarter'
+            ? view?.soft?.[c.id]?.on
+              ? `rampa ${Math.round(view.soft[c.id].pct * 100)} %`
+              : ''
+            : c.type === 'safetyrelay' && view?.safety?.[c.id]
+              ? `canal 1 ${view.safety[c.id].ch1 ? '✓' : '✗'} · canal 2 ${view.safety[c.id].ch2 ? '✓' : '✗'}`
+              : c.type === 'psu'
+                ? '230 V~ / 24 V DC'
+                : ''
+      const label = { psu: 'Fuente 24 V', phasemonitor: 'Control de fases', vfd: 'Variador', softstarter: 'Arrancador suave', safetyrelay: 'Relé de seguridad' }[c.type]
+      return (
+        <g>
+          <Box x={2} y={top} w={w - 4} h={bottom - top} label={label} sub={sub} on={view?.loads?.[c.id]} />
+          <Leads terms={terms} top={top} bottom={bottom} />
+        </g>
+      )
+    }
+    case 'doorswitch':
+      return <DoorSwitch open={closed === false} />
+    case 'lightcurtain':
+      return <LightCurtain ok={view?.loads?.[c.id]} broken={closed === false} />
+    case 'beacon':
+      return <Beacon lights={view?.beacons?.[c.id]} />
+    case 'litbutton':
+      return <LitButton c={c} closed={closed ?? false} lit={view?.loads?.[c.id]} />
+    case 'transmitter':
+      return <Transmitter c={c} />
+    case 'potentiometer':
+      return <Potentiometer value={view?.knob?.[c.id] ?? Number(c.initial ?? 0.5)} />
+    case 'brake':
+      return <Brake on={view?.loads?.[c.id]} />
     case 'contact':
       return <Contact nc={c.contact === 'NC'} closed={closed ?? c.contact === 'NC'} actuator={c.timed ? 'timer' : null} />
     case 'coil':

@@ -48,9 +48,18 @@ const threePoles = (h = 80) =>
 export function plcTerminals(c) {
   const ins = Math.max(1, Math.min(24, Number(c.inputs) || 14))
   const outs = Math.max(1, Math.min(16, Number(c.outputs) || 10))
+  const ains = Math.max(0, Math.min(8, Number(c.analogIn) || 0))
+  const aouts = Math.max(0, Math.min(4, Number(c.analogOut) || 0))
   const addr = (area, i) => `${area}${Math.floor(i / 8)}.${i % 8}`
-  const top = ['L+', 'M', '1M', ...Array.from({ length: ins }, (_, i) => addr('I', i))]
-  const bottom = ['1L', ...Array.from({ length: outs }, (_, i) => addr('Q', i))]
+  const top = [
+    'L+',
+    'M',
+    '1M',
+    ...Array.from({ length: ins }, (_, i) => addr('I', i)),
+    ...(ains ? ['AM', ...(c.aiAddrs ?? Array.from({ length: ains }, (_, i) => `AIW${2 * i}`)).slice(0, ains)] : []),
+  ]
+  const aq = (c.aqAddrs ?? Array.from({ length: aouts }, (_, i) => `AQW${2 * i}`)).slice(0, aouts)
+  const bottom = ['1L', ...Array.from({ length: outs }, (_, i) => addr('Q', i)), ...(aouts ? ['AQM', ...aq] : [])]
   return [
     ...top.map((id, i) => ({ id, x: 20 + 40 * i, y: 0, side: 'top' })),
     ...bottom.map((id, i) => ({ id, x: 20 + 40 * i, y: 120, side: 'bottom' })),
@@ -75,7 +84,15 @@ export const ELEC_TYPES = {
   },
   pushbutton: { label: 'Pulsador', group: 'Mando', prefix: 'S', defaults: { contact: 'NO', signal: '', text: '' }, size: () => ({ w: 40, h: 80 }), terminals: (c) => (c.contact === 'NC' ? two('11', '12') : two('13', '14')) },
   switch: { label: 'Interruptor / selector', group: 'Mando', prefix: 'S', defaults: { contact: 'NO', signal: '', text: '' }, size: () => ({ w: 40, h: 80 }), terminals: (c) => (c.contact === 'NC' ? two('11', '12') : two('13', '14')) },
-  emergency: { label: 'Seta de emergencia', group: 'Mando', prefix: 'S', defaults: { signal: '', text: 'Emergencia' }, size: () => ({ w: 40, h: 80 }), terminals: () => two('11', '12') },
+  // Seta de emergencia (channels: 2, doble canal 11-12 y 21-22 para un relé de seguridad).
+  emergency: {
+    label: 'Seta de emergencia',
+    group: 'Mando',
+    prefix: 'S',
+    defaults: { channels: 1, signal: '', text: 'Emergencia' },
+    size: (c) => ({ w: Number(c.channels) === 2 ? 80 : 40, h: 80 }),
+    terminals: (c) => (Number(c.channels) === 2 ? [...two('11', '12'), { id: '21', x: 60, y: 0, side: 'top' }, { id: '22', x: 60, y: 80, side: 'bottom' }] : two('11', '12')),
+  },
   // kind: limit (final de carrera), float (flotador), pressure (presostato), thermostat (termostato).
   limit: { label: 'Final de carrera / detector', group: 'Mando', prefix: 'B', defaults: { kind: 'limit', contact: 'NO', signal: '', text: '' }, size: () => ({ w: 40, h: 80 }), terminals: (c) => (c.contact === 'NC' ? two('11', '12') : two('13', '14')) },
   // Conmutador de 3 posiciones (0-1-2): en 1 cierra 13-14; en 2, 23-24.
@@ -113,6 +130,80 @@ export const ELEC_TYPES = {
     size: () => ({ w: 80, h: 80 }),
     terminals: () => [...two('A1', 'A2'), { id: 'R1', x: 60, y: 0, side: 'top' }, { id: 'R2', x: 60, y: 80, side: 'bottom' }],
   },
+  // Pulsador luminoso: contacto 13-14 y piloto X1-X2 en el mismo aparato.
+  litbutton: {
+    label: 'Pulsador luminoso',
+    group: 'Mando',
+    prefix: 'S',
+    defaults: { color: 'green', signal: '', light: '', text: '' },
+    size: () => ({ w: 80, h: 80 }),
+    terminals: () => [...two('13', '14'), { id: 'X1', x: 60, y: 0, side: 'top' }, { id: 'X2', x: 60, y: 80, side: 'bottom' }],
+  },
+  // Columna de señalización: rojo, ámbar, verde y zumbador con un común X0.
+  beacon: {
+    label: 'Columna de señalización',
+    group: 'Mando',
+    prefix: 'P',
+    defaults: { red: '', amber: '', green: '', buzzer: '', text: '' },
+    size: () => ({ w: 120, h: 120 }),
+    terminals: () => [
+      { id: 'X1', x: 20, y: 0, side: 'top' },
+      { id: 'X2', x: 40, y: 0, side: 'top' },
+      { id: 'X3', x: 60, y: 0, side: 'top' },
+      { id: 'X4', x: 80, y: 0, side: 'top' },
+      { id: 'X0', x: 100, y: 120, side: 'bottom' },
+    ],
+  },
+  // Transmisores analógicos: 4-20 mA a 2 hilos (+ / −) o 0-10 V a 3 hilos (+, 0V, OUT).
+  transmitter: {
+    label: 'Transmisor analógico',
+    group: 'Mando',
+    prefix: 'B',
+    defaults: { output: '4-20mA', signal: '', text: '' },
+    size: () => ({ w: 80, h: 80 }),
+    terminals: (c) =>
+      c.output === '0-10V'
+        ? [
+            { id: '+', x: 20, y: 0, side: 'top' },
+            { id: '0V', x: 60, y: 0, side: 'top' },
+            { id: 'OUT', x: 40, y: 80, side: 'bottom' },
+          ]
+        : [
+            { id: '+', x: 20, y: 0, side: 'top' },
+            { id: '−', x: 40, y: 80, side: 'bottom' },
+          ],
+  },
+  // Potenciómetro de consigna: su cursor W da de 0 a 10 V (con su referencia propia).
+  potentiometer: { label: 'Potenciómetro de consigna', group: 'Mando', prefix: 'R', defaults: { initial: 0.5, text: '' }, size: () => ({ w: 80, h: 80 }), terminals: () => [{ id: 'W', x: 40, y: 80, side: 'bottom' }] },
+  // Relé de seguridad: A1-A2 alimentación; canales S11-S12 y S21-S22; rearme S33-S34; salidas de
+  // seguridad 13-14 y 23-24 (NA) y auxiliar 41-42 (NC).
+  safetyrelay: {
+    label: 'Relé de seguridad',
+    group: 'Seguridad',
+    prefix: 'KS',
+    defaults: { text: '' },
+    size: () => ({ w: 200, h: 120 }),
+    terminals: () => [
+      ...['A1', 'S11', 'S12', 'S21', 'S22', 'S33', 'S34', '13', '23', '41'].map((id, i) => ({ id, x: 20 * i + 10, y: 0, side: 'top' })),
+      ...['A2', '14', '24', '42'].map((id, i) => ({ id, x: [10, 150, 170, 190][i], y: 120, side: 'bottom' })),
+    ],
+  },
+  // Interruptor de puerta de seguridad (dos contactos NC, abiertos con la puerta abierta).
+  doorswitch: { label: 'Interruptor de puerta', group: 'Seguridad', prefix: 'B', defaults: { signal: '', text: 'Resguardo' }, size: () => ({ w: 80, h: 80 }), terminals: () => [...two('11', '12'), { id: '21', x: 60, y: 0, side: 'top' }, { id: '22', x: 60, y: 80, side: 'bottom' }] },
+  // Cortina fotoeléctrica: alimentación +24 / 0V; salidas OSSD1 y OSSD2 (a + mientras está libre).
+  lightcurtain: {
+    label: 'Cortina fotoeléctrica',
+    group: 'Seguridad',
+    prefix: 'B',
+    defaults: { signal: '', text: '' },
+    size: () => ({ w: 100, h: 100 }),
+    terminals: () => [
+      { id: '+24', x: 20, y: 0, side: 'top' },
+      { id: '0V', x: 80, y: 0, side: 'top' },
+      { id: 'OSSD1', x: 40, y: 100, side: 'bottom' },
+      { id: 'OSSD2', x: 60, y: 100, side: 'bottom' },
+    ],
+  },
   buzzer: { label: 'Timbre / zumbador', group: 'Mando', prefix: 'H', defaults: { kind: 'bell', signal: '', text: '' }, size: () => ({ w: 40, h: 80 }), terminals: () => two('X1', 'X2') },
   contact: { label: 'Contacto auxiliar', group: 'Mando', prefix: '', defaults: { ref: 'KM1', contact: 'NO' }, size: () => ({ w: 40, h: 80 }), terminals: () => two('a', 'b') },
   coil: {
@@ -129,6 +220,31 @@ export const ELEC_TYPES = {
   fuse: { label: 'Fusible / seccionador', group: 'Potencia', prefix: 'F', defaults: { poles: 1, text: '' }, size: (c) => ({ w: Number(c.poles) === 3 ? 120 : 40, h: 80 }), terminals: (c) => (Number(c.poles) === 3 ? threePoles() : two('1', '2')) },
   // Diferencial (fase y neutro): salta con una derivación a tierra o con su botón de prueba.
   rcd: { label: 'Diferencial', group: 'Potencia', prefix: 'Q', defaults: { text: '' }, size: () => ({ w: 80, h: 80 }), terminals: () => twoPoles() },
+  // Interruptor general / seccionador de corte en carga (se maniobra a mano; con candado).
+  mainswitch: { label: 'Interruptor general', group: 'Alimentación', prefix: 'Q', defaults: { text: 'Interruptor general' }, size: () => ({ w: 120, h: 80 }), terminals: () => threePoles() },
+  // Fuente de alimentación 230 V~ -> 24 V DC: con tensión en L-N, da L+ y M.
+  psu: {
+    label: 'Fuente de alimentación 24 V DC',
+    group: 'Alimentación',
+    prefix: 'G',
+    defaults: { text: '230 V~ / 24 V DC' },
+    size: () => ({ w: 80, h: 80 }),
+    terminals: () => [
+      { id: 'L', x: 20, y: 0, side: 'top' },
+      { id: 'N', x: 60, y: 0, side: 'top' },
+      { id: 'L+', x: 20, y: 80, side: 'bottom' },
+      { id: 'M', x: 60, y: 80, side: 'bottom' },
+    ],
+  },
+  // Relé de control de fases: su contacto (por su identificador) cierra con las tres fases en orden.
+  phasemonitor: {
+    label: 'Relé de control de fases',
+    group: 'Alimentación',
+    prefix: 'KF',
+    defaults: { text: '' },
+    size: () => ({ w: 120, h: 60 }),
+    terminals: () => ['L1', 'L2', 'L3'].map((id, i) => ({ id, x: 20 + 40 * i, y: 0, side: 'top' })),
+  },
   // Transformador de mando: el secundario es un circuito aparte (S1-S2) mientras el primario
   // (P1-P2) tiene tensión.
   transformer: {
@@ -148,6 +264,40 @@ export const ELEC_TYPES = {
   motorprotector: { label: 'Guardamotor', group: 'Potencia', prefix: 'Q', defaults: { text: '' }, size: () => ({ w: 120, h: 80 }), terminals: () => threePoles() },
   thermal: { label: 'Relé térmico', group: 'Potencia', prefix: 'F', defaults: { text: '' }, size: () => ({ w: 120, h: 80 }), terminals: () => threePoles() },
   maincontacts: { label: 'Contactos principales', group: 'Potencia', prefix: '', defaults: { ref: 'KM1' }, size: () => ({ w: 120, h: 80 }), terminals: () => threePoles() },
+  // Variador de frecuencia: L1-L3 entrada, U-V-W al motor; mando con su propio 24 V (+24 / GND):
+  // DI1 marcha adelante, DI2 marcha atrás, DI3 segunda velocidad, AI1 consigna 0-10 V; relé de
+  // marcha R1-R2 (cerrado con el motor en marcha).
+  vfd: {
+    label: 'Variador de frecuencia',
+    group: 'Potencia',
+    prefix: 'T',
+    defaults: { speed2: 25, text: '' },
+    size: () => ({ w: 240, h: 120 }),
+    terminals: () => [
+      ...['L1', 'L2', 'L3'].map((id, i) => ({ id, x: 20 + 40 * i, y: 0, side: 'top' })),
+      ...['+24', 'DI1', 'DI2', 'DI3', 'AI1', 'GND'].map((id, i) => ({ id, x: 140 + 20 * i, y: 0, side: 'top' })),
+      ...['U', 'V', 'W'].map((id, i) => ({ id, x: 20 + 40 * i, y: 120, side: 'bottom' })),
+      { id: 'R1', x: 180, y: 120, side: 'bottom' },
+      { id: 'R2', x: 220, y: 120, side: 'bottom' },
+    ],
+  },
+  // Arrancador suave: L1-L3 a T1-T3 con rampa de arranque (A1-A2 mando); contacto de fin de rampa
+  // por su identificador.
+  softstarter: {
+    label: 'Arrancador suave',
+    group: 'Potencia',
+    prefix: 'T',
+    defaults: { ramp: 3, text: '' },
+    size: () => ({ w: 200, h: 100 }),
+    terminals: () => [
+      ...['L1', 'L2', 'L3'].map((id, i) => ({ id, x: 20 + 40 * i, y: 0, side: 'top' })),
+      { id: 'A1', x: 160, y: 0, side: 'top' },
+      ...['T1', 'T2', 'T3'].map((id, i) => ({ id, x: 20 + 40 * i, y: 100, side: 'bottom' })),
+      { id: 'A2', x: 160, y: 100, side: 'bottom' },
+    ],
+  },
+  // Freno del motor (electrofreno): suelta con tensión; sin ella, frena.
+  brake: { label: 'Freno del motor', group: 'Potencia', prefix: 'MB', defaults: { signal: '', text: 'Freno' }, size: () => ({ w: 40, h: 80 }), terminals: () => two('A1', 'A2') },
   motor3: {
     label: 'Motor trifásico',
     group: 'Potencia',
@@ -263,9 +413,12 @@ export function crossReferences(components) {
   return refs
 }
 
-// Normaliza una dirección del proyecto a la de los bornes: %IX0.0 -> I0.0, %QX1.2 -> Q1.2.
+// Normaliza una dirección del proyecto a la de los bornes: %IX0.0 -> I0.0, %QX1.2 -> Q1.2; las
+// analógicas, a AIW / AQW: IW64, PIW64 o %IW64 -> AIW64; QW80 -> AQW80.
 export const terminalAddress = (address) =>
   String(address ?? '')
     .trim()
     .toUpperCase()
     .replace(/^%([IQ])X/, '$1')
+    .replace(/^%?P?IW(\d+)$/, 'AIW$1')
+    .replace(/^%?P?QW(\d+)$/, 'AQW$1')

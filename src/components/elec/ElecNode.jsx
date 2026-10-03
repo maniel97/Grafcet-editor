@@ -4,8 +4,8 @@ import { INK, POTENTIAL_COLORS } from './elecColors'
 import { ELEC_TYPES, POTENTIALS, showTag, sizeOf, terminalsOf } from '../../lib/elec/catalog'
 
 // Lo que se acciona con el ratón al simular (modo Usar).
-const MOMENTARY = new Set(['pushbutton'])
-const TOGGLES = new Set(['switch', 'emergency', 'breaker', 'motorprotector', 'thermal', 'fuse', 'rcd', 'selector3', 'changeover', 'crossover'])
+const MOMENTARY = new Set(['pushbutton', 'litbutton'])
+const TOGGLES = new Set(['switch', 'emergency', 'breaker', 'motorprotector', 'thermal', 'fuse', 'rcd', 'selector3', 'changeover', 'crossover', 'mainswitch', 'doorswitch', 'lightcurtain', 'potentiometer'])
 const HINTS = {
   pushbutton: 'Mantén pulsado para accionarlo',
   switch: 'Clic: conmutar',
@@ -18,6 +18,11 @@ const HINTS = {
   selector3: 'Clic: siguiente posición (0 → 1 → 2)',
   changeover: 'Clic: conmutar',
   crossover: 'Clic: conmutar',
+  mainswitch: 'Clic: abrir o cerrar el interruptor general',
+  doorswitch: 'Clic: abrir o cerrar la puerta del resguardo',
+  lightcurtain: 'Clic: cortar el haz (o dejarlo libre)',
+  potentiometer: 'Clic: +25 % (de 100 % vuelve a 0)',
+  litbutton: 'Mantén pulsado para accionarlo',
 }
 
 // Componente del esquema eléctrico en el lienzo (React Flow): símbolo, bornes (handles) y rótulos.
@@ -37,7 +42,8 @@ export default function ElecNode({ data }) {
   // cerrados; protecciones, disparadas.
   const on = view ? Boolean(view.loads?.[c.id] ?? view.motors?.[c.id]?.running ?? view.closed?.[c.id]) : undefined
   // Números de borne junto a cada borne (los de los contactos auxiliares, calculados).
-  const termLabel = (t, i) => (c.type === 'contact' ? numbers?.[i] : rail || c.type === 'plc' ? null : t.id)
+  const boxed = ['psu', 'phasemonitor', 'vfd', 'softstarter', 'safetyrelay'].includes(c.type)
+  const termLabel = (t, i) => (c.type === 'contact' ? numbers?.[i] : rail || c.type === 'plc' || boxed ? null : t.id)
 
   return (
     <div
@@ -88,6 +94,14 @@ export default function ElecNode({ data }) {
           {c.type === 'counter' && <div className="text-slate-600">{`Preselección ${c.preset ?? 1}`}</div>}
           {c.type === 'coil' && c.kind === 'flash' && <div className="text-slate-600">{`Intermitente ${c.preset ?? 1} s`}</div>}
           {c.type === 'coil' && c.kind === 'impulse' && <div className="text-slate-600">Telerruptor</div>}
+          {c.type === 'coil' && c.interlock && <div className="text-slate-600">{`Enclavamiento mecánico con -${c.interlock}`}</div>}
+          {c.type === 'emergency' && Number(c.channels) === 2 && <div className="text-slate-600">Doble canal</div>}
+          {c.type === 'transmitter' && <div className="text-slate-600">{c.output === '0-10V' ? '0-10 V (3 hilos)' : '4-20 mA (2 hilos)'}</div>}
+          {c.type === 'vfd' && <div className="text-slate-600">{`2ª velocidad ${c.speed2 ?? 25} Hz`}</div>}
+          {c.type === 'softstarter' && <div className="text-slate-600">{`Rampa ${c.ramp ?? 3} s`}</div>}
+          {c.type === 'safetyrelay' && view?.safety?.[c.id]?.discrepancy && <div className="font-semibold text-amber-700">Discrepancia entre canales</div>}
+          {c.type === 'brake' && view && <div className={view.loads?.[c.id] ? 'text-green-700' : 'text-red-700'}>{view.loads?.[c.id] ? 'Suelto' : 'Frenado'}</div>}
+          {view?.motors?.[c.id]?.running && view.motors[c.id].speed < 1 && <div className="text-green-700">{`${Math.round(view.motors[c.id].speed * 100)} % de velocidad`}</div>}
         </div>
       )}
       {c.type === 'plc' && (
