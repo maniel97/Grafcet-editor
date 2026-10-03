@@ -6,6 +6,9 @@ import { NOTE_SIZE } from './notes'
 import { EMPTY_PLC, autoAssign } from './addressing'
 import { projectVariables } from './symbols'
 import { EXAMPLE_COMMENTS } from './exampleComments'
+import { buildPlcModel } from './plcModel'
+import { generatePlcWiring } from './elec/generate'
+import { pneumaticCircuit } from './elec/pneumaticCircuit'
 
 const step = (id, label, x, y, actions = [], extra = {}) => ({ id, type: 'step', position: { x, y }, data: { label, actions, ...extra } })
 const trans = (id, condition, x, y) => ({ id, type: 'transition', position: { x, y }, data: { condition } })
@@ -260,6 +263,37 @@ export const EXAMPLES = [
         ],
       }
       return { nodes, edges, plc: { scene } }
+    },
+  },
+  {
+    id: 'electroneumatica',
+    level: 5,
+    comments: 'cilindros',
+    title: 'Electroneumática A+ B+ A− B− con autómata',
+    description: 'El mismo ciclo de cilindros, montado de verdad: autómata, electroválvulas biestables, cilindros neumáticos y sus detectores en el esquema eléctrico y neumático.',
+    tags: ['Lineal', 'Neumática', 'Esquema eléctrico', 'Autómata', 'Planta'],
+    build() {
+      const project = EXAMPLES.find((e) => e.id === 'cilindros').rawBuild()
+      const text =
+        '# Electroneumática con autómata\n**Nivel 5.** El grafcet de la secuencia A+ B+ A− B− manda de verdad: abre el **Esquema eléctrico**.\n\n- Las salidas `Q` del autómata dan tensión a las electroválvulas `-Y1`…`-Y4`, que pilotan las 5/2 **biestables** 1V1 y 2V1.\n- Los cilindros A y B (con su regulador de caudal) mueven los de la planta.\n- Sus detectores `a0`…`b1` cierran los finales de carrera `-B`, que llegan a las entradas `I`.\n\nPruébalo: **Simular** y pulsa Marcha. Corta un tubo o una bobina con **Averías** y busca el fallo.'
+      return { ...project, nodes: project.nodes.map((n) => (n.id === 'nota' ? { ...n, data: { ...n.data, text }, height: 330 } : n)) }
+    },
+    // Esquema: el cableado del autómata (como «Conexiones del autómata») y, a su derecha, la parte
+    // neumática; las electroválvulas mueven las válvulas y los cilindros neumáticos, la planta.
+    after(project) {
+      const vars = buildPlcModel(project.nodes, project.edges, project.plc).variables
+      const wiring = generatePlcWiring(vars, project.plc.scene)
+      const valveOf = (name) => wiring.components.find((c) => c.type === 'valve' && c.signal === name)?.tag ?? ''
+      const right = Math.max(...wiring.components.map((c) => c.x + (c.type === 'rail' ? Number(c.length) : 160))) + 260
+      const top = Math.min(...wiring.components.map((c) => c.y))
+      const air = pneumaticCircuit(
+        ['A', 'B'].map((tag) => ({ tag, sol14: valveOf(`${tag}+`), sol12: valveOf(`${tag}-`), signal: `${tag}+`, reverse: `${tag}-`, throttle: 1 })),
+        right,
+        top,
+        'air',
+      )
+      const components = [...wiring.components.map((c) => (c.type === 'valve' ? { ...c, signal: '' } : c)), ...air.components]
+      return { ...project, plc: { ...project.plc, electrical: { enabled: true, components, wires: [...wiring.wires, ...air.wires] } } }
     },
   },
   {
@@ -1122,5 +1156,10 @@ export function documented(project, comments = {}) {
 
 for (const example of EXAMPLES) {
   const build = example.build
-  example.build = () => documented(build(), EXAMPLE_COMMENTS[example.id])
+  example.rawBuild = build
+  // after: lo que necesita las direcciones ya asignadas (p. ej. el esquema eléctrico).
+  example.build = () => {
+    const project = documented(build(), EXAMPLE_COMMENTS[example.comments ?? example.id])
+    return example.after ? example.after(project) : project
+  }
 }

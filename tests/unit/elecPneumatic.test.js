@@ -157,3 +157,69 @@ describe('neumática: montaje «Cilindro con electroválvula 5/2»', () => {
     expect(second.components.find((x) => x.type === 'valve').tag).toBe('Y2')
   })
 })
+
+describe('neumática: ejemplo «Electroneumática A+ B+ A− B− con autómata»', () => {
+  it('pulsando Marcha hace el ciclo entero por los cables, las válvulas y los detectores', async () => {
+    const { EXAMPLES } = await import('../../src/lib/examples')
+    const { normalizeProject } = await import('../../src/lib/projectFile')
+    const { buildPlcModel } = await import('../../src/lib/plcModel')
+    const { compile, evolve, initialState } = await import('../../src/lib/sim/engine')
+    const { sceneAction } = await import('../../src/lib/sim/scene')
+    const { advanceWorld, makeWorld } = await import('../../src/lib/sim/world')
+    const project = normalizeProject(EXAMPLES.find((e) => e.id === 'electroneumatica').build())
+    const elec = project.plc.electrical
+    expect(elec.enabled).toBe(true)
+    const valves = elec.components.filter((x) => x.type === 'pvalve')
+    expect(valves.map((v) => [v.sol14, v.sol12].every(Boolean))).toEqual([true, true])
+    const model = buildPlcModel(project.nodes, project.edges, project.plc)
+    const compiled = compile(model)
+    const scene = project.plc.scene
+    const world = makeWorld(scene, () => null, elec, model.variables)
+    let w = sceneAction(scene, world.init(), 'marcha', 'press')
+    let inputs = world.inputs(w)
+    let state = evolve(compiled, initialState(compiled), inputs, 0).state
+    const seen = []
+    let plantMax = 0
+    const cyl = (tag) => elec.components.find((x) => x.type === 'pcylinder' && x.tag === tag).id
+    for (let t = 0.1; t <= 8 + 1e-9; t += 0.1) {
+      const r = advanceWorld(compiled, { state, inputs, world: w }, t, { world })
+      ;({ state, inputs } = r)
+      w = r.world
+      if (t > 0.5) w = sceneAction(scene, w, 'marcha', 'release')
+      const p = w.elec.view.pneu.cylinders
+      const now = `${p[cyl('A')].pos > 0.98 ? 'A1' : 'A0'}${p[cyl('B')].pos > 0.98 ? 'B1' : 'B0'}`
+      if (seen.at(-1) !== now) seen.push(now)
+      plantMax = Math.max(plantMax, w.pos.A ?? 0)
+    }
+    expect(seen).toEqual(['A0B0', 'A1B0', 'A1B1', 'A0B1', 'A0B0'])
+    // La planta se ha movido con los cilindros neumáticos.
+    expect(plantMax).toBeGreaterThan(0.95)
+    expect(w.pos.A).toBe(0)
+  })
+})
+
+describe('neumática: montajes con dos bobinas', () => {
+  it('biestable: S1 la saca y se queda; S2 la mete', () => {
+    const s = insertTemplate(ELEC_TEMPLATES.find((t) => t.id === 'electroneumatica-biestable'))
+    const id = (tag) => s.components.find((x) => x.tag === tag).id
+    let st = act(s, act(s, run(s, elecInit()), id('S1'), 'press'), id('S1'), 'release')
+    st = run(s, st, 2.5)
+    expect(pos(st, id('A'))).toBe(1)
+    st = act(s, act(s, st, id('S2'), 'press'), id('S2'), 'release')
+    st = run(s, st, 1.5)
+    expect(pos(st, id('A'))).toBe(0)
+  })
+  it('secuencia A+ B+ A− B− con finales de carrera', () => {
+    const s = insertTemplate(ELEC_TEMPLATES.find((t) => t.id === 'secuencia-ab'))
+    const id = (tag) => s.components.find((x) => x.tag === tag).id
+    let st = act(s, run(s, elecInit()), id('S1'), 'press')
+    const seen = []
+    for (let i = 0; i < 160; i++) {
+      st = run(s, st, 0.05)
+      if (i === 10) st = act(s, st, id('S1'), 'release')
+      const now = `${pos(st, id('A')) > 0.98 ? 'A1' : 'A0'}${pos(st, id('B')) > 0.98 ? 'B1' : 'B0'}`
+      if (seen.at(-1) !== now) seen.push(now)
+    }
+    expect(seen).toEqual(['A0B0', 'A1B0', 'A1B1', 'A0B1', 'A0B0'])
+  })
+})

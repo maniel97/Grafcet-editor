@@ -1196,7 +1196,7 @@ function WireProperties({ wire, number, onChange, onDelete }) {
 // Propiedades del componente seleccionado.
 function Properties({ c, components, variables, onChange, onDelete }) {
   const t = ELEC_TYPES[c.type]
-  const isLoad = ['coil', 'valve', 'lamp', 'motor3', 'motor6', 'buzzer', 'brake'].includes(c.type)
+  const isLoad = ['coil', 'valve', 'lamp', 'motor3', 'motor6', 'buzzer', 'brake', 'pcylinder'].includes(c.type)
   const isContact = ['pushbutton', 'switch', 'limit', 'emergency', 'sensor3', 'litbutton', 'doorswitch', 'lightcurtain', 'transmitter'].includes(c.type)
   const signals = variables.filter((v) =>
     c.type === 'transmitter' ? v.type === 'analogIn' : isLoad ? v.type === 'output' : v.type !== 'output' && v.type !== 'analogIn' && v.type !== 'analogOut',
@@ -1411,8 +1411,9 @@ function Properties({ c, components, variables, onChange, onDelete }) {
         </>
       )}
       {(isContact || isLoad) &&
-        signalSelect('signal', c.type === 'transmitter' ? 'Mide en la planta (analógica)' : isLoad ? 'Mueve en la planta' : c.type === 'doorswitch' ? 'Puerta abierta en la planta' : 'Lo acciona en la planta')}
+        signalSelect('signal', c.type === 'transmitter' ? 'Mide en la planta (analógica)' : c.type === 'pcylinder' ? 'Al salir, mueve en la planta' : isLoad ? 'Mueve en la planta' : c.type === 'doorswitch' ? 'Puerta abierta en la planta' : 'Lo acciona en la planta')}
       {(c.type === 'motor3' || c.type === 'motor6') && signalSelect('reverse', 'Giro inverso en la planta')}
+      {c.type === 'pcylinder' && c.acting !== 'single' && signalSelect('reverse', 'Al entrar, mueve en la planta')}
       {c.type !== 'rail' && text('text', 'Descripción')}
       <button type="button" onClick={onDelete} className="flex items-center gap-1 rounded border border-red-200 px-2 py-0.5 text-red-700 hover:bg-red-50">
         <Trash2 size={12} /> Eliminar

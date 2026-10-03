@@ -609,6 +609,15 @@ export function elecStep(schematic, state, { physical = {}, analog = {}, plcOut 
   const air = pneuStep(schematic, s.pneu, { solenoids, manual: (c) => s.pressed[c.id] || s.latched[c.id], opened: s.opened, setting: (c) => s.knob[c.id] ?? Number(c.setting ?? 0.5), faults: s.faults }, dt)
   view.pneu = air.view
   view.pneuSignals = air.signals
+  // Un cilindro neumático puede mover un cilindro de la planta: su orden de salir (presión en A y
+  // escape en B) y la de entrar.
+  for (const c of list) {
+    if (c.type !== 'pcylinder' || !air.view) continue
+    const a = air.view.ports[key(c.id, 'A')]
+    const b = c.acting === 'single' ? 'R' : air.view.ports[key(c.id, 'B')]
+    if (c.signal) actuators[c.signal] = a === 'P' && b !== 'P' ? 1 : 0
+    if (c.reverse && c.acting !== 'single') actuators[c.reverse] = b === 'P' && a !== 'P' ? 1 : 0
+  }
   return { state: { ...after, pneu: air.state, pneuSignals: air.signals, view }, plcIn, plcInAnalog, actuators }
 }
 

@@ -2,6 +2,7 @@
 // Cada una devuelve { components, wires } colocados a partir de (ox, oy). Los identificadores son
 // los de los planos de siempre (-Q1, -KM1, -F2, -S0, -S1, -M1…).
 import { ELEC_TYPES, GRID, cylinderSignals, nextLetterTag } from './catalog'
+import { pneumaticCircuit } from './pneumaticCircuit'
 
 // Constructor: añade componentes y cables con ids propios de esta inserción.
 function builder(ox, oy, prefix) {
@@ -532,7 +533,80 @@ ELEC_TEMPLATES.push(
       return b
     },
   },
+  {
+    id: 'electroneumatica-biestable',
+    title: 'Cilindro con 5/2 biestable (memoria)',
+    description: 'Electroneumática: un impulso en S1 (-Y1) saca el cilindro A y se queda fuera aunque se suelte (la válvula biestable recuerda); un impulso en S2 (-Y2) lo hace entrar.',
+    build(ox, oy, prefix) {
+      const b = builder(ox, oy, prefix)
+      b.add('Lp', 'rail', 0, 0, { potential: 'L+', length: 200 })
+      b.add('M', 'rail', 0, 400, { potential: 'M', length: 200 })
+      for (const [k, x, text] of [
+        [1, 20, 'A+'],
+        [2, 120, 'A−'],
+      ]) {
+        b.add(`S${k}`, 'pushbutton', x, 60, { tag: `S${k}`, contact: 'NO', text })
+        b.add(`Y${k}`, 'valve', x, 240, { tag: `Y${k}`, text })
+        b.wire('Lp', tap(x + 20), `S${k}`, '13')
+        b.wire(`S${k}`, '14', `Y${k}`, 'A1')
+        b.wire(`Y${k}`, 'A2', 'M', tap(x + 20))
+      }
+      addAir(b, pneumaticCircuit([{ tag: 'A', sol14: 'Y1', sol12: 'Y2' }], 460, 20, 'air'))
+      return b
+    },
+  },
+  {
+    id: 'secuencia-ab',
+    title: 'Secuencia A+ B+ A− B− con finales de carrera',
+    description: 'Electroneumática sin autómata: cada movimiento lo da el final de carrera del anterior (válvulas biestables). Mientras S1 (marcha) esté pulsado, repite el ciclo: A+ con S1 y b0, B+ con a1, A− con b1 y B− con a0.',
+    build(ox, oy, prefix) {
+      const b = builder(ox, oy, prefix)
+      b.add('Lp', 'rail', 0, 0, { potential: 'L+', length: 420 })
+      b.add('M', 'rail', 0, 500, { potential: 'M', length: 420 })
+      // A+ : S1 y b0 en serie.
+      b.add('S1', 'pushbutton', 20, 40, { tag: 'S1', contact: 'NO', text: 'Marcha' })
+      b.add('Bb0', 'limit', 20, 160, { tag: 'B3', contact: 'NO', signal: 'b0', text: 'b0' })
+      b.wire('Lp', tap(40), 'S1', '13')
+      b.wire('S1', '14', 'Bb0', '13')
+      const branch = (name, x, from, fromT, tag, text) => {
+        b.add(name, 'valve', x, 340, { tag, text })
+        b.wire(from, fromT, name, 'A1')
+        b.wire(name, 'A2', 'M', tap(x + 20))
+      }
+      branch('Y1', 20, 'Bb0', '14', 'Y1', 'A+')
+      // B+ con a1, A− con b1, B− con a0.
+      for (const [k, x, signal, tag, text, limitTag] of [
+        [1, 120, 'a1', 'Y3', 'B+', 'B2'],
+        [2, 220, 'b1', 'Y2', 'A−', 'B4'],
+        [3, 320, 'a0', 'Y4', 'B−', 'B1'],
+      ]) {
+        b.add(`L${k}`, 'limit', x, 160, { tag: limitTag, contact: 'NO', signal, text: signal })
+        b.wire('Lp', tap(x + 20), `L${k}`, '13')
+        branch(`V${k}`, x, `L${k}`, '14', tag, text)
+      }
+      addAir(
+        b,
+        pneumaticCircuit(
+          [
+            { tag: 'A', sol14: 'Y1', sol12: 'Y2' },
+            { tag: 'B', sol14: 'Y3', sol12: 'Y4' },
+          ],
+          640,
+          20,
+          'air',
+        ),
+      )
+      return b
+    },
+  },
 )
+
+// Añade la parte neumática (lib/elec/pneumaticCircuit.js) a un montaje.
+function addAir(b, air) {
+  const local = (id) => id.replace(/^air-/, 'air')
+  for (const c of air.components) b.add(local(c.id), c.type, c.x, c.y, Object.fromEntries(Object.entries(c).filter(([k]) => !['id', 'type', 'x', 'y'].includes(k))))
+  for (const w of air.wires) b.wire(local(w.from.c), w.from.t, local(w.to.c), w.to.t)
+}
 
 // Inserta una plantilla debajo de lo que ya haya en la hoja (o en el origen). Sus identificadores
 // que ya existan en el esquema (all: todos los componentes, de todas las hojas) pasan al siguiente
