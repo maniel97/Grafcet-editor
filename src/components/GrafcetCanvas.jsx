@@ -865,6 +865,7 @@ export default function GrafcetCanvas() {
                 simulation={simulation}
                 scenarios={plc.scenarios}
                 onScenariosChange={(update) => setPlc((p) => ({ ...p, scenarios: update(p.scenarios ?? []) }))}
+                onPlantChange={(plant) => setPlc((p) => ({ ...p, plant }))}
                 exportProps={titleBlockProps}
                 onFocusNode={focusNode}
                 onClose={() => setSimulating(false)}

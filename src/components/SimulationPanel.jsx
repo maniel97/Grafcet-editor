@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
-import { AlertTriangle, ChevronDown, ChevronRight, Pause, Play, RotateCcw, SkipForward, Square, Timer } from 'lucide-react'
+import { AlertTriangle, ChevronDown, ChevronRight, Factory, Pause, Play, RotateCcw, SkipForward, Square, Timer } from 'lucide-react'
 import Chronogram from './Chronogram'
 import ScenarioControls from './ScenarioControls'
 import { chronogramCsv } from '../lib/sim/scenario'
 import { withMacros } from '../lib/sim/engine'
 import { firstFailure, waitingFor } from '../lib/sim/explain'
 import { plantInputNames } from '../lib/sim/plant'
+import PlantPanel from './PlantPanel'
 import { downloadFile } from '../lib/projectFile'
 import { fileName, getProjectName } from '../lib/fileNames'
 import { svgMarkupSource } from '../lib/svgExport'
@@ -97,9 +98,11 @@ function chronogramSource(samples, signals, now) {
 const fmtTime = (t) => (t < 60 ? `${t.toFixed(1)} s` : `${Math.floor(t / 60)} min ${(t % 60).toFixed(1)} s`)
 
 // Panel de control de la simulación.
-export default function SimulationPanel({ simulation, scenarios = [], onScenariosChange, exportProps, onFocusNode, onClose }) {
+export default function SimulationPanel({ simulation, scenarios = [], onScenariosChange, onPlantChange, exportProps, onFocusNode, onClose }) {
   const { compiled, sim, playing, setPlaying, speed, setSpeed, setInput, step, advance, reset } = simulation
 
+  // Planta virtual: panel flotante (abierto de entrada si el proyecto ya tiene planta).
+  const [plantOpen, setPlantOpen] = useState(() => simulation.plantElements.length > 0)
   // Las entradas que gobierna la planta virtual no se cambian a mano.
   const plantDriven = useMemo(() => plantInputNames(simulation.plantElements), [simulation.plantElements])
   const allInputs = useMemo(() => compiled?.variables.filter((v) => v.type === 'input') ?? [], [compiled])
@@ -281,6 +284,31 @@ export default function SimulationPanel({ simulation, scenarios = [], onScenario
             })}
           </ul>
         </Section>
+
+        <div className="border-b border-slate-100 px-4 py-2">
+          <button
+            type="button"
+            onClick={() => setPlantOpen((o) => !o)}
+            aria-pressed={plantOpen}
+            className={`flex w-full items-center gap-1.5 rounded-md border px-2 py-1 text-sm ${plantOpen ? 'border-blue-300 bg-blue-50 text-blue-800' : 'border-slate-300 hover:bg-slate-50'}`}
+          >
+            <Factory size={14} /> Planta virtual
+            <span className="ml-auto text-xs text-slate-500">
+              {simulation.plantElements.length ? `${simulation.plantElements.length} elementos` : 'sin elementos'}
+            </span>
+          </button>
+        </div>
+        {plantOpen && (
+          <PlantPanel
+            elements={simulation.plantElements}
+            plantState={sim.plant}
+            values={{ ...state.values, ...sim.inputs }}
+            variables={compiled.variables}
+            onChange={onPlantChange}
+            onAction={simulation.plantDo}
+            onClose={() => setPlantOpen(false)}
+          />
+        )}
 
         <Section title="Entradas" count={allInputs.length}>
           {allInputs.length === 0 && <p className="text-xs text-slate-400">No hay entradas: escribe receptividades como «Marcha».</p>}

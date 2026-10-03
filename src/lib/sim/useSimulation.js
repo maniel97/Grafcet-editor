@@ -59,7 +59,8 @@ export function useSimulation(nodes, edges, plc, enabled) {
       const until = playback ? Math.min(time, playback.scenario.duration ?? time) : time
       const { state, inputs, plant: plantState, next: nextEvent, events } = advanceWithPlant(
         compiled,
-        { state: current.state, inputs: current.inputs, plant: current.plant },
+        // Elementos añadidos durante la simulación: parten de su estado inicial.
+        { state: current.state, inputs: current.inputs, plant: { ...plantInit(plantElements), ...current.plant } },
         until,
         { elements: plantElements, analogRange, scenario: playback?.scenario, next: playback?.next ?? 0, options },
       )
@@ -183,7 +184,7 @@ export function useSimulation(nodes, edges, plc, enabled) {
     (id, action) => {
       const current = simRef.current
       if (!current) return
-      const plantState = plantAction(current.plant, id, action)
+      const plantState = plantAction({ ...plantInit(plantElements), ...current.plant }, id, action)
       const next = { ...current, plant: plantState, inputs: { ...current.inputs, ...plantInputs(plantElements, plantState, analogRange) } }
       simRef.current = next
       setSim(next)

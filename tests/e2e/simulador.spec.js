@@ -91,3 +91,28 @@ test('planta virtual: la secuencia neumática avanza sola con sus finales de car
   for (const s of ['s2', 's3', 's4', 's0']) await expect.poll(() => activeSteps(page), { timeout: 3000 }).toBe(s)
   expectNoErrors(errors)
 })
+
+test('panel de la planta: configurar una cinta y ver cómo la pieza para el motor', async ({ page }) => {
+  const errors = await openEditor(page)
+  await page.getByRole('button', { name: /Simular/ }).click()
+  await page.getByRole('button', { name: /Planta virtual/ }).click()
+  const panel = page.getByRole('region', { name: 'Planta virtual' })
+  await panel.getByLabel('Tipo de elemento').selectOption({ label: 'Cinta transportadora' })
+  await panel.getByRole('button', { name: 'Añadir' }).click()
+  // Motor: la salida del ejemplo; sensor final: Paro (al llegar la pieza, vuelve a X0).
+  const fields = panel.locator('select')
+  await fields.nth(0).selectOption({ index: 1 })
+  await fields.nth(1).selectOption('Paro')
+  await panel.getByRole('spinbutton').fill('1')
+  await expect(page.getByText('planta', { exact: true })).toHaveCount(1)
+
+  await panel.getByRole('button', { name: 'Nueva pieza' }).click()
+  await expect(panel.getByRole('img', { name: /Cinta .*: 1 piezas/ })).toBeVisible()
+  await page.getByRole('switch').first().click() // Marcha
+  await expect.poll(() => activeSteps(page)).toBe('s1')
+  await page.getByRole('switch').first().click()
+  // La pieza llega al sensor (Paro) en 1 s: vuelve a X0 y la cinta se para con la pieza delante.
+  await expect.poll(() => activeSteps(page), { timeout: 4000 }).toBe('s0')
+  await expect(panel.getByRole('img', { name: /Cinta .*: 1 piezas/ })).toBeVisible()
+  expectNoErrors(errors)
+})
