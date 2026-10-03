@@ -504,7 +504,8 @@ test('buscar (Ctrl+F), renombrar una variable y renumerar una etapa con sus refe
 
 test('autocompletado en receptividades y aviso de erratas', async ({ page }) => {
   const errors = await openEditor(page)
-  await page.locator('.react-flow__node-transition').nth(1).dblclick() // «Paro»
+  // Por su texto, no por su posición: el orden de los nodos en la página no está garantizado.
+  await page.locator('.react-flow__node-transition').filter({ hasText: 'Paro' }).dblclick()
   const input = page.getByPlaceholder('p. ej. a · b, ↑c, 5s/X2')
   await input.fill('')
   await input.pressSequentially('Paro · Ma')
