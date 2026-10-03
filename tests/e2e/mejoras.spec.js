@@ -696,3 +696,24 @@ test('idioma: inglés en la barra y los menús, recordado al recargar, y vuelta 
   await expect(page.getByTitle('Verificar conformidad con IEC 60848')).toBeVisible()
   expectNoErrors(errors)
 })
+
+test('modo oscuro: las opciones de los desplegables se leen (fondo oscuro y texto claro)', async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('grafcet-editor:settings', JSON.stringify({ theme: 'dark' })))
+  const errors = await openEditor(page)
+  await page.getByTitle(/Tabla de variables: direcciones/).click()
+  const dialog = page.getByRole('dialog', { name: 'Tabla de variables' })
+  await dialog.getByRole('tab', { name: /Variables/ }).click()
+  const lum = (css) => {
+    const m = css.match(/[\d.]+/g).map(Number)
+    // oklch: el navegador da la luminosidad como 0–1 (o como porcentaje).
+    if (css.startsWith('oklch')) return m[0] > 1 ? m[0] / 100 : m[0]
+    return (m[0] + m[1] + m[2]) / 765
+  }
+  for (const select of [dialog.getByLabel('Formato de direcciones'), dialog.getByRole('row', { name: /^Marcha/ }).getByRole('combobox').first()]) {
+    const option = select.locator('option').nth(1)
+    const [bg, fg] = await option.evaluate((o) => [getComputedStyle(o).backgroundColor, getComputedStyle(o).color])
+    expect(lum(bg)).toBeLessThan(0.35)
+    expect(lum(fg)).toBeGreaterThan(0.8)
+  }
+  expectNoErrors(errors)
+})

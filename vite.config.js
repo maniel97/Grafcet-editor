@@ -5,6 +5,9 @@ import { defineConfig } from 'vite'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  // Dependencias: solo desde la aplicación (no desde dist-portable/grafcet-editor.html, que lleva
+  // todo el código incrustado y el analizador de Vite no lo admite).
+  optimizeDeps: { entries: ['index.html'] },
   // Rutas relativas: la compilación funciona igual en la raíz de un dominio que en una subcarpeta
   // (GitHub Pages publica en https://usuario.github.io/<repositorio>/).
   base: './',

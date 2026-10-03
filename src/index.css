@@ -296,3 +296,11 @@ body {
 .exporting .canvas-hint {
   visibility: hidden;
 }
+/* Desplegables (<select>) en modo oscuro: la lista de opciones la dibuja el navegador y heredaba
+   el texto claro sobre su fondo blanco (solo se leía la opción resaltada). Fondo y texto propios. */
+:root[data-theme="dark"] select:not(.react-flow *):not(.paper *),
+:root[data-theme="dark"] select:not(.react-flow *):not(.paper *) option,
+:root[data-theme="dark"] select:not(.react-flow *):not(.paper *) optgroup {
+  background-color: oklch(20.8% 0.042 265.755); /* slate-900 original */
+  color: oklch(96.8% 0.007 247.896); /* slate-100 original */
+}
