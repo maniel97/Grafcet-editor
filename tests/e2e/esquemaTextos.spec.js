@@ -32,19 +32,19 @@ test('esquema eléctrico: ningún montaje tiene textos que se pisen (editor y pl
   }
 })
 
-test('esquema eléctrico: «Conexiones del autómata» sin textos que se pisen', async ({ page }) => {
-  test.setTimeout(120000)
+test('esquema eléctrico: el esquema de cada ejemplo, sin textos que se pisen', async ({ page }) => {
+  test.setTimeout(240000)
   await page.setViewportSize({ width: 1600, height: 1000 })
   await openEditor(page)
-  // Pulsadores y bobinas; detectores de 3 hilos; analógica 4-20 mA; electroneumática (ya montada).
-  for (const id of ['marcha-paro', 'clasificadora-tamano', 'deposito-nivel', 'electroneumatica']) {
-    const ex = EXAMPLES.find((e) => e.id === id)
-    await openExample(page, ex.title)
+  // Todos los ejemplos traen su esquema (el cableado del autómata; en electroneumática, también el
+  // aire): pulsadores y bobinas, detectores de 3 hilos, analógica 4-20 mA…
+  for (const ex of EXAMPLES) {
+    const id = ex.id
+    await openExample(page, new RegExp(`^${ex.title.replace(/[.*+?^${}()|[\]\\]/g, (c) => `\\${c}`)}`))
     const button = page.getByRole('button', { name: 'Esquema eléctrico' })
     await button.click()
     const view = page.getByRole('region', { name: 'Esquema eléctrico' })
     await view.getByRole('button', { name: 'Pantalla completa' }).click()
-    if (id !== 'electroneumatica') await view.getByRole('button', { name: 'Conexiones del autómata' }).click()
     await expect(view.locator('[data-elec="plc"]')).toBeVisible()
     await page.waitForTimeout(300)
     expect(await schematicOverlaps(page), id).toEqual([])

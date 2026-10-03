@@ -1160,6 +1160,17 @@ for (const example of EXAMPLES) {
   // after: lo que necesita las direcciones ya asignadas (p. ej. el esquema eléctrico).
   example.build = () => {
     const project = documented(build(), EXAMPLE_COMMENTS[example.comments ?? example.id])
-    return example.after ? example.after(project) : project
+    return withSchematic(example.after ? example.after(project) : project)
   }
+}
+
+// Todos los ejemplos traen su esquema eléctrico: el cableado del autómata con sus direcciones
+// (como «Conexiones del autómata»). Conectado si hay planta (los mandos y detectores llegan por
+// los cables); sin planta, sin conectar, para seguir accionando las entradas desde el panel.
+function withSchematic(project) {
+  if (project.plc.electrical?.components?.length) return project
+  const wiring = generatePlcWiring(buildPlcModel(project.nodes, project.edges, project.plc).variables, project.plc.scene)
+  if (!wiring.devices) return project
+  const enabled = (project.plc.scene?.elements?.length ?? 0) > 0
+  return { ...project, plc: { ...project.plc, electrical: { enabled, components: wiring.components, wires: wiring.wires } } }
 }

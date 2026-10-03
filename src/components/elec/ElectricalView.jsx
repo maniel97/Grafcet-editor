@@ -656,6 +656,11 @@ function Inner({ schematic, onChange, elecState, onAction, variables = [], build
   }
 
   const generate = () => {
+    // Un solo autómata: si ya está (p. ej. en los ejemplos, que traen su esquema), no se duplica.
+    if (allComponents.some((c) => c.type === 'plc')) {
+      setMessage({ kind: 'warn', text: 'El esquema ya tiene su autómata y sus conexiones. Para volver a crearlas, borra antes el autómata y sus aparatos.' })
+      return
+    }
     const vars = buildVariables?.() ?? []
     const withAddress = vars.filter((v) => (v.type === 'input' || v.type === 'output') && v.address?.trim())
     if (!withAddress.length) {
