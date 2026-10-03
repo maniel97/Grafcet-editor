@@ -719,6 +719,7 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
   const [zoom, setZoom] = useState(0.8)
   const [drag, setDrag] = useState(null) // { ids, start: { x, y }, dx, dy }
   const [marquee, setMarquee] = useState(null) // { x0, y0, x1, y1, add }
+  const [panning, setPanning] = useState(null) // { x, y, left, top }: arrastre con la rueda pulsada
   // Deshacer / rehacer de la escena (aparte del historial del grafcet).
   const history = useRef({ past: [], future: [] })
   const [historySize, setHistorySize] = useState({ past: 0, future: 0 }) // para los botones
@@ -1166,7 +1167,30 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
         )}
         <div
           ref={scrollRef}
-          className="paper min-w-0 flex-1 overflow-auto"
+          className={`paper min-w-0 flex-1 overflow-auto ${panning ? 'cursor-grabbing' : ''}`}
+          // Rueda pulsada y arrastrar: desplazar la vista (como en el lienzo del grafcet), también
+          // empezando encima de un elemento.
+          onPointerDownCapture={(ev) => {
+            if (ev.button !== 1) return
+            ev.preventDefault()
+            ev.stopPropagation()
+            const el = scrollRef.current
+            ev.currentTarget.setPointerCapture(ev.pointerId)
+            setPanning({ x: ev.clientX, y: ev.clientY, left: el.scrollLeft, top: el.scrollTop })
+          }}
+          onPointerMoveCapture={(ev) => {
+            if (!panning) return
+            ev.stopPropagation()
+            scrollRef.current.scrollLeft = panning.left - (ev.clientX - panning.x)
+            scrollRef.current.scrollTop = panning.top - (ev.clientY - panning.y)
+          }}
+          onPointerUpCapture={(ev) => {
+            if (!panning) return
+            ev.stopPropagation()
+            setPanning(null)
+          }}
+          // Sin el desplazamiento automático del navegador con la rueda pulsada.
+          onMouseDown={(ev) => ev.button === 1 && ev.preventDefault()}
           onDragOver={(ev) => {
             if (!ev.dataTransfer.types.includes(DRAG_TYPE)) return
             ev.preventDefault()
@@ -1300,7 +1324,7 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
       )}
       {mode === 'edit' && (
         <p className="border-t border-slate-200 px-2 py-1 text-[11px] text-slate-500">
-          Arrastra módulos de la paleta · Ctrl+clic o recuadro: varios · R gira · Supr borra · Ctrl+C/V/D copia, pega, duplica · deshacer y rehacer: los de siempre · asigna las variables en el panel de la derecha. Piezas de {PIECE_SIZES.small[0]} y{' '}
+          Arrastra módulos de la paleta · rueda pulsada: desplazar · Ctrl+clic o recuadro: varios · R gira · Supr borra · Ctrl+C/V/D copia, pega, duplica · deshacer y rehacer: los de siempre · asigna las variables en el panel de la derecha. Piezas de {PIECE_SIZES.small[0]} y{' '}
           {PIECE_SIZES.large[0]} px.
         </p>
       )}

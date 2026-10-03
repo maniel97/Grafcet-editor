@@ -345,3 +345,24 @@ test('escena: selección múltiple, mover en grupo, copiar/pegar/duplicar y desh
   await expect(page.locator('.react-flow__node')).toHaveCount(grafcetNodes)
   expectNoErrors(errors)
 })
+
+test('escena: desplazar la vista arrastrando con la rueda pulsada', async ({ page }) => {
+  const errors = await openEditor(page)
+  await openExample(page, /Cilindros A\+ B\+/)
+  await page.getByRole('button', { name: /Simular/ }).click()
+  const view = page.getByRole('region', { name: 'Escena de la planta' })
+  const scroller = view.locator('.paper')
+  for (let i = 0; i < 6; i++) await view.getByTitle('Acercar').click() // más grande que la vista
+  await scroller.evaluate((el) => el.scrollTo(200, 150))
+  const before = await scroller.evaluate((el) => [el.scrollLeft, el.scrollTop])
+  // Empezando encima de un cilindro: desplaza, no lo mueve ni lo acciona.
+  const b = await view.locator('[data-element="cylinder"]').first().boundingBox()
+  await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2)
+  await page.mouse.down({ button: 'middle' })
+  await page.mouse.move(b.x + b.width / 2 - 60, b.y + b.height / 2 - 40, { steps: 4 })
+  await page.mouse.up({ button: 'middle' })
+  const after = await scroller.evaluate((el) => [el.scrollLeft, el.scrollTop])
+  expect(after[0] - before[0]).toBeGreaterThan(50)
+  expect(after[1] - before[1]).toBeGreaterThan(30)
+  expectNoErrors(errors)
+})
