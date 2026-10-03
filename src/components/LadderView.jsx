@@ -1,8 +1,9 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { AlertTriangle, Check, Copy, Download, FileCode, FileText, Image, Table2, X } from 'lucide-react'
+import { AlertTriangle, Check, Copy, Download, FileCode, FileText, Image, Pause, Play, Table2, X } from 'lucide-react'
 import LadderDiagram from './LadderDiagram'
 import LadderZoom from './LadderZoom'
 import { generateLadder } from '../lib/ladder/generate'
+import { ladderLive } from '../lib/ladder/live'
 import { toAWL, toStructuredText } from '../lib/ladder/exportText'
 import { encodeAnsi, s7200Symbols, toS7200 } from '../lib/ladder/exportS7200'
 import { projectVariables } from '../lib/symbols'
@@ -60,7 +61,9 @@ function ActionButton({ icon: Icon, children, onClick, title }) {
 
 // Traducción del grafcet a ladder, con su texto equivalente en ST y AWL. Se regenera al abrirla,
 // así que siempre corresponde al diagrama y a la tabla de variables actuales.
-export default function LadderView({ nodes, edges, plc, grafcetErrors, exportProps, onClose }) {
+// simulation: la de useSimulation mientras se simula (ladder en vivo), o null. highlightNodeId:
+// segmentos de ese elemento del grafcet resaltados. onShowInGrafcet(id): clic en un segmento.
+export default function LadderView({ nodes, edges, plc, grafcetErrors, exportProps, onClose, simulation = null, highlightNodeId = null, onShowInGrafcet }) {
   const [tab, setTab] = useState('ladder')
   const [mode, setMode] = useState('both')
   const [mnemonic, setMnemonic] = useState('de')
@@ -77,6 +80,19 @@ export default function LadderView({ nodes, edges, plc, grafcetErrors, exportPro
   )
 
   const ladder = useMemo(() => generateLadder(nodes, edges, plc), [nodes, edges, plc])
+  // En vivo (y sin capas al exportar: el esquema exportado es siempre el limpio).
+  const simCompiled = simulation?.compiled
+  const simState = simulation?.sim?.state
+  const live = useMemo(
+    () => (simCompiled && simState && !exportFormat ? ladderLive(ladder, simCompiled, simState) : null),
+    [ladder, simCompiled, simState, exportFormat],
+  )
+  const simInputs = useMemo(() => simCompiled?.variables.filter((v) => v.type === 'input') ?? [], [simCompiled])
+  // Al abrir desde «Ver en el ladder»: el primer segmento resaltado, a la vista.
+  useEffect(() => {
+    if (!highlightNodeId) return
+    requestAnimationFrame(() => document.querySelector('[data-ladder-svg] [data-highlighted]')?.scrollIntoView({ block: 'center' }))
+  }, [highlightNodeId])
   // Ancho real del esquema (para ajustarlo al ancho de la ventana).
   const [naturalWidth, setNaturalWidth] = useState(0)
   useLayoutEffect(() => {
@@ -193,6 +209,37 @@ export default function LadderView({ nodes, edges, plc, grafcetErrors, exportPro
         </div>
       </header>
 
+      {live && tab === 'ladder' && (
+        <div className="flex flex-wrap items-center gap-2 border-b border-green-200 bg-green-50 px-4 py-2 text-xs text-green-900" aria-label="Simulación en vivo">
+          <span className="flex items-center gap-1.5 font-medium">
+            <span className="h-2 w-2 rounded-full bg-green-600" /> En vivo
+          </span>
+          <span className="text-green-800">contactos cerrados y salidas activas en verde · t = {simState.time.toFixed(1)} s</span>
+          <button
+            type="button"
+            onClick={() => simulation.setPlaying(!simulation.playing)}
+            className="flex items-center gap-1 rounded border border-green-300 bg-white px-2 py-0.5 hover:bg-green-100"
+          >
+            {simulation.playing ? <Pause size={12} /> : <Play size={12} />} {simulation.playing ? 'Pausa' : 'Seguir'}
+          </button>
+          {simInputs.map((v) => {
+            const on = Boolean(simulation.sim.inputs[v.name])
+            return (
+              <button
+                key={v.name}
+                type="button"
+                role="switch"
+                aria-checked={on}
+                onClick={() => simulation.setInput(v.name, !on)}
+                className={`rounded border px-2 py-0.5 font-mono ${on ? 'border-green-600 bg-green-600 text-white' : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-100'}`}
+              >
+                {v.name}
+              </button>
+            )
+          })}
+          {onShowInGrafcet && <span className="ml-auto text-green-800">Clic en un segmento: verlo en el grafcet</span>}
+        </div>
+      )}
       {tab === 's7200' && s7200 && (
         <div className="space-y-1 border-b border-blue-200 bg-blue-50 px-4 py-2 text-xs text-blue-900" aria-label="Instrucciones para Micro/WIN">
           <p>
@@ -242,7 +289,14 @@ export default function LadderView({ nodes, edges, plc, grafcetErrors, exportPro
 
       {tab === 'ladder' ? (
         <LadderZoom naturalWidth={naturalWidth}>
-          <LadderDiagram ref={svgRef} ladder={ladder} mode={mode} />
+          <LadderDiagram
+            ref={svgRef}
+            ladder={ladder}
+            mode={mode}
+            live={live}
+            highlightNodeId={exportFormat ? null : highlightNodeId}
+            onRungClick={onShowInGrafcet && !exportFormat ? (rung) => onShowInGrafcet(rung.nodeIds[0]) : undefined}
+          />
         </LadderZoom>
       ) : (
         <div className="min-h-0 flex-1 overflow-auto p-4">

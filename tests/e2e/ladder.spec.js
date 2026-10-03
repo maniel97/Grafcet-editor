@@ -125,3 +125,36 @@ test('S7-200: CPU sugerida, módulos y direcciones según la configuración', as
   await expect(dialog.getByRole('row', { name: /^Marcha/ }).locator('input').first()).toHaveValue('I0.0')
   expectNoErrors(errors)
 })
+
+test('ladder en vivo durante la simulación y navegación entre grafcet y ladder', async ({ page }) => {
+  const errors = await openEditor(page)
+  // «Ver en el ladder» (clic derecho en una transición): sus segmentos resaltados.
+  await page.locator('.react-flow__node-transition').filter({ hasText: 'Marcha' }).click({ button: 'right' })
+  await page.getByRole('menuitem', { name: 'Ver en el ladder' }).click()
+  const view = page.locator('[aria-label="Ladder generado"]')
+  await expect(view.locator('[data-highlighted]').first()).toBeVisible()
+  expect(await view.locator('[data-highlighted]').count()).toBeGreaterThanOrEqual(2)
+  await expect(view.locator('[data-live]:not([data-live="resaltado"])')).toHaveCount(0) // sin simular: sin estado
+
+  // Clic en un segmento: vuelve al grafcet con el elemento resaltado.
+  await view.locator('[data-highlighted]').first().click()
+  await expect(view).toHaveCount(0)
+  await expect(page.locator('.react-flow__node-transition').filter({ hasText: 'Marcha' }).locator('.outline-amber-400')).toHaveCount(1)
+
+  // Simulando: contactos y salidas en vivo, con las entradas en la propia vista.
+  await page.getByRole('button', { name: /Simular/ }).click()
+  await page.locator('.react-flow__node-transition').filter({ hasText: 'Marcha' }).click({ button: 'right' })
+  await page.getByRole('menuitem', { name: 'Ver en el ladder' }).click()
+  const bar = view.getByLabel('Simulación en vivo')
+  await expect(bar).toContainText('En vivo')
+  const motorOn = view.locator('[data-live="activa"]')
+  const before = await motorOn.count()
+  await bar.getByRole('switch', { name: 'Marcha' }).click()
+  await expect.poll(() => motorOn.count()).toBeGreaterThan(before)
+  await expect(bar.getByRole('switch', { name: 'Marcha' })).toHaveAttribute('aria-checked', 'true')
+
+  // El esquema exportado no lleva las capas del modo en vivo.
+  await view.getByRole('button', { name: 'SVG' }).click()
+  await expect(view.locator('[data-ladder-svg] [data-live]')).toHaveCount(0)
+  expectNoErrors(errors)
+})

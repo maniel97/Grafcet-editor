@@ -103,6 +103,8 @@ export default function GrafcetCanvas() {
   const [helpOpen, setHelpOpen] = useState(false)
   const [verifyOpen, setVerifyOpen] = useState(false)
   const [ladderOpen, setLadderOpen] = useState(false)
+  // Elemento del grafcet cuyos segmentos se resaltan en el ladder («Ver en el ladder»).
+  const [ladderFocus, setLadderFocus] = useState(null)
   const [gemmaOpen, setGemmaOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
   // Hojas (lib/sheets.js): la activa es la que se dibuja.
@@ -610,6 +612,11 @@ export default function GrafcetCanvas() {
   const modalOpen = settingsOpen || helpOpen || variablesOpen || ladderOpen || gemmaOpen || !!exportFormat || !!projectsTab || !!menu
   // En solo lectura el clic derecho no abre menús de edición (ni el del navegador).
   const blockMenu = (handler) => (readOnly ? (e) => e.preventDefault() : handler)
+  // En solo lectura (simulando), el clic derecho en una etapa o transición permite ver su ladder.
+  const readOnlyNodeMenu = (e, node) => {
+    e.preventDefault()
+    if (node.type === 'step' || node.type === 'transition') setMenu({ x: e.clientX, y: e.clientY, kind: 'readonly', nodeIds: [node.id] })
+  }
 
   return (
     <EditorProvider value={editorApi}>
@@ -639,7 +646,10 @@ export default function GrafcetCanvas() {
           simulating={simulating}
           readOnly={readOnly}
           onToggleSimulation={() => (simulating ? setSimulating(false) : startSimulation())}
-          onOpenLadder={() => setLadderOpen(true)}
+          onOpenLadder={() => {
+            setLadderFocus(null)
+            setLadderOpen(true)
+          }}
           onOpenGemma={() => setGemmaOpen(true)}
         />
         {ladderOpen && (
@@ -651,6 +661,13 @@ export default function GrafcetCanvas() {
               grafcetErrors={issueCounts.errors}
               exportProps={titleBlockProps}
               onClose={() => setLadderOpen(false)}
+              simulation={simulating ? simulation : null}
+              highlightNodeId={ladderFocus}
+              onShowInGrafcet={(id) => {
+                setLadderOpen(false)
+                setHighlight(new Set([id]))
+                focusNode(id)
+              }}
             />
           </Suspense>
         )}
@@ -781,7 +798,7 @@ export default function GrafcetCanvas() {
                 takeSnapshot()
                 return true
               }}
-              onNodeContextMenu={blockMenu(onNodeContextMenu)}
+              onNodeContextMenu={readOnly ? readOnlyNodeMenu : onNodeContextMenu}
               onSelectionContextMenu={blockMenu(onSelectionContextMenu)}
               onPaneContextMenu={blockMenu(onPaneContextMenu)}
               onEdgeContextMenu={blockMenu(onEdgeContextMenu)}
@@ -835,6 +852,10 @@ export default function GrafcetCanvas() {
                 onFrameAround={frameAroundNodes}
                 sheets={sheets.length > 1 ? sheets.filter((s) => s.id !== currentSheet) : []}
                 onMoveToSheet={moveToSheet}
+                onShowInLadder={(id) => {
+                  setLadderFocus(id)
+                  setLadderOpen(true)
+                }}
               />
             )}
           </div>

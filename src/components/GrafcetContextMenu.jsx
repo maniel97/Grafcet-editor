@@ -1,6 +1,7 @@
 import InitialStepIcon from './InitialStepIcon'
 import { useReactFlow } from '@xyflow/react'
 import {
+  Cpu,
   CornerLeftUp,
   Equal,
   EyeOff,
@@ -35,7 +36,7 @@ import { FRAME_KINDS } from '../lib/frames'
 
 // Menú contextual del lienzo: las opciones dependen de lo que se pulse con el botón derecho.
 // menu: { x, y, kind: 'node' | 'selection' | 'pane', nodeIds, flowPosition }
-export default function GrafcetContextMenu({ menu, onClose, onEdit, onAddNodeAt, onFrameAround, sheets = [], onMoveToSheet }) {
+export default function GrafcetContextMenu({ menu, onClose, onEdit, onAddNodeAt, onFrameAround, sheets = [], onMoveToSheet, onShowInLadder }) {
   const { getNode, getEdges, updateNodeData, setEdges, deleteElements } = useReactFlow()
   const quickConnect = useQuickConnect()
   const { arrange, addBranch, predecessorsOf, addAlternative, converge, toggleInitial, toggleMacro, addAction, remove } =
@@ -44,6 +45,15 @@ export default function GrafcetContextMenu({ menu, onClose, onEdit, onAddNodeAt,
 
   let title
   let items = []
+
+  // Solo lectura (simulando o bloqueado): únicamente consultar el ladder.
+  if (menu.kind === 'readonly') {
+    const node = getNode(menu.nodeIds[0])
+    if (!node) return null
+    title = node.type === 'step' ? `Etapa ${node.data.label}` : 'Transición'
+    items = [{ label: 'Ver en el ladder', icon: Cpu, onSelect: () => onShowInLadder(node.id) }]
+    return <ContextMenu x={menu.x} y={menu.y} title={title} items={items} onClose={onClose} />
+  }
 
   if (menu.kind === 'edge') {
     const edge = getEdges().find((e) => e.id === menu.edgeId)
@@ -235,6 +245,10 @@ export default function GrafcetContextMenu({ menu, onClose, onEdit, onAddNodeAt,
           ? [{ label: 'Bucle a etapa…', icon: CornerLeftUp, onSelect: () => startLoop(node.id) }]
           : []),
       ]
+    }
+    // Ver los segmentos del ladder que genera esta etapa o transición.
+    if (onShowInLadder && (node.type === 'step' || node.type === 'transition')) {
+      items.push({ label: 'Ver en el ladder', icon: Cpu, onSelect: () => onShowInLadder(node.id) })
     }
     items.push(
       { label: 'Editar…', icon: Pencil, onSelect: () => onEdit(node.id) },

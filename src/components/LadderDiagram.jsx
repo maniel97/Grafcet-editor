@@ -15,6 +15,10 @@ const MONO = 'ui-monospace, Consolas, monospace'
 const INK = '#0f172a'
 const MUTED = '#64748b'
 
+// Simulación en vivo: capas encima del esquema (data-live: no se exportan).
+const LIVE_ON = '#16a34a'
+const LIVE_OFF = '#94a3b8'
+
 const clip = (text, max = 14) => (text.length > max ? `${text.slice(0, max - 1)}…` : text)
 
 // Texto encima (nombre o dirección) y debajo (dirección) del símbolo, según el modo de etiquetas.
@@ -129,8 +133,21 @@ function Contact({ x, y, node, ctx }) {
   const cx = x + W / 2
   const text = node.kind === 'NOT' ? null : labels(node.operand, ctx.resolver, ctx.mode)
   const mark = { NC: '/', P: 'P', N: 'N', NOT: 'NOT' }[node.kind]
+  const closed = node.kind === 'NOT' ? null : ctx.live?.closed(node)
   return (
     <g>
+      {closed != null && (
+        <rect
+          data-live={closed ? 'cerrado' : 'abierto'}
+          x={cx - 14}
+          y={y - 16}
+          width={28}
+          height={32}
+          rx="3"
+          fill={closed ? LIVE_ON : LIVE_OFF}
+          fillOpacity={closed ? 0.3 : 0.12}
+        />
+      )}
       <line x1={x} y1={y} x2={cx - 8} y2={y} stroke={INK} strokeWidth="1.5" />
       <line x1={cx + 8} y1={y} x2={x + W} y2={y} stroke={INK} strokeWidth="1.5" />
       <line x1={cx - 8} y1={y - 12} x2={cx - 8} y2={y + 12} stroke={INK} strokeWidth="2" />
@@ -153,11 +170,15 @@ function Contact({ x, y, node, ctx }) {
 
 function Compare({ x, y, node, ctx }) {
   const name = (op) => (ctx.mode === 'address' ? ctx.resolver.address(op) || ctx.resolver.name(op) : ctx.resolver.name(op))
+  const closed = ctx.live?.closed(node)
   return (
     <g>
       <line x1={x} y1={y} x2={x + 12} y2={y} stroke={INK} strokeWidth="1.5" />
       <line x1={x + W - 12} y1={y} x2={x + W} y2={y} stroke={INK} strokeWidth="1.5" />
       <rect x={x + 12} y={y - 22} width={W - 24} height={44} fill="white" stroke={INK} strokeWidth="1.5" />
+      {closed != null && (
+        <rect data-live={closed ? 'cerrado' : 'abierto'} x={x + 12} y={y - 22} width={W - 24} height={44} fill={closed ? LIVE_ON : LIVE_OFF} fillOpacity={closed ? 0.25 : 0.1} />
+      )}
       <text x={x + W / 2} y={y - 9} textAnchor="middle" fontSize="10" fontWeight="600" fontFamily={FONT} fill={INK}>
         CMP {node.op}
       </text>
@@ -171,8 +192,12 @@ function Compare({ x, y, node, ctx }) {
   )
 }
 
-function Output({ x, y, output, ctx }) {
+function Output({ x, y, output, ctx, energized }) {
   const cx = x + W / 2
+  // En vivo: la salida recibe corriente (bobina activada, instrucción ejecutándose).
+  const live = energized != null && (
+    <rect data-live={energized ? 'activa' : 'inactiva'} x={x + 8} y={y - 22} width={W - 16} height={44} rx="4" fill={energized ? LIVE_ON : LIVE_OFF} fillOpacity={energized ? 0.25 : 0.08} />
+  )
   const text = labels(output.operand, ctx.resolver, ctx.mode)
   if (output.type === 'ton' || output.type === 'assign') {
     const title = output.type === 'ton' ? 'TON' : 'CALC'
@@ -181,6 +206,7 @@ function Output({ x, y, output, ctx }) {
       <g>
         <line x1={x} y1={y} x2={x + 8} y2={y} stroke={INK} strokeWidth="1.5" />
         <rect x={x + 8} y={y - 22} width={W - 16} height={44} fill="white" stroke={INK} strokeWidth="1.5" />
+        {live}
         <text x={cx} y={y - 8} textAnchor="middle" fontSize="10" fontWeight="600" fontFamily={FONT} fill={INK}>
           {title}
         </text>
@@ -199,6 +225,7 @@ function Output({ x, y, output, ctx }) {
   const letter = { set: 'S', reset: 'R' }[output.type]
   return (
     <g>
+      {live}
       <line x1={x} y1={y} x2={cx - 12} y2={y} stroke={INK} strokeWidth="1.5" />
       <path d={`M ${cx - 6} ${y - 12} A 14 14 0 0 0 ${cx - 6} ${y + 12}`} fill="none" stroke={INK} strokeWidth="2" />
       <path d={`M ${cx + 6} ${y - 12} A 14 14 0 0 1 ${cx + 6} ${y + 12}`} fill="none" stroke={INK} strokeWidth="2" />
@@ -214,8 +241,10 @@ function Output({ x, y, output, ctx }) {
 }
 
 // mode: 'symbol' | 'address' | 'both'
-const LadderDiagram = forwardRef(function LadderDiagram({ ladder, mode = 'both' }, ref) {
-  const ctx = { resolver: ladder.resolver, mode }
+// live: estado en vivo (lib/ladder/live.js) o null. highlightNodeId: resalta los segmentos de ese
+// elemento del grafcet. onRungClick(segmento): clic en un segmento.
+const LadderDiagram = forwardRef(function LadderDiagram({ ladder, mode = 'both', live = null, highlightNodeId = null, onRungClick }, ref) {
+  const ctx = { resolver: ladder.resolver, mode, live }
   const laidOut = new Map(ladder.sections.flatMap((s) => s.rungs.map((r) => [r, layout(r.network, ctx)])))
   // Todas las bobinas alineadas en la misma columna, como en un esquema real.
   const netCols = Math.max(1, ...[...laidOut.values()].map((l) => l.w))
@@ -242,8 +271,22 @@ const LadderDiagram = forwardRef(function LadderDiagram({ ladder, mode = 'both' 
       const railTop = top + 4
       const railBottom = top + rows * H - 4
       const x0 = MARGIN + RAIL
+      const energized = live ? live.energized(rung) : null
+      const linked = rung.nodeIds?.length > 0
       blocks.push(
-        <g key={`r-${rung.number}`} data-block-top={y} data-block-bottom={top + rows * H + RUNG_GAP}>
+        <g
+          key={`r-${rung.number}`}
+          data-block-top={y}
+          data-block-bottom={top + rows * H + RUNG_GAP}
+          data-rung={rung.number}
+          data-highlighted={highlightNodeId && rung.nodeIds?.includes(highlightNodeId) ? '1' : undefined}
+          onClick={onRungClick && linked ? () => onRungClick(rung) : undefined}
+          style={onRungClick && linked ? { cursor: 'pointer' } : undefined}
+        >
+          {highlightNodeId && rung.nodeIds?.includes(highlightNodeId) && (
+            <rect data-live="resaltado" x={MARGIN / 2} y={y - 4} width={width - MARGIN} height={top + rows * H + 8 - y} rx="6" fill="#3b82f6" fillOpacity="0.12" stroke="#3b82f6" strokeWidth="1.5" />
+          )}
+          {onRungClick && linked && <title>Clic: ver en el grafcet</title>}
           <text x={MARGIN} y={y + 14} fontSize="11" fontFamily={FONT} fill={rung.error ? '#dc2626' : MUTED}>
             <tspan fontWeight="700" fill={rung.error ? '#dc2626' : INK}>
               {rung.number}
@@ -261,7 +304,7 @@ const LadderDiagram = forwardRef(function LadderDiagram({ ladder, mode = 'both' 
           )}
           {rung.outputs.map((o, i) => (
             <g key={i}>
-              <Output x={outX} y={lineY + i * H} output={o} ctx={ctx} />
+              <Output x={outX} y={lineY + i * H} output={o} ctx={ctx} energized={energized} />
               <line x1={outX + W} y1={lineY + i * H} x2={outX + W + 8} y2={lineY + i * H} stroke={INK} strokeWidth="1.5" />
             </g>
           ))}
