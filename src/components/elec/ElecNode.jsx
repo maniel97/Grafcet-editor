@@ -111,7 +111,7 @@ export default function ElecNode({ data }) {
       </svg>
       {!rail && c.type !== 'plc' && (
         // Rótulo a la derecha; la descripción se parte en líneas para no pisar al aparato de al lado.
-        <div className="pointer-events-none absolute top-[22px] w-[92px] text-[11px] leading-tight text-slate-900" style={c.type === 'pcylinder' ? { left: 30, top: 40 } : { left: w + 2 }}>
+        <div className="pointer-events-none absolute top-[22px] w-[92px] text-[11px] leading-tight text-slate-900" style={c.type === 'pcylinder' ? { left: 30, top: 40 } : { left: w + (boxed ? 16 : 2) }}>
           {/* Neumática: identificación ISO 1219-2, sin guion (1V1, A). */}
           <div className="font-semibold">{c.type === 'terminal' ? `${showTag(tag)}:${c.n ?? 1}` : isPneumatic(c.type) ? tag : showTag(tag)}</div>
           {c.text && <div className="text-[10px] text-slate-600">{c.text}</div>}
@@ -142,11 +142,6 @@ export default function ElecNode({ data }) {
           {c.type === 'throttle' && <div className="text-slate-600">{`Abierto ${Math.round((view?.knob?.[c.id] ?? Number(c.setting ?? 0.5)) * 100)} %`}</div>}
           {c.type === 'airsource' && air?.leaks && <div className="font-semibold text-amber-700">Fuga: el aire sale por un escape</div>}
           {view?.motors?.[c.id]?.running && view.motors[c.id].speed < 1 && <div className="text-green-700">{`${Math.round(view.motors[c.id].speed * 100)} % de velocidad`}</div>}
-        </div>
-      )}
-      {c.type === 'plc' && (
-        <div className="pointer-events-none absolute -top-4 left-0 text-[11px] font-semibold text-slate-900">
-          {showTag(c.tag)}
         </div>
       )}
       {rail && <span className="sr-only">{POTENTIALS[c.potential]?.label}</span>}

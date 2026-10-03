@@ -5,9 +5,10 @@
 import { ElecSymbol } from './ElecSymbols'
 import ElecFrame from './ElecFrame'
 import { INK, POTENTIAL_COLORS } from './elecColors'
-import { contactNumbers, showTag, sizeOf, terminalsOf } from '../../lib/elec/catalog'
+import { contactNumbers, isPneumatic, showTag, sizeOf, terminalsOf } from '../../lib/elec/catalog'
 import { COLUMN_WIDTH, FRAME_HEIGHT, FRAME_TOP, crossReferenceMap, elecSheetsOf, frameColumns, sheetOfComponent } from '../../lib/elec/sheet'
 import { WIRE_COLORS, junctions, sectionWidth, wireNumbers } from '../../lib/elec/wiring'
+import { routePath, wireRoute } from '../../lib/elec/route'
 
 const BOXED = new Set(['psu', 'phasemonitor', 'vfd', 'softstarter', 'safetyrelay'])
 const MARGIN = 20
@@ -26,15 +27,10 @@ function lines(text, n = 18) {
   return out
 }
 
-// Recorrido ortogonal de un cable: sale de cada borne hacia su lado (arriba o abajo) y se une por
-// una horizontal a media altura.
-function route(a, b) {
-  const out = (p) => (p.side === 'top' ? -12 : 12)
-  const a1 = { x: a.x, y: a.y + out(a) }
-  const b1 = { x: b.x, y: b.y + out(b) }
-  const mid = (a1.y + b1.y) / 2
-  const pts = [a, a1, { x: a1.x, y: mid }, { x: b1.x, y: mid }, b1, b]
-  return { d: pts.map((p, i) => `${i ? 'L' : 'M'} ${p.x} ${p.y}`).join(' '), label: { x: (a1.x + b1.x) / 2, y: mid } }
+// Recorrido de un cable: el mismo que en el editor (lib/elec/route.js).
+function route(a, b, w) {
+  const { points, label } = wireRoute(a, b, w)
+  return { d: routePath(points), label }
 }
 
 export default function ElecStatic({ schematic, sheetId, info = {} }) {
@@ -80,7 +76,7 @@ export default function ElecStatic({ schematic, sheetId, info = {} }) {
         const a = at(w.from)
         const b = at(w.to)
         if (!a || !b) return null
-        const { d, label } = route(a, b)
+        const { d, label } = route(a, b, w)
         return (
           <g key={w.id}>
             <path d={d} fill="none" stroke={WIRE_COLORS[w.color]?.stroke ?? INK} strokeWidth={sectionWidth(w.section)} strokeLinejoin="round" />
@@ -104,7 +100,7 @@ export default function ElecStatic({ schematic, sheetId, info = {} }) {
           c.type === 'rail' || c.type === 'plc'
             ? []
             : [
-                [c.type === 'terminal' ? `${showTag(tag)}:${c.n ?? 1}` : showTag(tag), 11, 700],
+                [c.type === 'terminal' ? `${showTag(tag)}:${c.n ?? 1}` : isPneumatic(c.type) ? tag : showTag(tag), 11, 700],
                 ...lines(c.text).map((t) => [t, 9.5, 400]),
                 ...(xref.byTag[c.tag]?.length ? [[xref.byTag[c.tag].map((x) => `${x.numbers.join('-')} ${x.where}`).join(' · '), 7.5, 400]] : []),
                 ...(xref.ownerOf[c.id] ? [[xref.ownerOf[c.id], 7.5, 400]] : []),
@@ -113,7 +109,7 @@ export default function ElecStatic({ schematic, sheetId, info = {} }) {
           <g key={c.id} transform={`translate(${c.x} ${c.y})`}>
             <ElecSymbol c={{ ...c, timed: false }} view={null} />
             {!BOXED.has(c.type) &&
-              !['rail', 'plc', 'terminal'].includes(c.type) &&
+              !['rail', 'plc', 'terminal', 'pcylinder', 'airsource'].includes(c.type) &&
               terms.map((t, i) => {
                 const text = c.type === 'contact' ? numbers[c.id]?.[i] : t.id
                 return text ? (
@@ -127,13 +123,8 @@ export default function ElecStatic({ schematic, sheetId, info = {} }) {
                 {c.potential}
               </text>
             )}
-            {c.type === 'plc' && (
-              <text x="0" y="-6" fontSize="11" fontWeight="700" fill={INK}>
-                {showTag(c.tag)}
-              </text>
-            )}
             {label.map(([t, size, weight], i) => (
-              <text key={i} x={w + 3} y={32 + i * 12} fontSize={size} fontWeight={weight} fill={i ? '#334155' : INK}>
+              <text key={i} x={c.type === 'pcylinder' ? 30 : w + (BOXED.has(c.type) ? 16 : 3)} y={(c.type === 'pcylinder' ? 50 : 32) + i * 12} fontSize={size} fontWeight={weight} fill={i ? '#334155' : INK}>
                 {t}
               </text>
             ))}

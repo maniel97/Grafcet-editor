@@ -137,6 +137,10 @@ function Plc({ c, s }) {
           </g>
         )
       })}
+      {/* Identificador dentro de la caja (fuera lo pisarían los cables de los bornes). */}
+      <text x="12" y="64" fontSize="11" fontWeight="700" fill={INK}>
+        {c.tag ? `-${c.tag}` : ''}
+      </text>
       <text x={w / 2} y="64" textAnchor="middle" fontSize="13" fontWeight="700" fill={INK}>
         {c.text || 'Autómata'}
       </text>
@@ -287,15 +291,18 @@ function Socket() {
 }
 
 // Caja con un rótulo dentro (aparatos electrónicos: fuente, variador, relé de seguridad…).
+// El nombre (y el estado) van en la franja central, entre los nombres de los bornes de arriba y
+// los de abajo (13 px cada franja).
 function Box({ x = 4, y = 16, w, h, label, sub, on }) {
+  const mid = y + h / 2
   return (
     <g>
       <rect x={x} y={y} width={w} height={h} rx="3" fill={on ? '#dcfce7' : '#f8fafc'} stroke={INK} strokeWidth="2" />
-      <text x={x + w / 2} y={y + h / 2 + (sub ? -2 : 4)} textAnchor="middle" fontSize="11" fontWeight="700" fill={INK}>
+      <text x={x + w / 2} y={sub ? mid - 3 : mid + 4} textAnchor="middle" fontSize="11" fontWeight="700" fill={INK}>
         {label}
       </text>
       {sub && (
-        <text x={x + w / 2} y={y + h / 2 + 12} textAnchor="middle" fontSize="9" fill="#334155">
+        <text x={x + w / 2} y={mid + 11} textAnchor="middle" fontSize="9" fill="#334155">
           {sub}
         </text>
       )}
@@ -497,7 +504,7 @@ export function ElecSymbol({ c, view }) {
     case 'softstarter':
     case 'safetyrelay': {
       const { w, h } = sizeOf(c)
-      const top = c.type === 'phasemonitor' ? 14 : 16
+      const top = 16
       const bottom = h - 16
       const terms = terminalsOf(c)
       const sub =
@@ -512,9 +519,9 @@ export function ElecSymbol({ c, view }) {
             : c.type === 'safetyrelay' && view?.safety?.[c.id]
               ? `canal 1 ${view.safety[c.id].ch1 ? '✓' : '✗'} · canal 2 ${view.safety[c.id].ch2 ? '✓' : '✗'}`
               : c.type === 'psu'
-                ? '230 V~ / 24 V DC'
+                ? '24 V DC'
                 : ''
-      const label = { psu: 'Fuente 24 V', phasemonitor: 'Control de fases', vfd: 'Variador', softstarter: 'Arrancador suave', safetyrelay: 'Relé de seguridad' }[c.type]
+      const label = { psu: 'Fuente', phasemonitor: 'Control de fases', vfd: 'Variador', softstarter: 'Arrancador suave', safetyrelay: 'Relé de seguridad' }[c.type]
       return (
         <g>
           <Box x={2} y={top} w={w - 4} h={bottom - top} label={label} sub={sub} on={view?.loads?.[c.id]} />

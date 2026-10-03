@@ -2,9 +2,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Background, BackgroundVariant, ConnectionMode, ReactFlow, ReactFlowProvider, useReactFlow, useViewport } from '@xyflow/react'
 import { AlertTriangle, Download, Gauge, Minus, Plus, Wrench, Maximize2, Minimize2, MousePointer2, Hand, Scan, Trash2, WandSparkles, X, Zap } from 'lucide-react'
 import ElecNode from './ElecNode'
+import WireEdge from './WireEdge'
 import { ElecSymbol } from './ElecSymbols'
 import { potentialColor } from './elecColors'
-import { ELEC_TYPES, GRID, POTENTIALS, contactNumbers, cylinderSignals, isPneumatic, newTag, nextTag, showTag, sizeOf, terminalsOf } from '../../lib/elec/catalog'
+import { ELEC_TYPES, GRID, LOWER_RAILS, POTENTIALS, contactNumbers, cylinderSignals, isPneumatic, newTag, nextTag, showTag, sizeOf, terminalsOf } from '../../lib/elec/catalog'
 import { COLUMN_WIDTH, FRAME_HEIGHT, FRAME_TOP, crossReferenceMap, elecSheetsOf, frameColumns, sheetOfComponent } from '../../lib/elec/sheet'
 import SheetTabs from '../SheetTabs'
 import { ElecFrameNode } from './ElecFrame'
@@ -18,6 +19,7 @@ import { ELEC_TEMPLATES, insertTemplate } from '../../lib/elec/templates'
 import { WIRE_COLORS, WIRE_SECTIONS, junctions as findJunctions, nextTerminalNumber, sectionWidth, wireNumbers } from '../../lib/elec/wiring'
 
 const nodeTypes = { elec: ElecNode, elecframe: ElecFrameNode }
+const edgeTypes = { wire: WireEdge }
 const FRAME_NODE = 'elec-frame'
 const EMPTY = { enabled: false, components: [], wires: [] }
 const HISTORY_LIMIT = 100
@@ -571,7 +573,7 @@ function Inner({ schematic, onChange, elecState, onAction, variables = [], build
             sourceHandle: w.from.t,
             target: w.to.c,
             targetHandle: w.to.t,
-            type: 'step',
+            type: 'wire',
             selected: sel,
             selectable: mode === 'edit',
             style: {
@@ -579,7 +581,7 @@ function Inner({ schematic, onChange, elecState, onAction, variables = [], build
               strokeWidth: air === 'P' ? 2.6 : 1.6,
               ...(view?.faults?.[w.id] ? { strokeDasharray: '6 4' } : {}),
             },
-            data: { air: air ?? null },
+            data: { air: air ?? null, bend: w.bend, bendX: w.bendX },
           }
         }
         return {
@@ -588,7 +590,7 @@ function Inner({ schematic, onChange, elecState, onAction, variables = [], build
           sourceHandle: w.from.t,
           target: w.to.c,
           targetHandle: w.to.t,
-          type: 'step',
+          type: 'wire',
           selected: sel,
           selectable: mode === 'edit',
           // Al simular, el color de su potencial (con tensión); si no, el que se le haya dado.
@@ -605,7 +607,7 @@ function Inner({ schematic, onChange, elecState, onAction, variables = [], build
                 labelBgPadding: [2, 1],
               }
             : {}),
-          data: { potential: p ?? null },
+          data: { potential: p ?? null, bend: w.bend, bendX: w.bendX },
         }
       }),
     [wires, view, selectedWires, mode, wireLabels, pneumaticIds],
@@ -658,7 +660,7 @@ function Inner({ schematic, onChange, elecState, onAction, variables = [], build
     save({ components: [...components, ...r.components], wires: [...wires, ...r.wires], enabled: true })
     setMessage({
       kind: r.skipped.length ? 'warn' : 'ok',
-      text: `Conexiones del autómata creadas (${r.components.length - 3} aparatos) y conectadas con el autómata y la planta.${r.skipped.length ? ` Sin borne: ${r.skipped.join(', ')}.` : ''}`,
+      text: `Conexiones del autómata creadas (${r.devices} aparatos) y conectadas con el autómata y la planta.${r.skipped.length ? ` Sin borne: ${r.skipped.join(', ')}.` : ''}`,
     })
     requestAnimationFrame(() => requestAnimationFrame(() => fitView({ padding: 0.15 })))
   }
@@ -995,6 +997,7 @@ function Inner({ schematic, onChange, elecState, onAction, variables = [], build
             nodes={allNodes}
             edges={edges}
             nodeTypes={nodeTypes}
+            edgeTypes={edgeTypes}
             onNodesChange={onNodesChange}
             onEdgesChange={onEdgesChange}
             onNodeDragStop={onNodeDragStop}
@@ -1258,6 +1261,11 @@ function Properties({ c, components, variables, onChange, onDelete }) {
         <>
           {select('potential', 'Potencial', Object.entries(POTENTIALS).map(([k, v]) => [k, v.label]))}
           {text('length', 'Largo (px)', { type: 'number', min: 40, step: 20 })}
+          {select('wires', 'Los cables salen', [
+            ['', LOWER_RAILS.has(c.potential) ? 'Hacia arriba (embarrado de abajo)' : 'Hacia abajo (embarrado de arriba)'],
+            ['down', 'Hacia abajo'],
+            ['up', 'Hacia arriba'],
+          ])}
         </>
       )}
       {c.type === 'limit' &&

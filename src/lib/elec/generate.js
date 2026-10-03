@@ -7,13 +7,15 @@
 //    cintas…) o relé (lo demás).
 // Cada aparato queda enlazado con su señal de la planta (pulsarlo en la planta acciona su
 // contacto; la bobina mueve la planta). Entradas en sumidero (1M a M), salidas por relé (1L a L+).
-import { GRID, nextTag, plcTerminals, terminalAddress } from './catalog'
+import { GRID, nextTag, plcTerminals, sizeOf, terminalAddress } from './catalog'
 
 const PLC_X = 100
-const PLC_Y = 300
-// Separación entre aparatos (los bornes del autómata van cada 40 px; los aparatos, con su rótulo,
-// necesitan más sitio: el cable baja hasta su borne).
-const PITCH = 140
+// Sitio de un aparato en su fila: su ancho, su rótulo (92 px) y el accionamiento del siguiente.
+const LABEL = 92
+const GAP = 40
+const slot = (c) => Math.ceil((sizeOf(c).w + 2 + LABEL + GAP) / GRID) * GRID
+// Separación entre los tramos horizontales de los cables de entrada (o de salida).
+const LANE = 20
 
 // Aparato de una entrada según el elemento de la planta que da esa señal.
 function inputDevice(name, scene) {
@@ -47,7 +49,13 @@ function outputDevice(name, scene) {
 }
 
 // variables: las del modelo ({ name, type, address, comment }); scene: plc.scene; existing: el
-// esquema actual (lo nuevo se coloca debajo). Devuelve { components, wires, skipped }.
+// esquema actual (lo nuevo se coloca debajo). Devuelve { components, wires, skipped, devices }.
+// Disposición (sin textos ni cables que se pisen):
+//  - arriba, los embarrados L+ y M (0 V, con sus cables hacia abajo); abajo, otro M para las cargas;
+//  - el autómata: L+, M y 1M bajan rectos de los embarrados; 1L, puenteado desde su L+ por fuera;
+//  - una fila de aparatos de entrada encima y otra de salida debajo, cada uno con el sitio de su
+//    rótulo; cada cable a su borne por un tramo horizontal a su propia altura, escalonados para que
+//    no se crucen entre ellos.
 export function generatePlcWiring(variables, scene, existing = { components: [], wires: [] }) {
   const all = [...(existing.components ?? [])]
   const offset = all.length ? Math.ceil((Math.max(...all.map((c) => c.y)) + 300) / GRID) * GRID : 0
@@ -59,117 +67,120 @@ export function generatePlcWiring(variables, scene, existing = { components: [],
       .filter((a) => a.startsWith(area))
   const aiAddrs = [...new Set(analogAddr('analogIn', 'AIW'))]
   const aqAddrs = [...new Set(analogAddr('analogOut', 'AQW'))]
-  const plc = {
-    id: `plc-${Date.now().toString(36)}`,
-    type: 'plc',
-    x: PLC_X,
-    y: PLC_Y + offset,
-    tag: nextTag(all, 'A'),
-    inputs: 14,
-    outputs: 10,
-    ...(aiAddrs.length ? { analogIn: aiAddrs.length, aiAddrs } : {}),
-    ...(aqAddrs.length ? { analogOut: aqAddrs.length, aqAddrs } : {}),
-    text: 'Autómata',
-  }
-  all.push(plc)
-  const terms = plcTerminals(plc)
+  const plcBase = { type: 'plc', inputs: 14, outputs: 10, ...(aiAddrs.length ? { analogIn: aiAddrs.length, aiAddrs } : {}), ...(aqAddrs.length ? { analogOut: aqAddrs.length, aqAddrs } : {}) }
+  const terms = plcTerminals(plcBase)
   const at = (id) => terms.find((t) => t.id === id)
+  const byX = (a, b) => at(terminalAddress(a.address)).x - at(terminalAddress(b.address)).x
+  const ins = variables.filter((v) => (v.type === 'input' || v.type === 'analogIn') && at(terminalAddress(v.address))).sort(byX)
+  const outs = variables.filter((v) => v.type === 'output' && at(terminalAddress(v.address))).sort(byX)
+  const skipped = variables.filter((v) => (v.type === 'input' || v.type === 'output' || v.type === 'analogIn') && !at(terminalAddress(v.address))).map((v) => v.name)
+
+  // Alturas: embarrados, fila de entradas (80 px), sus tramos, autómata (120 px), tramos de las
+  // salidas, fila de salidas (80 px) y el M de abajo.
+  const top = offset
+  const inY = top + 80
+  const plcY = inY + 80 + LANE * (ins.length + 1)
+  const outY = plcY + 120 + LANE * (outs.length + 1)
+  const bottomY = outY + 140
+
+  let n = 0
+  const plcId = `plc-${Date.now().toString(36)}`
+  const id = (p) => `${p}-${plcId}-${n++}`
+  const plc = { id: plcId, ...plcBase, x: PLC_X, y: plcY, tag: nextTag(all, 'A'), text: 'Autómata' }
+  all.push(plc)
   const components = [plc]
   const wires = []
-  let n = 0
-  const id = (p) => `${p}-${plc.id}-${n++}`
-  const wire = (a, ta, b, tb) => wires.push({ id: id('w'), from: { c: a, t: ta }, to: { c: b, t: tb } })
+  // bend / bendX: tramo del cable, medido desde su primer borne (lib/elec/route.js).
+  const wire = (a, ta, b, tb, extra = {}) => wires.push({ id: id('w'), from: { c: a, t: ta }, to: { c: b, t: tb }, ...extra })
 
-  const ins = variables.filter((v) => v.type === 'input' && at(terminalAddress(v.address)))
-  const outs = variables.filter((v) => v.type === 'output' && at(terminalAddress(v.address)))
-  const ains = variables.filter((v) => v.type === 'analogIn' && at(terminalAddress(v.address)))
-  const skipped = variables.filter((v) => (v.type === 'input' || v.type === 'output' || v.type === 'analogIn') && !at(terminalAddress(v.address))).map((v) => v.name)
-  const width = Math.max(Math.max(...terms.map((t) => t.x)) + 40, Math.max(ins.length + ains.length, outs.length) * PITCH + 40)
-
-  // Fuente de 24 V: L+ arriba, M abajo (embarrados con tomas cada 20 px desde x = PLC_X).
-  const top = { id: id('rail'), type: 'rail', x: PLC_X, y: PLC_Y + offset - 200, potential: 'L+', length: width }
-  const bottom = { id: id('rail'), type: 'rail', x: PLC_X, y: PLC_Y + offset + 290, potential: 'M', length: width }
-  components.push(top, bottom)
-  const tap = (x) => `t${Math.round((x - PLC_X) / GRID)}`
-  wire(top.id, tap(PLC_X + at('L+').x), plc.id, 'L+')
-  wire(plc.id, 'M', bottom.id, tap(PLC_X + at('M').x))
-  wire(plc.id, '1M', bottom.id, tap(PLC_X + at('1M').x))
-  wire(top.id, tap(PLC_X + at('1L').x), plc.id, '1L')
-
-  ins.forEach((v, i) => {
-    const t = at(terminalAddress(v.address))
+  // Aparatos de una fila, de izquierda a derecha, cada uno con el sitio de su rótulo y nunca a la
+  // izquierda de su borne (col: dónde tiene el aparato el borne que va al autómata).
+  const place = (list, make) => {
+    let x = PLC_X + 40
+    return list.map((v, i) => {
+      const t = at(terminalAddress(v.address))
+      const probe = make(v, 0)
+      x = Math.max(x, PLC_X + t.x - probe.col)
+      const c = make(v, x)
+      x += slot(c)
+      return { t, c, i }
+    })
+  }
+  const inputs = place(ins, (v, x) => {
+    if (v.type === 'analogIn') {
+      const volts = v.analog?.signal === '0-10V'
+      return { id: id('ain'), type: 'transmitter', x, y: inY, signal: v.name, text: v.comment || v.name, output: volts ? '0-10V' : '4-20mA', col: 40 }
+    }
     const d = inputDevice(v.name, scene)
-    const nc = d.type === 'emergency' || d.contact === 'NC'
-    const x = PLC_X + 40 + i * PITCH
-    const c = {
+    return {
       id: id('in'),
       type: d.type,
       x,
-      y: PLC_Y + offset - 140,
-      tag: nextTag(all, d.prefix),
+      y: inY,
       signal: v.name,
       text: v.comment || v.name,
       ...(d.contact ? { contact: d.contact } : {}),
       ...(d.kind ? { kind: d.kind } : {}),
       ...(d.output ? { output: d.output } : {}),
-    }
-    all.push(c)
-    components.push(c)
-    if (d.type === 'sensor3') {
-      // BN al +24 V, BU al 0 V de la fuente del autómata y BK (salida) a la entrada.
-      wire(top.id, tap(x + 20), c.id, 'BN')
-      wire(c.id, 'BU', plc.id, 'M')
-      wire(c.id, 'BK', plc.id, t.id)
-    } else {
-      wire(top.id, tap(x + 20), c.id, nc ? '11' : '13')
-      wire(c.id, nc ? '12' : '14', plc.id, t.id)
+      prefix: d.prefix,
+      col: d.type === 'sensor3' ? 40 : 20,
     }
   })
-  // Entradas analógicas: transmisor de 4-20 mA (2 hilos: + a L+, − a la entrada) o de 0-10 V
-  // (3 hilos: +, 0V y OUT a la entrada), según la señal de la variable; el común AM a M.
-  if (ains.length) wire(plc.id, 'AM', bottom.id, tap(PLC_X + at('AM').x))
-  ains.forEach((v, k) => {
-    const t = at(terminalAddress(v.address))
-    const volts = v.analog?.signal === '0-10V'
-    const x = PLC_X + 40 + (ins.length + k) * PITCH
-    const c = {
-      id: id('ain'),
-      type: 'transmitter',
-      x,
-      y: PLC_Y + offset - 140,
-      tag: nextTag(all, 'B'),
-      output: volts ? '0-10V' : '4-20mA',
-      signal: v.name,
-      text: v.comment || v.name,
-    }
-    all.push(c)
-    components.push(c)
-    wire(top.id, tap(x + 20), c.id, '+')
-    if (volts) {
-      wire(c.id, '0V', plc.id, 'M')
-      wire(c.id, 'OUT', plc.id, t.id)
-    } else wire(c.id, '−', plc.id, t.id)
-  })
-  outs.forEach((v, i) => {
-    const t = at(terminalAddress(v.address))
+  const outputs = place(outs, (v, x) => {
     const d = outputDevice(v.name, scene)
-    const x = PLC_X + 40 + i * PITCH
-    const c = {
-      id: id('out'),
-      type: d.type,
-      x,
-      y: PLC_Y + offset + 180,
-      tag: nextTag(all, d.prefix),
-      signal: v.name,
-      text: v.comment || v.name,
-      ...(d.kind ? { kind: d.kind } : {}),
-      ...(d.color ? { color: d.color } : {}),
-    }
-    all.push(c)
-    components.push(c)
-    const [a, b] = d.type === 'lamp' ? ['X1', 'X2'] : ['A1', 'A2']
-    wire(plc.id, t.id, c.id, a)
-    wire(c.id, b, bottom.id, tap(x + 20))
+    return { id: id('out'), type: d.type, x, y: outY, signal: v.name, text: v.comment || v.name, ...(d.kind ? { kind: d.kind } : {}), ...(d.color ? { color: d.color } : {}), prefix: d.prefix, col: 20 }
   })
-  return { components, wires, skipped }
+  const right = Math.max(PLC_X + Math.max(...terms.map((t) => t.x)) + 40, ...[...inputs, ...outputs].map(({ c }) => c.x + slot(c)))
+  const left = PLC_X - 60
+  const rail = (y, potential, extra = {}) => ({ id: id('rail'), type: 'rail', x: left, y, potential, length: right - left, ...extra })
+  const lp = rail(top, 'L+')
+  const m0 = rail(top + 20, 'M', { wires: 'down' })
+  const m1 = rail(bottomY, 'M')
+  components.push(lp, m0, m1)
+  const tap = (x) => `t${Math.round((x - left) / GRID)}`
+
+  // Autómata: alimentación y comunes (1L puenteado desde L+, por la izquierda del autómata).
+  wire(lp.id, tap(PLC_X + at('L+').x), plc.id, 'L+')
+  wire(m0.id, tap(PLC_X + at('M').x), plc.id, 'M')
+  wire(m0.id, tap(PLC_X + at('1M').x), plc.id, '1M')
+  wire(plc.id, 'L+', plc.id, '1L', { bendX: -40 })
+  if (aiAddrs.length) wire(m0.id, tap(PLC_X + at('AM').x), plc.id, 'AM')
+
+  // Entradas: el tramo horizontal de cada una, más abajo cuanto más a la derecha.
+  for (const { t, c, i } of inputs) {
+    const { col, prefix, ...device } = c
+    device.tag = nextTag(all, prefix ?? 'B')
+    all.push(device)
+    components.push(device)
+    const bend = { bend: LANE * (i + 1) }
+    if (device.type === 'transmitter') {
+      wire(lp.id, tap(device.x + 20), device.id, '+')
+      if (device.output === '0-10V') {
+        wire(m0.id, tap(device.x + 60), device.id, '0V')
+        wire(device.id, 'OUT', plc.id, t.id, bend)
+      } else wire(device.id, '−', plc.id, t.id, bend)
+    } else if (device.type === 'sensor3') {
+      // BN al +24 V, BU al 0 V y BK (salida) a la entrada.
+      wire(lp.id, tap(device.x + 20), device.id, 'BN')
+      wire(m0.id, tap(device.x + 60), device.id, 'BU')
+      wire(device.id, 'BK', plc.id, t.id, bend)
+    } else {
+      const nc = device.type === 'emergency' || device.contact === 'NC'
+      wire(lp.id, tap(device.x + 20), device.id, nc ? '11' : '13')
+      wire(device.id, nc ? '12' : '14', plc.id, t.id, bend)
+    }
+    void col
+  }
+  // Salidas: el tramo de cada una, más arriba cuanto más a la derecha.
+  for (const { t, c, i } of outputs) {
+    const { col, prefix, ...device } = c
+    device.tag = nextTag(all, prefix)
+    all.push(device)
+    components.push(device)
+    const [a, b] = device.type === 'lamp' ? ['X1', 'X2'] : ['A1', 'A2']
+    wire(plc.id, t.id, device.id, a, { bend: LANE * (outputs.length - i) })
+    wire(device.id, b, m1.id, tap(device.x + 20))
+    void col
+  }
+  return { components, wires, skipped, devices: inputs.length + outputs.length }
 }

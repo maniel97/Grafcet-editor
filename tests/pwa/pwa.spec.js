@@ -37,6 +37,7 @@ test('instalable, sin conexión y con aviso de versión nueva', async ({ page, c
   await expect(banner).toBeVisible({ timeout: 30_000 })
   await banner.getByRole('button', { name: /Recargar/ }).click()
   await page.waitForSelector('.react-flow__node')
-  await expect.poll(() => page.evaluate(() => navigator.serviceWorker.controller?.scriptURL)).not.toBe(before)
+  // (Si la página aún está recargando, la consulta falla: se vuelve a intentar.)
+  await expect.poll(() => page.evaluate(() => navigator.serviceWorker.controller?.scriptURL).catch(() => before)).not.toBe(before)
   await expect(page.getByLabel('Nombre del proyecto')).toHaveValue('Mezcladora') // el trabajo sigue
 })

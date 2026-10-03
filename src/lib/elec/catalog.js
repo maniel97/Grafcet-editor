@@ -27,6 +27,7 @@ export const POTENTIALS = {
 export const isSecondary = (p) => typeof p === 'string' && p.startsWith('sec:')
 // Embarrados de abajo (los cables salen hacia arriba).
 export const LOWER_RAILS = new Set(['M', 'N', 'PE'])
+export const railSide = (c) => (c.wires === 'down' ? 'bottom' : c.wires === 'up' ? 'top' : LOWER_RAILS.has(c.potential) ? 'top' : 'bottom')
 
 const two = (top, bottom, h = 80) => [
   { id: top, x: 20, y: 0, side: 'top' },
@@ -92,7 +93,8 @@ export const ELEC_TYPES = {
         id: `t${i}`,
         x: i * GRID,
         y: 10,
-        side: LOWER_RAILS.has(c.potential) ? 'top' : 'bottom',
+        // wires: 'down' / 'up' fija hacia dónde salen los cables (N arriba, junto a L, va hacia abajo).
+        side: railSide(c),
       })),
   },
   pushbutton: { label: 'Pulsador', group: 'Mando', prefix: 'S', defaults: { contact: 'NO', signal: '', text: '' }, size: () => ({ w: 40, h: 80 }), terminals: (c) => (c.contact === 'NC' ? two('11', '12') : two('13', '14')) },
@@ -241,12 +243,12 @@ export const ELEC_TYPES = {
     group: 'Alimentación',
     prefix: 'G',
     defaults: { text: '230 V~ / 24 V DC' },
-    size: () => ({ w: 80, h: 80 }),
+    size: () => ({ w: 80, h: 100 }),
     terminals: () => [
       { id: 'L', x: 20, y: 0, side: 'top' },
       { id: 'N', x: 60, y: 0, side: 'top' },
-      { id: 'L+', x: 20, y: 80, side: 'bottom' },
-      { id: 'M', x: 60, y: 80, side: 'bottom' },
+      { id: 'L+', x: 20, y: 100, side: 'bottom' },
+      { id: 'M', x: 60, y: 100, side: 'bottom' },
     ],
   },
   // Relé de control de fases: su contacto (por su identificador) cierra con las tres fases en orden.
@@ -255,7 +257,7 @@ export const ELEC_TYPES = {
     group: 'Alimentación',
     prefix: 'KF',
     defaults: { text: '' },
-    size: () => ({ w: 120, h: 60 }),
+    size: () => ({ w: 120, h: 80 }),
     terminals: () => ['L1', 'L2', 'L3'].map((id, i) => ({ id, x: 20 + 40 * i, y: 0, side: 'top' })),
   },
   // Transformador de mando: el secundario es un circuito aparte (S1-S2) mientras el primario
