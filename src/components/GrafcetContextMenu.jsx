@@ -35,7 +35,7 @@ import { FRAME_KINDS } from '../lib/frames'
 
 // Menú contextual del lienzo: las opciones dependen de lo que se pulse con el botón derecho.
 // menu: { x, y, kind: 'node' | 'selection' | 'pane', nodeIds, flowPosition }
-export default function GrafcetContextMenu({ menu, onClose, onEdit, onAddNodeAt, onFrameAround }) {
+export default function GrafcetContextMenu({ menu, onClose, onEdit, onAddNodeAt, onFrameAround, sheets = [], onMoveToSheet }) {
   const { getNode, getEdges, updateNodeData, setEdges, deleteElements } = useReactFlow()
   const quickConnect = useQuickConnect()
   const { arrange, addBranch, predecessorsOf, addAlternative, converge, toggleInitial, toggleMacro, addAction, remove } =
@@ -109,6 +109,10 @@ export default function GrafcetContextMenu({ menu, onClose, onEdit, onAddNodeAt,
         { label: 'Encerrar en un grafcet parcial', hint: 'G…', icon: Group, onSelect: () => onFrameAround(menu.nodeIds, 'grafcet') },
         { label: 'Encerrar como expansión de macroetapa', hint: 'M…', icon: Group, onSelect: () => onFrameAround(menu.nodeIds, 'macro') },
       )
+    }
+    if (sheets.length) {
+      if (items.length) items.push('separator')
+      for (const s of sheets) items.push({ label: `Mover a ${s.name}`, icon: Rows3, onSelect: () => onMoveToSheet(menu.nodeIds, s.id) })
     }
     if (items.length) items.push('separator')
     items.push({ label: 'Eliminar selección', icon: Trash2, danger: true, onSelect: () => remove(menu.nodeIds) })

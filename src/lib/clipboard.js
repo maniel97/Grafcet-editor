@@ -25,7 +25,9 @@ export function prepareClipboard(clip, existingNodes, offset = PASTE_OFFSET) {
   const nodes = clip.nodes.map((n) => {
     const id = crypto.randomUUID()
     idMap.set(n.id, id)
-    let data = n.data
+    // Sin hoja: lo pegado va a la hoja activa (lib/sheets.js).
+    let data = { ...n.data }
+    delete data.sheet
     if (n.type === 'step') data = { ...data, label: nextStepLabel(working) }
     else if (/^T\d+$/i.test(String(data.condition ?? '').trim())) data = { ...data, condition: nextTransitionLabel(working) }
     const node = { id, type: n.type, position: { x: n.position.x + offset, y: n.position.y + offset }, data, selected: true }

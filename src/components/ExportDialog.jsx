@@ -136,13 +136,37 @@ export default function ExportDialog({ source, initialFormat = 'pdf', fileName, 
   }
 
   const pdfOptions = { ...options, title, titleBlockData: titleBlock, projectName }
-  const layout = useMemo(() => (image ? exportLayout(image, { ...options, title }) : null), [image, options, title])
-  const page = layout?.pages[Math.min(pageIndex, layout.pages.length - 1)]
+  // Todas las hojas (solo PDF del grafcet con varias hojas): una captura por hoja, al pedirlo.
+  const [allSheets, setAllSheets] = useState(false)
+  const [allImages, setAllImages] = useState(null)
+  useEffect(() => {
+    if (!allSheets || allImages || !source.captureAll) return
+    let cancelled = false
+    source.captureAll().then((list) => !cancelled && setAllImages(list))
+    return () => {
+      cancelled = true
+    }
+  }, [allSheets, allImages, source])
+  const images = useMemo(() => (format === 'pdf' && allSheets ? allImages : image ? [image] : null), [format, allSheets, allImages, image])
+  // Todas las páginas del documento: [{ img, layout, page }].
+  const flat = useMemo(
+    () =>
+      (images ?? []).flatMap((img) => {
+        const l = exportLayout(img, { ...options, title })
+        return l.pages.map((p) => ({ img, layout: l, page: p }))
+      }),
+    [images, options, title],
+  )
+  const current = flat[Math.min(pageIndex, flat.length - 1)]
+  const layout = current?.layout ?? null
+  const page = current?.page
+  const pageImage = current?.img
+  const totalPages = flat.length
 
   const save = async () => {
     setSaving(true)
     try {
-      if (format === 'pdf') await savePdf(image, pdfOptions, fileName('pdf'))
+      if (format === 'pdf') await savePdf(allSheets ? allImages : image, pdfOptions, fileName('pdf'))
       else await source.save(format, options)
       onClose()
     } catch (err) {
@@ -206,6 +230,21 @@ export default function ExportDialog({ source, initialFormat = 'pdf', fileName, 
           )}
           {format === 'pdf' && (
             <>
+              {source.captureAll && (
+                <Choice
+                  legend="Hojas"
+                  name="pdf-sheets"
+                  value={allSheets ? 'all' : 'one'}
+                  options={[
+                    { id: 'one', label: 'Esta hoja' },
+                    { id: 'all', label: 'Todas las hojas' },
+                  ]}
+                  onChange={(v) => {
+                    setAllSheets(v === 'all')
+                    setPageIndex(0)
+                  }}
+                />
+              )}
               <Choice legend="Tamaño de página" name="pdf-page" value={options.page} options={PAGE_OPTIONS} onChange={(p) => update({ page: p })} />
               <Choice
                 legend="Orientación"
@@ -300,7 +339,7 @@ export default function ExportDialog({ source, initialFormat = 'pdf', fileName, 
                 {/* Franja del dibujo que va en esta página. */}
                 <div className="absolute overflow-hidden" style={{ left: layout.x * k, top: layout.y * k, width: layout.w * k, height: page.h * k }}>
                   <img
-                    src={image.dataUrl}
+                    src={pageImage.dataUrl}
                     alt="Diagrama tal como quedará en el PDF"
                     className="absolute left-0 max-w-none"
                     style={{ top: -page.top * layout.scale * PX_TO_MM * k, width: layout.w * k }}
@@ -315,7 +354,7 @@ export default function ExportDialog({ source, initialFormat = 'pdf', fileName, 
                   <TitleBlockPreview
                     k={k}
                     origin={titleBlockOrigin(layout.pageW, layout.pageH, PAGE_MARGIN)}
-                    cells={titleBlockCells(titleBlockValues(titleBlock, { projectName, today, page: pageIndex + 1, pages: layout.pages.length }))}
+                    cells={titleBlockCells(titleBlockValues(titleBlock, { projectName, today, page: pageIndex + 1, pages: totalPages }))}
                   />
                 )}
                 {options.footer && !options.titleBlock && (
@@ -323,7 +362,7 @@ export default function ExportDialog({ source, initialFormat = 'pdf', fileName, 
                     className="absolute truncate text-slate-500"
                     style={{ left: PAGE_MARGIN * k, bottom: (PAGE_MARGIN / 2 - 1) * k, fontSize: Math.max(6, 2.9 * k), right: PAGE_MARGIN * k }}
                   >
-                    {[title.trim(), today, layout.pages.length > 1 ? `página ${pageIndex + 1} de ${layout.pages.length}` : null]
+                    {[title.trim(), pageImage.sheetName, today, totalPages > 1 ? `página ${pageIndex + 1} de ${totalPages}` : null]
                       .filter(Boolean)
                       .join(' · ')}
                   </span>
@@ -348,7 +387,7 @@ export default function ExportDialog({ source, initialFormat = 'pdf', fileName, 
               </button>
             </div>
           )}
-          {format === 'pdf' && layout && layout.pages.length > 1 && (
+          {format === 'pdf' && layout && totalPages > 1 && (
             <div className="flex items-center gap-2 text-sm" aria-label="Páginas">
               <button
                 type="button"
@@ -360,12 +399,12 @@ export default function ExportDialog({ source, initialFormat = 'pdf', fileName, 
                 <ChevronLeft size={16} />
               </button>
               <span aria-live="polite">
-                Página {pageIndex + 1} de {layout.pages.length}
+                Página {pageIndex + 1} de {totalPages}
               </span>
               <button
                 type="button"
-                onClick={() => setPageIndex((i) => Math.min(layout.pages.length - 1, i + 1))}
-                disabled={pageIndex >= layout.pages.length - 1}
+                onClick={() => setPageIndex((i) => Math.min(totalPages - 1, i + 1))}
+                disabled={pageIndex >= totalPages - 1}
                 aria-label="Página siguiente"
                 className="rounded p-1 hover:bg-slate-100 disabled:opacity-30"
               >
@@ -379,7 +418,7 @@ export default function ExportDialog({ source, initialFormat = 'pdf', fileName, 
             {format === 'pdf' && layout && (
               <>
                 {layout.page.label} {orientationLabel} · escala {Math.round(layout.scale * 100)} %{layout.scale === 1 && ' (tamaño real)'}
-                {layout.pages.length > 1 && ` · ${layout.pages.length} páginas`}
+                {totalPages > 1 && ` · ${totalPages} páginas`}
               </>
             )}
           </p>

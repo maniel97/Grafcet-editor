@@ -38,6 +38,9 @@ import { neighbor } from '../lib/keyboardNav'
 import { FRAME_SIZE, frameAround, frameOf, membersOf, nextFrameName } from '../lib/frames'
 import { isValidName, renameVariable, renumberStep } from '../lib/rename'
 import SearchBar from './SearchBar'
+import SheetTabs from './SheetTabs'
+import SheetRefs from './SheetRefs'
+import { crossSheetRefs, sheetOf, sheetsOf, visibleEdges, visibleNodes } from '../lib/sheets'
 
 // Partes que no hacen falta al abrir el editor: se descargan la primera vez que se usan, para que
 // la carga inicial sea más ligera (importa sobre todo publicado en internet).
@@ -98,6 +101,8 @@ export default function GrafcetCanvas() {
   const [verifyOpen, setVerifyOpen] = useState(false)
   const [ladderOpen, setLadderOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
+  // Hojas (lib/sheets.js): la activa es la que se dibuja.
+  const [currentSheet, setCurrentSheet] = useState(() => sheetsOf(restored?.plc ?? EMPTY_PLC)[0].id)
   const [exportFormat, setExportFormat] = useState(null) // diálogo de exportación abierto en ese formato
   // Modo simulación: la edición queda bloqueada y el lienzo muestra la evolución.
   const [simulating, setSimulating] = useState(false)
@@ -143,7 +148,8 @@ export default function GrafcetCanvas() {
   const { menu, setMenu, closeMenu, onNodeContextMenu, onSelectionContextMenu, onPaneContextMenu, onEdgeContextMenu } =
     useCanvasContextMenu()
   const clearHighlight = useCallback(() => setHighlight(null), [setHighlight])
-  const exportSource = useImageExport(clearHighlight, projectName.trim() || 'Grafcet (IEC 60848)')
+  const sheetsForExport = useMemo(() => ({ list: sheetsOf(plc), current: currentSheet, show: setCurrentSheet }), [plc, currentSheet])
+  const exportSource = useImageExport(clearHighlight, projectName.trim() || 'Grafcet (IEC 60848)', sheetsForExport)
   // Pantallas táctiles: pulsación larga = menú contextual; doble toque = editar.
   const { isDoubleTap } = useTouchGestures(wrapperRef)
 
@@ -276,6 +282,62 @@ export default function GrafcetCanvas() {
     [takeSnapshot, screenToFlowPosition, setNodes],
   )
 
+  // --- Hojas ----------------------------------------------------------------------------------
+  const sheets = sheetsOf(plc)
+  const shownNodes = useMemo(() => visibleNodes(nodes, currentSheet), [nodes, currentSheet])
+  const shownEdges = useMemo(() => visibleEdges(edges, nodes, currentSheet), [edges, nodes, currentSheet])
+  const sheetRefs = useMemo(() => crossSheetRefs(nodes, edges, plc, currentSheet), [nodes, edges, plc, currentSheet])
+  const sheetCounts = useMemo(() => {
+    const counts = new Map()
+    for (const n of nodes) counts.set(sheetOf(n, currentSheet), (counts.get(sheetOf(n, currentSheet)) ?? 0) + 1)
+    return counts
+  }, [nodes, currentSheet])
+  // Lo recién creado, pegado o abierto sin hoja pasa a la hoja activa.
+  useEffect(() => {
+    if (nodes.some((n) => !n.data?.sheet)) setNodes((nds) => nds.map((n) => (n.data?.sheet ? n : { ...n, data: { ...n.data, sheet: currentSheet } })))
+  }, [nodes, currentSheet, setNodes])
+  const selectSheet = useCallback(
+    (id) => {
+      setNodes((nds) => nds.map((n) => (n.selected ? { ...n, selected: false } : n)))
+      setEditingId(null)
+      setCurrentSheet(id)
+      requestAnimationFrame(() => requestAnimationFrame(() => fitDrawn(200)))
+    },
+    [setNodes, fitDrawn],
+  )
+  const addSheet = useCallback(() => {
+    const list = sheetsOf(plcRef.current)
+    let n = list.length + 1
+    while (list.some((s) => s.name === `Hoja ${n}`)) n++
+    const sheet = { id: crypto.randomUUID(), name: `Hoja ${n}` }
+    setPlc((p) => ({ ...p, sheets: [...sheetsOf(p), sheet] }))
+    selectSheet(sheet.id)
+  }, [setPlc, selectSheet])
+  const deleteSheet = useCallback(
+    (id) => {
+      const inside = getNodes().filter((n) => n.data?.sheet === id)
+      const name = sheetsOf(plcRef.current).find((s) => s.id === id)?.name
+      if (inside.length && !window.confirm(`¿Borrar «${name}» y sus ${inside.length} elementos?`)) return
+      takeSnapshot()
+      const gone = new Set(inside.map((n) => n.id))
+      setNodes((nds) => nds.filter((n) => !gone.has(n.id)))
+      setEdges((eds) => eds.filter((e) => !gone.has(e.source) && !gone.has(e.target)))
+      const rest = sheetsOf(plcRef.current).filter((s) => s.id !== id)
+      setPlc((p) => ({ ...p, sheets: rest }))
+      if (id === currentSheet) selectSheet(rest[0].id)
+    },
+    [getNodes, takeSnapshot, setNodes, setEdges, setPlc, currentSheet, selectSheet],
+  )
+  // Mover la selección a otra hoja (sus enlaces con lo que se queda pasan a ser referencias).
+  const moveToSheet = useCallback(
+    (nodeIds, sheet) => {
+      const ids = new Set(nodeIds)
+      takeSnapshot()
+      setNodes((nds) => nds.map((n) => (ids.has(n.id) ? { ...n, selected: false, data: { ...n.data, sheet } } : n)))
+    },
+    [takeSnapshot, setNodes],
+  )
+
   // Renumerar una etapa: al terminar de editar su número (o al cerrar el panel) se actualizan
   // las referencias a ella (X5, 5s/X5, F/G2{5}). Se compara con el número que tenía al empezar.
   const labelAtStart = useRef(new Map())
@@ -400,6 +462,7 @@ export default function GrafcetCanvas() {
       setNodes(project.nodes)
       setEdges(project.edges)
       setPlc(project.plc ?? EMPTY_PLC)
+      setCurrentSheet(sheetsOf(project.plc ?? EMPTY_PLC)[0].id)
       setProjectNameState(project.name ?? '')
       setEditingId(null)
       if (project.viewport) setViewport(project.viewport)
@@ -644,8 +707,8 @@ export default function GrafcetCanvas() {
               />
             )}
             <ReactFlow
-              nodes={nodes}
-              edges={edges}
+              nodes={shownNodes}
+              edges={shownEdges}
               nodeTypes={nodeTypes}
               edgeTypes={edgeTypes}
               defaultEdgeOptions={defaultEdgeOptions}
@@ -687,6 +750,17 @@ export default function GrafcetCanvas() {
               deleteKeyCode={modalOpen || readOnly ? null : ['Delete', 'Backspace']}
             >
               <Background variant={BackgroundVariant.Dots} gap={20} size={1} />
+              <SheetRefs refs={sheetRefs} nodes={shownNodes} />
+              <SheetTabs
+                sheets={sheets}
+                current={currentSheet}
+                counts={sheetCounts}
+                readOnly={readOnly}
+                onSelect={selectSheet}
+                onAdd={addSheet}
+                onRename={(id, name) => setPlc((p) => ({ ...p, sheets: sheetsOf(p).map((s) => (s.id === id ? { ...s, name } : s)) }))}
+                onDelete={deleteSheet}
+              />
               <CanvasControls
                 onFitView={fitDrawn}
                 locked={readOnly}
@@ -697,7 +771,15 @@ export default function GrafcetCanvas() {
               <GhostPreview preview={preview} />
             </ReactFlow>
             {menu && (
-              <GrafcetContextMenu menu={menu} onClose={closeMenu} onEdit={setEditingId} onAddNodeAt={addNode} onFrameAround={frameAroundNodes} />
+              <GrafcetContextMenu
+                menu={menu}
+                onClose={closeMenu}
+                onEdit={setEditingId}
+                onAddNodeAt={addNode}
+                onFrameAround={frameAroundNodes}
+                sheets={sheets.length > 1 ? sheets.filter((s) => s.id !== currentSheet) : []}
+                onMoveToSheet={moveToSheet}
+              />
             )}
           </div>
           {simulating ? (

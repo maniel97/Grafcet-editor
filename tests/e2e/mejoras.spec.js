@@ -596,6 +596,9 @@ test('analógicas: tipo detectado, rango en la tabla, deslizador en la simulaci�
 
   await page.getByRole('button', { name: /Simular/ }).click()
   await page.getByRole('switch').first().click() // Marcha: a la etapa 1
+  await expect(page.locator('aside.side-panel').getByRole('button', { name: 'X1', exact: true })).toBeVisible()
+  // Se suelta Marcha: si no, con 75 °C iría de 0 a 1 y vuelta sin parar (evolución fugaz).
+  await page.getByRole('switch').first().click()
   const slider = page.getByLabel('Valor de Temperatura')
   await expect(slider).toHaveAttribute('max', '120')
   await slider.evaluate((el) => {
@@ -605,5 +608,37 @@ test('analógicas: tipo detectado, rango en la tabla, deslizador en la simulaci�
   })
   await expect(page.locator('aside.side-panel')).toContainText('75 °C')
   await expect(page.locator('aside.side-panel').getByRole('button', { name: 'X0', exact: true })).toBeVisible() // 1 -> 0 con 75 >= 60
+  expectNoErrors(errors)
+})
+
+test('hojas: añadir, mover elementos, referencias entre hojas y simulación del proyecto entero', async ({ page }) => {
+  const errors = await openEditor(page)
+  const tabs = page.getByRole('tablist', { name: 'Hojas' })
+  await expect(tabs.getByRole('tab')).toHaveCount(1)
+  // Mover la etapa 1 a una hoja nueva.
+  await tabs.getByLabel('Añadir hoja').click()
+  await expect(tabs.getByRole('tab', { name: 'Hoja 2' })).toHaveAttribute('aria-selected', 'true')
+  await expect(page.locator('.react-flow__node-step')).toHaveCount(0) // hoja vacía
+  await tabs.getByRole('tab', { name: 'Hoja 1' }).click()
+  // Selección de la etapa 1 y de la transición siguiente (Ctrl) y menú «Mover a Hoja 2».
+  const step1 = page.locator('.react-flow__node-step').nth(1)
+  await step1.click()
+  await page.locator('.react-flow__node-transition').nth(1).click({ modifiers: ['Control'] })
+  await step1.click({ button: 'right' })
+  await page.getByRole('menuitem', { name: 'Mover a Hoja 2' }).click()
+  await expect(page.locator('.react-flow__node-step')).toHaveCount(1)
+  await expect(page.locator('[data-ref-label]').first()).toContainText('(Hoja 2)')
+  await tabs.getByRole('tab', { name: 'Hoja 2' }).click()
+  await expect(page.locator('.react-flow__node-step')).toHaveCount(1)
+  await expect(page.locator('[data-ref-label]').first()).toContainText('(Hoja 1)')
+  // Renombrar con doble clic.
+  await tabs.getByRole('tab', { name: 'Hoja 2' }).dblclick()
+  await page.getByLabel('Nombre de la hoja').fill('Producción')
+  await page.keyboard.press('Enter')
+  await expect(tabs.getByRole('tab', { name: 'Producción' })).toBeVisible()
+  // La simulación sigue siendo del proyecto entero: Marcha (hoja 1) activa la etapa 1 (otra hoja).
+  await page.getByRole('button', { name: /Simular/ }).click()
+  await page.getByRole('switch').first().click()
+  await expect(page.locator('aside.side-panel').getByRole('button', { name: 'X1', exact: true })).toBeVisible()
   expectNoErrors(errors)
 })

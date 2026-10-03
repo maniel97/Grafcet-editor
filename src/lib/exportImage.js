@@ -97,45 +97,53 @@ export async function capturePdf(viewport) {
 // imagen y la escena ya capturadas y las opciones del diálogo de exportación. La maquetación es
 // la misma que muestra la vista previa (lib/pdfLayout.js: exportLayout). Con varias páginas, cada
 // una recorta su franja del dibujo.
-export async function savePdf(image, options = DEFAULT_PDF_OPTIONS, name = fileName('pdf')) {
+export async function savePdf(images, options = DEFAULT_PDF_OPTIONS, name = fileName('pdf')) {
   const { jsPDF } = await import('jspdf')
-  const layout = exportLayout(image, options)
-  const pdf = new jsPDF({ orientation: layout.orientation, unit: 'mm', format: [layout.page.width, layout.page.height] })
-  const k = layout.scale * PX_TO_MM
-  const vector = options.vector !== false && image.scene
+  // Una imagen, o una por hoja (todas las hojas en un PDF): cada una en sus páginas.
+  const parts = (Array.isArray(images) ? images : [images]).map((image) => ({ image, layout: exportLayout(image, options) }))
+  const total = parts.reduce((n, p) => n + p.layout.pages.length, 0)
+  const first = parts[0].layout
+  const pdf = new jsPDF({ orientation: first.orientation, unit: 'mm', format: [first.page.width, first.page.height] })
   const date = new Date().toLocaleDateString('es-ES')
-  const many = layout.pages.length > 1
-  layout.pages.forEach((p, i) => {
-    if (i) pdf.addPage()
-    const y = layout.y - p.top * k
-    if (many) {
-      pdf.saveGraphicsState()
-      pdf.rect(layout.x - 1, layout.y, layout.w + 2, p.h, null)
-      pdf.clip()
-      pdf.discardPath()
+  let number = 0
+  for (const [index, { image, layout }] of parts.entries()) {
+    const k = layout.scale * PX_TO_MM
+    const vector = options.vector !== false && image.scene
+    const many = layout.pages.length > 1
+    for (const p of layout.pages) {
+      if (number++) pdf.addPage([layout.page.width, layout.page.height], layout.orientation)
+      const y = layout.y - p.top * k
+      if (many) {
+        pdf.saveGraphicsState()
+        pdf.rect(layout.x - 1, layout.y, layout.w + 2, p.h, null)
+        pdf.clip()
+        pdf.discardPath()
+      }
+      // Vectorial (por defecto): líneas y texto reales; si no, la imagen a alta resolución.
+      if (vector) {
+        const items = many
+          ? image.scene.filter((it) => {
+              const [a, b] = itemSpan(it)
+              return b > p.top && a < p.bottom
+            })
+          : image.scene
+        drawScene(pdf, items, { x: layout.x, y, scale: layout.scale })
+      } else {
+        pdf.addImage(image.dataUrl, 'PNG', layout.x, y, layout.w, image.height * k, `dibujo${index}`, 'FAST')
+      }
+      if (many) pdf.restoreGraphicsState()
+      if (options.titleBlock) {
+        const values = titleBlockValues(options.titleBlockData, { projectName: options.projectName, today: date, page: number, pages: total })
+        drawTitleBlock(pdf, titleBlockOrigin(layout.pageW, layout.pageH, PAGE_MARGIN), titleBlockCells(values))
+      } else if (options.footer) {
+        pdf.setFont('helvetica', 'normal')
+        pdf.setFontSize(8)
+        pdf.setTextColor(120)
+        const text = [options.title?.trim(), image.sheetName, date, total > 1 ? `página ${number} de ${total}` : null]
+        pdf.text(pdfSafe(text.filter(Boolean).join(' · ')), PAGE_MARGIN, layout.pageH - PAGE_MARGIN / 2)
+      }
     }
-    // Vectorial (por defecto): líneas y texto reales; si no, la imagen a alta resolución.
-    if (vector) {
-      const items = many ? image.scene.filter((it) => {
-        const [a, b] = itemSpan(it)
-        return b > p.top && a < p.bottom
-      }) : image.scene
-      drawScene(pdf, items, { x: layout.x, y, scale: layout.scale })
-    } else {
-      pdf.addImage(image.dataUrl, 'PNG', layout.x, y, layout.w, image.height * k, 'dibujo', 'FAST')
-    }
-    if (many) pdf.restoreGraphicsState()
-    if (options.titleBlock) {
-      const values = titleBlockValues(options.titleBlockData, { projectName: options.projectName, today: date, page: i + 1, pages: layout.pages.length })
-      drawTitleBlock(pdf, titleBlockOrigin(layout.pageW, layout.pageH, PAGE_MARGIN), titleBlockCells(values))
-    } else if (options.footer) {
-      pdf.setFont('helvetica', 'normal')
-      pdf.setFontSize(8)
-      pdf.setTextColor(120)
-      const parts = [options.title?.trim(), date, many ? `página ${i + 1} de ${layout.pages.length}` : null]
-      pdf.text(pdfSafe(parts.filter(Boolean).join(' · ')), PAGE_MARGIN, layout.pageH - PAGE_MARGIN / 2)
-    }
-  })
+  }
   pdf.save(name)
 }
 

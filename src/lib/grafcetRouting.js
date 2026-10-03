@@ -35,7 +35,8 @@ function routingIndex(state) {
   const { nodeLookup, edgeLookup } = state
   // Solo etapas y transiciones son obstáculos (no la tabla de variables del lienzo).
   const boxes = []
-  for (const n of nodeLookup.values()) if (n.type === 'step' || n.type === 'transition') boxes.push(box(n, labelSpace))
+  // Los nodos de otras hojas (ocultos) no son obstáculos.
+  for (const n of nodeLookup.values()) if ((n.type === 'step' || n.type === 'transition') && !n.hidden) boxes.push(box(n, labelSpace))
   const yOf = (id) => nodeLookup.get(id)?.internals.positionAbsolute.y
   const forwardOut = new Map()
   const forwardIn = new Map()
@@ -44,7 +45,7 @@ function routingIndex(state) {
     const ys = yOf(e.source)
     const yt = yOf(e.target)
     // Los enlaces cortados con referencias no ocupan carril.
-    if (ys === undefined || yt === undefined || e.data?.reference) continue
+    if (ys === undefined || yt === undefined || e.data?.reference || e.hidden) continue
     if (yt > ys) {
       forwardOut.set(e.source, (forwardOut.get(e.source) ?? 0) + 1)
       forwardIn.set(e.target, (forwardIn.get(e.target) ?? 0) + 1)
