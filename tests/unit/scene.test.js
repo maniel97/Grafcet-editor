@@ -496,3 +496,61 @@ describe('vista de frente (gravedad)', () => {
     expect(down.pieces[0].y + 28).toBeCloseTo(plateTop(down), 3)
   })
 })
+
+describe('choques', () => {
+  const piece = (id, x, y) => ({ id, x, y, w: 28, h: 28, color: 'amber', material: 'plastic' })
+  const withPieces = (scene, pieces) => ({ ...sceneInit(scene), pieces, nextPiece: pieces.length + 1 })
+  const conveyor = { id: 'c', type: 'conveyor', x: 0, y: 100, rot: 0, motor: 'M', length: 400, time: 4 }
+  const stop = { id: 't', type: 'platform', x: 300, y: 80, rot: 90, length: 40, text: 'Tope' }
+
+  it('un tope en la cinta para las piezas, que se acumulan detrás', () => {
+    const scene = { elements: [conveyor, stop] }
+    const end = run(scene, withPieces(scene, [piece(1, 100, 86), piece(2, 20, 86)]), { M: 1 }, 6)
+    const [first, second] = end.pieces
+    expect(first.x + first.w).toBeLessThanOrEqual(286) // el tope (girado) ocupa x 286–300
+    expect(first.x + first.w).toBeGreaterThan(276)
+    expect(second.x + second.w).toBeLessThanOrEqual(first.x)
+    expect(second.x + second.w).toBeGreaterThan(first.x - 10)
+  })
+
+  it('la barrera cerrada para la pieza; abierta, la deja pasar', () => {
+    const barrier = { id: 'b', type: 'barrier', x: 200, y: 200, rot: 270, open: 'Abrir', length: 140 }
+    const scene = { elements: [conveyor, barrier] }
+    const start = withPieces(scene, [piece(1, 100, 86)])
+    const closed = run(scene, start, { M: 1 }, 3)
+    expect(closed.pieces[0].x + 28).toBeLessThanOrEqual(178 + 0.001) // brazo (girado) en x 178–186
+    const opened = run(scene, run(scene, start, { Abrir: 1 }, 2.5), { M: 1, Abrir: 1 }, 3)
+    expect(opened.pieces[0].x).toBeGreaterThan(200)
+  })
+
+  it('el cilindro empuja en cadena y, contra una pared, se queda a medio recorrido', () => {
+    const cyl = { id: 'a', type: 'cylinder', x: 0, y: 100, rot: 0, extend: 'A', retract: '', extended: 'a1', stroke: 200, time: 1 }
+    const pieces = () => [piece(1, 100, 86), piece(2, 140, 86)]
+    const free = { elements: [cyl] }
+    const out = run(free, withPieces(free, pieces()), { A: 1 }, 1.5)
+    expect(out.pos.a).toBe(1)
+    expect(out.pieces[1].x).toBeGreaterThanOrEqual(out.pieces[0].x + 28) // la primera empuja a la segunda
+    expect(sceneInputs(free, out).a1).toBe(1)
+
+    const wall = { id: 'w', type: 'platform', x: 260, y: 60, rot: 90, length: 80 }
+    const blocked = { elements: [cyl, wall] }
+    const jam = run(blocked, withPieces(blocked, pieces()), { A: 1 }, 1.5)
+    expect(jam.pos.a).toBeLessThan(1)
+    expect(jam.pieces[1].x + 28).toBeLessThanOrEqual(246) // contra la pared (x 246–260)
+    expect(sceneInputs(blocked, jam).a1).toBe(0) // el final de carrera no llega
+  })
+
+  it('de frente: la pieza que sale despedida choca con la pared y cae a plomo', () => {
+    const scene = {
+      gravity: true,
+      elements: [
+        { id: 'c', type: 'conveyor', x: 0, y: 300, rot: 0, motor: 'M', length: 200, time: 1 },
+        { id: 'w', type: 'platform', x: 270, y: 200, rot: 90, length: 400 },
+      ],
+    }
+    const end = run(scene, withPieces(scene, [piece(1, 150, 257)]), { M: 1 }, 3)
+    expect(end.pieces[0].x + 28).toBeLessThanOrEqual(256) // la pared ocupa x 256–270
+    expect(end.pieces[0].x).toBeGreaterThan(200) // salió de la cinta antes de chocar
+    expect(end.pieces[0].y + 28).toBe(SCENE_FLOOR)
+  })
+})

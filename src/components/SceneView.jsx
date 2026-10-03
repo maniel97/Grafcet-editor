@@ -1105,11 +1105,12 @@ const HINTS = {
     'Pick & place: cilindro horizontal X y vertical Z montado en su vástago. Asigna a Z la ventosa (vacío) para coger la pieza que toca y llevarla con los dos vástagos.',
   diverter: 'Desviador: mientras su salida está activa, empuja las piezas de su zona hacia donde apunta la flecha (para sacarlas de una cinta).',
   ramp: 'Rampa: las piezas resbalan solas hasta su extremo (a la salida de una cinta, hacia una recogida…).',
-  platform: 'Plataforma: superficie fija (mesa, estante, suelo). En la vista de frente, las piezas se apoyan en ella.',
+  platform: 'Plataforma: superficie fija (mesa, estante, suelo). Las piezas no la atraviesan y, en la vista de frente, se apoyan en ella.',
+  stop: 'Tope / pared: para las piezas (en una cinta se acumulan detrás). Un cilindro que empuja una pieza contra él se queda a medio recorrido y su final de carrera no llega.',
   siren: 'Sirena: avisa (con sonido, si se activa en sus propiedades) mientras su salida está activa.',
   trafficlight: 'Semáforo: tres luces (rojo, ámbar y verde), cada una con su salida.',
   valve: 'Electroválvula: abierta (azul) mientras su salida está activa. Para dibujar el circuito de un depósito.',
-  barrier: 'Barrera: se abre con su orden y se cierra con la suya o por su peso; finales de carrera de abierta y cerrada.',
+  barrier: 'Barrera: se abre con su orden y se cierra con la suya o por su peso; finales de carrera de abierta y cerrada. Mientras no está abierta, para las piezas.',
   pipe: 'Tubería: decoración; se pinta de azul, con el fluido moviéndose, mientras la variable elegida está activa.',
   label: 'Rótulo: texto libre en la escena (nombre de la estación, zonas…).',
   image: 'Imagen: una foto o un plano de fondo (se dibuja debajo de todo).',
@@ -1205,7 +1206,12 @@ const PALETTE_ITEMS = Object.entries(SCENE_TYPES).flatMap(([type, t]) =>
           { key: type, type, group: t.group, label: t.label, preset: {} },
           { key: 'pickplace', type, group: t.group, label: 'Pick & place (2 cilindros)', preset: {} },
         ]
-      : [{ key: type, type, group: t.group, label: t.label, preset: {} }],
+      : type === 'platform'
+        ? [
+            { key: type, type, group: t.group, label: t.label, preset: {} },
+            { key: 'stop', type, group: t.group, label: 'Tope / pared', preset: { length: 40, rot: 90, text: 'Tope' } },
+          ]
+          : [{ key: type, type, group: t.group, label: t.label, preset: {} }],
 )
 const PALETTE = PALETTE_ITEMS.reduce((groups, item) => ({ ...groups, [item.group]: [...(groups[item.group] ?? []), item] }), {})
 // Imagen elegida para la escena: reducida (lado mayor ≤ 1200 px) para que el proyecto no pese

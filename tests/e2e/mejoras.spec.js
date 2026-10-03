@@ -852,9 +852,13 @@ test('Abrir > Nuevo…: título, S7-200 con su CPU, enunciado y tabla de variabl
   await expect(page.locator('.react-flow__node-note')).toContainText('Taladrar la pieza')
   // La tabla, ya colocada a la izquierda de la etapa inicial.
   await page.locator('[data-auto-place="pending"]').waitFor({ state: 'detached' })
-  const table = await page.locator('.react-flow__node-variables').boundingBox()
-  const step = await page.locator('.react-flow__node-step').boundingBox()
-  expect(table.x + table.width).toBeLessThan(step.x)
+  // Las dos medidas a la vez: la vista se reencuadra justo después de colocarla.
+  const gap = () =>
+    page.evaluate(() => {
+      const table = document.querySelector('.react-flow__node-variables').getBoundingClientRect()
+      return document.querySelector('.react-flow__node-step').getBoundingClientRect().left - table.right
+    })
+  await expect.poll(gap).toBeGreaterThan(0)
 
   // La próxima vez recuerda el autómata y el autor, no el título.
   await page.getByTitle('Abrir un proyecto, un ejemplo o un trabajo anterior').click()

@@ -825,3 +825,16 @@ test('planta de frente: con «Gravedad» la pieza cae a la cinta y, al final de 
   await expect(piece).toHaveCount(0)
   expectNoErrors(errors)
 })
+
+test('planta: «Tope / pared» en la paleta, con su explicación', async ({ page }) => {
+  const errors = await openEditor(page, 'escena-gravedad.json')
+  await page.getByRole('button', { name: /Simular/ }).click()
+  const view = page.getByRole('region', { name: 'Escena de la planta' })
+  await view.getByRole('radio', { name: /Editar/ }).click()
+  const palette = view.getByRole('navigation', { name: 'Elementos' })
+  await palette.getByRole('button', { name: '+ Tope / pared' }).hover()
+  await expect(page.getByRole('tooltip', { name: 'Vista previa: Tope / pared' })).toContainText('medio recorrido')
+  await palette.getByRole('button', { name: '+ Tope / pared' }).click()
+  await expect(view.locator('[aria-label="Plataforma Tope"]')).toHaveCount(1)
+  expectNoErrors(errors)
+})

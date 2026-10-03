@@ -4,7 +4,9 @@
 // plc.scene = { elements: [{ id, type, x, y, rot, ...propiedades }] }
 //   x, y: punto de anclaje (px de la escena); rot: 0 | 90 | 180 | 270 (sentido horario).
 // Física sencilla, sin motor físico: rectángulos que se mueven y se empujan; los detectores
-// miran si algo entra en su zona.
+// miran si algo entra en su zona. Las plataformas (también giradas, como pared o tope) y las
+// barreras sin abrir son obstáculos: paran las piezas, y un cilindro que empuja contra ellos se
+// queda a medio recorrido (su final de carrera no llega).
 // scene.gravity: vista de frente (como PC_SIMU) en vez de desde arriba: las piezas caen hasta
 // apoyarse en algo (cinta, rampa, plataforma, báscula, placa de un cilindro, fondo de una
 // recogida, otra pieza o el suelo de la escena) y las cintas arrastran lo que llevan encima.
@@ -182,6 +184,8 @@ export const conveyorRect = (e) => worldRect(e, 0, -15, Number(e.length) || 240,
 export const sinkRect = (e) => worldRect(e, -30, -30, 60, 60)
 // Plataforma: superficie fija (anclaje: extremo izquierdo de su cara de arriba).
 export const platformRect = (e) => worldRect(e, 0, 0, Number(e.length) || 160, 14)
+// Brazo de una barrera cerrada (al abrirse gira hacia arriba y deja de estorbar).
+export const barrierArm = (e) => worldRect(e, 0, -22, Number(e.length) || 140, 8)
 
 // Vista de frente (scene.gravity): aceleración (px/s²), suelo de la escena (10 px por encima del
 // borde de abajo, para que se vea) y
@@ -222,6 +226,36 @@ function supports(scene, state) {
   }
   return out
 }
+// Obstáculos fijos para las piezas: plataformas y barreras que no están abiertas.
+function obstacles(scene, state) {
+  const out = []
+  for (const e of elementsOf(scene)) {
+    if (e.type === 'platform') out.push(platformRect(e))
+    if (e.type === 'barrier' && (state.pos?.[e.id] ?? 0) < 0.9) out.push(barrierArm(e))
+  }
+  return out
+}
+
+// Empuje en cadena: la pieza p pasa a quedar delante de `front` en el sentido (ux, uy) y empuja a
+// su vez a las que encuentre. Propone las posiciones nuevas en `moves` (id -> rect); false si
+// algo lo impide (un obstáculo, una pieza cogida por una ventosa o una cadena demasiado larga).
+function shove(p, front, ux, uy, ctx, depth = 0) {
+  if (depth > 30 || ctx.held.has(p.id)) return false
+  const now = ctx.moves.get(p.id) ?? p
+  const target = { ...now }
+  if (ux > 0) target.x = Math.max(now.x, front.x + front.w)
+  if (ux < 0) target.x = Math.min(now.x, front.x - now.w)
+  if (uy > 0) target.y = Math.max(now.y, front.y + front.h)
+  if (uy < 0) target.y = Math.min(now.y, front.y - now.h)
+  if (ctx.walls.some((w) => overlaps(target, w))) return false
+  ctx.moves.set(p.id, target)
+  for (const o of ctx.pieces) {
+    if (o === p) continue
+    if (overlaps(target, ctx.moves.get(o.id) ?? o) && !shove(o, target, ux, uy, ctx, depth + 1)) return false
+  }
+  return true
+}
+
 // ¿Descansa la pieza sobre la cara de arriba de r? (con gravedad, lo que mueve una cinta)
 const restsOn = (p, r) => Math.abs(p.y + p.h - r.y) < 1 && p.x + p.w / 2 >= r.x && p.x + p.w / 2 <= r.x + r.w
 
@@ -230,6 +264,7 @@ const restsOn = (p, r) => Math.abs(p.y + p.h - r.y) < 1 && p.x + p.w / 2 >= r.x 
 // aire conserva la velocidad horizontal con la que salió (de una cinta, una rampa…).
 function fall(scene, state, held, dt) {
   const fixed = supports(scene, state)
+  const walls = obstacles(scene, state)
   const below = []
   for (const p of [...state.pieces].sort((a, b) => b.y + b.h - (a.y + a.h))) {
     if (held.has(p.id)) {
@@ -251,7 +286,10 @@ function fall(scene, state, held, dt) {
       if (bottom + vy * dt >= top) land()
       else {
         p.y = Math.round((p.y + vy * dt) * 1000) / 1000
-        p.x = Math.round((p.x + (p.vx ?? 0) * dt) * 1000) / 1000
+        // En el aire sigue avanzando, salvo que choque con una pared: entonces cae a plomo.
+        const x = Math.round((p.x + (p.vx ?? 0) * dt) * 1000) / 1000
+        if (walls.some((w) => overlaps({ ...p, x }, w) && !overlaps(p, w))) p.vx = 0
+        else p.x = x
         p.vy = vy
       }
     }
@@ -336,13 +374,15 @@ export function sceneStep(scene, state, values, dt) {
     if (e.type === 'diverter' && on(values, e.gate)) movers.push([e, diverterRect(e), Number(e.length) || 80, Number(e.time) || 0.5])
     if (e.type === 'ramp') movers.push([e, rampRect(e), Number(e.length) || 120, Number(e.time) || 1])
   }
+  const walls = obstacles(scene, next)
   for (const [e, rect, length, time] of movers) {
     const speed = length / Math.max(0.1, time)
     const [dx, dy] = rotate(speed * dt, 0, e.rot)
     for (const p of next.pieces) {
       if (heldIds.has(p.id) || !(scene?.gravity ? restsOn(p, rect) : inside(center(p), rect))) continue
       const moved = { ...p, x: p.x + dx, y: p.y + dy }
-      const blocked = next.pieces.some((o) => o !== p && overlaps(moved, o) && !overlaps(p, o))
+      const blocked =
+        next.pieces.some((o) => o !== p && overlaps(moved, o) && !overlaps(p, o)) || walls.some((w) => overlaps(moved, w) && !overlaps(p, w))
       if (!blocked) Object.assign(p, { x: moved.x, y: moved.y }, scene?.gravity ? { vx: dx / dt } : {})
     }
   }
@@ -355,21 +395,21 @@ export function sceneStep(scene, state, values, dt) {
     const dir = out && !back ? 1 : back && !out ? -1 : 0
     if (!dir) continue
     // Redondeada: sin restos de coma flotante (0,000…003 en vez de 0) al sumar muchos pasos.
-    const pos = Math.round(clamp(next.pos[e.id] + (dir * dt) / Math.max(0.05, Number(e.time) || 1)) * 1e6) / 1e6
+    const before = next.pos[e.id]
+    const pos = Math.round(clamp(before + (dir * dt) / Math.max(0.05, Number(e.time) || 1)) * 1e6) / 1e6
     next.pos[e.id] = pos
     if (dir > 0 && pos < 1) extending.add(e.id)
     // Con ventosa no empuja: coge (abajo).
     if (dir < 0 || e.vacuum) continue
+    // La placa deja delante, en el sentido del vástago, las piezas que toca (y estas a las que
+    // tengan delante). Si algo fijo lo impide, el vástago no avanza: se queda empujando.
     const plate = platePlaced(scene, next, e)
     const [ux, uy] = rotate(1, 0, e.rot)
-    for (const p of next.pieces) {
-      if (heldIds.has(p.id) || !overlaps(plate, p)) continue
-      // Delante de la placa, en el sentido del vástago.
-      if (ux > 0) p.x = plate.x + plate.w
-      if (ux < 0) p.x = plate.x - p.w
-      if (uy > 0) p.y = plate.y + plate.h
-      if (uy < 0) p.y = plate.y - p.h
-    }
+    const ctx = { pieces: next.pieces, walls, held: heldIds, moves: new Map() }
+    const pushed = next.pieces.filter((p) => !heldIds.has(p.id) && overlaps(plate, p))
+    if (pushed.every((p) => shove(p, plate, ux, uy, ctx))) {
+      for (const p of next.pieces) if (ctx.moves.has(p.id)) Object.assign(p, ctx.moves.get(p.id))
+    } else next.pos[e.id] = before
   }
 
   // Ventosas: con vacío cogen la pieza que tocan y la llevan con el vástago; sin vacío, la sueltan
