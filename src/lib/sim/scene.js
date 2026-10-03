@@ -74,7 +74,8 @@ export const SCENE_VARS = {
     ['temperature', 'Temperatura en °C (analógica)', 'analog'],
     ['thermostat', 'Termostato (opcional)', 'in'],
   ],
-  feeder: [['trigger', 'Orden de soltar pieza (opcional)', 'out']],
+  // La orden de soltar pieza: una salida del grafcet o un pulsador de la planta (flanco de subida).
+  feeder: [['trigger', 'Soltar pieza: salida o pulsador (opcional)', 'trigger']],
   sink: [],
   tank: [
     ['fill', 'Válvula de llenado', 'out'],
@@ -595,10 +596,12 @@ export function sceneIO(scene, variables) {
   const byName = new Map(variables.map((v) => [v.name, v]))
   const signals = new Map()
   for (const e of elements) {
-    for (const [key, , dir] of SCENE_VARS[e.type] ?? []) {
+    for (const [key, , kind] of SCENE_VARS[e.type] ?? []) {
       const name = e[key]
       if (!name) continue
       const v = byName.get(name)
+      // La orden del alimentador: salida si la da el grafcet; si no, entrada (un pulsador).
+      const dir = kind === 'trigger' ? (v?.type === 'output' || v?.type === 'memory' ? 'out' : 'in') : kind
       const entry = signals.get(name) ?? { name, type: v?.type ?? null, address: v?.address ?? '', dir, elements: [] }
       if (!entry.elements.includes(e.id)) entry.elements.push(e.id)
       signals.set(name, entry)
@@ -608,6 +611,8 @@ export function sceneIO(scene, variables) {
   const driven = sceneInputNames(scene)
   const manual = variables.filter((v) => (v.type === 'input' || v.type === 'analogIn') && v.uses.length && !driven.has(v.name)).map((v) => v.name)
   const unusedOutputs = variables.filter((v) => v.type === 'output' && v.uses.length && !signals.has(v.name)).map((v) => v.name)
-  const notInGrafcet = [...signals.values()].filter((s) => !byName.get(s.name)?.uses.length).map((s) => s.name)
+  // Un pulsador que solo suelta piezas del alimentador es de la planta: no es un aviso.
+  const plantOnly = new Set(elements.filter((e) => e.type === 'feeder' && e.trigger && driven.has(e.trigger)).map((e) => e.trigger))
+  const notInGrafcet = [...signals.values()].filter((s) => !byName.get(s.name)?.uses.length && !plantOnly.has(s.name)).map((s) => s.name)
   return { signals: [...signals.values()].sort((a, b) => a.name.localeCompare(b.name)), unassigned, manual, unusedOutputs, notInGrafcet }
 }

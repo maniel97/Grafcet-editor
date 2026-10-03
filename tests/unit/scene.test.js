@@ -394,3 +394,27 @@ describe('escena: pick & place', () => {
     expect(sceneInputs(scene, s).Cogida).toBe(0)
   })
 })
+
+describe('escena: alimentador con un pulsador de la planta', () => {
+  it('cada pulsación suelta una pieza y no cuenta como aviso de conexión', async () => {
+    const { sceneIO } = await import('../../src/lib/sim/scene')
+    const scene = {
+      elements: [
+        { id: 'b', type: 'button', variable: 'Poner', contact: 'NO' },
+        { id: 'f', type: 'feeder', x: 100, y: 100, trigger: 'Poner', auto: false },
+      ],
+    }
+    const world = makeWorld(scene)
+    let w = world.init()
+    const step = (s) => sceneStep(scene, s, world.inputs(s), 0.05)
+    w = step(sceneAction(scene, w, 'b', 'press'))
+    w = step(w)
+    expect(w.pieces).toHaveLength(1) // una por pulsación, aunque se mantenga
+    w = step(sceneAction(scene, { ...w, pieces: [] }, 'b', 'release'))
+    w = step(sceneAction(scene, w, 'b', 'press'))
+    expect(w.pieces).toHaveLength(1)
+    const io = sceneIO(scene, [{ name: 'Poner', type: 'input', uses: [], address: '' }])
+    expect(io.notInGrafcet).toEqual([])
+    expect(io.signals[0].dir).toBe('in')
+  })
+})

@@ -420,7 +420,7 @@ function labelOf(e) {
 
 // Tipo de la variable nueva según el campo: lo que la escena escribe es una entrada, lo que lee
 // una salida; las analógicas, entradas analógicas; el visualizador, una marca.
-const NEW_TYPE = { in: 'input', out: 'output', analog: 'analogIn', any: 'memory' }
+const NEW_TYPE = { in: 'input', out: 'output', analog: 'analogIn', any: 'memory', trigger: 'input' }
 const TYPE_NAMES = { input: 'entrada', output: 'salida', analogIn: 'entrada analógica', memory: 'marca' }
 
 // Campo de variable: se elige de la tabla o se escribe un nombre nuevo, que se añade a la tabla
@@ -632,7 +632,15 @@ function Properties({ element, variables, onChange, onDelete, onRotate, onCreate
   const names = (dir) =>
     variables
       .filter((v) =>
-        dir === 'any' ? true : dir === 'analog' ? v.type === 'analogIn' : dir === 'out' ? v.type === 'output' || v.type === 'memory' : v.type === 'input',
+        dir === 'any'
+          ? true
+          : dir === 'trigger'
+            ? ['input', 'output', 'memory'].includes(v.type)
+            : dir === 'analog'
+              ? v.type === 'analogIn'
+              : dir === 'out'
+                ? v.type === 'output' || v.type === 'memory'
+                : v.type === 'input',
       )
       .map((v) => v.name)
   const set = (patch) => onChange({ ...element, ...patch })
@@ -673,16 +681,16 @@ function Properties({ element, variables, onChange, onDelete, onRotate, onCreate
           <label className="block flex-1">
             <span className="text-slate-500">Ubicación</span>
             <select value={element.place === 'desk' ? 'desk' : 'machine'} onChange={(ev) => set({ place: ev.target.value })} className={field}>
-              <option value="desk">En el pupitre</option>
+              <option value="desk">En el panel de control</option>
               <option value="machine">En la máquina</option>
             </select>
           </label>
           {element.place === 'desk' && (
             <>
-              <button type="button" onClick={() => onMoveInDesk(-1)} title="Mover a la izquierda en el pupitre" className="rounded border border-slate-300 px-1.5 py-0.5 hover:bg-slate-100">
+              <button type="button" onClick={() => onMoveInDesk(-1)} title="Mover a la izquierda en el panel" className="rounded border border-slate-300 px-1.5 py-0.5 hover:bg-slate-100">
                 ◀
               </button>
-              <button type="button" onClick={() => onMoveInDesk(1)} title="Mover a la derecha en el pupitre" className="rounded border border-slate-300 px-1.5 py-0.5 hover:bg-slate-100">
+              <button type="button" onClick={() => onMoveInDesk(1)} title="Mover a la derecha en el panel" className="rounded border border-slate-300 px-1.5 py-0.5 hover:bg-slate-100">
                 ▶
               </button>
             </>
@@ -1029,7 +1037,7 @@ const PALETTE = PALETTE_ITEMS.reduce((groups, item) => ({ ...groups, [item.group
 // Elementos por los que pasan las piezas: se dibujan debajo de todo.
 const UNDER = ['conveyor', 'sink', 'ramp', 'diverter']
 
-// Pupitre de mando: los mandos y la señalización pueden ir en un panel fijo, aparte del
+// Panel de control: los mandos y la señalización pueden ir en un panel fijo, aparte del
 // mecanismo (como el cuadro eléctrico real). e.place: 'desk' | 'machine' (por defecto, máquina).
 const DESK_TYPES = ['button', 'switch', 'emergency', 'potentiometer', 'lamp', 'display']
 const isDesk = (e) => DESK_TYPES.includes(e.type) && e.place === 'desk'
@@ -1083,7 +1091,7 @@ function drawElement(e, { scene, state, values, time, signals }) {
 }
 
 // Escena estática (sin interacción), en su estado inicial y encuadrada: para el dossier.
-// Con rótulos y, debajo, las variables de cada elemento con su dirección. Los del pupitre, en una
+// Con rótulos y, debajo, las variables de cada elemento con su dirección. Los del panel, en una
 // fila aparte debajo de la máquina.
 export function SceneStatic({ scene, variables = [] }) {
   const elements = scene?.elements ?? []
@@ -1139,7 +1147,7 @@ export function SceneStatic({ scene, variables = [] }) {
         <g>
           <rect x={minX + 10} y={deskY - 20} width={width - 20} height="110" rx="4" fill="#cbd5e1" />
           <text x={minX + 18} y={deskY - 6} fontSize="10" fontWeight="600" fill="#334155">
-            Pupitre de mando
+            Panel de control
           </text>
           {desk.map((e, i) => {
             const x = minX + 60 + i * 100
@@ -1437,7 +1445,7 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
     return PALETTE_BY_KEY[key] ?? null
   }
 
-  // Mandos y señalización: con un clic (o soltados en el pupitre) van al pupitre; soltados en la
+  // Mandos y señalización: con un clic (o soltados en el panel) van al panel; soltados en la
   // escena, a la máquina.
   const add = (type, preset = {}, at = null, place = null) => {
     const el = scrollRef.current
@@ -1458,7 +1466,7 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
     return { x: p.x, y: p.y }
   }
 
-  // Orden en el pupitre: intercambia el elemento con el anterior o el siguiente del pupitre.
+  // Orden en el panel: intercambia el elemento con el anterior o el siguiente del panel.
   const moveInDesk = (id, dir) => {
     const desk = elements.filter(isDesk)
     const i = desk.findIndex((e) => e.id === id)
@@ -1471,7 +1479,7 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
     save(list)
   }
 
-  // Pupitre: los mismos mandos que en la escena, en celdas fijas (el potenciómetro, por la
+  // Panel: los mismos mandos que en la escena, en celdas fijas (el potenciómetro, por la
   // posición del ratón en su celda).
   const [deskKnob, setDeskKnob] = useState(null)
   const turnDeskKnob = (ev, e) => {
@@ -1954,7 +1962,7 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
         {(deskItems.length > 0 || mode === 'edit') && (
           <div
             role="region"
-            aria-label="Pupitre de mando"
+            aria-label="Panel de control"
             className="paper flex shrink-0 items-start gap-2 overflow-x-auto border-t-4 border-slate-400 bg-slate-300 px-3 py-2"
             onDragOver={(ev) => {
               if (!ev.dataTransfer.types.includes(DRAG_TYPE)) return
@@ -1969,7 +1977,7 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
             }}
           >
             {deskItems.length === 0 && (
-              <p className="py-3 text-xs text-slate-600">Pupitre de mando: arrastra aquí pulsadores, pilotos, potenciómetros…</p>
+              <p className="py-3 text-xs text-slate-600">Panel de control: arrastra aquí pulsadores, pilotos, potenciómetros…</p>
             )}
             {deskItems.map((e) => {
               const b = boundsOf({ ...e, x: 0, y: 0 })
@@ -2092,7 +2100,7 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
       )}
       {mode === 'edit' && (
         <p className="border-t border-slate-200 px-2 py-1 text-[11px] text-slate-500">
-          Arrastra módulos a la escena o al pupitre · rueda: zoom · rueda pulsada: desplazar · Ctrl+clic o recuadro: varios · R gira · Supr borra · Ctrl+C/V/D copia, pega, duplica · deshacer y rehacer: los de siempre · asigna las variables en el panel de la derecha. Piezas de {PIECE_SIZES.small[0]} y{' '}
+          Arrastra módulos a la escena o al panel · rueda: zoom · rueda pulsada: desplazar · Ctrl+clic o recuadro: varios · R gira · Supr borra · Ctrl+C/V/D copia, pega, duplica · deshacer y rehacer: los de siempre · asigna las variables en el panel de la derecha. Piezas de {PIECE_SIZES.small[0]} y{' '}
           {PIECE_SIZES.large[0]} px.
         </p>
       )}

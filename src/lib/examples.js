@@ -52,7 +52,7 @@ export const EXAMPLES = [
           'nota',
           520,
           0,
-          '# Marcha y paro de un motor\n**Nivel 1.** Lo más básico: una etapa de reposo (0) y una de trabajo (1) con acciones continuas.\n\n- **Paro** es un pulsador **NC** (normalmente cerrado), como en los cuadros reales: sin pulsar da 1, así que la transición es `!Paro` (se cumple al pulsarlo).\n- Entradas: `Marcha` (NA), `Paro` (NC)\n- Salidas: `Motor`, `Piloto`\n\nPruébalo: **Simular** y usa los pulsadores del pupitre.',
+          '# Marcha y paro de un motor\n**Nivel 1.** Lo más básico: una etapa de reposo (0) y una de trabajo (1) con acciones continuas.\n\n- **Paro** es un pulsador **NC** (normalmente cerrado), como en los cuadros reales: sin pulsar da 1, así que la transición es `!Paro` (se cumple al pulsarlo).\n- Entradas: `Marcha` (NA), `Paro` (NC)\n- Salidas: `Motor`, `Piloto`\n\nPruébalo: **Simular** y usa los pulsadores del panel.',
           { width: 320, height: 300 },
         ),
       )
@@ -139,7 +139,7 @@ export const EXAMPLES = [
           'nota',
           640,
           0,
-          '# Puerta de garaje\n**Nivel 2.** Abre con **Abrir**, espera 5 s abierta y cierra. Si la **fotocélula** ve un obstáculo mientras cierra, vuelve a abrir (seguridad).\n\n- La puerta es un cilindro vertical: sube (`Subir`) y baja (`Bajar`), con `Abierta` y `Cerrada` como finales de carrera.\n- Entradas: `Abrir`, `Abierta`, `Cerrada`, `Foto` · Salidas: `Subir`, `Bajar`, `Luz`\n\nPruébalo: **Simular**, pulsa Abrir y, mientras baja, pulsa el alimentador para poner un coche en la puerta.',
+          '# Puerta de garaje\n**Nivel 2.** Abre con **Abrir**, espera 5 s abierta y cierra. Si la **fotocélula** ve un obstáculo mientras cierra, vuelve a abrir (seguridad).\n\n- La puerta es un cilindro vertical: sube (`Subir`) y baja (`Bajar`), con `Abierta` y `Cerrada` como finales de carrera.\n- Entradas: `Abrir`, `Abierta`, `Cerrada`, `Foto` · Salidas: `Subir`, `Bajar`, `Luz`\n\nPruébalo: **Simular**, pulsa Abrir y, mientras baja, pulsa **Poner coche** en el panel de control.',
           { width: 330, height: 340 },
         ),
       ]
@@ -158,13 +158,15 @@ export const EXAMPLES = [
       const scene = {
         elements: [
           { id: 'puerta', type: 'cylinder', x: 300, y: 260, rot: 270, extend: 'Subir', retract: 'Bajar', retracted: 'Cerrada', extended: 'Abierta', stroke: 120, time: 2, text: 'Puerta' },
-          { id: 'coche', type: 'feeder', x: 300, y: 300, rot: 0, trigger: '', auto: false, spacing: 0, sizes: 'large', material: 'metal', color: 'amber' },
+          { id: 'coche', type: 'feeder', x: 300, y: 300, rot: 0, trigger: 'Poner_coche', auto: false, spacing: 0, sizes: 'large', material: 'metal', color: 'amber' },
           { id: 'foto', type: 'sensor', x: 200, y: 300, rot: 0, variable: 'Foto', contact: 'NO', range: 200, kind: 'optical', color: 'amber' },
           { id: 'abrir', type: 'button', x: 0, y: 0, rot: 0, variable: 'Abrir', contact: 'NO', color: 'green', text: 'Abrir', place: 'desk' },
           { id: 'luz', type: 'lamp', x: 0, y: 0, rot: 0, variable: 'Luz', color: 'yellow', text: 'Luz de aviso', place: 'desk' },
+          // Solo para la planta: suelta un coche delante de la puerta (no lo usa el grafcet).
+          { id: 'poner', type: 'button', x: 0, y: 0, rot: 0, variable: 'Poner_coche', contact: 'NO', color: 'yellow', text: 'Poner coche', place: 'desk' },
         ],
       }
-      return { nodes, edges, plc: { scene } }
+      return { nodes, edges, plc: { scene, variables: { Poner_coche: { type: 'input', comment: 'Planta virtual: poner un coche en la puerta' } } } }
     },
   },
   {
@@ -287,7 +289,7 @@ export const EXAMPLES = [
           'nota',
           520,
           0,
-          '# Pick & place\nZ baja con vacío (`V`) hasta coger la pieza (`Cogida`), sube, X la lleva, Z baja y la suelta (sin vacío), sube y X vuelve.\n\n- Entradas: `Marcha`, `x0`, `x1`, `z0`, `z1`, `Cogida`\n- Salidas: `X+`, `X-`, `Z+`, `Z-`, `V`\n\nPruébalo: **Simular** y pulsa Marcha en el pupitre.',
+          '# Pick & place\nZ baja con vacío (`V`) hasta coger la pieza (`Cogida`), sube, X la lleva, Z baja y la suelta (sin vacío), sube y X vuelve.\n\n- Entradas: `Marcha`, `x0`, `x1`, `z0`, `z1`, `Cogida`\n- Salidas: `X+`, `X-`, `Z+`, `Z-`, `V`\n\nPruébalo: **Simular** y pulsa Marcha en el panel.',
           { width: 300, height: 250 },
         ),
       )
@@ -323,7 +325,7 @@ export const EXAMPLES = [
           'nota',
           560,
           0,
-          '# Clasificadora por material\nCon **Marcha** la cinta lleva las piezas; el detector inductivo (`Metal`) solo ve las de metal y el desviador (`D`) las saca a su recogida. Las de plástico siguen hasta el final.\n\n- Entradas: `Marcha` (interruptor), `Metal`\n- Salidas: `M` (cinta), `D` (desviador)\n\nPruébalo: **Simular** y activa Marcha en el pupitre.',
+          '# Clasificadora por material\nCon **Marcha** la cinta lleva las piezas; el detector inductivo (`Metal`) solo ve las de metal y el desviador (`D`) las saca a su recogida. Las de plástico siguen hasta el final.\n\n- Entradas: `Marcha` (interruptor), `Metal`\n- Salidas: `M` (cinta), `D` (desviador)\n\nPruébalo: **Simular** y activa Marcha en el panel.',
           { width: 300, height: 280 },
         ),
       ]
@@ -441,7 +443,7 @@ export const EXAMPLES = [
           'nota',
           1120,
           0,
-          '# Ascensor de 3 plantas\n**Nivel 3.** Desde el reposo se elige un movimiento según la llamada (`L0`, `L1`, `L2`) y la planta donde está la cabina (`P0`, `P1`, `P2`).\n\n- Si se llama a la vez desde dos plantas, **prioridades**: planta 0, luego 2, luego 1 (las receptividades llevan `!L0`, `!L2` para ser excluyentes).\n- La cabina es un cilindro vertical; los finales de carrera de cada planta los pisa al pasar.\n- Entradas: `L0`, `L1`, `L2`, `P0`, `P1`, `P2` · Salidas: `Subir`, `Bajar`\n\nPruébalo: **Simular** y llama desde el pupitre.',
+          '# Ascensor de 3 plantas\n**Nivel 3.** Desde el reposo se elige un movimiento según la llamada (`L0`, `L1`, `L2`) y la planta donde está la cabina (`P0`, `P1`, `P2`).\n\n- Si se llama a la vez desde dos plantas, **prioridades**: planta 0, luego 2, luego 1 (las receptividades llevan `!L0`, `!L2` para ser excluyentes).\n- La cabina es un cilindro vertical; los finales de carrera de cada planta los pisa al pasar.\n- Entradas: `L0`, `L1`, `L2`, `P0`, `P1`, `P2` · Salidas: `Subir`, `Bajar`\n\nPruébalo: **Simular** y llama desde el panel.',
           { width: 340, height: 380 },
         ),
       ]

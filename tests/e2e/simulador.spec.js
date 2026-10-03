@@ -463,29 +463,29 @@ test('escena: rótulos con E/S y panel de conexiones', async ({ page }) => {
   expectNoErrors(errors)
 })
 
-test('escena: pupitre de mando aparte de la máquina', async ({ page }) => {
+test('escena: panel de control aparte de la máquina', async ({ page }) => {
   const errors = await openEditor(page)
   await page.getByRole('button', { name: /Simular/ }).click()
   await page.getByRole('button', { name: /Planta virtual/ }).click()
   const view = page.getByRole('region', { name: 'Escena de la planta' })
   await view.getByRole('radio', { name: /Editar/ }).click()
-  const desk = view.getByRole('region', { name: 'Pupitre de mando' })
+  const desk = view.getByRole('region', { name: 'Panel de control' })
   const props = view.getByLabel('Propiedades del elemento')
   const pick = async (name, value) => {
     await props.getByRole('combobox', { name }).fill(value)
     await props.getByRole('combobox', { name }).press('Enter')
   }
-  // Con un clic, los mandos van al pupitre; arrastrado al pupitre, también.
+  // Con un clic, los mandos van al panel; arrastrado al panel, también.
   await view.getByRole('button', { name: '+ Pulsador' }).click()
   await pick('Entrada', 'Marcha')
   await view.getByRole('button', { name: '+ Piloto' }).dragTo(desk)
   await expect(desk.locator('[data-element]')).toHaveCount(2)
   await expect(view.locator('svg[aria-label="Escena"] [data-element]')).toHaveCount(0)
-  // Orden en el pupitre: el piloto (seleccionado) a la izquierda.
-  await props.getByTitle('Mover a la izquierda en el pupitre').click()
+  // Orden en el panel: el piloto (seleccionado) a la izquierda.
+  await props.getByTitle('Mover a la izquierda en el panel').click()
   await expect(desk.locator('[data-element]').first()).toHaveAttribute('data-element', 'lamp')
 
-  // Funciona igual desde el pupitre.
+  // Funciona igual desde el panel.
   await view.getByRole('radio', { name: /Usar/ }).click()
   const marcha = desk.locator('[aria-label="Pulsador Marcha"]')
   const b = await marcha.boundingBox()
@@ -525,7 +525,7 @@ test('ejemplo pick & place: la ventosa lleva la pieza del almacén al destino', 
   await openExample(page, /Pick & place/)
   await page.getByRole('button', { name: /Simular/ }).click()
   const view = page.getByRole('region', { name: 'Escena de la planta' })
-  const marcha = view.getByRole('region', { name: 'Pupitre de mando' }).locator('[aria-label="Pulsador Marcha"]')
+  const marcha = view.getByRole('region', { name: 'Panel de control' }).locator('[aria-label="Pulsador Marcha"]')
   const b = await marcha.boundingBox()
   await page.mouse.move(b.x + b.width / 2, b.y + b.height / 3)
   await page.mouse.down()
@@ -554,7 +554,7 @@ test('estación «Clasificadora por material»: el metal y el plástico acaban e
   await page.getByRole('button', { name: /Simular/ }).click()
   await page.getByLabel('Velocidad').selectOption('5')
   const view = page.getByRole('region', { name: 'Escena de la planta' })
-  await view.getByRole('region', { name: 'Pupitre de mando' }).locator('[aria-label="Interruptor Marcha"]').click()
+  await view.getByRole('region', { name: 'Panel de control' }).locator('[aria-label="Interruptor Marcha"]').click()
   await expect(view.locator('[aria-label="Recogida Metal"]')).toContainText(/[1-9]/, { timeout: 15000 })
   await expect(view.locator('[aria-label="Recogida Plástico"]')).toContainText(/[1-9]/, { timeout: 15000 })
   expectNoErrors(errors)
@@ -567,7 +567,7 @@ test('escena: guardar una selección en «Mis grupos», colocarla, exportar e im
   const view = page.getByRole('region', { name: 'Escena de la planta' })
   await view.getByRole('radio', { name: /Editar/ }).click()
   const machine = view.locator('svg[aria-label="Escena"] [data-element]')
-  await expect(machine).toHaveCount(4) // X, Z, almacén y destino (Marcha está en el pupitre)
+  await expect(machine).toHaveCount(4) // X, Z, almacén y destino (Marcha está en el panel)
 
   // Seleccionar los dos cilindros y guardarlos como grupo.
   await view.locator('[aria-label="Cilindro X"]').click()
@@ -604,7 +604,7 @@ test('escena: guardar una selección en «Mis grupos», colocarla, exportar e im
 
 test('ejemplos de nivel 1 y 2: marcha/paro NC, contador y puerta de garaje', async ({ page }) => {
   const errors = await openEditor(page)
-  const desk = () => page.getByRole('region', { name: 'Pupitre de mando' })
+  const desk = () => page.getByRole('region', { name: 'Panel de control' })
   const press = async (label) => {
     const b = await desk().locator(`[aria-label="${label}"]`).boundingBox()
     await page.mouse.move(b.x + b.width / 2, b.y + b.height / 3)
@@ -643,7 +643,7 @@ test('ejemplos de nivel 1 y 2: marcha/paro NC, contador y puerta de garaje', asy
   await page.getByLabel('Velocidad').selectOption('2') // a ×2, bajar dura 1 s
   await press('Pulsador Abrir')
   await expect.poll(() => activeSteps(page), { timeout: 8000, intervals: [100] }).toBe('s3')
-  await page.getByRole('region', { name: 'Escena de la planta' }).locator('[data-element="feeder"]').click()
+  await press('Pulsador Poner coche') // el pulsador del panel de control suelta el coche
   // Vuelve a abrir (etapa 1 -> 2) y, con el coche delante, se queda abierta.
   await expect.poll(() => activeSteps(page), { intervals: [100] }).toBe('s2')
   await page.waitForTimeout(3500)
@@ -653,7 +653,7 @@ test('ejemplos de nivel 1 y 2: marcha/paro NC, contador y puerta de garaje', asy
 
 test('ejemplos de nivel 3: ascensor, doble puesto y clasificadora por tamaño', async ({ page }) => {
   const errors = await openEditor(page)
-  const desk = () => page.getByRole('region', { name: 'Pupitre de mando' })
+  const desk = () => page.getByRole('region', { name: 'Panel de control' })
   const press = async (label) => {
     const b = await desk().locator(`[aria-label="${label}"]`).boundingBox()
     await page.mouse.move(b.x + b.width / 2, b.y + b.height / 3)
@@ -702,7 +702,7 @@ test('ejemplos de nivel 3: ascensor, doble puesto y clasificadora por tamaño', 
 
 test('ejemplos de nivel 4: manual/automático y línea con GEMMA', async ({ page }) => {
   const errors = await openEditor(page)
-  const desk = () => page.getByRole('region', { name: 'Pupitre de mando' })
+  const desk = () => page.getByRole('region', { name: 'Panel de control' })
   const hold = async (label, ms = 150) => {
     const b = await desk().locator(`[aria-label="${label}"]`).boundingBox()
     await page.mouse.move(b.x + b.width / 2, b.y + b.height / 3)
@@ -770,7 +770,7 @@ test('generador de secuencias neumáticas: de «A+ B+ B− A−» a un grafcet q
   await page.getByRole('button', { name: /Simular/ }).click()
   const view = page.getByRole('region', { name: 'Escena de la planta' })
   await expect(view.locator('[data-element="cylinder"]')).toHaveCount(3)
-  const marcha = view.getByRole('region', { name: 'Pupitre de mando' }).locator('[aria-label="Pulsador Marcha"]')
+  const marcha = view.getByRole('region', { name: 'Panel de control' }).locator('[aria-label="Pulsador Marcha"]')
   const b = await marcha.boundingBox()
   await page.mouse.move(b.x + b.width / 2, b.y + b.height / 3)
   await page.mouse.down()
