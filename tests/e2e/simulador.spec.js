@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { activeSteps, expectNoErrors, openEditor } from './helpers'
+import { activeSteps, expectNoErrors, openEditor, openExample } from './helpers'
 
 test('simulación del ejemplo: entradas, salidas, pausa y paso a paso', async ({ page }) => {
   const errors = await openEditor(page)
@@ -100,10 +100,9 @@ test('panel de la planta: configurar una cinta y ver cómo la pieza para el moto
   await panel.getByLabel('Tipo de elemento').selectOption({ label: 'Cinta transportadora' })
   await panel.getByRole('button', { name: 'Añadir' }).click()
   // Motor: la salida del ejemplo; sensor final: Paro (al llegar la pieza, vuelve a X0).
-  const fields = panel.locator('select')
-  await fields.nth(0).selectOption({ index: 1 })
-  await fields.nth(1).selectOption('Paro')
-  await panel.getByRole('spinbutton').fill('1')
+  await panel.getByRole('combobox', { name: 'Motor', exact: true }).selectOption({ index: 1 })
+  await panel.getByRole('combobox', { name: 'Sensor final' }).selectOption('Paro')
+  await panel.getByRole('spinbutton', { name: 'Recorrido (s)' }).fill('1')
   await expect(page.getByText('planta', { exact: true })).toHaveCount(1)
 
   await panel.getByRole('button', { name: 'Nueva pieza' }).click()
@@ -114,5 +113,30 @@ test('panel de la planta: configurar una cinta y ver cómo la pieza para el moto
   // La pieza llega al sensor (Paro) en 1 s: vuelve a X0 y la cinta se para con la pieza delante.
   await expect.poll(() => activeSteps(page), { timeout: 4000 }).toBe('s0')
   await expect(panel.getByRole('img', { name: /Cinta .*: 1 piezas/ })).toBeVisible()
+  expectNoErrors(errors)
+})
+
+test('ejemplo con planta, averías y «Detectar planta»', async ({ page }) => {
+  const errors = await openEditor(page)
+  await openExample(page, /Cilindros A\+ B\+/)
+  await page.getByRole('button', { name: /Simular/ }).click()
+  const panel = page.getByRole('region', { name: 'Planta virtual' })
+  await expect(panel.getByRole('img', { name: /Cilindro [AB]/ })).toHaveCount(2)
+
+  // Avería: el final de carrera b1 no detecta; el grafcet se queda esperándolo.
+  await panel.getByLabel('Avería de B').selectOption({ label: 'Sensor b1 roto' })
+  await page.getByRole('switch').click() // Marcha
+  await expect.poll(() => activeSteps(page), { timeout: 4000 }).toBe('s2')
+  await page.waitForTimeout(1500)
+  expect(await activeSteps(page)).toBe('s2')
+  await expect(page.getByRole('list', { name: 'Qué espera el grafcet' })).toContainText('falta b1: vale 0')
+  await panel.getByLabel('Avería de B').selectOption('')
+  await expect.poll(() => activeSteps(page), { timeout: 4000 }).not.toBe('s2')
+
+  // Sin planta, «Detectar planta» monta los dos cilindros a partir de los nombres.
+  await panel.getByRole('button', { name: 'Quitar A' }).click()
+  await panel.getByRole('button', { name: 'Quitar B' }).click()
+  await panel.getByRole('button', { name: /Detectar planta: cilindro A, cilindro B/ }).click()
+  await expect(panel.getByRole('img', { name: /Cilindro [AB]/ })).toHaveCount(2)
   expectNoErrors(errors)
 })

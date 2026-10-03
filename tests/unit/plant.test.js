@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { compile, evolve, initialState } from '../../src/lib/sim/engine'
-import { advanceWithPlant, plantAction, plantInit, plantInputNames, plantInputs, plantStep } from '../../src/lib/sim/plant'
+import { advanceWithPlant, detectPlant, plantAction, plantFaults, plantInit, plantInputNames, plantInputs, plantStep, setPlantFault } from '../../src/lib/sim/plant'
 import { buildPlcModel } from '../../src/lib/plcModel'
 import { EMPTY_PLC } from '../../src/lib/addressing'
 import { links, step, transition } from './helpers'
@@ -101,5 +101,29 @@ describe('planta virtual en la simulación', () => {
     ;({ state, inputs, plant } = advanceWithPlant(compiled, { state, inputs, plant }, 2.2, { elements }))
     // A fuera (1 s) y B fuera (0,5 s) y vuelta de B (0,5 s): en X4, recogiendo A.
     expect(compiled.steps.find((s) => state.active.has(s.id)).label).toBe('4')
+  })
+})
+
+describe('planta virtual: detección y averías', () => {
+  it('detecta cilindros por los nombres (A+, A−, a0, a1) sin repetir los que ya hay', () => {
+    const vars = ['A+', 'A-', 'a0', 'a1', 'B+', 'b1', 'Marcha'].map((name) => ({ name }))
+    const found = detectPlant(vars)
+    expect(found.map((e) => [e.name, e.extend, e.retract, e.retracted, e.extended])).toEqual([
+      ['A', 'A+', 'A-', 'a0', 'a1'],
+      ['B', 'B+', '', '', 'b1'], // simple efecto, sin final dentro
+    ])
+    expect(detectPlant(vars, [found[0]]).map((e) => e.name)).toEqual(['B'])
+  })
+
+  it('averías: cilindro atascado y sensor roto', () => {
+    expect(plantFaults(CYL_A).map((f) => f.label)).toEqual(['Cilindro atascado', 'Sensor a0 roto', 'Sensor a1 roto'])
+    let s = setPlantFault(plantInit([CYL_A]), 'A', 'stuck')
+    s = plantStep([CYL_A], s, { 'A+': 1 }, 2)
+    expect(s.A.pos).toBe(0)
+    s = setPlantFault(s, 'A', 'sensor:extended')
+    s = plantStep([CYL_A], s, { 'A+': 1 }, 2)
+    expect(s.A.pos).toBe(1)
+    expect(plantInputs([CYL_A], s)).toEqual({ a0: 0, a1: 0 }) // fuera, pero a1 no lo detecta
+    expect(plantInputs([CYL_A], setPlantFault(s, 'A', ''))).toEqual({ a0: 0, a1: 1 })
   })
 })

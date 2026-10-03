@@ -61,7 +61,8 @@ export function plantStep(elements = [], state, values, dt) {
   const next = { ...state }
   for (const e of elements) {
     const s = state[e.id]
-    if (!s) continue
+    // Avería «atascado»: no se mueve (ni el vástago, ni la cinta, ni el nivel).
+    if (!s || s.fault === 'stuck') continue
     if (e.type === 'cylinder') {
       const out = on(values, e.extend)
       // Simple efecto (sin A−): vuelve con el muelle en cuanto se quita A+.
@@ -86,24 +87,27 @@ export function plantStep(elements = [], state, values, dt) {
 // Entradas que produce la planta. `analogRange(name)` -> { min, max } de una analógica.
 export function plantInputs(elements = [], state, analogRange = () => null) {
   const inputs = {}
-  const set = (name, value) => {
-    if (name) inputs[name] = value
+  let broken = null
+  // Avería «sensor roto» (fault 'sensor:clave'): ese sensor da siempre 0.
+  const set = (name, value, key) => {
+    if (name) inputs[name] = broken === key ? 0 : value
   }
   for (const e of elements) {
     const s = state[e.id]
     if (!s) continue
+    broken = s.fault?.startsWith('sensor:') ? s.fault.slice('sensor:'.length) : null
     if (e.type === 'cylinder') {
-      set(e.retracted, s.pos <= 1 - END ? 1 : 0)
-      set(e.extended, s.pos >= END ? 1 : 0)
+      set(e.retracted, s.pos <= 1 - END ? 1 : 0, 'retracted')
+      set(e.extended, s.pos >= END ? 1 : 0, 'extended')
     }
     if (e.type === 'conveyor') {
-      set(e.sensor, s.pieces.some((p) => p >= CONVEYOR_SENSOR) ? 1 : 0)
-      set(e.entry, s.pieces.some((p) => p <= CONVEYOR_ENTRY) ? 1 : 0)
+      set(e.sensor, s.pieces.some((p) => p >= CONVEYOR_SENSOR) ? 1 : 0, 'sensor')
+      set(e.entry, s.pieces.some((p) => p <= CONVEYOR_ENTRY) ? 1 : 0, 'entry')
     }
     if (e.type === 'tank') {
-      set(e.low, s.level >= TANK_LOW ? 1 : 0)
-      set(e.high, s.level >= TANK_HIGH ? 1 : 0)
-      if (e.level) {
+      set(e.low, s.level >= TANK_LOW ? 1 : 0, 'low')
+      set(e.high, s.level >= TANK_HIGH ? 1 : 0, 'high')
+      if (e.level && broken !== 'level') {
         const range = analogRange(e.level) ?? { min: 0, max: 100 }
         inputs[e.level] = Math.round((range.min + s.level * (range.max - range.min)) * 100) / 100
       }
@@ -126,6 +130,43 @@ export function plantAction(state, id, action) {
   if (action === 'add-piece' && !s.pieces.some((p) => p <= CONVEYOR_ENTRY)) return { ...state, [id]: { ...s, pieces: [...s.pieces, 0] } }
   if (action === 'remove-piece') return { ...state, [id]: { ...s, pieces: s.pieces.filter((p) => p < CONVEYOR_SENSOR) } }
   return state
+}
+
+// Averías que se pueden provocar en un elemento (solo durante la simulación, no se guardan):
+// [{ id, label }]. 'stuck' = atascado; 'sensor:clave' = ese sensor roto (da siempre 0).
+export function plantFaults(element) {
+  const type = PLANT_TYPES[element.type]
+  if (!type || element.type === 'lamp') return []
+  const stuck = { cylinder: 'Cilindro atascado', conveyor: 'Cinta atascada', tank: 'Válvulas atascadas' }[element.type]
+  const sensors = type.inputs.filter((key) => element[key]).map((key) => ({ id: `sensor:${key}`, label: `Sensor ${element[key]} roto` }))
+  return [{ id: 'stuck', label: stuck }, ...sensors]
+}
+export const setPlantFault = (state, id, fault) => (state[id] ? { ...state, [id]: { ...state[id], fault: fault || null } } : state)
+
+// Propone elementos a partir de los nombres de las variables (convenio de la neumática): cada
+// salida «A+» con, si existen, «A−», «a0» y «a1» es un cilindro (sin «A−», de simple efecto).
+// No repite los que ya usan esa salida.
+export function detectPlant(variables, existing = []) {
+  const names = new Set(variables.map((v) => v.name))
+  const used = new Set(existing.flatMap((e) => Object.values(e)))
+  const pick = (...options) => options.find((o) => names.has(o)) ?? ''
+  const found = []
+  for (const v of variables) {
+    if (!v.name.endsWith('+') || used.has(v.name)) continue
+    const n = v.name.slice(0, -1)
+    if (!/^[A-Za-z]\w*$/.test(n)) continue
+    found.push({
+      id: `p${n}`,
+      type: 'cylinder',
+      name: n,
+      ...PLANT_TYPES.cylinder.defaults,
+      extend: v.name,
+      retract: pick(`${n}-`, `${n}−`),
+      retracted: pick(`${n.toLowerCase()}0`, `${n}0`),
+      extended: pick(`${n.toLowerCase()}1`, `${n}1`),
+    })
+  }
+  return found
 }
 
 // Paso máximo de la planta: a velocidades altas el tiempo avanza a saltos y se trocea, para que

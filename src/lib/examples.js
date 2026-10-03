@@ -47,9 +47,16 @@ export const EXAMPLES = [
         'Fc_arriba',
       ])
       nodes.push(
-        note('nota', 520, 0, 'Taladradora\n\nCon pieza y Marcha, la broca baja girando hasta Fc_abajo, repasa 2 s y sube hasta Fc_arriba.'),
+        note(
+          'nota',
+          520,
+          0,
+          'Taladradora\n\nCon pieza y Marcha, la broca baja girando hasta Fc_abajo, repasa 2 s y sube hasta Fc_arriba.\n\nAl simular, la planta virtual mueve la broca y sus finales de carrera.',
+        ),
       )
-      return { nodes, edges }
+      // Planta virtual: la broca como un cilindro vertical (Bajar / Subir).
+      const plant = [{ id: 'broca', type: 'cylinder', name: 'Broca', extend: 'Bajar', retract: 'Subir', retracted: 'Fc_arriba', extended: 'Fc_abajo', time: 1.5 }]
+      return { nodes, edges, plc: { plant } }
     },
   },
   {
@@ -70,8 +77,16 @@ export const EXAMPLES = [
         { actions: ['B-'] },
         'b0',
       ])
-      nodes.push(note('nota', 520, 0, 'Secuencia A+ B+ A− B−\n\nCada movimiento empieza cuando el anterior llega a su final de carrera.'))
-      return { nodes, edges }
+      nodes.push(
+        note(
+          'nota',
+          520,
+          0,
+          'Secuencia A+ B+ A− B−\n\nCada movimiento empieza cuando el anterior llega a su final de carrera.\n\nAl simular, la planta virtual mueve los cilindros: solo hay que pulsar Marcha.',
+        ),
+      )
+      const cylinder = (n) => ({ id: n, type: 'cylinder', name: n, extend: `${n}+`, retract: `${n}-`, retracted: `${n.toLowerCase()}0`, extended: `${n.toLowerCase()}1`, time: 1 })
+      return { nodes, edges, plc: { plant: [cylinder('A'), cylinder('B')] } }
     },
   },
   {

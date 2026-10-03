@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { buildPlcModel } from '../plcModel'
 import { compile, evolve, initialState, inspect, withMacros } from './engine'
 import { recordEvent } from './scenario'
-import { advanceWithPlant, plantAction, plantInit, plantInputs } from './plant'
+import { advanceWithPlant, plantAction, plantInit, plantInputs, setPlantFault } from './plant'
 
 const TICK_MS = 50
 const MAX_LOG = 200
@@ -192,6 +192,19 @@ export function useSimulation(nodes, edges, plc, enabled) {
     [plantElements, analogRange],
   )
 
+  // Averías provocadas (solo en esta simulación): sus sensores cambian al momento.
+  const plantFault = useCallback(
+    (id, fault) => {
+      const current = simRef.current
+      if (!current) return
+      const plantState = setPlantFault({ ...plantInit(plantElements), ...current.plant }, id, fault)
+      const next = { ...current, plant: plantState, inputs: { ...current.inputs, ...plantInputs(plantElements, plantState, analogRange) } }
+      simRef.current = next
+      setSim(next)
+    },
+    [plantElements, analogRange],
+  )
+
   const step = useCallback(() => apply(simRef.current?.state.time ?? 0, { singleStep: true }), [apply])
   const advance = useCallback((seconds) => apply((simRef.current?.state.time ?? 0) + seconds), [apply])
 
@@ -232,5 +245,6 @@ export function useSimulation(nodes, edges, plc, enabled) {
     playScenario,
     plantElements,
     plantDo,
+    plantFault,
   }
 }

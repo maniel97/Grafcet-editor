@@ -306,6 +306,7 @@ export default function SimulationPanel({ simulation, scenarios = [], onScenario
             variables={compiled.variables}
             onChange={onPlantChange}
             onAction={simulation.plantDo}
+            onFault={simulation.plantFault}
             onClose={() => setPlantOpen(false)}
           />
         )}

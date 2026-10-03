@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
-import { ChevronDown, ChevronUp, Factory, Pencil, Plus, Trash2, X } from 'lucide-react'
-import { PLANT_TYPES } from '../lib/sim/plant'
+import { ChevronDown, ChevronUp, Factory, Pencil, Plus, Trash2, WandSparkles, X } from 'lucide-react'
+import { PLANT_TYPES, detectPlant, plantFaults } from '../lib/sim/plant'
 
 const POSITION_KEY = 'grafcet-editor:plant-panel'
 const loadPosition = () => {
@@ -230,13 +230,15 @@ const nextName = (type, elements) => {
 // Planta virtual (lib/sim/plant.js): panel flotante sobre el lienzo durante la simulación, con un
 // dibujo animado de cada elemento y su configuración. Se arrastra por la cabecera, se pliega y
 // recuerda su posición.
-export default function PlantPanel({ elements, plantState, values, variables, onChange, onAction, onClose, extra }) {
+export default function PlantPanel({ elements, plantState, values, variables, onChange, onAction, onFault, onClose }) {
   const [position, setPosition] = useState(() => loadPosition() ?? { x: Math.max(16, window.innerWidth - 360 - 300), y: 72 })
   const [collapsed, setCollapsed] = useState(false)
   const [editing, setEditing] = useState(null)
   const [adding, setAdding] = useState('cylinder')
   const drag = useRef(null)
 
+  // Cilindros que se pueden montar solos a partir de los nombres (A+, A−, a0, a1).
+  const detected = detectPlant(variables, elements)
   const update = (id, element) => onChange(elements.map((e) => (e.id === id ? element : e)))
   const add = () => {
     const id = `p${Date.now().toString(36)}`
@@ -279,7 +281,16 @@ export default function PlantPanel({ elements, plantState, values, variables, on
       </header>
       {!collapsed && (
         <div className="max-h-[70vh] space-y-2 overflow-y-auto p-2">
-          {extra}
+          {detected.length > 0 && (
+            <button
+              type="button"
+              onClick={() => onChange([...elements, ...detected])}
+              title="A partir de los nombres de las variables: cada salida A+ con A−, a0 y a1 es un cilindro"
+              className="flex w-full items-center gap-1.5 rounded border border-blue-300 bg-blue-50 px-2 py-1 text-xs text-blue-800 hover:bg-blue-100"
+            >
+              <WandSparkles size={13} /> Detectar planta: {detected.map((d) => `cilindro ${d.name}`).join(', ')}
+            </button>
+          )}
           {elements.length === 0 && (
             <p className="text-xs text-slate-500">
               Añade cilindros, cintas o depósitos y asígnales las salidas y entradas: la simulación moverá la planta y sus
@@ -317,6 +328,24 @@ export default function PlantPanel({ elements, plantState, values, variables, on
                   </button>
                 </div>
                 <Drawing e={e} s={plantState?.[e.id]} values={values} />
+                {plantFaults(e).length > 0 && (
+                  <label className="flex items-center gap-1 text-[11px]">
+                    <span className="text-slate-500">Avería</span>
+                    <select
+                      value={plantState?.[e.id]?.fault ?? ''}
+                      onChange={(ev) => onFault(e.id, ev.target.value)}
+                      aria-label={`Avería de ${e.name}`}
+                      className={`min-w-0 flex-1 rounded border px-0.5 ${plantState?.[e.id]?.fault ? 'border-red-400 text-red-700' : 'border-slate-300'}`}
+                    >
+                      <option value="">ninguna</option>
+                      {plantFaults(e).map((f) => (
+                        <option key={f.id} value={f.id}>
+                          {f.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                )}
                 {editing === e.id && <ElementEditor element={e} variables={variables} onChange={(x) => update(e.id, x)} />}
               </div>
             )
