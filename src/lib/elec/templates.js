@@ -502,10 +502,30 @@ ELEC_TEMPLATES.push(
   },
 )
 
-// Inserta una plantilla debajo de lo que ya haya (o en el origen).
-export function insertTemplate(template, existing = { components: [] }) {
+// Inserta una plantilla debajo de lo que ya haya en la hoja (o en el origen). Sus identificadores
+// que ya existan en el esquema (all: todos los componentes, de todas las hojas) pasan al siguiente
+// libre (-KM1 -> -KM3…), y con ellos sus contactos, contactos principales y enclavamientos.
+let inserted = 0 // para que dos inserciones seguidas no repitan identificadores internos
+export function insertTemplate(template, existing = { components: [] }, all = existing.components ?? []) {
   const list = existing.components ?? []
   const oy = list.length ? Math.ceil((Math.max(...list.map((c) => c.y)) + 200) / GRID) * GRID : 0
-  const b = template.build(40, oy + 40, `${template.id}-${Date.now().toString(36)}`)
-  return { components: b.components, wires: b.wires }
+  const b = template.build(40, oy + 40, `${template.id}-${Date.now().toString(36)}${(inserted++).toString(36)}`)
+  const used = new Set(all.filter((c) => c.tag && c.type !== 'rail').map((c) => c.tag))
+  const rename = new Map()
+  for (const c of b.components) {
+    if (!c.tag || c.type === 'rail' || rename.has(c.tag) || !used.has(c.tag)) continue
+    const prefix = c.tag.replace(/\d+$/, '')
+    let n = 1
+    while (used.has(`${prefix}${n}`) || [...rename.values()].includes(`${prefix}${n}`)) n++
+    rename.set(c.tag, `${prefix}${n}`)
+  }
+  for (const v of rename.values()) used.add(v)
+  const fix = (t) => (t && rename.has(t) ? rename.get(t) : t)
+  const components = b.components.map((c) => ({
+    ...c,
+    ...(c.tag ? { tag: fix(c.tag) } : {}),
+    ...(c.ref ? { ref: fix(c.ref) } : {}),
+    ...(c.interlock ? { interlock: fix(c.interlock) } : {}),
+  }))
+  return { components, wires: b.wires, renamed: Object.fromEntries(rename) }
 }

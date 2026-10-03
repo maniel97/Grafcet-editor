@@ -29,7 +29,7 @@ const HINTS = {
 // data: { c, view, numbers: [arriba, abajo] (contactos auxiliares), xref: [{ kind, numbers }],
 //         timed, mode: 'edit' | 'use', onAction(id, action) }
 export default function ElecNode({ data }) {
-  const { c, view, numbers, xref, timed, mode, onAction, junctions } = data
+  const { c, view, numbers, xref, where, timed, mode, onAction, junctions } = data
   const { w, h } = sizeOf(c)
   const terminals = terminalsOf(c)
   const use = mode === 'use'
@@ -88,7 +88,10 @@ export default function ElecNode({ data }) {
           {c.text && <div className="text-[10px] text-slate-600">{c.text}</div>}
           {c.type === 'coil' && (c.kind === 'ton' || c.kind === 'tof') && <div className="text-slate-600">{`${c.kind === 'ton' ? 'Conexión' : 'Desconexión'} ${c.preset ?? 0} s`}</div>}
           {c.type === 'sensor3' && <div className="text-slate-600">{`${{ inductive: 'Inductivo', capacitive: 'Capacitivo', optical: 'Óptico' }[c.kind] ?? ''} ${c.output ?? 'PNP'}`}</div>}
-          {xref?.length > 0 && <div className="font-mono text-[9px] text-slate-500">{xref.map((x) => x.numbers.join('-')).join(' · ')}</div>}
+          {/* Referencias cruzadas: bajo la bobina, sus contactos (número y /hoja.columna); bajo el
+              contacto, dónde está su bobina. */}
+          {xref?.length > 0 && <div className="font-mono text-[9px] text-slate-500">{xref.map((x) => `${x.numbers.join('-')} ${x.where ?? ''}`.trim()).join(' · ')}</div>}
+          {where && <div className="font-mono text-[9px] text-slate-500">{where}</div>}
           {c.signal && <div className="font-mono text-[9px] text-blue-700">↔ {c.signal}</div>}
           {view?.motors?.[c.id]?.mode && <div className="text-green-700">{view.motors[c.id].mode}</div>}
           {view?.motors?.[c.id]?.warning && <div className="text-amber-700">{view.motors[c.id].warning}</div>}

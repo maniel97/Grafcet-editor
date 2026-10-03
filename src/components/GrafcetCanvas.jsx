@@ -138,6 +138,17 @@ export default function GrafcetCanvas() {
   const [elecHistory, setElecHistory] = useState(null)
   // Panel que se tocó por última vez: a él van deshacer/rehacer/copiar/pegar de la barra.
   const [lastPanel, setLastPanel] = useState(null)
+  // Cajetín del esquema eléctrico: los mismos datos que el del PDF (la fecha, la de hoy si no hay).
+  const [today] = useState(() => new Date().toLocaleDateString('es-ES'))
+  const elecTitle = useMemo(
+    () => ({
+      project: projectName,
+      author: plc.titleBlock?.author ?? '',
+      company: plc.titleBlock?.company ?? '',
+      date: plc.titleBlock?.date || today,
+    }),
+    [projectName, plc.titleBlock, today],
+  )
   const activeSceneHistory = lastPanel === 'elec' && elecView && elecHistory ? elecHistory : simulating && sceneView ? sceneHistory : null
   // Bloqueo de edición (candado de los controles): solo mirar, desplazar y hacer zoom.
   const [editLocked, setEditLocked] = useState(false)
@@ -1054,6 +1065,7 @@ export default function GrafcetCanvas() {
                 buildVariables={() => buildPlcModel(nodes, edges, plc).variables}
                 scene={plc.scene}
                 simulating={simulating}
+                titleInfo={elecTitle}
                 onHistory={setElecHistory}
                 onActivate={() => setLastPanel('elec')}
                 maximized={elecView === 'full'}

@@ -4,12 +4,16 @@ import { AlertTriangle, Minus, Plus, Maximize2, Minimize2, MousePointer2, Hand, 
 import ElecNode from './ElecNode'
 import { ElecSymbol } from './ElecSymbols'
 import { potentialColor } from './elecColors'
-import { ELEC_TYPES, GRID, POTENTIALS, contactNumbers, crossReferences, nextTag, showTag, sizeOf, terminalsOf } from '../../lib/elec/catalog'
+import { ELEC_TYPES, GRID, POTENTIALS, contactNumbers, nextTag, showTag, sizeOf, terminalsOf } from '../../lib/elec/catalog'
+import { COLUMN_WIDTH, FRAME_HEIGHT, FRAME_TOP, crossReferenceMap, elecSheetsOf, frameColumns, sheetOfComponent } from '../../lib/elec/sheet'
+import SheetTabs from '../SheetTabs'
+import { ElecFrameNode } from './ElecFrame'
 import { generatePlcWiring } from '../../lib/elec/generate'
 import { ELEC_TEMPLATES, insertTemplate } from '../../lib/elec/templates'
 import { WIRE_COLORS, WIRE_SECTIONS, junctions as findJunctions, nextTerminalNumber, sectionWidth, wireNumbers } from '../../lib/elec/wiring'
 
-const nodeTypes = { elec: ElecNode }
+const nodeTypes = { elec: ElecNode, elecframe: ElecFrameNode }
+const FRAME_NODE = 'elec-frame'
 const EMPTY = { enabled: false, components: [], wires: [] }
 const HISTORY_LIMIT = 100
 const DRAG_TYPE = 'application/x-grafcet-elec'
@@ -227,10 +231,25 @@ export default function ElectricalView(props) {
   )
 }
 
-function Inner({ schematic, onChange, elecState, onAction, variables = [], buildVariables, scene, simulating, onHistory, onActivate, maximized, onToggleMaximize, onClose }) {
+function Inner({ schematic, onChange, elecState, onAction, variables = [], buildVariables, scene, simulating, onHistory, onActivate, maximized, onToggleMaximize, onClose, titleInfo = {} }) {
   const sch = schematic ?? EMPTY
-  const components = useMemo(() => sch.components ?? [], [sch.components])
-  const wires = useMemo(() => sch.wires ?? [], [sch.wires])
+  const allComponents = useMemo(() => sch.components ?? [], [sch.components])
+  const allWires = useMemo(() => sch.wires ?? [], [sch.wires])
+  // Hojas: se dibuja (y se edita) la actual; la simulación tiene en cuenta todas.
+  const sheets = elecSheetsOf(sch)
+  const [sheetChoice, setSheetChoice] = useState(sheets[0].id)
+  const sheetId = sheets.some((s) => s.id === sheetChoice) ? sheetChoice : sheets[0].id
+  const components = useMemo(() => allComponents.filter((c) => sheetOfComponent(sch, c) === sheetId), [allComponents, sch, sheetId])
+  const wires = useMemo(() => {
+    const here = new Set(components.map((c) => c.id))
+    return allWires.filter((w) => here.has(w.from.c) && here.has(w.to.c))
+  }, [allWires, components])
+  // Lo de las otras hojas no se toca al guardar los cambios de esta.
+  const others = useMemo(() => allComponents.filter((c) => sheetOfComponent(sch, c) !== sheetId), [allComponents, sch, sheetId])
+  const otherWires = useMemo(() => {
+    const here = new Set(components.map((c) => c.id))
+    return allWires.filter((w) => !(here.has(w.from.c) && here.has(w.to.c)))
+  }, [allWires, components])
   const { screenToFlowPosition, fitView, getNodes, zoomIn, zoomOut } = useReactFlow()
   const wrapperRef = useRef(null)
   // Al empezar o acabar la simulación, Usar o Editar (se puede cambiar a mano).
@@ -282,7 +301,11 @@ function Inner({ schematic, onChange, elecState, onAction, variables = [], build
     h.past = [...h.past.slice(-(HISTORY_LIMIT - 1)), sch]
     h.future = []
     setHistorySize({ past: h.past.length, future: 0 })
-    onChange({ ...sch, ...next })
+    // next.components / next.wires son los de la hoja actual (lo nuevo, a esta hoja).
+    const merged = { ...sch, ...next }
+    if (next.components) merged.components = [...others, ...next.components.map((c) => (c.sheet ? c : { ...c, sheet: sheetId }))]
+    if (next.wires) merged.wires = [...otherWires, ...next.wires]
+    onChange(merged)
   }
   const travel = (from, to) => {
     const h = history.current
@@ -370,7 +393,7 @@ function Inner({ schematic, onChange, elecState, onAction, variables = [], build
       map.set(c.id, id)
       const prefix = ELEC_TYPES[c.type]?.prefix
       const tag = c.type === 'contact' || c.type === 'maincontacts' || c.type === 'rail' ? c.tag : nextTag(all, (c.tag ?? '').replace(/\d+$/, '') || prefix)
-      const copyC = { ...c, id, x: c.x + 40, y: c.y + 40, tag }
+      const copyC = { ...c, id, x: c.x + 40, y: c.y + 40, tag, sheet: sheetId }
       all = [...all, copyC]
       return copyC
     })
@@ -410,7 +433,8 @@ function Inner({ schematic, onChange, elecState, onAction, variables = [], build
   const numbers = useMemo(() => contactNumbers(components), [components])
   const joints = useMemo(() => findJunctions(sch), [sch])
   const wireLabels = useMemo(() => (sch.wireNumbers ? wireNumbers(sch) : {}), [sch])
-  const xrefs = useMemo(() => crossReferences(components), [components])
+  // Referencias cruzadas con hoja y columna (de todo el esquema, no solo de esta hoja).
+  const xrefMap = useMemo(() => crossReferenceMap(sch, contactNumbers(allComponents)), [sch, allComponents])
   const timers = useMemo(() => new Set(components.filter((c) => c.type === 'coil' && (c.kind === 'ton' || c.kind === 'tof')).map((c) => c.tag)), [components])
   const act = useCallback((id, action) => onAction?.(id, action), [onAction])
   const nodes = useMemo(
@@ -423,7 +447,8 @@ function Inner({ schematic, onChange, elecState, onAction, variables = [], build
           c,
           view,
           numbers: numbers[c.id],
-          xref: xrefs[c.tag],
+          xref: xrefMap.byTag[c.tag],
+          where: xrefMap.ownerOf[c.id],
           timed: c.type === 'contact' && timers.has(c.ref),
           mode,
           onAction: act,
@@ -438,8 +463,34 @@ function Inner({ schematic, onChange, elecState, onAction, variables = [], build
         // llegan en cada paso de la simulación hasta volver a medirlos).
         measured: (({ w, h }) => ({ width: w, height: h }))(sizeOf(c)),
       })),
-    [components, dragPos, view, numbers, xrefs, timers, mode, act, selected, joints],
+    [components, dragPos, view, numbers, xrefMap, timers, mode, act, selected, joints],
   )
+  // Marco de la hoja (detrás de todo).
+  const cols = frameColumns(sch)
+  const frameNode = useMemo(
+    () =>
+      sch.frame
+        ? [
+            {
+              id: FRAME_NODE,
+              type: 'elecframe',
+              position: { x: 0, y: -FRAME_TOP },
+              data: {
+                cols,
+                info: { ...titleInfo, sheet: sheets.find((s) => s.id === sheetId)?.name, index: sheets.findIndex((s) => s.id === sheetId) + 1, count: sheets.length },
+              },
+              draggable: false,
+              selectable: false,
+              connectable: false,
+              focusable: false,
+              zIndex: -1,
+              measured: { width: cols * COLUMN_WIDTH, height: FRAME_HEIGHT + FRAME_TOP },
+            },
+          ]
+        : [],
+    [sch.frame, cols, titleInfo, sheets, sheetId],
+  )
+  const allNodes = useMemo(() => [...frameNode, ...nodes], [frameNode, nodes])
   const edges = useMemo(
     () =>
       wires.map((w) => {
@@ -510,7 +561,7 @@ function Inner({ schematic, onChange, elecState, onAction, variables = [], build
       setMessage({ kind: 'warn', text: 'Ninguna entrada ni salida tiene dirección: asígnalas en Variables («Rellenar vacías»).' })
       return
     }
-    const r = generatePlcWiring(vars, scene, sch)
+    const r = generatePlcWiring(vars, scene, { components, wires })
     save({ components: [...components, ...r.components], wires: [...wires, ...r.wires], enabled: true })
     setMessage({
       kind: r.skipped.length ? 'warn' : 'ok',
@@ -625,6 +676,10 @@ function Inner({ schematic, onChange, elecState, onAction, variables = [], build
           <WandSparkles size={12} /> <span className="hidden @2xl:inline">Conexiones del autómata</span>
           <span className="@2xl:hidden">Autómata</span>
         </button>
+        <label className="flex items-center gap-1 rounded border border-slate-300 px-2 py-0.5" title="Marco de la hoja: columnas numeradas (para las referencias cruzadas /hoja.columna) y cajetín">
+          <input type="checkbox" checked={Boolean(sch.frame)} onChange={(e) => save({ frame: e.target.checked })} />
+          Marco
+        </label>
         <label className="flex items-center gap-1 rounded border border-slate-300 px-2 py-0.5" title="Un número por red equipotencial (los de los embarrados, su potencial)">
           <input type="checkbox" checked={Boolean(sch.wireNumbers)} onChange={(e) => save({ wireNumbers: e.target.checked })} />
           Nº de cable
@@ -637,7 +692,7 @@ function Inner({ schematic, onChange, elecState, onAction, variables = [], build
             onChange={(e) => {
               const t = ELEC_TEMPLATES.find((x) => x.id === e.target.value)
               if (!t) return
-              const r = insertTemplate(t, sch)
+              const r = insertTemplate(t, { components }, allComponents)
               save({ components: [...components, ...r.components], wires: [...wires, ...r.wires] })
               setMessage({ kind: 'ok', text: `${t.title}: ${t.description}` })
               requestAnimationFrame(() => requestAnimationFrame(() => fitView({ padding: 0.15 })))
@@ -743,7 +798,7 @@ function Inner({ schematic, onChange, elecState, onAction, variables = [], build
               e.preventDefault()
               add(item, screenToFlowPosition({ x: e.clientX, y: e.clientY }))
             }}
-            nodes={nodes}
+            nodes={allNodes}
             edges={edges}
             nodeTypes={nodeTypes}
             onNodesChange={onNodesChange}
@@ -772,6 +827,43 @@ function Inner({ schematic, onChange, elecState, onAction, variables = [], build
           >
             <Background variant={BackgroundVariant.Dots} gap={GRID} size={1} color="#cbd5e1" />
           </ReactFlow>
+          <SheetTabs
+            sheets={sheets}
+            current={sheetId}
+            counts={new Map(sheets.map((s) => [s.id, allComponents.filter((c) => sheetOfComponent(sch, c) === s.id).length]))}
+            onSelect={(id) => {
+              setSheetChoice(id)
+              setSelected([])
+              setSelectedWires([])
+              requestAnimationFrame(() => requestAnimationFrame(() => getNodes().length && fitView({ padding: 0.15 })))
+            }}
+            onAdd={() => {
+              const used = new Set(sheets.map((s) => s.id))
+              let n = sheets.length + 1
+              while (used.has(`e${n}`)) n++
+              const sheet = { id: `e${n}`, name: `Hoja ${sheets.length + 1}` }
+              save({ sheets: [...sheets, sheet], components: [...components] })
+              setSheetChoice(sheet.id)
+            }}
+            onRename={(id, name) => save({ sheets: sheets.map((s) => (s.id === id ? { ...s, name } : s)) })}
+            onDelete={(id) => {
+              const gone = new Set(allComponents.filter((c) => sheetOfComponent(sch, c) === id).map((c) => c.id))
+              const rest = sheets.filter((s) => s.id !== id)
+              const h = history.current
+              h.past = [...h.past.slice(-(HISTORY_LIMIT - 1)), sch]
+              h.future = []
+              setHistorySize({ past: h.past.length, future: 0 })
+              onChange({
+                ...sch,
+                sheets: rest,
+                // Lo que quedara sin hoja (de la primera, por defecto), a la primera que queda.
+                components: allComponents.filter((c) => !gone.has(c.id)).map((c) => (c.sheet ? c : { ...c, sheet: sheets[0].id })),
+                wires: allWires.filter((w) => !gone.has(w.from.c) && !gone.has(w.to.c)),
+              })
+              setSheetChoice(rest[0].id)
+            }}
+            readOnly={mode !== 'edit'}
+          />
           {components.length === 0 && (
             <p className="pointer-events-none absolute inset-x-0 top-1/3 px-6 text-center text-sm text-slate-500">
               Añade embarrados y aparatos desde la paleta y únelos arrastrando de borne a borne, o pulsa «Conexiones del autómata» para crear el cableado del autómata desde la tabla de variables.
