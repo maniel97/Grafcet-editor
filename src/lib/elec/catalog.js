@@ -45,6 +45,11 @@ const threePoles = (h = 80) =>
     { id: String(2 * i + 2), x: 20 + 40 * i, y: h, side: 'bottom' },
   ])
 
+// Motores (lo que gira y mueve la planta) y bornes de los de dos velocidades.
+export const MOTORS = new Set(['motor3', 'motor6', 'motor1', 'dahlander', 'motor2w'])
+export const isMotor = (type) => MOTORS.has(type)
+const TWO_SPEED = ['1U', '1V', '1W', '2U', '2V', '2W']
+
 // Conexión neumática (se une con tubos, no con cables).
 const pneu = (id, x, y, side) => ({ id, x, y, side, pneu: true })
 // Válvulas: una casilla por posición (80 px), con el accionamiento a cada lado (40 px). Las
@@ -331,6 +336,40 @@ export const ELEC_TYPES = {
       ...['U1', 'V1', 'W1'].map((id, i) => ({ id, x: 20 + 40 * i, y: 0, side: 'top' })),
       ...['W2', 'U2', 'V2'].map((id, i) => ({ id, x: 20 + 40 * i, y: 120, side: 'bottom' })),
     ],
+  },
+  // Motor monofásico: devanado principal U1-U2 y auxiliar Z1-Z2 con su condensador (permanente, o de
+  // arranque: desconectado el auxiliar, sigue girando). El sentido, por cómo se conecta el auxiliar.
+  motor1: {
+    label: 'Motor monofásico con condensador',
+    group: 'Potencia',
+    prefix: 'M',
+    defaults: { capacitor: 'permanent', signal: '', reverse: '', text: '' },
+    size: () => ({ w: 120, h: 100 }),
+    terminals: () => [
+      { id: 'U1', x: 20, y: 0, side: 'top' },
+      { id: 'U2', x: 40, y: 0, side: 'top' },
+      { id: 'Z1', x: 80, y: 0, side: 'top' },
+      { id: 'Z2', x: 100, y: 0, side: 'top' },
+    ],
+  },
+  // Motor Dahlander (un devanado, dos velocidades 1:2): lenta en triángulo por 1U-1V-1W (2U-2V-2W
+  // libres); rápida en doble estrella por 2U-2V-2W con 1U-1V-1W puenteados.
+  dahlander: {
+    label: 'Motor Dahlander (2 velocidades)',
+    group: 'Potencia',
+    prefix: 'M',
+    defaults: { signal: '', reverse: '', text: '' },
+    size: () => ({ w: 260, h: 100 }),
+    terminals: () => TWO_SPEED.map((id, i) => ({ id, x: 20 + 40 * i + (i > 2 ? 20 : 0), y: 0, side: 'top' })),
+  },
+  // Motor de dos devanados separados: lenta por 1U-1V-1W, rápida por 2U-2V-2W (nunca los dos).
+  motor2w: {
+    label: 'Motor de dos devanados',
+    group: 'Potencia',
+    prefix: 'M',
+    defaults: { signal: '', reverse: '', text: '' },
+    size: () => ({ w: 260, h: 100 }),
+    terminals: () => TWO_SPEED.map((id, i) => ({ id, x: 20 + 40 * i + (i > 2 ? 20 : 0), y: 0, side: 'top' })),
   },
   // Borna de una regleta (-X1:1, -X1:2…): une su borne de arriba con el de abajo. kind: 'pe' (tierra).
   terminal: {

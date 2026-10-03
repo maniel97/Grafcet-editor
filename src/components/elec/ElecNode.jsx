@@ -1,7 +1,7 @@
 import { Handle, Position } from '@xyflow/react'
 import { ElecSymbol } from './ElecSymbols'
 import { INK, POTENTIAL_COLORS } from './elecColors'
-import { ELEC_TYPES, POTENTIALS, isPneumatic, showTag, sizeOf, terminalsOf } from '../../lib/elec/catalog'
+import { ELEC_TYPES, POTENTIALS, isMotor, isPneumatic, showTag, sizeOf, terminalsOf } from '../../lib/elec/catalog'
 
 // Lo que se acciona con el ratón al simular (modo Usar).
 const MOMENTARY = new Set(['pushbutton', 'litbutton'])
@@ -125,7 +125,7 @@ export default function ElecNode({ data }) {
           {view?.motors?.[c.id]?.mode && <div className="text-green-700">{view.motors[c.id].mode}</div>}
           {view?.motors?.[c.id]?.warning && <div className="text-amber-700">{view.motors[c.id].warning}</div>}
           {view?.tripped?.[c.id] && <div className="font-semibold text-red-700">{c.type === 'fuse' ? 'Fundido' : 'Disparado'}</div>}
-          {fault && <div className="font-semibold text-red-700">{fault === 'welded' ? 'Avería: soldado' : ['coil', 'valve', 'lamp', 'buzzer', 'brake', 'motor3', 'motor6'].includes(c.type) ? 'Avería: cortado' : c.type === 'terminal' ? 'Avería: borna floja' : 'Avería: quemado'}</div>}
+          {fault && <div className="font-semibold text-red-700">{fault === 'welded' ? 'Avería: soldado' : ['coil', 'valve', 'lamp', 'buzzer', 'brake'].includes(c.type) || isMotor(c.type) ? 'Avería: cortado' : c.type === 'terminal' ? 'Avería: borna floja' : 'Avería: quemado'}</div>}
           {c.type === 'counter' && <div className="text-slate-600">{`Preselección ${c.preset ?? 1}`}</div>}
           {c.type === 'coil' && c.kind === 'flash' && <div className="text-slate-600">{`Intermitente ${c.preset ?? 1} s`}</div>}
           {c.type === 'coil' && c.kind === 'impulse' && <div className="text-slate-600">Telerruptor</div>}
@@ -141,6 +141,7 @@ export default function ElecNode({ data }) {
           {c.type === 'pvalve' && <div className="text-slate-600">{`${c.ways ?? '5/2'} ${c.ways === '5/3' ? `centro ${{ closed: 'cerrado', exhaust: 'a escape', pressure: 'a presión' }[c.center] ?? 'cerrado'}` : c.sol12 ? 'biestable' : c.ways === '3/2' && c.normally === 'NO' ? 'NA' : 'monoestable'}`}</div>}
           {c.type === 'throttle' && <div className="text-slate-600">{`Abierto ${Math.round((view?.knob?.[c.id] ?? Number(c.setting ?? 0.5)) * 100)} %`}</div>}
           {c.type === 'airsource' && air?.leaks && <div className="font-semibold text-amber-700">Fuga: el aire sale por un escape</div>}
+          {c.type === 'motor1' && <div className="text-slate-600">{c.capacitor === 'start' ? 'Condensador de arranque' : 'Condensador permanente'}</div>}
           {view?.motors?.[c.id]?.running && view.motors[c.id].speed < 1 && <div className="text-green-700">{`${Math.round(view.motors[c.id].speed * 100)} % de velocidad`}</div>}
         </div>
       )}

@@ -86,6 +86,59 @@ function ThreePoles({ closed, fixedMark, thermal = false, tripped = false }) {
   )
 }
 
+// Monofásico: principal U1-U2 y auxiliar Z1-Z2 con su condensador (dibujado en el hilo Z1).
+function SinglePhaseMotor({ c, m }) {
+  const color = m?.running ? LIVE : INK
+  return (
+    <g fill="none" stroke={INK} strokeWidth="2">
+      <path d="M 20 0 L 20 30 L 45 47 M 40 0 L 40 30 L 52 40 M 100 0 L 100 30 L 80 44" />
+      {/* Condensador en serie con el auxiliar (Z1) */}
+      <path d="M 80 0 L 80 20 M 72 20 L 88 20 M 72 25 L 88 25 M 80 25 L 80 30 L 70 40" />
+      {c.capacitor === 'start' && <text x="60" y="26" textAnchor="end" fontSize="7" fill={INK} stroke="none">arr.</text>}
+      <circle cx="60" cy="62" r="24" fill="white" stroke={color} strokeWidth={m?.running ? 3 : 2} />
+      <text x="60" y="60" textAnchor="middle" fontSize="14" fontWeight="700" fill={INK} stroke="none">
+        M
+      </text>
+      <text x="60" y="75" textAnchor="middle" fontSize="10" fill={INK} stroke="none">
+        1~
+      </text>
+      {m?.running && (
+        <text x="90" y="70" fontSize="16" fill={LIVE} stroke="none">
+          {m.dir > 0 ? '↻' : '↺'}
+        </text>
+      )}
+    </g>
+  )
+}
+
+// Dos velocidades (Dahlander o dos devanados): seis bornes que llegan al motor.
+function TwoSpeedMotor({ c, m }) {
+  const color = m?.running ? LIVE : INK
+  const xs = [20, 60, 100, 160, 200, 240]
+  return (
+    <g fill="none" stroke={INK} strokeWidth="2">
+      {xs.map((x, i) => (
+        <path key={x} d={`M ${x} 0 L ${x} 24 L ${130 + (i - 2.5) * 7} 42`} strokeWidth="1.6" />
+      ))}
+      <circle cx="130" cy="64" r="24" fill="white" stroke={color} strokeWidth={m?.running ? 3 : 2} />
+      <text x="130" y="62" textAnchor="middle" fontSize="14" fontWeight="700" fill={INK} stroke="none">
+        M
+      </text>
+      <text x="130" y="77" textAnchor="middle" fontSize="10" fill={INK} stroke="none">
+        3~
+      </text>
+      <text x="130" y="100" textAnchor="middle" fontSize="8" fill="#334155" stroke="none">
+        {c.type === 'dahlander' ? 'Dahlander' : '2 devanados'}
+      </text>
+      {m?.running && (
+        <text x="160" y="72" fontSize="16" fill={LIVE} stroke="none">
+          {m.dir > 0 ? '↻' : '↺'}
+        </text>
+      )}
+    </g>
+  )
+}
+
 function Motor({ c, m }) {
   const six = c.type === 'motor6'
   const color = m?.running ? LIVE : INK
@@ -562,6 +615,11 @@ export function ElecSymbol({ c, view }) {
     case 'motor3':
     case 'motor6':
       return <Motor c={c} m={view?.motors?.[c.id]} />
+    case 'motor1':
+      return <SinglePhaseMotor c={c} m={view?.motors?.[c.id]} />
+    case 'dahlander':
+    case 'motor2w':
+      return <TwoSpeedMotor c={c} m={view?.motors?.[c.id]} />
     case 'plc':
       return <Plc c={c} s={view} />
     default:

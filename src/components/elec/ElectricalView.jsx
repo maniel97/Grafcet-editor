@@ -5,7 +5,7 @@ import ElecNode from './ElecNode'
 import WireEdge from './WireEdge'
 import { ElecSymbol } from './ElecSymbols'
 import { potentialColor } from './elecColors'
-import { ELEC_TYPES, GRID, LOWER_RAILS, POTENTIALS, contactNumbers, cylinderSignals, isPneumatic, newTag, nextTag, showTag, sizeOf, terminalsOf } from '../../lib/elec/catalog'
+import { ELEC_TYPES, GRID, LOWER_RAILS, POTENTIALS, contactNumbers, cylinderSignals, isMotor, isPneumatic, newTag, nextTag, showTag, sizeOf, terminalsOf } from '../../lib/elec/catalog'
 import { COLUMN_WIDTH, FRAME_HEIGHT, FRAME_TOP, crossReferenceMap, elecSheetsOf, frameColumns, sheetOfComponent } from '../../lib/elec/sheet'
 import SheetTabs from '../SheetTabs'
 import { ElecFrameNode } from './ElecFrame'
@@ -141,6 +141,9 @@ const HINTS = {
   maincontacts: 'Contactos principales (1-2, 3-4, 5-6) de un contactor.',
   motor3: 'Motor trifásico U V W: el orden de las fases da el sentido de giro.',
   motor6: 'Motor con las seis puntas: arranque estrella-triángulo.',
+  motor1: 'Motor monofásico: principal U1-U2 y auxiliar Z1-Z2 con condensador. Sin el auxiliar no arranca (zumba); para invertir el giro se cambia la conexión del auxiliar.',
+  dahlander: 'Motor Dahlander: lenta (triángulo) alimentando 1U-1V-1W; rápida (doble estrella) alimentando 2U-2V-2W con 1U-1V-1W puenteados. Nunca las dos a la vez.',
+  motor2w: 'Motor de dos devanados separados: lenta por 1U-1V-1W, rápida por 2U-2V-2W. Nunca los dos a la vez.',
   plc: 'Autómata: entradas I (con 1M a M) y salidas Q por relé (1L común).',
   selector3: 'Conmutador de 3 posiciones: en 1 cierra 13-14 y en 2, 23-24 (p. ej. manual / 0 / automático).',
   sensor3: 'Detector de proximidad de 3 hilos: BN (+), BU (−) y BK (salida). PNP da + a la entrada; NPN, −. Necesita su alimentación.',
@@ -190,6 +193,9 @@ const NORMS = {
   maincontacts: 'Lleva el identificador del contactor (-KM) · 1-2, 3-4, 5-6.',
   motor3: 'Identificador -M · bornes U, V, W.',
   motor6: 'Identificador -M · U1 V1 W1 / U2 V2 W2.',
+  motor1: 'Identificador -M · principal U1-U2, auxiliar Z1-Z2 (IEC 60034-8); condensador -C.',
+  dahlander: 'Identificador -M · 1U 1V 1W (lenta) / 2U 2V 2W (rápida), IEC 60034-8.',
+  motor2w: 'Identificador -M · 1U 1V 1W / 2U 2V 2W, IEC 60034-8.',
   plc: 'Identificador -A · entradas I con común 1M; salidas por relé Q con común 1L.',
   selector3: 'Identificador -S · 13-14 (posición 1) y 23-24 (posición 2).',
   sensor3: 'Identificador -B · cables BN marrón (+), BU azul (−), BK negro (salida), IEC 60947-5-2.',
@@ -1123,7 +1129,7 @@ const field = 'mt-0.5 w-full rounded border border-slate-300 px-1.5 py-0.5'
 
 // Menú de averías de un aparato o de un cable (junto al ratón).
 function FaultMenu({ menu, component, current, onPick, onClose }) {
-  const loads = ['coil', 'valve', 'lamp', 'buzzer', 'brake', 'motor3', 'motor6']
+  const loads = ['coil', 'valve', 'lamp', 'buzzer', 'brake', 'motor3', 'motor6', 'motor1', 'dahlander', 'motor2w']
   const contacts = ['pushbutton', 'switch', 'limit', 'litbutton', 'contact', 'emergency', 'doorswitch', 'maincontacts']
   const options = menu.wire
     ? [['cut', 'Cable cortado']]
@@ -1199,7 +1205,7 @@ function WireProperties({ wire, number, onChange, onDelete }) {
 // Propiedades del componente seleccionado.
 function Properties({ c, components, variables, onChange, onDelete }) {
   const t = ELEC_TYPES[c.type]
-  const isLoad = ['coil', 'valve', 'lamp', 'motor3', 'motor6', 'buzzer', 'brake', 'pcylinder'].includes(c.type)
+  const isLoad = ['coil', 'valve', 'lamp', 'buzzer', 'brake', 'pcylinder'].includes(c.type) || isMotor(c.type)
   const isContact = ['pushbutton', 'switch', 'limit', 'emergency', 'sensor3', 'litbutton', 'doorswitch', 'lightcurtain', 'transmitter'].includes(c.type)
   const signals = variables.filter((v) =>
     c.type === 'transmitter' ? v.type === 'analogIn' : isLoad ? v.type === 'output' : v.type !== 'output' && v.type !== 'analogIn' && v.type !== 'analogOut',
@@ -1420,7 +1426,12 @@ function Properties({ c, components, variables, onChange, onDelete }) {
       )}
       {(isContact || isLoad) &&
         signalSelect('signal', c.type === 'transmitter' ? 'Mide en la planta (analógica)' : c.type === 'pcylinder' ? 'Al salir, mueve en la planta' : isLoad ? 'Mueve en la planta' : c.type === 'doorswitch' ? 'Puerta abierta en la planta' : 'Lo acciona en la planta')}
-      {(c.type === 'motor3' || c.type === 'motor6') && signalSelect('reverse', 'Giro inverso en la planta')}
+      {isMotor(c.type) && signalSelect('reverse', 'Giro inverso en la planta')}
+      {c.type === 'motor1' &&
+        select('capacitor', 'Condensador', [
+          ['permanent', 'Permanente'],
+          ['start', 'De arranque (con interruptor centrífugo)'],
+        ])}
       {c.type === 'pcylinder' && c.acting !== 'single' && signalSelect('reverse', 'Al entrar, mueve en la planta')}
       {c.type !== 'rail' && text('text', 'Descripción')}
       <button type="button" onClick={onDelete} className="flex items-center gap-1 rounded border border-red-200 px-2 py-0.5 text-red-700 hover:bg-red-50">

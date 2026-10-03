@@ -13,7 +13,7 @@
 //     (magnetotérmico, guardamotor o fusible; si es una derivación a tierra, el diferencial); sin
 //     protección, se avisa y todo queda sin tensión.
 // Puro: se prueba sin navegador.
-import { POTENTIALS, isSecondary, terminalsOf } from './catalog'
+import { POTENTIALS, isMotor, isSecondary, terminalsOf } from './catalog'
 import { pneuStep } from './pneumatic'
 
 const key = (c, t) => `${c}:${t}`
@@ -40,7 +40,7 @@ const WELDABLE = {
 // Lo que puede averiarse, para una avería al azar: contactos (quemados o soldados), cargas
 // (cortadas o fundidas) y cables (cortados).
 const CONTACTS = new Set(Object.keys(WELDABLE))
-const LOADS = new Set(['coil', 'valve', 'lamp', 'buzzer', 'brake', 'motor3', 'motor6'])
+const LOADS = new Set(['coil', 'valve', 'lamp', 'buzzer', 'brake', 'motor3', 'motor6', 'motor1', 'dahlander', 'motor2w'])
 
 // Una avería al azar (rand: () => 0..1): { id, fault }.
 export function randomFault(schematic, rand = Math.random) {
@@ -71,7 +71,7 @@ export function voltageBetween(a, b) {
 export function elecInit() {
   // faults: averías provocadas { [componente o cable]: 'open' | 'welded' | 'cut' }; hidden: si se
   // han puesto al azar sin decir dónde (para practicar el diagnóstico con el polímetro).
-  return { pressed: {}, latched: {}, opened: {}, tripped: {}, pos: {}, coils: {}, timers: {}, counts: {}, impulse: {}, safety: {}, safetyReset: {}, knob: {}, faults: {}, hidden: false, pneu: {}, pneuSignals: {}, view: null }
+  return { pressed: {}, latched: {}, opened: {}, tripped: {}, pos: {}, coils: {}, timers: {}, counts: {}, impulse: {}, safety: {}, safetyReset: {}, knob: {}, faults: {}, hidden: false, pneu: {}, pneuSignals: {}, spinning: {}, view: null }
 }
 
 const components = (schematic) => schematic?.components ?? []
@@ -552,7 +552,8 @@ export function elecStep(schematic, state, { physical = {}, analog = {}, plcOut 
     faults: s.hidden ? {} : s.faults,
     hiddenFaults: s.hidden && Object.keys(s.faults).length > 0,
   }
-  const after = { ...s, tripped, coils: devices, timers, impulse, counts, safety, safetyReset }
+  const spinning = {} // sentido de giro de cada motor (el monofásico de arranque lo necesita)
+  const after = { ...s, tripped, coils: devices, timers, impulse, counts, safety, safetyReset, spinning }
   const deviceOn = deviceOnWith(devices, timers, impulse, counts)
   for (const c of list) {
     for (const t of terminalsOf(c)) {
@@ -582,10 +583,12 @@ export function elecStep(schematic, state, { physical = {}, analog = {}, plcOut 
     if (c.type === 'vfd') loads[c.id] = Boolean(devices[`V:${c.id}`])
     if (c.type === 'softstarter') loads[c.id] = Boolean(devices[`SS:${c.id}`])
     if (c.type === 'counter') loads[c.id] = Boolean(devices[`C:${c.tag}`])
-    if (c.type === 'motor3' || c.type === 'motor6') {
-      const m = s.faults[c.id] === 'open' ? { running: false, dir: 0, mode: null, warning: null } : motorState(c, (t) => pot(c.id, t), (t) => root(c.id, t))
-      const speed = speedByRoot.get(root(c.id, c.type === 'motor6' ? 'U1' : 'U')) ?? 1
+    if (isMotor(c.type)) {
+      const m = s.faults[c.id] === 'open' ? { running: false, dir: 0, mode: null, warning: null } : motorState(c, (t) => pot(c.id, t), (t) => root(c.id, t), s.spinning[c.id] ?? 0)
+      const first = terminalsOf(c)[0].id
+      const speed = (speedByRoot.get(root(c.id, first)) ?? 1) * (m.speed ?? 1)
       motors[c.id] = { ...m, speed: m.running ? speed : 0 }
+      spinning[c.id] = m.running ? m.dir : 0
       if (c.signal) actuators[c.signal] = m.running ? speed : 0
       if (c.reverse) actuators[c.reverse] = m.running && m.dir < 0 ? 1 : 0
     }
@@ -624,7 +627,9 @@ export function elecStep(schematic, state, { physical = {}, analog = {}, plcOut 
 // Motor trifásico: gira con las tres fases distintas; el sentido, por el orden de las fases.
 // Estrella-triángulo: en estrella si U2, V2 y W2 están unidos; en triángulo si cada devanado
 // queda entre dos fases.
-function motorState(c, potOf, rootOf) {
+function motorState(c, potOf, rootOf, spinning = 0) {
+  if (c.type === 'motor1') return singlePhase(c, potOf, spinning)
+  if (c.type === 'dahlander' || c.type === 'motor2w') return twoSpeed(c, potOf, rootOf)
   const sixWire = c.type === 'motor6'
   const [u, v, w] = (sixWire ? ['U1', 'V1', 'W1'] : ['U', 'V', 'W']).map(potOf)
   const { distinct, dir } = phaseOrder(u, v, w)
@@ -642,3 +647,41 @@ function motorState(c, potOf, rootOf) {
   return { running: Boolean(mode), dir: mode ? dir : 0, mode, warning: count && !mode ? 'Sin conexión válida (ni estrella ni triángulo)' : null }
 }
 
+// Monofásico: gira con tensión en el principal (U1-U2) y en el auxiliar (Z1-Z2, con su
+// condensador); el sentido, por cómo se une el auxiliar con el principal (Z1 con U1: a derechas).
+// Con condensador de arranque, una vez en marcha sigue girando sin el auxiliar.
+function singlePhase(c, potOf, spinning) {
+  const [u1, u2, z1, z2] = ['U1', 'U2', 'Z1', 'Z2'].map(potOf)
+  const main = powered(u1, u2)
+  const aux = powered(z1, z2)
+  if (main && aux) {
+    const dir = z1 === u1 || z2 === u2 ? 1 : z1 === u2 || z2 === u1 ? -1 : 1
+    return { running: true, dir, mode: null, warning: null }
+  }
+  if (main && c.capacitor === 'start' && spinning) return { running: true, dir: spinning, mode: 'sin el auxiliar (ya arrancado)', warning: null }
+  return { running: false, dir: 0, mode: null, warning: main ? 'Zumba sin arrancar: falta el devanado auxiliar' : aux ? 'Sin tensión en el devanado principal' : null }
+}
+
+// Dos velocidades: Dahlander (lenta en triángulo por 1U-1V-1W; rápida en doble estrella por
+// 2U-2V-2W con 1U-1V-1W puenteados) o dos devanados separados (lenta por 1, rápida por 2).
+function twoSpeed(c, potOf, rootOf) {
+  const low = ['1U', '1V', '1W']
+  const high = ['2U', '2V', '2W']
+  const order = (ids) => phaseOrder(...ids.map(potOf))
+  const fed = (ids) => ids.some((t) => potOf(t))
+  const slow = order(low)
+  const fast = order(high)
+  const off = { running: false, dir: 0, speed: 0 }
+  if (fed(low) && fed(high)) {
+    // En el Dahlander, la rápida necesita los 1 puenteados (sin tensión propia): con tensión en los
+    // dos lados es un error; en el de dos devanados, también.
+    return { ...off, mode: null, warning: 'Las dos velocidades a la vez: conexión no válida' }
+  }
+  if (slow.distinct) return { running: true, dir: slow.dir, speed: 0.5, mode: c.type === 'dahlander' ? 'velocidad lenta (triángulo)' : 'velocidad lenta', warning: null }
+  if (fast.distinct) {
+    if (c.type === 'dahlander' && !(rootOf('1U') === rootOf('1V') && rootOf('1V') === rootOf('1W')))
+      return { ...off, mode: null, warning: 'Rápida sin puentear 1U-1V-1W (doble estrella)' }
+    return { running: true, dir: fast.dir, speed: 1, mode: c.type === 'dahlander' ? 'velocidad rápida (doble estrella)' : 'velocidad rápida', warning: null }
+  }
+  return { ...off, mode: null, warning: fed(low) || fed(high) ? 'Le falta una fase' : null }
+}

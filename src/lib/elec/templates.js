@@ -629,6 +629,157 @@ ELEC_TEMPLATES.push(
   },
 )
 
+// Motores especiales: monofásico con inversión, Dahlander y dos devanados.
+// Mando con dos marchas enclavadas (como en la inversión de giro) en la columna x0: S0 para;
+// S1 y S2 arrancan cada sentido o velocidad con su autorretención y el NC del otro contactor.
+function twoWayControl(b, x0, railL, railX0, nRail, nX0, [first, second], extra = null) {
+  b.add('S0', 'pushbutton', x0, 80, { tag: 'S0', contact: 'NC', text: 'Paro' })
+  b.wire(railL, tap(x0 + 20, railX0), 'S0', '11')
+  const branch = (k, x, start, coil, other, text, bend) => {
+    b.add(start, 'pushbutton', x, 220, { tag: start, contact: 'NO', text })
+    b.add(`${coil}h`, 'contact', x + 140, 220, { ref: coil, contact: 'NO' })
+    b.wire('S0', '12', start, '13', x === x0 ? {} : { bend })
+    b.wire('S0', '12', `${coil}h`, 'a', { bend: bend + 10 })
+    b.wire(`${coil}h`, 'b', start, '14')
+    b.add(`${other}i${k}`, 'contact', x, 340, { ref: other, contact: 'NC' })
+    b.wire(start, '14', `${other}i${k}`, 'a')
+    b.add(coil, 'coil', x, 460, { tag: coil, kind: 'contactor', text, interlock: other })
+    b.wire(`${other}i${k}`, 'b', coil, 'A1')
+    b.wire(coil, 'A2', nRail, tap(x + 20, nX0))
+    return `${other}i${k}`
+  }
+  branch(1, x0, 'S1', first.coil, second.coil, first.text, 160)
+  const last = branch(2, x0 + 280, 'S2', second.coil, first.coil, second.text, 180)
+  // Contactor que entra con el segundo (puente de estrella del Dahlander).
+  if (extra) {
+    b.add(extra.coil, 'coil', x0 + 420, 460, { tag: extra.coil, kind: 'contactor', text: extra.text })
+    b.wire(last, 'b', extra.coil, 'A1', { bend: 440 })
+    b.wire(extra.coil, 'A2', nRail, tap(x0 + 440, nX0))
+  }
+}
+
+ELEC_TEMPLATES.push(
+  {
+    id: 'monofasico-inversion',
+    title: 'Motor monofásico con inversión de giro',
+    description: 'Motor de condensador: KM1 gira a derechas y KM2 a izquierdas cambiando la conexión del devanado auxiliar (Z1-Z2); el principal (U1-U2) no cambia. Enclavamiento eléctrico y mecánico.',
+    build(ox, oy, prefix) {
+      const b = builder(ox, oy, prefix)
+      b.add('L', 'rail', 0, 0, { potential: 'L', length: 1020 })
+      b.add('N', 'rail', 0, 20, { potential: 'N', length: 380, wires: 'down' })
+      b.add('Q1', 'breaker', 20, 60, { tag: 'Q1', poles: 1, text: 'PIA 10 A' })
+      b.wire('L', tap(40), 'Q1', '1')
+      b.add('KM1m', 'maincontacts', 20, 220, { ref: 'KM1' })
+      b.add('KM2m', 'maincontacts', 180, 220, { ref: 'KM2' })
+      // KM1: U1 y Z1 a fase, Z2 a neutro. KM2: U1 y Z2 a fase, Z1 a neutro (auxiliar al revés).
+      b.wire('Q1', '2', 'KM1m', '1')
+      b.wire('Q1', '2', 'KM1m', '3', { bend: 160 })
+      b.wire('Q1', '2', 'KM2m', '1', { bend: 170 })
+      b.wire('Q1', '2', 'KM2m', '5', { bend: 180 })
+      b.wire('N', tap(120), 'KM1m', '5')
+      b.wire('N', tap(240), 'KM2m', '3')
+      b.add('M1', 'motor1', 20, 440, { tag: 'M1', capacitor: 'permanent', text: 'Motor' })
+      b.wire('KM1m', '2', 'M1', 'U1')
+      b.wire('KM2m', '2', 'M1', 'U1', { bend: 320 })
+      b.wire('KM1m', '4', 'M1', 'Z1', { bend: 340 })
+      b.wire('KM2m', '4', 'M1', 'Z1', { bend: 360 })
+      b.wire('KM1m', '6', 'M1', 'Z2')
+      b.wire('KM2m', '6', 'M1', 'Z2', { bend: 380 })
+      // U2 al neutro, por la derecha.
+      b.wire('M1', 'U2', 'N', tap(360), { bend: 420 })
+      b.add('N2', 'rail', 440, 600, { potential: 'N', length: 580 })
+      twoWayControl(b, 460, 'L', 0, 'N2', 440, [
+        { coil: 'KM1', text: 'Derechas' },
+        { coil: 'KM2', text: 'Izquierdas' },
+      ])
+      return b
+    },
+  },
+  ...[
+    {
+      id: 'dahlander',
+      type: 'dahlander',
+      title: 'Motor Dahlander (dos velocidades)',
+      description: 'Un solo devanado: KM1 da la velocidad lenta (triángulo, por 1U-1V-1W); KM2 con KM3 (que puentea 1U-1V-1W) da la rápida (doble estrella, por 2U-2V-2W). Enclavadas: nunca las dos a la vez.',
+    },
+    {
+      id: 'dos-devanados',
+      type: 'motor2w',
+      title: 'Motor de dos devanados (dos velocidades)',
+      description: 'Dos devanados separados: KM1 alimenta el de la velocidad lenta (1U-1V-1W) y KM2 el de la rápida (2U-2V-2W). Enclavadas: nunca las dos a la vez.',
+    },
+  ].map(({ id, type, title, description }) => ({
+    id,
+    title,
+    description,
+    build(ox, oy, prefix) {
+      const b = builder(ox, oy, prefix)
+      const dahlander = type === 'dahlander'
+      b.add('L1', 'rail', 0, 0, { potential: 'L1', length: 1100 })
+      b.add('L2', 'rail', 0, 20, { potential: 'L2', length: 520 })
+      b.add('L3', 'rail', 0, 40, { potential: 'L3', length: 520 })
+      b.add('Q1', 'motorprotector', 20, 100, { tag: 'Q1', text: 'Guardamotor' })
+      b.wire('L1', tap(40), 'Q1', '1')
+      b.wire('L2', tap(80), 'Q1', '3')
+      b.wire('L3', tap(120), 'Q1', '5')
+      b.add('KM1m', 'maincontacts', 20, 240, { ref: 'KM1' })
+      b.add('KM2m', 'maincontacts', 220, 240, { ref: 'KM2' })
+      for (const [a, t] of [
+        ['2', '1'],
+        ['4', '3'],
+        ['6', '5'],
+      ])
+        b.wire('Q1', a, 'KM1m', t)
+      for (const [a, t, bend] of [
+        ['2', '1', 195],
+        ['4', '3', 210],
+        ['6', '5', 225],
+      ])
+        b.wire('Q1', a, 'KM2m', t, { bend })
+      b.add('M1', type, 20, 520, { tag: 'M1', text: 'Motor' })
+      for (const [a, t] of [
+        ['2', '1U'],
+        ['4', '1V'],
+        ['6', '1W'],
+      ])
+        b.wire('KM1m', a, 'M1', t)
+      for (const [a, t, bend] of [
+        ['2', '2U', 340],
+        ['4', '2V', 360],
+        ['6', '2W', 380],
+      ])
+        b.wire('KM2m', a, 'M1', t, { bend })
+      if (dahlander) {
+        // KM3 puentea 1U-1V-1W (tomados a la salida de KM1) para la doble estrella.
+        b.add('KM3m', 'maincontacts', 380, 460, { ref: 'KM3' })
+        for (const [a, t, bend] of [
+          ['2', '1', 400],
+          ['4', '3', 420],
+          ['6', '5', 440],
+        ])
+          b.wire('KM1m', a, 'KM3m', t, { bend })
+        b.wire('KM3m', '2', 'KM3m', '4')
+        b.wire('KM3m', '4', 'KM3m', '6')
+      }
+      b.add('N', 'rail', 560, 600, { potential: 'N', length: 540 })
+      twoWayControl(
+        b,
+        580,
+        'L1',
+        0,
+        'N',
+        560,
+        [
+          { coil: 'KM1', text: 'Lenta' },
+          { coil: 'KM2', text: 'Rápida' },
+        ],
+        dahlander ? { coil: 'KM3', text: 'Puente estrella' } : null,
+      )
+      return b
+    },
+  })),
+)
+
 // Añade la parte neumática (lib/elec/pneumaticCircuit.js) a un montaje.
 function addAir(b, air) {
   const local = (id) => id.replace(/^air-/, 'air')
