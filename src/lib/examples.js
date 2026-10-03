@@ -975,6 +975,80 @@ export const EXAMPLES = [
     },
   },
   {
+    id: 'elevador-frente',
+    level: 5,
+    title: 'Estación de elevación (vista de frente)',
+    description: 'Planta vista de frente, con gravedad: la pieza cae a la cinta, sube en un elevador y pasa a otra cinta; vigilancia de tiempo contra atascos.',
+    tags: ['Vista de frente', 'Gravedad', 'Vigilancia de tiempo', 'Divergencia en O', 'Planta'],
+    build() {
+      const nodes = [
+        step('s0', '0', 200, 0, [], { initial: true }),
+        trans('t1', 'Marcha · b0 · c0', 200, 100),
+        step('s1', '1', 200, 170, ['Soltar', 'M1', 'M2']),
+        trans('t2', 'S1', 200, 270),
+        step('s2', '2', 200, 340, ['B', 'M2']),
+        // Vigilancia: si el vástago no llega a tiempo, algo lo atasca.
+        trans('t3', 'b1', 200, 440),
+        trans('t6', '3s/X2 · !b1', 440, 440),
+        step('s3', '3', 200, 510, ['B', 'C', 'M2']),
+        trans('t4', 'c1', 200, 610),
+        trans('t7', '3s/X3 · !c1', 680, 610),
+        step('s4', '4', 200, 680, ['M2']),
+        trans('t5', 'b0 · c0', 200, 780),
+        step('s5', '5', 440, 510, ['Alarma']),
+        trans('t8', 'Rearme', 440, 610),
+        step('s6', '6', 680, 680, ['Alarma']),
+        trans('t9', 'Rearme', 680, 780),
+        note(
+          'nota',
+          920,
+          0,
+          '# Estación de elevación\n**Nivel 5.** La planta se ve **de frente**, con **gravedad** (botón «Gravedad» de la planta): las piezas caen y se apoyan en lo que tienen debajo.\n\n- Cada ciclo suelta una pieza (`Soltar`), que cae a la cinta `M1`; al final sale despedida, choca con el tope y cae al **elevador** (`S1` la ve).\n- El elevador `B` la sube, el empujador `C` la pasa a la cinta `M2` y la pieza acaba en la recogida.\n- **Vigilancia de tiempo:** si un vástago no llega a su final en 3 s (`3s/X2 · !b1`), hay un atasco: alarma hasta pulsar `Rearme`.\n\nPruébalo: **Simular** y Marcha. Para provocar un atasco, en **Averías** atasca el elevador, o en **Editar** pon un «Tope / pared» delante del empujador.',
+          { width: 360, height: 470 },
+        ),
+      ]
+      const edges = links([
+        ['s0', 't1'],
+        ['t1', 's1'],
+        ['s1', 't2'],
+        ['t2', 's2'],
+        ['s2', 't3'],
+        ['s2', 't6'],
+        ['t3', 's3'],
+        ['s3', 't4'],
+        ['s3', 't7'],
+        ['t4', 's4'],
+        ['s4', 't5'],
+        ['t5', 's0'],
+        ['t6', 's5'],
+        ['s5', 't8'],
+        ['t8', 's0'],
+        ['t7', 's6'],
+        ['s6', 't9'],
+        ['t9', 's0'],
+      ])
+      // Medidas comprobadas en la simulación: la pieza sale de la cinta a 100 px/s, choca con el
+      // tope y cae justo sobre el plato del elevador (pruebas: tests/unit/exampleRuns.test.js).
+      const scene = {
+        gravity: true,
+        elements: [
+          { id: 'alimentador', type: 'feeder', x: 140, y: 200, rot: 0, trigger: 'Soltar', auto: false, spacing: 0, sizes: 'small', material: 'plastic', color: 'amber' },
+          { id: 'cinta1', type: 'conveyor', x: 60, y: 300, rot: 0, motor: 'M1', length: 320, time: 3.2, text: 'Cinta 1' },
+          { id: 'tope', type: 'platform', x: 438, y: 250, rot: 90, length: 75, text: 'Tope' },
+          { id: 'elevador', type: 'cylinder', x: 410, y: 413, rot: 270, extend: 'B', retract: '', retracted: 'b0', extended: 'b1', stroke: 160, time: 1.5, text: 'Elevador' },
+          { id: 'llegada', type: 'sensor', x: 500, y: 311, rot: 180, variable: 'S1', contact: 'NO', kind: 'optical', range: 80, color: 'amber' },
+          { id: 'empujador', type: 'cylinder', x: 300, y: 151, rot: 0, extend: 'C', retract: '', retracted: 'c0', extended: 'c1', stroke: 60, time: 0.8, text: 'Empujador' },
+          { id: 'cinta2', type: 'conveyor', x: 424, y: 180, rot: 0, motor: 'M2', length: 260, time: 2.6, text: 'Cinta 2' },
+          { id: 'recogida', type: 'sink', x: 800, y: 560, rot: 0, text: 'Recogida' },
+          { id: 'marcha', type: 'switch', x: 0, y: 0, rot: 0, variable: 'Marcha', contact: 'NO', text: 'Marcha', place: 'desk' },
+          { id: 'rearme', type: 'button', x: 0, y: 0, rot: 0, variable: 'Rearme', contact: 'NO', color: 'blue', text: 'Rearme', place: 'desk' },
+          { id: 'alarma', type: 'lamp', x: 0, y: 0, rot: 0, variable: 'Alarma', color: 'red', text: 'Atasco', place: 'desk' },
+        ],
+      }
+      return { nodes, edges, plc: { scene } }
+    },
+  },
+  {
     id: 'macroetapa',
     level: 4,
     title: 'Dosificadora (macroetapa)',

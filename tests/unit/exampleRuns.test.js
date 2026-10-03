@@ -45,6 +45,22 @@ describe('los ejemplos con planta funcionan de verdad', () => {
   })
 })
 
+describe('estación de elevación (vista de frente, con gravedad)', () => {
+  it('cada ciclo lleva una pieza a la recogida', () => {
+    const { world } = runExample('elevador-frente', 40, { marcha: 'toggle' })
+    expect(world.counts.recogida).toBeGreaterThanOrEqual(3)
+  })
+
+  it('con el elevador atascado, la vigilancia de tiempo enciende la alarma', () => {
+    let alarm = false
+    const { state } = runExample('elevador-frente', 15, { marcha: 'toggle', elevador: 'fault:stuck' }, (t, { state }) => {
+      if (state.values.Alarma) alarm = true
+    })
+    expect(alarm).toBe(true)
+    expect([...state.active]).toEqual(['s5'])
+  })
+})
+
 describe('ejemplos analógicos', () => {
   it('horno: la temperatura se mantiene en la consigna ± 5 °C', () => {
     const temps = []
