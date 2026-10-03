@@ -205,7 +205,7 @@
     "retract": "A-",
     "retracted": "a0",
     "extended": "a1",
-    "time": 0.4
+    "time": 1
    },
    {
     "id": "B",
@@ -215,7 +215,7 @@
     "retract": "B-",
     "retracted": "b0",
     "extended": "b1",
-    "time": 0.4
+    "time": 1
    }
   ]
  }

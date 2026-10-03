@@ -175,3 +175,40 @@ test('escena de la planta: colocar mandos y piloto, asignar variables y accionar
   await expect(view.locator('[data-element]')).toHaveCount(3)
   expectNoErrors(errors)
 })
+
+test('escena: separador para cambiar el ancho y «Ajustar» para ver todo', async ({ page }) => {
+  await page.setViewportSize({ width: 1400, height: 800 })
+  const errors = await openEditor(page)
+  await openExample(page, /Cilindros A\+ B\+/)
+  await page.getByRole('button', { name: /Simular/ }).click()
+  const view = page.getByRole('region', { name: 'Escena de la planta' })
+  const scroller = view.locator('.paper')
+  // Todo a la vista: cada elemento dentro de la zona visible de la escena.
+  const allVisible = async () => {
+    const area = await scroller.boundingBox()
+    for (const el of await view.locator('[data-element]').all()) {
+      const b = await el.boundingBox()
+      if (b.x < area.x - 1 || b.y < area.y - 1 || b.x + b.width > area.x + area.width + 1 || b.y + b.height > area.y + area.height + 1) return false
+    }
+    return true
+  }
+  await expect.poll(allVisible).toBe(true) // ajuste automático al abrir
+
+  // Separador: más estrecha, y la escena se reajusta sola.
+  const before = (await view.boundingBox()).width
+  const handle = view.getByRole('separator', { name: 'Ancho de la planta' })
+  const h = await handle.boundingBox()
+  await page.mouse.move(h.x + h.width / 2, h.y + 200)
+  await page.mouse.down()
+  await page.mouse.move(h.x + 200, h.y + 200, { steps: 5 })
+  await page.mouse.up()
+  await expect.poll(async () => (await view.boundingBox()).width).toBeLessThan(before - 150)
+  await expect.poll(allVisible).toBe(true)
+
+  // Con zoom manual se sale de la vista; «Ajustar» lo devuelve.
+  for (let i = 0; i < 8; i++) await view.getByTitle('Acercar').click()
+  await expect.poll(allVisible).toBe(false)
+  await view.getByRole('button', { name: 'Ajustar la vista' }).click()
+  await expect.poll(allVisible).toBe(true)
+  expectNoErrors(errors)
+})

@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
-import { Hand, Maximize2, Minimize2, Minus, MousePointer2, Plus, RotateCw, Trash2, WandSparkles, X } from 'lucide-react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { Hand, Maximize2, Minimize2, Minus, MousePointer2, Plus, RotateCw, Scan, Trash2, WandSparkles, X } from 'lucide-react'
 import {
   PIECE_SIZES,
   SCENE_TYPES,
@@ -417,6 +417,28 @@ function Faults({ element, fault, onAction }) {
 
 // --- Vista ---------------------------------------------------------------------------------
 
+// Ancho de la planta en la vista dividida (se recuerda en este navegador).
+const WIDTH_KEY = 'grafcet-editor:scene-width'
+const MIN_WIDTH = 320
+const loadWidth = () => {
+  try {
+    const w = Number(localStorage.getItem(WIDTH_KEY))
+    return w >= MIN_WIDTH ? w : null
+  } catch {
+    return null
+  }
+}
+const saveWidth = (w) => {
+  try {
+    localStorage.setItem(WIDTH_KEY, String(Math.round(w)))
+  } catch {
+    /* sin almacenamiento */
+  }
+}
+const ZOOM_MIN = 0.3
+const ZOOM_MAX = 2
+const FIT_MARGIN = 30
+
 let created = 0
 const newId = () => `e${Date.now().toString(36)}${(created++).toString(36)}`
 const PALETTE = Object.entries(SCENE_TYPES).reduce((groups, [type, t]) => ({ ...groups, [t.group]: [...(groups[t.group] ?? []), type] }), {})
@@ -433,6 +455,48 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
   const [drag, setDrag] = useState(null) // { id, dx, dy, x, y }
   const svgRef = useRef(null)
   const scrollRef = useRef(null)
+  const sectionRef = useRef(null)
+  const [width, setWidth] = useState(loadWidth)
+  const resizing = useRef(null)
+  const [fitTick, setFitTick] = useState(0) // se reajusta al terminar de arrastrar el separador
+
+  // Ajustar: zoom y desplazamiento para ver todos los elementos (y las piezas), con margen.
+  const pendingScroll = useRef(null)
+  const fit = useCallback(() => {
+    const el = scrollRef.current
+    const list = scene?.elements ?? []
+    if (!el || !list.length) return
+    const boxes = list.map((e) => boundsOf(e, 1))
+    // Hueco para los rótulos, debajo de cada elemento.
+    const minX = Math.max(0, Math.min(...boxes.map((b) => b.x)) - FIT_MARGIN)
+    const minY = Math.max(0, Math.min(...boxes.map((b) => b.y)) - FIT_MARGIN)
+    const maxX = Math.min(W, Math.max(...boxes.map((b) => b.x + b.w)) + FIT_MARGIN)
+    const maxY = Math.min(H, Math.max(...boxes.map((b) => b.y + b.h + 16)) + FIT_MARGIN)
+    const z = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, Math.min(el.clientWidth / (maxX - minX), el.clientHeight / (maxY - minY))))
+    const zoomed = Math.floor(z * 100) / 100
+    // Centrado en lo que se ve (el desplazamiento se aplica cuando el SVG ya tiene el nuevo tamaño).
+    pendingScroll.current = {
+      left: ((minX + maxX) / 2) * zoomed - el.clientWidth / 2,
+      top: ((minY + maxY) / 2) * zoomed - el.clientHeight / 2,
+    }
+    setZoom(zoomed)
+  }, [scene])
+  useLayoutEffect(() => {
+    const el = scrollRef.current
+    if (!el || !pendingScroll.current) return
+    el.scrollLeft = Math.max(0, pendingScroll.current.left)
+    el.scrollTop = Math.max(0, pendingScroll.current.top)
+    pendingScroll.current = null
+  })
+  // Ajuste automático al abrir, al soltar el separador y al pasar a pantalla completa o volver.
+  const fitRef = useRef(fit)
+  useEffect(() => {
+    fitRef.current = fit
+  })
+  useEffect(() => {
+    const id = requestAnimationFrame(() => fitRef.current())
+    return () => cancelAnimationFrame(id)
+  }, [maximized, fitTick])
   const state = worldState ?? { pos: {}, pressed: {}, pieces: [], counts: {} }
   const signals = sceneSignals(scene ?? { elements: [] }, state)
   const selectedElement = elements.find((e) => e.id === selected)
@@ -555,8 +619,52 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
   return (
     <section
       aria-label="Escena de la planta"
-      className={`side-panel flex min-w-0 flex-col border-l border-slate-200 bg-white ${maximized ? 'absolute inset-y-0 left-0 right-80 z-20' : 'w-1/2 shrink-0'}`}
+      ref={sectionRef}
+      className={`side-panel relative flex min-w-0 flex-col border-l border-slate-200 bg-white ${maximized ? 'absolute inset-y-0 left-0 right-80 z-20' : 'shrink-0'}`}
+      style={maximized ? undefined : { width: width ?? '50%' }}
     >
+      {/* Separador: arrastrar para repartir el espacio entre el grafcet y la planta. */}
+      {!maximized && (
+        <div
+          role="separator"
+          aria-orientation="vertical"
+          aria-label="Ancho de la planta"
+          title="Arrastra para cambiar el ancho de la planta (doble clic: mitad y mitad)"
+          className="absolute inset-y-0 -left-1 z-10 w-2 cursor-col-resize hover:bg-blue-400/40"
+          onPointerDown={(ev) => {
+            const right = sectionRef.current.getBoundingClientRect().right
+            const total = sectionRef.current.parentElement.getBoundingClientRect().width
+            resizing.current = { right, max: total - 320 - MIN_WIDTH, frame: 0, width: null }
+            ev.currentTarget.setPointerCapture(ev.pointerId)
+          }}
+          onPointerMove={(ev) => {
+            const r = resizing.current
+            if (!r) return
+            r.width = Math.round(Math.min(Math.max(MIN_WIDTH, r.right - ev.clientX), Math.max(MIN_WIDTH, r.max)))
+            // Un cambio por fotograma (el lienzo del grafcet se redimensiona con él).
+            if (!r.frame) {
+              r.frame = requestAnimationFrame(() => {
+                r.frame = 0
+                setWidth(r.width)
+              })
+            }
+          }}
+          onPointerUp={() => {
+            const r = resizing.current
+            resizing.current = null
+            if (!r?.width) return
+            cancelAnimationFrame(r.frame)
+            setWidth(r.width)
+            saveWidth(r.width)
+            setFitTick((t) => t + 1)
+          }}
+          onDoubleClick={() => {
+            setWidth(null)
+            saveWidth(0)
+            setFitTick((t) => t + 1)
+          }}
+        />
+      )}
       <header className="flex flex-wrap items-center gap-1 border-b border-slate-200 px-2 py-1.5 text-xs">
         <span className="mr-1 text-sm font-semibold">Planta</span>
         <div className="flex rounded-md border border-slate-300 p-0.5" role="radiogroup" aria-label="Modo de la escena">
@@ -584,12 +692,15 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
           Vaciar piezas
         </button>
         <span className="ml-auto" />
-        <button type="button" onClick={() => setZoom((z) => Math.max(0.4, z - 0.1))} title="Alejar" className="rounded p-1 hover:bg-slate-100">
+        <button type="button" onClick={() => setZoom((z) => Math.max(ZOOM_MIN, z - 0.1))} title="Alejar" className="rounded p-1 hover:bg-slate-100">
           <Minus size={13} />
         </button>
         <span className="w-9 text-center tabular-nums">{Math.round(zoom * 100)} %</span>
-        <button type="button" onClick={() => setZoom((z) => Math.min(2, z + 0.1))} title="Acercar" className="rounded p-1 hover:bg-slate-100">
+        <button type="button" onClick={() => setZoom((z) => Math.min(ZOOM_MAX, z + 0.1))} title="Acercar" className="rounded p-1 hover:bg-slate-100">
           <Plus size={13} />
+        </button>
+        <button type="button" onClick={fit} title="Ajustar: ver todos los mandos y el mecanismo" aria-label="Ajustar la vista" className="rounded p-1 hover:bg-slate-100">
+          <Scan size={14} />
         </button>
         <button type="button" onClick={onToggleMaximize} title={maximized ? 'Vista dividida con el grafcet' : 'Pantalla completa'} className="rounded p-1 hover:bg-slate-100">
           {maximized ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
