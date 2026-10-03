@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Background, BackgroundVariant, ConnectionMode, ReactFlow, ReactFlowProvider, useReactFlow, useViewport } from '@xyflow/react'
-import { AlertTriangle, Minus, Plus, Maximize2, Minimize2, MousePointer2, Hand, Scan, Trash2, WandSparkles, X, Zap } from 'lucide-react'
+import { AlertTriangle, Download, Minus, Plus, Maximize2, Minimize2, MousePointer2, Hand, Scan, Trash2, WandSparkles, X, Zap } from 'lucide-react'
 import ElecNode from './ElecNode'
 import { ElecSymbol } from './ElecSymbols'
 import { potentialColor } from './elecColors'
@@ -8,6 +8,10 @@ import { ELEC_TYPES, GRID, POTENTIALS, contactNumbers, nextTag, showTag, sizeOf,
 import { COLUMN_WIDTH, FRAME_HEIGHT, FRAME_TOP, crossReferenceMap, elecSheetsOf, frameColumns, sheetOfComponent } from '../../lib/elec/sheet'
 import SheetTabs from '../SheetTabs'
 import { ElecFrameNode } from './ElecFrame'
+import ElecStatic from './ElecStatic'
+import ExportDialog from '../ExportDialog'
+import { svgMarkupSource } from '../../lib/svgExport'
+import { fileName } from '../../lib/fileNames'
 import { generatePlcWiring } from '../../lib/elec/generate'
 import { ELEC_TEMPLATES, insertTemplate } from '../../lib/elec/templates'
 import { WIRE_COLORS, WIRE_SECTIONS, junctions as findJunctions, nextTerminalNumber, sectionWidth, wireNumbers } from '../../lib/elec/wiring'
@@ -231,7 +235,7 @@ export default function ElectricalView(props) {
   )
 }
 
-function Inner({ schematic, onChange, elecState, onAction, variables = [], buildVariables, scene, simulating, onHistory, onActivate, maximized, onToggleMaximize, onClose, titleInfo = {} }) {
+function Inner({ schematic, onChange, elecState, onAction, variables = [], buildVariables, scene, simulating, onHistory, onActivate, maximized, onToggleMaximize, onClose, titleInfo = {}, exportProps = {} }) {
   const sch = schematic ?? EMPTY
   const allComponents = useMemo(() => sch.components ?? [], [sch.components])
   const allWires = useMemo(() => sch.wires ?? [], [sch.wires])
@@ -263,6 +267,7 @@ function Inner({ schematic, onChange, elecState, onAction, variables = [], build
   const [selectedWires, setSelectedWires] = useState([])
   const [dragPos, setDragPos] = useState({})
   const [message, setMessage] = useState(null)
+  const [exporting, setExporting] = useState(null) // fuente del diálogo de exportación
   const [width, setWidth] = useState(loadWidth)
   const resizing = useRef(null)
   const [preview, setPreview] = useState(null) // { item, x, y }
@@ -708,6 +713,26 @@ function Inner({ schematic, onChange, elecState, onAction, variables = [], build
           </select>
         )}
         <span className="ml-auto" />
+        <button
+          type="button"
+          onClick={() => {
+            const sheetName = sheets.find((s) => s.id === sheetId)?.name ?? ''
+            setExporting(
+              svgMarkupSource(
+                async () => {
+                  const { renderToStaticMarkup } = await import('react-dom/server')
+                  return renderToStaticMarkup(<ElecStatic schematic={sch} sheetId={sheetId} info={titleInfo} />)
+                },
+                { kind: 'esquema', title: `${titleInfo.project?.trim() || 'Esquema eléctrico'} · ${sheetName}`, name: (ext) => fileName(ext, 'esquema') },
+              ),
+            )
+          }}
+          title="Exportar esta hoja del esquema (PDF vectorial, PNG o SVG)"
+          aria-label="Exportar el esquema"
+          className="rounded p-1 hover:bg-slate-100"
+        >
+          <Download size={14} />
+        </button>
         <button type="button" onClick={() => zoomOut()} title="Alejar" aria-label="Alejar" className="rounded p-1 hover:bg-slate-100">
           <Minus size={13} />
         </button>
@@ -904,6 +929,9 @@ function Inner({ schematic, onChange, elecState, onAction, variables = [], build
           <p className="mt-1 text-slate-600">{HINTS[preview.item.type]}</p>
           {NORMS[preview.item.type] && <p className="mt-0.5 text-[10px] text-slate-500">{NORMS[preview.item.type]}</p>}
         </div>
+      )}
+      {exporting && (
+        <ExportDialog source={exporting} initialFormat="pdf" fileName={(ext) => fileName(ext, 'esquema')} {...exportProps} onClose={() => setExporting(null)} />
       )}
       <p className="border-t border-slate-200 px-3 py-1 text-[11px] text-slate-500">
         {mode === 'edit'

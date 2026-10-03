@@ -20,6 +20,7 @@ export const DOSSIER_SECTIONS = [
   { id: 'verification', label: 'Verificación IEC 60848' },
   { id: 'ladder', label: 'Ladder' },
   { id: 'plant', label: 'Planta virtual' },
+  { id: 'electrical', label: 'Esquema eléctrico' },
   { id: 'chronogram', label: 'Cronograma' },
   { id: 'notes', label: 'Notas del lienzo' },
 ]
@@ -42,7 +43,7 @@ export const LADDER_LISTINGS = [
 
 export const DEFAULT_DOSSIER = {
   page: 'a4',
-  sections: { cover: true, toc: true, statement: true, grafcet: true, variables: true, verification: true, ladder: true, plant: true, chronogram: true, notes: false },
+  sections: { cover: true, toc: true, statement: true, grafcet: true, variables: true, verification: true, ladder: true, plant: true, electrical: true, chronogram: true, notes: false },
   cover: {},
   statement: '',
   ladderListing: '',
@@ -354,6 +355,10 @@ export function buildDossier(content, options, measure) {
         { mono: [0, 1] },
       )
     }
+  }
+  if (S.electrical && content.figures.electrical?.length) {
+    heading('Esquema eléctrico')
+    for (const fig of content.figures.electrical) figure(fig, { caption: content.figures.electrical.length > 1 ? fig.name : undefined })
   }
   if (S.chronogram && content.figures.chronogram) {
     heading('Cronograma')

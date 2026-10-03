@@ -1066,6 +1066,7 @@ export default function GrafcetCanvas() {
                 scene={plc.scene}
                 simulating={simulating}
                 titleInfo={elecTitle}
+                exportProps={titleBlockProps}
                 onHistory={setElecHistory}
                 onActivate={() => setLastPanel('elec')}
                 maximized={elecView === 'full'}

@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { activeSteps, download, expectNoErrors, openEditor, openExample, openVariables } from './helpers'
+import { activeSteps, download, expectNoErrors, openEditor, openExample, openVariables, saveFromDialog } from './helpers'
 
 test('simulación del ejemplo: entradas, salidas, pausa y paso a paso', async ({ page }) => {
   const errors = await openEditor(page)
@@ -1071,5 +1071,27 @@ test('esquema eléctrico: parada de emergencia con relé de seguridad (rearme, s
   await expect(km1).toHaveAttribute('data-on', '1')
   await view.locator('[data-elec="doorswitch"]').click() // se abre la puerta
   await expect(km1).toHaveAttribute('data-on', '0')
+  expectNoErrors(errors)
+})
+
+test('esquema eléctrico: marco, hojas y exportar la hoja (vista previa y SVG)', async ({ page }) => {
+  const errors = await openEditor(page)
+  await page.getByRole('button', { name: 'Esquema eléctrico' }).click()
+  const view = page.getByRole('region', { name: 'Esquema eléctrico' })
+  await view.getByLabel('Insertar montaje').selectOption('directo')
+  await view.getByLabel('Marco').check()
+  await expect(view.locator('.react-flow__node-elecframe')).toHaveCount(1)
+  // Segunda hoja con otro montaje: sus identificadores no se repiten (KM2).
+  await view.getByRole('button', { name: 'Añadir hoja' }).click()
+  await view.getByLabel('Insertar montaje').selectOption('marcha-paro')
+  await expect(view.locator('[data-elec="coil"]')).toHaveAttribute('data-tag', 'KM2')
+  await view.getByRole('tab', { name: 'Hoja 1' }).click()
+  await expect(view.locator('[data-elec="coil"]')).toHaveAttribute('data-tag', 'KM1')
+  // Exportar: diálogo con vista previa; SVG con el nombre del proyecto y «esquema».
+  await view.getByRole('button', { name: 'Exportar el esquema' }).click()
+  const dialog = page.getByRole('dialog', { name: 'Exportar' })
+  await expect(dialog).toBeVisible()
+  const file = await saveFromDialog(page, 'svg')
+  expect(file.suggestedFilename()).toMatch(/esquema\.svg$/)
   expectNoErrors(errors)
 })

@@ -5,6 +5,8 @@ import { createElement } from 'react'
 import LadderDiagram from '../components/LadderDiagram'
 import Chronogram from '../components/Chronogram'
 import { SceneStatic } from '../components/SceneView'
+import ElecStatic from '../components/elec/ElecStatic'
+import { elecSheetsOf, sheetOfComponent } from './elec/sheet'
 import { buildPlcModel } from './plcModel'
 import { describeRange } from './analog'
 import { generateLadder } from './ladder/generate'
@@ -109,6 +111,17 @@ export async function dossierFigures({ nodes, edges, plc, scenarioId, model }) {
   figures.ladder = await figureFromMarkup(renderToStaticMarkup(createElement(LadderDiagram, { ladder, mode: 'both' })))
   if (plc.scene?.elements?.length) {
     figures.plant = await figureFromMarkup(renderToStaticMarkup(createElement(SceneStatic, { scene: plc.scene, variables: model.variables })))
+  }
+  // Esquema eléctrico: una figura por hoja con algo dibujado.
+  const elec = plc.electrical
+  if (elec?.components?.length) {
+    const info = { project: plc.titleBlock?.project || '', author: plc.titleBlock?.author ?? '', company: plc.titleBlock?.company ?? '', date: plc.titleBlock?.date ?? '' }
+    figures.electrical = []
+    for (const s of elecSheetsOf(elec)) {
+      if (!elec.components.some((c) => sheetOfComponent(elec, c) === s.id)) continue
+      const fig = await figureFromMarkup(renderToStaticMarkup(createElement(ElecStatic, { schematic: elec, sheetId: s.id, info })), s.name)
+      if (fig) figures.electrical.push(fig)
+    }
   }
   const scenarios = plc.scenarios ?? []
   const scenario = scenarios.find((s) => s.id === scenarioId) ?? scenarios[0]

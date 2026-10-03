@@ -97,3 +97,17 @@ describe('insertar plantillas sin repetir identificadores', async () => {
     expect(st.coils.KM2).toBe(false)
   })
 })
+
+describe('el esquema como documento (vista estática)', async () => {
+  const { renderToStaticMarkup } = await import('react-dom/server')
+  const { createElement } = await import('react')
+  const { default: ElecStatic } = await import('../../src/components/elec/ElecStatic')
+  it('dibuja aparatos, referencias, números de cable y el marco con su cajetín', () => {
+    const b = ELEC_TEMPLATES.find((t) => t.id === 'directo').build(0, 0, 'p')
+    const sch = { components: b.components, wires: b.wires, frame: true, wireNumbers: true }
+    const svg = renderToStaticMarkup(createElement(ElecStatic, { schematic: sch, info: { project: 'Taladradora', author: 'Ana' } }))
+    expect(svg.startsWith('<svg')).toBe(true)
+    for (const text of ['-KM1', '-Q1', '-M1', 'Taladradora', 'Ana', '1 de 1', '13-14 /']) expect(svg, text).toContain(text)
+    expect((svg.match(/<path /g) ?? []).length).toBeGreaterThan(b.wires.length - 1)
+  })
+})
