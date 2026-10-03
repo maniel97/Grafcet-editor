@@ -43,6 +43,7 @@ import SheetTabs from './SheetTabs'
 import SheetRefs from './SheetRefs'
 import { crossSheetRefs, sheetOf, sheetsOf, visibleEdges, visibleNodes } from '../lib/sheets'
 import { EMPTY_GEMMA, generateConduction } from '../lib/gemma'
+import { clearSharedHash, decodeProject, sharedData } from '../lib/share'
 
 // Partes que no hacen falta al abrir el editor: se descargan la primera vez que se usan, para que
 // la carga inicial sea más ligera (importa sobre todo publicado en internet).
@@ -56,6 +57,12 @@ const ExportDialog = lazy(() => import('./ExportDialog'))
 const GemmaDialog = lazy(() => import('./GemmaDialog'))
 const PneumaticDialog = lazy(() => import('./PneumaticDialog'))
 const DossierDialog = lazy(() => import('./DossierDialog'))
+const ShareDialog = lazy(() => import('./ShareDialog'))
+// Lo que va en el enlace: sin la selección ni el estado de arrastre.
+const stripForShare = ({ nodes, edges }) => ({
+  nodes: nodes.map(({ selected: _s, dragging: _d, measured: _m, ...n }) => n),
+  edges: edges.map(({ selected: _s, ...e }) => e),
+})
 const ProjectsDialog = lazy(() => import('./ProjectsDialog'))
 
 // Mientras se descarga una parte diferida (normalmente un instante).
@@ -505,6 +512,27 @@ export default function GrafcetCanvas() {
   // --- Archivos ----------------------------------------------------------------------------------
   const save = useCallback(() => saveProject({ ...toObject(), plc, name: projectName }), [toObject, plc, projectName])
 
+  // Proyecto que llega en el enlace (lib/share.js): se ofrece abrirlo (lo de ahora va a «Trabajos
+  // anteriores»).
+  const [incoming, setIncoming] = useState(null) // { project } | { error }
+  useEffect(() => {
+    const check = () => {
+      const data = sharedData()
+      if (!data) return
+      decodeProject(data)
+        .then((project) => setIncoming({ project }))
+        .catch((error) => setIncoming({ error: error.message }))
+    }
+    check()
+    // También al pegar un enlace compartido en la pestaña del editor ya abierto (solo cambia el «#»).
+    window.addEventListener('hashchange', check)
+    return () => window.removeEventListener('hashchange', check)
+  }, [])
+  const closeIncoming = () => {
+    setIncoming(null)
+    clearSharedHash()
+  }
+
   // Sustituye el diagrama (abrir archivo, ejemplo o trabajo anterior). Lo que había se guarda
   // antes como trabajo anterior (lib/recent.js) y además se puede deshacer con Ctrl+Z.
   const replaceProject = useCallback(
@@ -751,7 +779,16 @@ export default function GrafcetCanvas() {
             />
           </Suspense>
         )}
-        {exportFormat && exportFormat !== 'dossier' && (
+        {exportFormat === 'share' && (
+          <Suspense fallback={<Loading />}>
+            <ShareDialog
+              project={{ name: projectName, ...stripForShare(toObject()), plc }}
+              onDownload={save}
+              onClose={() => setExportFormat(null)}
+            />
+          </Suspense>
+        )}
+        {exportFormat && exportFormat !== 'dossier' && exportFormat !== 'share' && (
           <Suspense fallback={<Loading />}>
             <ExportDialog
               source={exportSource}
@@ -761,6 +798,34 @@ export default function GrafcetCanvas() {
               onClose={() => setExportFormat(null)}
             />
           </Suspense>
+        )}
+        {incoming && (
+          <div role="alertdialog" aria-label="Proyecto compartido" className="fixed left-1/2 top-16 z-50 flex -translate-x-1/2 items-center gap-3 rounded-lg bg-slate-900 px-4 py-2 text-sm text-white shadow-xl">
+            {incoming.error ? (
+              <span>{incoming.error}</span>
+            ) : (
+              <>
+                <span>
+                  Proyecto compartido: <strong>«{incoming.project.name || 'sin nombre'}»</strong>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const project = normalizeProject(incoming.project)
+                    if (project) replaceProject({ ...project, name: incoming.project.name ?? '' }, 'Antes de abrir un proyecto compartido')
+                    closeIncoming()
+                  }}
+                  className="rounded-md bg-blue-600 px-2.5 py-1 font-medium hover:bg-blue-700"
+                >
+                  Abrir
+                </button>
+                <span className="text-xs text-slate-300">(lo de ahora queda en «Trabajos anteriores»)</span>
+              </>
+            )}
+            <button type="button" onClick={closeIncoming} className="rounded-md px-2 py-1 text-slate-300 hover:text-white">
+              {incoming.error ? 'Cerrar' : 'Descartar'}
+            </button>
+          </div>
         )}
         {pneumaticOpen && (
           <Suspense fallback={<Loading />}>
