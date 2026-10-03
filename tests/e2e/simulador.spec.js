@@ -88,7 +88,7 @@ test('planta virtual: la secuencia neumática avanza sola con sus finales de car
   await page.getByRole('switch').click() // Marcha
   await expect.poll(() => activeSteps(page)).toBe('s1')
   await page.getByRole('switch').click() // un solo ciclo
-  for (const s of ['s2', 's3', 's4', 's0']) await expect.poll(() => activeSteps(page), { timeout: 3000 }).toBe(s)
+  for (const s of ['s2', 's3', 's4', 's0']) await expect.poll(() => activeSteps(page), { timeout: 3000, intervals: [100] }).toBe(s)
   expectNoErrors(errors)
 })
 
@@ -325,17 +325,22 @@ test('escena: selección múltiple, mover en grupo, copiar/pegar/duplicar y desh
   const grafcetNodes = await page.locator('.react-flow__node').count()
   await page.keyboard.press('Control+d')
   await expect(items).toHaveCount(6)
+  // Deshacer / rehacer: los de siempre (atajos y botones de la barra), aplicados a la escena.
   await page.keyboard.press('Control+z')
   await expect(items).toHaveCount(3)
-  await page.keyboard.press('Control+y')
+  await page.getByTitle('Rehacer (Ctrl+Shift+Z)').click()
   await expect(items).toHaveCount(6)
   await page.keyboard.press('Control+c')
   await page.keyboard.press('Control+v')
   await expect(items).toHaveCount(9)
   await page.keyboard.press('Delete')
   await expect(items).toHaveCount(6)
-  await view.getByRole('button', { name: 'Deshacer en la escena' }).click()
+  await page.getByTitle('Deshacer (Ctrl+Z)').click()
   await expect(items).toHaveCount(9)
+  await expect(view.getByRole('button', { name: /Deshacer/ })).toHaveCount(0) // sin botones propios
+  // En modo Usar, la barra vuelve a ser la del grafcet (bloqueada mientras se simula).
+  await view.getByRole('radio', { name: /Usar/ }).click()
+  await expect(page.getByTitle('Deshacer (Ctrl+Z)')).toBeDisabled()
   // El grafcet no se ha tocado: los atajos se quedan en la escena.
   await expect(page.locator('.react-flow__node')).toHaveCount(grafcetNodes)
   expectNoErrors(errors)

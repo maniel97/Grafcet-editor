@@ -3,7 +3,7 @@ import { ARROWS } from './keyboardNav'
 
 // Atajos de teclado globales del editor. Se ignoran mientras se escribe en un campo de texto
 // o con un diálogo modal abierto, para no interferir con la edición.
-// handlers: { undo, redo, copy, cut, paste, duplicate, selectAll, save, open, help, escape,
+// handlers: { undo, redo, copy, cut, paste, duplicate, selectAll, remove, save, open, help, escape,
 //             move(dx, dy), navigate(dir), edit, find }
 export function useEditorShortcuts(handlers) {
   const ref = useRef(handlers)
@@ -50,6 +50,8 @@ export function useEditorShortcuts(handlers) {
         return run(() => h.move?.(arrow.dx * step, arrow.dy * step))
       }
       if (canvasKey && e.key === 'Enter' && !e.altKey) return run(h.edit)
+      // Supr: solo si hay quien lo atienda fuera del lienzo (la escena de la planta, al editarla).
+      if ((e.key === 'Delete' || e.key === 'Backspace') && h.remove) return run(h.remove)
       if (e.key === '?' || e.key === 'F1') return run(h.help)
       if (e.key === 'Escape') h.escape?.()
     }

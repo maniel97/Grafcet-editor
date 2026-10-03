@@ -73,6 +73,7 @@ export default function Toolbar({
   onRedo,
   canUndo,
   canRedo,
+  historyUnlocked = false, // deshacer / rehacer disponibles aunque se esté simulando (escena)
   onExport,
   onSave,
   onOpen,
@@ -106,8 +107,8 @@ export default function Toolbar({
         className="mr-2 w-20 shrink-0 rounded-md border border-transparent px-2 py-1 text-sm text-slate-700 placeholder:italic placeholder:text-slate-400 hover:border-slate-300 focus:border-blue-500 focus:outline-none 2xl:w-44"
       />
 
-      <ToolButton icon={Undo2} label="Deshacer" title="Deshacer (Ctrl+Z)" onClick={onUndo} disabled={locked || !canUndo} iconOnly />
-      <ToolButton icon={Redo2} label="Rehacer" title="Rehacer (Ctrl+Shift+Z)" onClick={onRedo} disabled={locked || !canRedo} iconOnly />
+      <ToolButton icon={Undo2} label="Deshacer" title="Deshacer (Ctrl+Z)" onClick={onUndo} disabled={(locked && !historyUnlocked) || !canUndo} iconOnly />
+      <ToolButton icon={Redo2} label="Rehacer" title="Rehacer (Ctrl+Shift+Z)" onClick={onRedo} disabled={(locked && !historyUnlocked) || !canRedo} iconOnly />
 
       <Separator />
 

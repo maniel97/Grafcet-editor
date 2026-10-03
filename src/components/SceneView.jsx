@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { Copy, Hand, Maximize2, Minimize2, Minus, MousePointer2, Plus, Redo2, RotateCw, Scan, Trash2, Undo2, WandSparkles, X } from 'lucide-react'
+import { Copy, Hand, Maximize2, Minimize2, Minus, MousePointer2, Plus, RotateCw, Scan, Trash2, WandSparkles, X } from 'lucide-react'
 import {
   PIECE_SIZES,
   SCENE_TYPES,
@@ -706,7 +706,10 @@ const PALETTE_BY_KEY = Object.fromEntries(PALETTE_ITEMS.map((i) => [i.key, i]))
 // libremente, se les asignan las variables y, al simular, interactúan (el vástago pisa los finales
 // de carrera, las cintas llevan las piezas, los cilindros las empujan…). Modo «Editar» para
 // colocar y configurar; modo «Usar» para accionar los mandos.
-export default function SceneView({ scene, onChange, worldState, values, time, variables, onAction, maximized, onToggleMaximize, onClose }) {
+// onHistory({ canUndo, canRedo, undo, redo, copy, cut, paste, duplicate, selectAll, remove } | null): en
+// modo Editar, los botones y atajos de edición de siempre (deshacer, rehacer, copiar, pegar…)
+// actúan sobre la escena, con su propio historial.
+export default function SceneView({ scene, onChange, worldState, values, time, variables, onAction, onHistory, maximized, onToggleMaximize, onClose }) {
   const elements = scene?.elements ?? []
   const [mode, setMode] = useState('use')
   // Selección: ids de los elementos (Ctrl+clic añade o quita; recuadro con el ratón).
@@ -820,18 +823,43 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
     paste()
   }
 
+  // Para la barra del editor: funciones estables que llaman a las de este momento.
+  const latest = useRef({})
+  useEffect(() => {
+    latest.current = {
+      undo,
+      redo,
+      copy: copySelected,
+      cut: () => {
+        copySelected()
+        removeSelected()
+      },
+      paste,
+      duplicate,
+      selectAll: () => setSelection(elements.map((e) => e.id)),
+      remove: removeSelected,
+    }
+  })
+  useEffect(() => {
+    if (!onHistory) return
+    onHistory(
+      mode === 'edit'
+        ? {
+            canUndo: historySize.past > 0,
+            canRedo: historySize.future > 0,
+            ...Object.fromEntries(['undo', 'redo', 'copy', 'cut', 'paste', 'duplicate', 'selectAll', 'remove'].map((k) => [k, () => latest.current[k]()])),
+          }
+        : null,
+    )
+  }, [mode, historySize, onHistory])
+  useEffect(() => () => onHistory?.(null), [onHistory])
+
   // Teclado de la escena (solo con el foco en ella, para no mezclarse con los atajos del grafcet).
   const onKeyDown = (ev) => {
     if (mode !== 'edit' || ['INPUT', 'SELECT', 'TEXTAREA'].includes(ev.target.tagName)) return
     const ctrl = ev.ctrlKey || ev.metaKey
     const key = ev.key.toLowerCase()
     const actions = {
-      z: ctrl && (ev.shiftKey ? redo : undo),
-      y: ctrl && redo,
-      c: ctrl && copySelected,
-      v: ctrl && paste,
-      d: ctrl && duplicate,
-      a: ctrl && (() => setSelection(elements.map((e) => e.id))),
       r: !ctrl && rotateSelected,
       delete: removeSelected,
       backspace: removeSelected,
@@ -1062,16 +1090,6 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
             </button>
           ))}
         </div>
-        {mode === 'edit' && (
-          <>
-            <button type="button" onClick={undo} disabled={!historySize.past} title="Deshacer (Ctrl+Z)" aria-label="Deshacer en la escena" className="rounded p-1 hover:bg-slate-100 disabled:opacity-30">
-              <Undo2 size={13} />
-            </button>
-            <button type="button" onClick={redo} disabled={!historySize.future} title="Rehacer (Ctrl+Y)" aria-label="Rehacer en la escena" className="rounded p-1 hover:bg-slate-100 disabled:opacity-30">
-              <Redo2 size={13} />
-            </button>
-          </>
-        )}
         <button type="button" onClick={() => onAction(null, 'clear')} title="Quitar todas las piezas" className="rounded border border-slate-300 px-2 py-0.5 hover:bg-slate-100">
           Vaciar piezas
         </button>
@@ -1282,7 +1300,7 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
       )}
       {mode === 'edit' && (
         <p className="border-t border-slate-200 px-2 py-1 text-[11px] text-slate-500">
-          Arrastra módulos de la paleta · Ctrl+clic o recuadro: varios · R gira · Supr borra · Ctrl+C/V/D copia, pega, duplica · Ctrl+Z/Y · asigna las variables en el panel de la derecha. Piezas de {PIECE_SIZES.small[0]} y{' '}
+          Arrastra módulos de la paleta · Ctrl+clic o recuadro: varios · R gira · Supr borra · Ctrl+C/V/D copia, pega, duplica · deshacer y rehacer: los de siempre · asigna las variables en el panel de la derecha. Piezas de {PIECE_SIZES.small[0]} y{' '}
           {PIECE_SIZES.large[0]} px.
         </p>
       )}

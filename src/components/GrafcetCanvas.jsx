@@ -106,6 +106,8 @@ export default function GrafcetCanvas() {
   const [ladderOpen, setLadderOpen] = useState(false)
   // Escena de la planta durante la simulación: null | 'split' (junto al grafcet) | 'full'.
   const [sceneView, setSceneView] = useState(null)
+  // Historial de la escena en modo Editar: entonces deshacer / rehacer (botones y atajos) van a ella.
+  const [sceneHistory, setSceneHistory] = useState(null)
   // Elemento del grafcet cuyos segmentos se resaltan en el ladder («Ver en el ladder»).
   const [ladderFocus, setLadderFocus] = useState(null)
   const [gemmaOpen, setGemmaOpen] = useState(false)
@@ -115,6 +117,7 @@ export default function GrafcetCanvas() {
   const [exportFormat, setExportFormat] = useState(null) // diálogo de exportación abierto en ese formato
   // Modo simulación: la edición queda bloqueada y el lienzo muestra la evolución.
   const [simulating, setSimulating] = useState(false)
+  const activeSceneHistory = simulating && sceneView ? sceneHistory : null
   // Bloqueo de edición (candado de los controles): solo mirar, desplazar y hacer zoom.
   const [editLocked, setEditLocked] = useState(false)
   // Solo lectura: al simular o con la edición bloqueada.
@@ -567,13 +570,17 @@ export default function GrafcetCanvas() {
   // En solo lectura (simulando o con la edición bloqueada) los atajos de edición no hacen nada.
   const selectedIds = () => getNodes().filter((n) => n.selected).map((n) => ({ id: n.id }))
   useEditorShortcuts({
-    undo: () => !readOnly && undo(),
-    redo: () => !readOnly && redo(),
-    copy,
-    cut: () => !readOnly && copy() && deleteElements({ nodes: selectedIds() }),
-    paste: () => !readOnly && paste(),
-    duplicate: () => !readOnly && duplicate(),
-    selectAll: () => !readOnly && setNodes((nds) => nds.map((n) => ({ ...n, selected: true }))),
+    undo: () => (activeSceneHistory ? activeSceneHistory.undo() : !readOnly && undo()),
+    redo: () => (activeSceneHistory ? activeSceneHistory.redo() : !readOnly && redo()),
+    // Editando la escena de la planta, los atajos de edición de siempre actúan sobre ella.
+    copy: () => (activeSceneHistory ? activeSceneHistory.copy() : copy()),
+    cut: () => (activeSceneHistory ? activeSceneHistory.cut() : !readOnly && copy() && deleteElements({ nodes: selectedIds() })),
+    paste: () => (activeSceneHistory ? activeSceneHistory.paste() : !readOnly && paste()),
+    duplicate: () => (activeSceneHistory ? activeSceneHistory.duplicate() : !readOnly && duplicate()),
+    selectAll: () =>
+      activeSceneHistory ? activeSceneHistory.selectAll() : !readOnly && setNodes((nds) => nds.map((n) => ({ ...n, selected: true }))),
+    // Supr en el lienzo lo atiende React Flow; fuera de él, solo la escena.
+    remove: activeSceneHistory?.remove,
     save,
     open: () => fileInputRef.current?.click(),
     help: () => setHelpOpen(true),
@@ -632,10 +639,11 @@ export default function GrafcetCanvas() {
           onAdd={addNode}
           onAddAction={addAction}
           canAddAction={!!selectedStep}
-          onUndo={undo}
-          onRedo={redo}
-          canUndo={canUndo}
-          canRedo={canRedo}
+          onUndo={activeSceneHistory ? activeSceneHistory.undo : undo}
+          onRedo={activeSceneHistory ? activeSceneHistory.redo : redo}
+          canUndo={activeSceneHistory ? activeSceneHistory.canUndo : canUndo}
+          canRedo={activeSceneHistory ? activeSceneHistory.canRedo : canRedo}
+          historyUnlocked={Boolean(activeSceneHistory)}
           onExport={onExport}
           onSave={save}
           onOpen={() => fileInputRef.current?.click()}
@@ -874,6 +882,7 @@ export default function GrafcetCanvas() {
                 time={simulation.sim.state.time}
                 variables={simulation.compiled.variables}
                 onAction={simulation.sceneDo}
+                onHistory={setSceneHistory}
                 maximized={sceneView === 'full'}
                 onToggleMaximize={() => setSceneView((v) => (v === 'full' ? 'split' : 'full'))}
                 onClose={() => setSceneView(null)}
