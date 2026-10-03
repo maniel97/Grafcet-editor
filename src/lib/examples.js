@@ -354,6 +354,190 @@ export const EXAMPLES = [
     },
   },
   {
+    id: 'clasificadora-tamano',
+    level: 3,
+    title: 'Clasificadora por tamaño y material',
+    description: 'Tres caminos: el metal se rechaza, el plástico grande sale por un segundo desviador y el pequeño sigue hasta el final.',
+    tags: ['Divergencia en O', 'Temporización', 'Planta'],
+    build() {
+      const nodes = [
+        step('s0', '0', 200, 0, [], { initial: true }),
+        trans('t1', 'Marcha', 200, 100),
+        step('s1', '1', 200, 170, ['M']),
+        // Elección excluyente entre tres caminos (el metal tiene prioridad sobre el tamaño).
+        trans('t2', '↑Metal · Marcha', 200, 270),
+        trans('t4', '↑Grande · !Metal · Marcha', 440, 270),
+        trans('t6', '!Marcha', 680, 270),
+        step('s2', '2', 200, 340, ['M', 'D1']),
+        trans('t3', '1.5s/X2', 200, 440),
+        step('s3', '3', 440, 340, ['M', 'D2']),
+        trans('t5', '1.5s/X3', 440, 440),
+        note(
+          'nota',
+          880,
+          0,
+          '# Clasificadora por tamaño y material\n**Nivel 3.** Una divergencia en O con tres caminos excluyentes: rechazar el metal (`D1`), sacar el plástico grande (`D2`) o parar.\n\n- **Metal**: detector inductivo. **Grande**: detector óptico alto, que solo alcanza a las piezas grandes.\n- El metal tiene prioridad: el segundo camino lleva `!Metal` para que las dos elecciones no puedan cumplirse a la vez.\n- Mientras se desvía una pieza (etapas 2 o 3) no se atiende otra: por eso las piezas vienen separadas. Prueba a juntarlas (alimentador, «Hueco») y verás piezas mal clasificadas.\n- Entradas: `Marcha`, `Metal`, `Grande` · Salidas: `M`, `D1`, `D2`\n\nPruébalo: **Simular**, Marcha y mira cómo se reparten.',
+          { width: 340, height: 430 },
+        ),
+      ]
+      const edges = links([
+        ['s0', 't1'],
+        ['t1', 's1'],
+        ['s1', 't2'],
+        ['s1', 't4'],
+        ['s1', 't6'],
+        ['t2', 's2'],
+        ['s2', 't3'],
+        ['t3', 's1'],
+        ['t4', 's3'],
+        ['s3', 't5'],
+        ['t5', 's1'],
+        ['t6', 's0'],
+      ])
+      const sink = (id, x, y, text) => ({ id, type: 'sink', x, y, rot: 0, text })
+      const scene = {
+        elements: [
+          { id: 'cinta', type: 'conveyor', x: 40, y: 200, rot: 0, motor: 'M', length: 720, time: 7.2, text: 'Cinta' },
+          { id: 'alimentador', type: 'feeder', x: 70, y: 200, rot: 0, trigger: '', auto: true, spacing: 400, sizes: 'mixed', material: 'mixed', color: 'blue' },
+          { id: 'inductivo', type: 'sensor', x: 250, y: 230, rot: 270, variable: 'Metal', contact: 'NO', kind: 'inductive', range: 20, color: 'amber' },
+          { id: 'd1', type: 'diverter', x: 330, y: 200, rot: 90, gate: 'D1', length: 80, time: 0.5, text: 'D1' },
+          { id: 'r1', type: 'ramp', x: 330, y: 280, rot: 90, length: 80, time: 0.6, text: '' },
+          sink('rechazo', 330, 390, 'Rechazo (metal)'),
+          // Detector alto: su haz pasa por encima de las piezas pequeñas.
+          { id: 'altura', type: 'sensor', x: 420, y: 180, rot: 0, variable: 'Grande', contact: 'NO', kind: 'optical', range: 30, color: 'amber' },
+          { id: 'd2', type: 'diverter', x: 510, y: 200, rot: 90, gate: 'D2', length: 80, time: 0.5, text: 'D2' },
+          { id: 'r2', type: 'ramp', x: 510, y: 280, rot: 90, length: 80, time: 0.6, text: '' },
+          sink('grandes', 510, 390, 'Grandes'),
+          sink('pequenas', 790, 200, 'Pequeñas'),
+          { id: 'marcha', type: 'switch', x: 0, y: 0, rot: 0, variable: 'Marcha', contact: 'NO', text: 'Marcha', place: 'desk' },
+        ],
+      }
+      return { nodes, edges, plc: { scene } }
+    },
+  },
+  {
+    id: 'ascensor',
+    level: 3,
+    title: 'Ascensor de 3 plantas',
+    description: 'Elegir el movimiento según la llamada y la planta en la que está la cabina.',
+    tags: ['Divergencia en O', 'Prioridades', 'Planta'],
+    build() {
+      const nodes = [
+        step('s0', '0', 440, 0, [], { initial: true }),
+        // Prioridades para que las elecciones sean excluyentes: L0, luego L2, luego L1.
+        trans('t1', 'L0 · !P0', 200, 100),
+        trans('t3', 'L2 · !P2 · !L0', 440, 100),
+        trans('t5', 'L1 · P0 · !L0 · !L2', 680, 100),
+        trans('t7', 'L1 · P2 · !P0 · !L0 · !L2', 920, 100),
+        step('s1', '1', 200, 170, ['Bajar']),
+        trans('t2', 'P0', 200, 270),
+        step('s3', '3', 440, 170, ['Subir']),
+        trans('t4', 'P2', 440, 270),
+        step('s2', '2', 680, 170, ['Subir']),
+        trans('t6', 'P1', 680, 270),
+        step('s4', '4', 920, 170, ['Bajar']),
+        trans('t8', 'P1', 920, 270),
+        note(
+          'nota',
+          1120,
+          0,
+          '# Ascensor de 3 plantas\n**Nivel 3.** Desde el reposo se elige un movimiento según la llamada (`L0`, `L1`, `L2`) y la planta donde está la cabina (`P0`, `P1`, `P2`).\n\n- Si se llama a la vez desde dos plantas, **prioridades**: planta 0, luego 2, luego 1 (las receptividades llevan `!L0`, `!L2` para ser excluyentes).\n- La cabina es un cilindro vertical; los finales de carrera de cada planta los pisa al pasar.\n- Entradas: `L0`, `L1`, `L2`, `P0`, `P1`, `P2` · Salidas: `Subir`, `Bajar`\n\nPruébalo: **Simular** y llama desde el pupitre.',
+          { width: 340, height: 380 },
+        ),
+      ]
+      const edges = links([
+        ['s0', 't1'],
+        ['s0', 't3'],
+        ['s0', 't5'],
+        ['s0', 't7'],
+        ['t1', 's1'],
+        ['s1', 't2'],
+        ['t2', 's0'],
+        ['t3', 's3'],
+        ['s3', 't4'],
+        ['t4', 's0'],
+        ['t5', 's2'],
+        ['s2', 't6'],
+        ['t6', 's0'],
+        ['t7', 's4'],
+        ['s4', 't8'],
+        ['t8', 's0'],
+      ])
+      // Cabina: cilindro vertical (carrera 200: planta 0 abajo, 1 en medio, 2 arriba). Los finales
+      // de carrera están a la altura de la cabina en cada planta.
+      const floor = (id, variable, y) => ({ id, type: 'limit', x: 300, y, rot: 0, variable, contact: 'NO', text: '' })
+      const call = (id, variable, color) => ({ id, type: 'button', x: 0, y: 0, rot: 0, variable, contact: 'NO', color, text: `Llamar ${variable.slice(1)}`, place: 'desk' })
+      const scene = {
+        elements: [
+          { id: 'cabina', type: 'cylinder', x: 300, y: 420, rot: 270, extend: 'Subir', retract: 'Bajar', retracted: '', extended: '', stroke: 200, time: 4, text: 'Cabina' },
+          floor('p0', 'P0', 352),
+          floor('p1', 'P1', 252),
+          floor('p2', 'P2', 152),
+          call('l0', 'L0', 'green'),
+          call('l1', 'L1', 'green'),
+          call('l2', 'L2', 'green'),
+        ],
+      }
+      return { nodes, edges, plc: { scene } }
+    },
+  },
+  {
+    id: 'doble-puesto',
+    level: 3,
+    title: 'Estación de doble puesto',
+    description: 'Taladrar y marcar a la vez (divergencia en Y) y seguir cuando los dos han terminado (convergencia en Y).',
+    tags: ['Divergencia en Y', 'Neumática', 'Planta'],
+    build() {
+      const nodes = [
+        step('s0', '0', 200, 0, [], { initial: true }),
+        trans('t1', 'Marcha · t0 · k0', 320, 100),
+        step('s1', '1', 200, 170, ['T+', 'Broca']),
+        trans('t2', 't1', 200, 270),
+        step('s2', '2', 200, 340, ['T-']),
+        trans('t3', 't0', 200, 440),
+        step('s3', '3', 200, 510),
+        step('s4', '4', 440, 170, ['K+']),
+        trans('t4', 'k1', 440, 270),
+        step('s5', '5', 440, 340, ['K-']),
+        trans('t5', 'k0', 440, 440),
+        step('s6', '6', 440, 510),
+        trans('t6', '1', 320, 610),
+        note(
+          'nota',
+          640,
+          0,
+          '# Estación de doble puesto\n**Nivel 3.** Al dar **Marcha** empiezan a la vez dos secuencias (divergencia en **Y**): taladrar (`T`) y marcar (`K`). Cada una termina en una etapa de espera (3 y 6); cuando las dos han acabado, la convergencia en **Y** vuelve al reposo.\n\n- Entradas: `Marcha`, `t0`, `t1`, `k0`, `k1` · Salidas: `T+`, `T-`, `Broca`, `K+`, `K-`\n- El marcado es más rápido: espera en la etapa 6 a que termine el taladro.\n\nPruébalo: **Simular** y pulsa Marcha.',
+          { width: 330, height: 340 },
+        ),
+      ]
+      const edges = links([
+        ['s0', 't1'],
+        ['t1', 's1'],
+        ['t1', 's4'],
+        ['s1', 't2'],
+        ['t2', 's2'],
+        ['s2', 't3'],
+        ['t3', 's3'],
+        ['s4', 't4'],
+        ['t4', 's5'],
+        ['s5', 't5'],
+        ['t5', 's6'],
+        ['s3', 't6'],
+        ['s6', 't6'],
+        ['t6', 's0'],
+      ])
+      const scene = {
+        elements: [
+          { id: 'broca', type: 'motor', x: 160, y: 40, rot: 0, variable: 'Broca', reverse: '', pulses: '', text: 'Broca' },
+          { id: 'T', type: 'cylinder', x: 160, y: 80, rot: 90, extend: 'T+', retract: 'T-', retracted: 't0', extended: 't1', stroke: 100, time: 2, text: 'Taladro' },
+          { id: 'K', type: 'cylinder', x: 360, y: 80, rot: 90, extend: 'K+', retract: 'K-', retracted: 'k0', extended: 'k1', stroke: 100, time: 0.8, text: 'Marcado' },
+          { id: 'marcha', type: 'button', x: 0, y: 0, rot: 0, variable: 'Marcha', contact: 'NO', color: 'green', text: 'Marcha', place: 'desk' },
+        ],
+      }
+      return { nodes, edges, plc: { scene } }
+    },
+  },
+  {
     id: 'semaforo',
     level: 1,
     title: 'Semáforo',

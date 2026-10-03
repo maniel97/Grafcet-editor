@@ -650,3 +650,52 @@ test('ejemplos de nivel 1 y 2: marcha/paro NC, contador y puerta de garaje', asy
   expect(await activeSteps(page)).toBe('s2')
   expectNoErrors(errors)
 })
+
+test('ejemplos de nivel 3: ascensor, doble puesto y clasificadora por tamaño', async ({ page }) => {
+  const errors = await openEditor(page)
+  const desk = () => page.getByRole('region', { name: 'Pupitre de mando' })
+  const press = async (label) => {
+    const b = await desk().locator(`[aria-label="${label}"]`).boundingBox()
+    await page.mouse.move(b.x + b.width / 2, b.y + b.height / 3)
+    await page.mouse.down()
+    await page.waitForTimeout(150)
+    await page.mouse.up()
+  }
+  const noteFits = async () => page.locator('.react-flow__node-note [data-note-body]').first().evaluate((el) => el.scrollHeight <= el.clientHeight + 2)
+  const seen = async (step) => expect.poll(() => activeSteps(page), { timeout: 8000, intervals: [100] }).toContain(step)
+
+  // Ascensor: a la planta 2, a la 1 (bajando) y a la 0; vuelve al reposo cada vez.
+  await openExample(page, /Ascensor de 3 plantas/)
+  expect(await noteFits()).toBe(true)
+  await page.getByRole('button', { name: /Simular/ }).click()
+  await page.getByLabel('Velocidad').selectOption('2')
+  for (const [call, step] of [['Pulsador Llamar 2', 's3'], ['Pulsador Llamar 1', 's4'], ['Pulsador Llamar 0', 's1']]) {
+    await press(call)
+    await seen(step)
+    await expect.poll(() => activeSteps(page), { timeout: 8000 }).toBe('s0')
+  }
+  await page.getByRole('button', { name: /Detener/ }).click()
+
+  // Doble puesto: las dos ramas a la vez y vuelta al reposo cuando acaban las dos.
+  await openExample(page, /Estación de doble puesto/)
+  expect(await noteFits()).toBe(true)
+  await page.getByRole('button', { name: /Simular/ }).click()
+  await press('Pulsador Marcha')
+  await seen('s1')
+  expect(await activeSteps(page)).toContain('s4')
+  await seen('s6') // el marcado acaba antes y espera
+  await expect.poll(() => activeSteps(page), { timeout: 8000 }).toBe('s0')
+  await page.getByRole('button', { name: /Detener/ }).click()
+
+  // Clasificadora por tamaño: las tres recogidas reciben piezas.
+  await openExample(page, /Clasificadora por tamaño/)
+  expect(await noteFits()).toBe(true)
+  await page.getByRole('button', { name: /Simular/ }).click()
+  await page.getByLabel('Velocidad').selectOption('5')
+  await desk().locator('[aria-label="Interruptor Marcha"]').click()
+  const view = page.getByRole('region', { name: 'Escena de la planta' })
+  for (const name of ['Rechazo (metal)', 'Grandes', 'Pequeñas']) {
+    await expect(view.locator(`[aria-label="Recogida ${name}"]`)).toContainText(/[1-9]/, { timeout: 20000 })
+  }
+  expectNoErrors(errors)
+})
