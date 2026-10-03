@@ -92,28 +92,40 @@ test('planta virtual: la secuencia neumática avanza sola con sus finales de car
   expectNoErrors(errors)
 })
 
-test('ejemplo con planta, averías y «Detectar planta»', async ({ page }) => {
+test('ejemplo con escena: pulsar Marcha en la planta, averías y «Detectar cilindros»', async ({ page }) => {
   const errors = await openEditor(page)
   await openExample(page, /Cilindros A\+ B\+/)
   await page.getByRole('button', { name: /Simular/ }).click()
-  const panel = page.getByRole('region', { name: 'Planta virtual' })
-  await expect(panel.getByRole('img', { name: /Cilindro [AB]/ })).toHaveCount(2)
+  // Con escena, la planta se ve junto al grafcet desde el principio.
+  const view = page.getByRole('region', { name: 'Escena de la planta' })
+  await expect(view.locator('[data-element="cylinder"]')).toHaveCount(2)
+  await expect(page.getByRole('switch')).toHaveCount(0) // todas las entradas las da la escena
 
-  // Avería: el final de carrera b1 no detecta; el grafcet se queda esperándolo.
-  await panel.getByLabel('Avería de B').selectOption({ label: 'Sensor b1 roto' })
-  await page.getByRole('switch').click() // Marcha
+  // Avería: el detector b1 no detecta; el grafcet se queda esperándolo.
+  await view.locator('[aria-label="Cilindro B"]').click()
+  await view.getByLabel('Avería de B').selectOption({ label: 'Detector b1 roto' })
+  const marcha = view.locator('[aria-label="Pulsador Marcha"]')
+  const mb = await marcha.boundingBox()
+  await page.mouse.move(mb.x + mb.width / 2, mb.y + mb.height / 2)
+  await page.mouse.down()
+  await expect.poll(() => activeSteps(page)).toBe('s1')
+  await page.mouse.up()
   await expect.poll(() => activeSteps(page), { timeout: 4000 }).toBe('s2')
   await page.waitForTimeout(1500)
   expect(await activeSteps(page)).toBe('s2')
   await expect(page.getByRole('list', { name: 'Qué espera el grafcet' })).toContainText('falta b1: vale 0')
-  await panel.getByLabel('Avería de B').selectOption('')
+  await view.getByLabel('Avería de B').selectOption('')
   await expect.poll(() => activeSteps(page), { timeout: 4000 }).not.toBe('s2')
 
-  // Sin planta, «Detectar planta» monta los dos cilindros a partir de los nombres.
-  await panel.getByRole('button', { name: 'Quitar A' }).click()
-  await panel.getByRole('button', { name: 'Quitar B' }).click()
-  await panel.getByRole('button', { name: /Detectar planta: cilindro A, cilindro B/ }).click()
-  await expect(panel.getByRole('img', { name: /Cilindro [AB]/ })).toHaveCount(2)
+  // Sin cilindros, «Detectar cilindros» los monta a partir de los nombres.
+  await view.getByRole('radio', { name: /Editar/ }).click()
+  for (const name of ['Cilindro A', 'Cilindro B']) {
+    await view.locator(`[aria-label="${name}"]`).click()
+    await page.keyboard.press('Delete')
+  }
+  await expect(view.locator('[data-element="cylinder"]')).toHaveCount(0)
+  await view.getByRole('button', { name: /Detectar cilindros \(2\)/ }).click()
+  await expect(view.locator('[data-element="cylinder"]')).toHaveCount(2)
   expectNoErrors(errors)
 })
 

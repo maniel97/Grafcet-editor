@@ -559,7 +559,9 @@ export default function GrafcetCanvas() {
     setNodes((nds) => (nds.some((n) => n.selected) ? nds.map((n) => ({ ...n, selected: false })) : nds))
     setSimulating(true)
     simulation.setPlaying(true)
-  }, [setNodes, setMenu, simulation])
+    // Con planta montada, la escena se ve junto al grafcet desde el principio.
+    if (plc.scene?.elements?.length) setSceneView((v) => v ?? 'split')
+  }, [setNodes, setMenu, simulation, plc.scene])
 
   // --- Atajos ------------------------------------------------------------------------------------
   // En solo lectura (simulando o con la edición bloqueada) los atajos de edición no hacen nada.
@@ -867,7 +869,7 @@ export default function GrafcetCanvas() {
               <SceneView
                 scene={plc.scene}
                 onChange={(scene) => setPlc((p) => ({ ...p, scene }))}
-                worldState={simulation.sim.world?.scene}
+                worldState={simulation.sim.world}
                 values={{ ...simulation.sim.state.values, ...simulation.sim.inputs }}
                 time={simulation.sim.state.time}
                 variables={simulation.compiled.variables}
@@ -886,7 +888,6 @@ export default function GrafcetCanvas() {
                 simulation={simulation}
                 scenarios={plc.scenarios}
                 onScenariosChange={(update) => setPlc((p) => ({ ...p, scenarios: update(p.scenarios ?? []) }))}
-                onPlantChange={(plant) => setPlc((p) => ({ ...p, plant }))}
                 exportProps={titleBlockProps}
                 onFocusNode={focusNode}
                 onClose={() => setSimulating(false)}

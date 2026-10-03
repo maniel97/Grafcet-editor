@@ -1,15 +1,19 @@
 import { useEffect, useRef, useState } from 'react'
-import { Hand, Maximize2, Minimize2, Minus, MousePointer2, Plus, RotateCw, Trash2, X } from 'lucide-react'
+import { Hand, Maximize2, Minimize2, Minus, MousePointer2, Plus, RotateCw, Trash2, WandSparkles, X } from 'lucide-react'
 import {
   PIECE_SIZES,
   SCENE_TYPES,
   SCENE_VARS,
+  TANK,
   conveyorRect,
   cylinderPlate,
+  detectScene,
   limitZone,
+  sceneFaults,
   sceneSignals,
   sensorZone,
   sinkRect,
+  worldRect,
 } from '../lib/sim/scene'
 
 const W = 1200
@@ -157,6 +161,55 @@ function SinkShape({ count }) {
   )
 }
 
+function TankShape({ e, level, values }) {
+  const { w, h } = TANK
+  const fill = isOn(values, e.fill)
+  const drain = isOn(values, e.drain)
+  return (
+    <g>
+      <rect x="0" y="0" width={w} height={h} rx="4" fill="#f8fafc" stroke={INK} strokeWidth="1.5" />
+      <rect x="1" y={1 + (h - 2) * (1 - level)} width={w - 2} height={(h - 2) * level} fill="#3b82f6" opacity="0.55" />
+      {/* Válvulas: entrada arriba, salida abajo */}
+      <path d={`M ${w / 2 - 8} -16 L ${w / 2 + 8} -4 L ${w / 2 + 8} -16 L ${w / 2 - 8} -4 Z`} fill={fill ? ON : OFF} stroke={INK} />
+      <line x1={w / 2} y1="-24" x2={w / 2} y2="-16" stroke={INK} strokeWidth="2" />
+      <path d={`M ${w / 2 - 8} ${h + 4} L ${w / 2 + 8} ${h + 16} L ${w / 2 + 8} ${h + 4} L ${w / 2 - 8} ${h + 16} Z`} fill={drain ? ON : OFF} stroke={INK} />
+      {fill && <line x1={w / 2} y1="-4" x2={w / 2} y2={(h - 2) * (1 - level)} stroke="#3b82f6" strokeWidth="3" opacity="0.6" />}
+      {e.high && <circle cx={w + 8} cy={h * (1 - TANK.high)} r="4" fill={level >= TANK.high ? ON : OFF} stroke={INK} strokeWidth="0.75" />}
+      {e.low && <circle cx={w + 8} cy={h * (1 - TANK.low)} r="4" fill={level >= TANK.low ? ON : OFF} stroke={INK} strokeWidth="0.75" />}
+      <text x={w / 2} y={h / 2 + 4} textAnchor="middle" fontSize="12" fontWeight="600" fill={INK}>
+        {Math.round(level * 100)} %
+      </text>
+    </g>
+  )
+}
+function MotorShape({ angle, running }) {
+  return (
+    <g>
+      <circle r="20" fill="#e2e8f0" stroke={running ? ON : INK} strokeWidth="1.5" />
+      <g transform={`rotate(${angle})`}>
+        {[0, 120, 240].map((a) => (
+          <path key={a} d="M 0 0 L 16 -5 L 16 5 Z" fill="#475569" transform={`rotate(${a})`} />
+        ))}
+      </g>
+      <circle r="3" fill={INK} />
+      <text x="0" y="-24" textAnchor="middle" fontSize="9" fontWeight="700" fill={running ? ON : '#64748b'}>
+        M
+      </text>
+    </g>
+  )
+}
+function DisplayShape({ value }) {
+  const text = Number.isFinite(Number(value)) ? String(Math.round(Number(value) * 100) / 100).replace('.', ',') : '—'
+  return (
+    <g>
+      <rect x="-40" y="-16" width="80" height="32" rx="4" fill="#0f172a" stroke={INK} />
+      <text x="34" y="7" textAnchor="end" fontSize="18" fontFamily="ui-monospace, Consolas, monospace" fill="#4ade80">
+        {text}
+      </text>
+    </g>
+  )
+}
+
 // Rectángulo que ocupa un elemento (para seleccionar y para el contorno de selección).
 function boundsOf(e, pos = 0) {
   const r = (x, y, w, h) => ({ x: e.x + x, y: e.y + y, w, h })
@@ -170,11 +223,13 @@ function boundsOf(e, pos = 0) {
       return r(-20, -20, 40, 40)
     case 'cylinder': {
       const body = { ...e }
-      const a = cylinderPlate(body, pos)
-      const b = { ...conveyorRect({ ...e, length: 80 }) }
-      const x = Math.min(a.x, b.x)
-      const y = Math.min(a.y, b.y)
-      return { x, y, w: Math.max(a.x + a.w, b.x + b.w) - x, h: Math.max(a.y + a.h, b.y + b.h) - y }
+      // Cuerpo y carrera completa (la guía discontinua): así se puede pulsar en cualquier punto.
+      const a = cylinderPlate(body, Math.max(pos, 1))
+      const b = conveyorRect({ ...e, length: 80 })
+      const guide = worldRect(e, 88, 14, Number(e.stroke) || 100, 8)
+      const x = Math.min(a.x, b.x, guide.x)
+      const y = Math.min(a.y, b.y, guide.y)
+      return { x, y, w: Math.max(a.x + a.w, b.x + b.w, guide.x + guide.w) - x, h: Math.max(a.y + a.h, b.y + b.h, guide.y + guide.h) - y }
     }
     case 'conveyor':
       return conveyorRect(e)
@@ -192,6 +247,12 @@ function boundsOf(e, pos = 0) {
       return r(-28, -56, 56, 80)
     case 'sink':
       return sinkRect(e)
+    case 'tank':
+      return r(0, -24, TANK.w + 14, TANK.h + 40)
+    case 'motor':
+      return r(-20, -28, 40, 48)
+    case 'display':
+      return r(-40, -16, 80, 32)
     default:
       return r(-20, -20, 40, 40)
   }
@@ -205,7 +266,12 @@ function labelOf(e) {
 // --- Propiedades -------------------------------------------------------------------------------
 
 function Properties({ element, variables, onChange, onDelete, onRotate }) {
-  const names = (dir) => variables.filter((v) => (dir === 'out' ? v.type === 'output' || v.type === 'memory' : v.type === 'input')).map((v) => v.name)
+  const names = (dir) =>
+    variables
+      .filter((v) =>
+        dir === 'any' ? true : dir === 'analog' ? v.type === 'analogIn' : dir === 'out' ? v.type === 'output' || v.type === 'memory' : v.type === 'input',
+      )
+      .map((v) => v.name)
   const set = (patch) => onChange({ ...element, ...patch })
   const field = 'w-full rounded border border-slate-300 px-1 py-0.5'
   const number = (key, label, min, step = 1) => (
@@ -273,6 +339,24 @@ function Properties({ element, variables, onChange, onDelete, onRotate }) {
         </>
       )}
       {element.type === 'sensor' && number('range', 'Alcance (px)', 10, 10)}
+      {element.type === 'tank' && (
+        <>
+          {number('fillTime', 'Llenado de vacío a lleno (s)', 0.5, 0.5)}
+          {number('drainTime', 'Vaciado de lleno a vacío (s)', 0.5, 0.5)}
+          <label className="block">
+            <span className="text-slate-500">Nivel al empezar (%)</span>
+            <input
+              type="number"
+              min="0"
+              max="100"
+              step="5"
+              value={Math.round((Number(element.initial) || 0) * 100)}
+              onChange={(ev) => set({ initial: Math.min(1, Math.max(0, Number(ev.target.value) / 100)) })}
+              className={field}
+            />
+          </label>
+        </>
+      )}
       {element.type === 'feeder' && (
         <>
           <label className="block">
@@ -301,6 +385,36 @@ function Properties({ element, variables, onChange, onDelete, onRotate }) {
   )
 }
 
+function Faults({ element, fault, onAction }) {
+  const options = sceneFaults(element)
+  return (
+    <div className="space-y-2 text-xs" aria-label="Averías del elemento">
+      <p className="font-semibold">{labelOf(element)}</p>
+      {options.length ? (
+        <label className="block">
+          <span className="text-slate-500">Avería (solo en esta simulación)</span>
+          <select
+            value={fault ?? ''}
+            onChange={(ev) => onAction(element.id, `fault:${ev.target.value}`)}
+            aria-label={`Avería de ${labelOf(element)}`}
+            className={`w-full rounded border px-1 py-0.5 ${fault ? 'border-red-400 text-red-700' : 'border-slate-300'}`}
+          >
+            <option value="">Ninguna</option>
+            {options.map((f) => (
+              <option key={f.id} value={f.id}>
+                {f.label}
+              </option>
+            ))}
+          </select>
+        </label>
+      ) : (
+        <p className="text-slate-500">Este elemento no tiene averías.</p>
+      )}
+      <p className="text-[11px] text-slate-500">Mira en «Qué espera el grafcet» cómo reacciona el programa.</p>
+    </div>
+  )
+}
+
 // --- Vista ---------------------------------------------------------------------------------
 
 let created = 0
@@ -322,6 +436,7 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
   const state = worldState ?? { pos: {}, pressed: {}, pieces: [], counts: {} }
   const signals = sceneSignals(scene ?? { elements: [] }, state)
   const selectedElement = elements.find((e) => e.id === selected)
+  const detected = mode === 'edit' ? detectScene(variables, scene) : []
 
   const save = (list) => onChange({ ...(scene ?? {}), elements: list })
   const update = (element) => save(elements.map((e) => (e.id === element.id ? element : e)))
@@ -373,7 +488,8 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
     ev.stopPropagation()
     if (mode === 'use') {
       ev.currentTarget.setPointerCapture?.(ev.pointerId)
-      operate(e, 'down')
+      if (operable(e)) operate(e, 'down')
+      else setSelected(e.id)
       return
     }
     setSelected(e.id)
@@ -422,12 +538,18 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
         return <FeederShape />
       case 'sink':
         return <SinkShape count={state.counts[e.id] ?? 0} />
+      case 'tank':
+        return <TankShape e={e} level={state.level?.[e.id] ?? (Number(e.initial) || 0)} values={values} />
+      case 'motor':
+        return <MotorShape angle={state.angle?.[e.id] ?? 0} running={isOn(values, e.variable)} />
+      case 'display':
+        return <DisplayShape value={values[e.variable]} />
       default:
         return null
     }
   }
   // Los mandos y pilotos no se giran (su rótulo se lee siempre).
-  const turns = (e) => !['button', 'switch', 'emergency', 'lamp', 'sink', 'feeder'].includes(e.type)
+  const turns = (e) => !['button', 'switch', 'emergency', 'lamp', 'sink', 'feeder', 'tank', 'motor', 'display'].includes(e.type)
   const operable = (e) => ['button', 'switch', 'emergency', 'feeder'].includes(e.type)
 
   return (
@@ -450,7 +572,7 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
               title={title}
               onClick={() => {
                 setMode(id)
-                if (id === 'use') setSelected(null)
+                setSelected(null)
               }}
               className={`flex items-center gap-1 rounded px-2 py-0.5 ${mode === id ? 'bg-slate-800 text-white' : 'text-slate-600 hover:bg-slate-100'}`}
             >
@@ -480,6 +602,16 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
       <div className="flex min-h-0 flex-1">
         {mode === 'edit' && (
           <nav className="w-32 shrink-0 space-y-2 overflow-y-auto border-r border-slate-200 p-1.5 text-xs" aria-label="Elementos">
+            {detected.length > 0 && (
+              <button
+                type="button"
+                onClick={() => save([...elements, ...detected])}
+                title="A partir de los nombres de las variables: cada salida A+ con A−, a0 y a1 es un cilindro"
+                className="flex w-full items-center gap-1 rounded border border-blue-300 bg-blue-50 px-1 py-0.5 text-left text-blue-800 hover:bg-blue-100"
+              >
+                <WandSparkles size={12} className="shrink-0" /> Detectar cilindros ({detected.length})
+              </button>
+            )}
             {Object.entries(PALETTE).map(([group, types]) => (
               <div key={group}>
                 <p className="mb-0.5 text-[10px] font-medium uppercase tracking-wide text-slate-400">{group}</p>
@@ -500,7 +632,7 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
             viewBox={`0 0 ${W} ${H}`}
             className="block select-none"
             onPointerMove={onPointerMove}
-            onPointerDown={() => mode === 'edit' && setSelected(null)}
+            onPointerDown={() => setSelected(null)}
             role="img"
             aria-label="Escena"
           >
@@ -522,13 +654,17 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
                 key={e.id}
                 data-element={e.type}
                 aria-label={`${SCENE_TYPES[e.type].label} ${labelOf(e)}`}
-                transform={`translate(${e.x} ${e.y})${turns(e) ? ` rotate(${e.rot ?? 0})` : ''}`}
                 style={{ cursor: mode === 'edit' ? 'move' : operable(e) ? 'pointer' : 'default' }}
                 onPointerDown={(ev) => onPointerDown(ev, e)}
                 onPointerUp={(ev) => onPointerUp(ev, e)}
                 onPointerCancel={(ev) => onPointerUp(ev, e)}
               >
-                {draw(e)}
+                {/* Zona de clic: todo el contorno (también los huecos del dibujo). */}
+                {(() => {
+                  const b = boundsOf(e, state.pos[e.id] ?? 0)
+                  return <rect x={b.x} y={b.y} width={b.w} height={b.h} fill="transparent" />
+                })()}
+                <g transform={`translate(${e.x} ${e.y})${turns(e) ? ` rotate(${e.rot ?? 0})` : ''}`}>{draw(e)}</g>
               </g>
             ))}
             {state.pieces.map((p) => (
@@ -543,8 +679,7 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
                 </text>
               )
             })}
-            {mode === 'edit' &&
-              selected &&
+            {selected &&
               shown
                 .filter((e) => e.id === selected)
                 .map((e) => {
@@ -553,9 +688,13 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
                 })}
           </svg>
         </div>
-        {mode === 'edit' && selectedElement && (
+        {selectedElement && (
           <aside className="w-48 shrink-0 overflow-y-auto border-l border-slate-200 p-2">
-            <Properties element={selectedElement} variables={variables} onChange={update} onDelete={() => remove(selectedElement.id)} onRotate={rotateSelected} />
+            {mode === 'edit' ? (
+              <Properties element={selectedElement} variables={variables} onChange={update} onDelete={() => remove(selectedElement.id)} onRotate={rotateSelected} />
+            ) : (
+              <Faults element={selectedElement} fault={state.faults?.[selectedElement.id]} onAction={onAction} />
+            )}
           </aside>
         )}
       </div>

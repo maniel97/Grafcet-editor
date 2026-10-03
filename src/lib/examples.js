@@ -54,9 +54,16 @@ export const EXAMPLES = [
           'Taladradora\n\nCon pieza y Marcha, la broca baja girando hasta Fc_abajo, repasa 2 s y sube hasta Fc_arriba.\n\nAl simular, la planta virtual mueve la broca y sus finales de carrera.',
         ),
       )
-      // Planta virtual: la broca como un cilindro vertical (Bajar / Subir).
-      const plant = [{ id: 'broca', type: 'cylinder', name: 'Broca', extend: 'Bajar', retract: 'Subir', retracted: 'Fc_arriba', extended: 'Fc_abajo', time: 1.5 }]
-      return { nodes, edges, plc: { plant } }
+      // Planta virtual: mandos, el motor de la broca y la broca como un cilindro vertical.
+      const scene = {
+        elements: [
+          { id: 'marcha', type: 'button', x: 80, y: 80, rot: 0, variable: 'Marcha', contact: 'NO', color: 'green', text: 'Marcha' },
+          { id: 'pieza', type: 'switch', x: 80, y: 180, rot: 0, variable: 'Pieza', contact: 'NO', text: 'Pieza colocada' },
+          { id: 'motor', type: 'motor', x: 300, y: 50, rot: 0, variable: 'Motor_broca', reverse: '', text: 'Motor broca' },
+          { id: 'broca', type: 'cylinder', x: 300, y: 100, rot: 90, extend: 'Bajar', retract: 'Subir', retracted: 'Fc_arriba', extended: 'Fc_abajo', stroke: 120, time: 1.5, text: 'Broca' },
+        ],
+      }
+      return { nodes, edges, plc: { scene } }
     },
   },
   {
@@ -85,8 +92,28 @@ export const EXAMPLES = [
           'Secuencia A+ B+ A− B−\n\nCada movimiento empieza cuando el anterior llega a su final de carrera.\n\nAl simular, la planta virtual mueve los cilindros: solo hay que pulsar Marcha.',
         ),
       )
-      const cylinder = (n) => ({ id: n, type: 'cylinder', name: n, extend: `${n}+`, retract: `${n}-`, retracted: `${n.toLowerCase()}0`, extended: `${n.toLowerCase()}1`, time: 1 })
-      return { nodes, edges, plc: { plant: [cylinder('A'), cylinder('B')] } }
+      const cylinder = (n, x, y, rot) => ({
+        id: n,
+        type: 'cylinder',
+        x,
+        y,
+        rot,
+        text: n,
+        extend: `${n}+`,
+        retract: `${n}-`,
+        retracted: `${n.toLowerCase()}0`,
+        extended: `${n.toLowerCase()}1`,
+        stroke: 100,
+        time: 1,
+      })
+      const scene = {
+        elements: [
+          { id: 'marcha', type: 'button', x: 80, y: 100, rot: 0, variable: 'Marcha', contact: 'NO', color: 'green', text: 'Marcha' },
+          cylinder('A', 200, 100, 0),
+          cylinder('B', 520, 60, 90),
+        ],
+      }
+      return { nodes, edges, plc: { scene } }
     },
   },
   {

@@ -5,7 +5,6 @@ import ScenarioControls from './ScenarioControls'
 import { chronogramCsv } from '../lib/sim/scenario'
 import { withMacros } from '../lib/sim/engine'
 import { firstFailure, waitingFor } from '../lib/sim/explain'
-import PlantPanel from './PlantPanel'
 import { downloadFile } from '../lib/projectFile'
 import { fileName, getProjectName } from '../lib/fileNames'
 import { svgMarkupSource } from '../lib/svgExport'
@@ -97,11 +96,9 @@ function chronogramSource(samples, signals, now) {
 const fmtTime = (t) => (t < 60 ? `${t.toFixed(1)} s` : `${Math.floor(t / 60)} min ${(t % 60).toFixed(1)} s`)
 
 // Panel de control de la simulación.
-export default function SimulationPanel({ simulation, scenarios = [], onScenariosChange, onPlantChange, sceneOpen, onToggleScene, exportProps, onFocusNode, onClose }) {
+export default function SimulationPanel({ simulation, scenarios = [], onScenariosChange, sceneOpen, onToggleScene, exportProps, onFocusNode, onClose }) {
   const { compiled, sim, playing, setPlaying, speed, setSpeed, setInput, step, advance, reset } = simulation
 
-  // Planta por elementos (la anterior a la escena): panel flotante, si el proyecto la tiene.
-  const [plantOpen, setPlantOpen] = useState(() => simulation.plantElements.length > 0)
   // Las entradas que gobierna la planta virtual no se cambian a mano.
   const plantDriven = useMemo(() => simulation.world.inputNames(), [simulation.world])
   const allInputs = useMemo(() => compiled?.variables.filter((v) => v.type === 'input') ?? [], [compiled])
@@ -298,18 +295,6 @@ export default function SimulationPanel({ simulation, scenarios = [], onScenario
             </span>
           </button>
         </div>
-        {plantOpen && (
-          <PlantPanel
-            elements={simulation.plantElements}
-            plantState={sim.world?.plant}
-            values={{ ...state.values, ...sim.inputs }}
-            variables={compiled.variables}
-            onChange={onPlantChange}
-            onAction={simulation.plantDo}
-            onFault={simulation.plantFault}
-            onClose={() => setPlantOpen(false)}
-          />
-        )}
 
         <Section title="Entradas" count={allInputs.length}>
           {allInputs.length === 0 && <p className="text-xs text-slate-400">No hay entradas: escribe receptividades como «Marcha».</p>}

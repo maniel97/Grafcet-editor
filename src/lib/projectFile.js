@@ -2,6 +2,7 @@
 
 import { EMPTY_PLC } from './addressing'
 import { fileName } from './fileNames'
+import { sceneFromPlant } from './sim/scene'
 
 const FORMAT = 'grafcet-editor'
 const VERSION = 1
@@ -35,6 +36,13 @@ export async function loadProject(file) {
 
 // Valida y adapta al formato actual un proyecto leído (de archivo o del autoguardado).
 // Devuelve null si no tiene forma de proyecto.
+// Planta por elementos de versiones anteriores (plc.plant) -> escena (plc.scene).
+function migratePlant(plc) {
+  if (!plc.plant) return plc
+  const { plant, ...rest } = plc
+  return plant.length && !rest.scene?.elements?.length ? { ...rest, scene: sceneFromPlant(plant) } : rest
+}
+
 export function normalizeProject(project) {
   if (!project || !Array.isArray(project.nodes) || !Array.isArray(project.edges)) return null
   const { nodes, edges } = migrateActionNodes(project.nodes, project.edges)
@@ -43,7 +51,7 @@ export function normalizeProject(project) {
     edges: edges.map(normalizeEdge),
     viewport: project.viewport,
     name: typeof project.name === 'string' ? project.name : undefined,
-    plc: project.plc ? { ...EMPTY_PLC, ...project.plc } : EMPTY_PLC,
+    plc: project.plc ? migratePlant({ ...EMPTY_PLC, ...project.plc }) : EMPTY_PLC,
   }
 }
 

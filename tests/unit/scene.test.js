@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { compile, evolve, initialState } from '../../src/lib/sim/engine'
 import { buildPlcModel } from '../../src/lib/plcModel'
 import { EMPTY_PLC } from '../../src/lib/addressing'
-import { rotate, sceneAction, sceneInit, sceneInputNames, sceneInputs, sceneStep, worldRect } from '../../src/lib/sim/scene'
+import { detectScene, rotate, sceneAction, sceneFaults, sceneFromPlant, sceneInit, sceneInputNames, sceneInputs, sceneStep, worldRect } from '../../src/lib/sim/scene'
+import { normalizeProject } from '../../src/lib/projectFile'
 import { advanceWorld, makeWorld } from '../../src/lib/sim/world'
 import { links, step, transition } from './helpers'
 
@@ -117,18 +118,73 @@ describe('escena en la simulación', () => {
         { id: 'fc1', type: 'limit', x: 290, y: 100, rot: 0, variable: 'a1' },
       ],
     }
-    const world = makeWorld([], scene)
-    let w = sceneAction(scene, world.init().scene, 'm', 'press')
-    let inputs = world.inputs({ plant: {}, scene: w })
+    const world = makeWorld(scene)
+    let w = sceneAction(scene, world.init(), 'm', 'press')
+    let inputs = world.inputs(w)
     let state = evolve(compiled, initialState(compiled), inputs, 0).state
     const seen = []
     for (let t = 0.1; t <= 2; t += 0.1) {
-      const r = advanceWorld(compiled, { state, inputs, world: { plant: {}, scene: w } }, t, { world })
+      const r = advanceWorld(compiled, { state, inputs, world: w }, t, { world })
       ;({ state, inputs } = r)
-      w = t > 0.2 ? sceneAction(scene, r.world.scene, 'm', 'release') : r.world.scene
+      w = t > 0.2 ? sceneAction(scene, r.world, 'm', 'release') : r.world
       const label = compiled.steps.find((s) => state.active.has(s.id)).label
       if (seen.at(-1) !== label) seen.push(label)
     }
     expect(seen).toEqual(['1', '2', '0'])
+  })
+})
+
+describe('escena: depósito, averías, detección y proyectos antiguos', () => {
+  it('depósito: sensores de nivel y nivel analógico en unidades físicas', () => {
+    const scene = { elements: [{ id: 'd', type: 'tank', x: 0, y: 0, fill: 'EV1', drain: 'EV2', low: 'Nb', high: 'Na', level: 'Nivel', fillTime: 10, drainTime: 5 }] }
+    const range = () => ({ min: 0, max: 2000 })
+    let s = sceneInit(scene)
+    expect(sceneInputs(scene, s, range)).toEqual({ Nb: 0, Na: 0, Nivel: 0 })
+    s = run(scene, s, { EV1: 1 }, 5)
+    expect(sceneInputs(scene, s, range)).toEqual({ Nb: 1, Na: 0, Nivel: 1000 })
+    s = run(scene, s, { EV1: 1 }, 5)
+    expect(sceneInputs(scene, s, range)).toEqual({ Nb: 1, Na: 1, Nivel: 2000 })
+    s = run(scene, s, { EV2: 1 }, 5)
+    expect(s.level.d).toBeCloseTo(0)
+    expect([...sceneInputNames(scene)]).toEqual(['Nb', 'Na', 'Nivel'])
+  })
+
+  it('averías: cilindro atascado, detector roto y final de carrera roto', () => {
+    const cyl = { id: 'A', type: 'cylinder', x: 0, y: 0, rot: 0, extend: 'A+', retracted: 'a0', extended: 'a1', stroke: 100, time: 1 }
+    const fc = { id: 'f', type: 'limit', x: 190, y: 0, rot: 0, variable: 'fc' }
+    const scene = { elements: [cyl, fc] }
+    expect(sceneFaults(cyl).map((f) => f.label)).toEqual(['Atascado', 'Detector a0 roto', 'Detector a1 roto'])
+    let s = sceneAction(scene, sceneInit(scene), 'A', 'fault:stuck')
+    s = run(scene, s, { 'A+': 1 }, 2)
+    expect(s.pos.A).toBe(0)
+    s = sceneAction(scene, s, 'A', 'fault:sensor:extended')
+    s = run(scene, s, { 'A+': 1 }, 2)
+    expect(sceneInputs(scene, s)).toEqual({ a0: 0, a1: 0, fc: 1 }) // fuera, pero a1 no lo detecta
+    s = sceneAction(scene, s, 'f', 'fault:broken')
+    expect(sceneInputs(scene, s).fc).toBe(0)
+    s = sceneAction(scene, sceneAction(scene, s, 'A', 'fault:'), 'f', 'fault:')
+    expect(sceneInputs(scene, s)).toEqual({ a0: 0, a1: 1, fc: 1 })
+  })
+
+  it('detecta cilindros por los nombres (A+, A−, a0, a1) sin repetir los que ya hay', () => {
+    const vars = ['A+', 'A-', 'a0', 'a1', 'B+', 'b1', 'Marcha'].map((name) => ({ name }))
+    const found = detectScene(vars, { elements: [] })
+    expect(found.map((e) => [e.text, e.extend, e.retract, e.retracted, e.extended])).toEqual([
+      ['A', 'A+', 'A-', 'a0', 'a1'],
+      ['B', 'B+', '', '', 'b1'], // simple efecto, sin detector dentro
+    ])
+    expect(detectScene(vars, { elements: [found[0]] }).map((e) => e.text)).toEqual(['B'])
+  })
+
+  it('los proyectos con la planta anterior (plc.plant) se abren con su escena', () => {
+    const plant = [
+      { id: 'A', type: 'cylinder', name: 'A', extend: 'A+', retract: 'A-', retracted: 'a0', extended: 'a1', time: 1 },
+      { id: 'C', type: 'conveyor', name: 'Cinta', motor: 'M', sensor: 'S', entry: '', time: 3 },
+      { id: 'L', type: 'lamp', name: 'Luz', output: 'H1' },
+    ]
+    expect(sceneFromPlant(plant).elements.map((e) => e.type)).toEqual(['cylinder', 'conveyor', 'feeder', 'sensor', 'lamp'])
+    const project = normalizeProject({ nodes: [], edges: [], plc: { plant } })
+    expect(project.plc.plant).toBeUndefined()
+    expect(project.plc.scene.elements).toHaveLength(5)
   })
 })

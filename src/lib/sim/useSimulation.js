@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { buildPlcModel } from '../plcModel'
 import { compile, evolve, initialState, inspect, withMacros } from './engine'
 import { recordEvent } from './scenario'
-import { plantAction, setPlantFault } from './plant'
 import { sceneAction } from './scene'
 import { advanceWorld, makeWorld } from './world'
 
@@ -30,10 +29,8 @@ const sameSample = (a, b) => {
 // El modelo se compila al empezar y cada vez que cambia el diagrama o la tabla.
 export function useSimulation(nodes, edges, plc, enabled) {
   const compiled = useMemo(() => (enabled ? compile(buildPlcModel(nodes, edges, plc)) : null), [enabled, nodes, edges, plc])
-  // Planta virtual (plant.js) y escena (scene.js): producen las entradas a partir de las salidas.
-  const plant = plc.plant
+  // Escena de la planta (scene.js): produce las entradas a partir de las salidas.
   const scene = plc.scene
-  const plantElements = useMemo(() => (enabled ? (plant ?? []) : []), [enabled, plant])
   const analogRange = useCallback(
     (name) => {
       const v = compiled?.variables.find((x) => x.name === name)
@@ -41,10 +38,10 @@ export function useSimulation(nodes, edges, plc, enabled) {
     },
     [compiled],
   )
-  const world = useMemo(() => makeWorld(plantElements, enabled ? scene : null, analogRange), [plantElements, enabled, scene, analogRange])
+  const world = useMemo(() => makeWorld(enabled ? scene : null, analogRange), [enabled, scene, analogRange])
 
   // { state, inputs, log, samples, recording: [eventos] | null, playback: { scenario, next } | null,
-  //   world: estado de la planta virtual y de la escena }
+  //   world: estado de la escena de la planta }
   const [sim, setSim] = useState(null)
   const [playing, setPlaying] = useState(false)
   const [speed, setSpeed] = useState(1)
@@ -196,9 +193,7 @@ export function useSimulation(nodes, edges, plc, enabled) {
     },
     [world],
   )
-  const plantDo = useCallback((id, action) => changeWorld((w) => ({ ...w, plant: plantAction(w.plant, id, action) })), [changeWorld])
-  const plantFault = useCallback((id, fault) => changeWorld((w) => ({ ...w, plant: setPlantFault(w.plant, id, fault) })), [changeWorld])
-  const sceneDo = useCallback((id, action) => changeWorld((w) => ({ ...w, scene: sceneAction(scene, w.scene, id, action) })), [changeWorld, scene])
+  const sceneDo = useCallback((id, action) => changeWorld((w) => sceneAction(scene, w, id, action)), [changeWorld, scene])
 
   const step = useCallback(() => apply(simRef.current?.state.time ?? 0, { singleStep: true }), [apply])
   const advance = useCallback((seconds) => apply((simRef.current?.state.time ?? 0) + seconds), [apply])
@@ -238,9 +233,6 @@ export function useSimulation(nodes, edges, plc, enabled) {
     startRecording,
     stopRecording,
     playScenario,
-    plantElements,
-    plantDo,
-    plantFault,
     sceneDo,
     world,
     sceneCount: scene?.elements?.length ?? 0,
