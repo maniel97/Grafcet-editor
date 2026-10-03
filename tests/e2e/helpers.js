@@ -52,6 +52,18 @@ export async function openExample(page, name) {
   await page.getByTitle('Abrir un proyecto, un ejemplo o un trabajo anterior').click()
   await page.getByRole('menuitem', { name: /Ejemplos/ }).click()
   await page.getByRole('button', { name }).click()
+  // La tabla de variables se coloca y la vista se reencuadra un instante después de abrirse:
+  // se espera a que termine (si no, un clic podría caer donde ya no está lo buscado).
+  await page.locator('[data-auto-place="pending"]').waitFor({ state: 'detached' })
+  let last = ''
+  await expect
+    .poll(async () => {
+      const now = await page.locator('.react-flow__viewport').getAttribute('style')
+      const stable = now === last
+      last = now
+      return stable
+    }, { intervals: [100] })
+    .toBe(true)
 }
 
 // Abre el diálogo de exportación en un formato ('PNG', 'SVG' o 'PDF') y lo devuelve.

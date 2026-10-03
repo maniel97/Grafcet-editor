@@ -758,3 +758,24 @@ for (const [fontId, diagramFontSize] of [['inter', 14], ['opendyslexic', 24], ['
     expectNoErrors(errors)
   })
 }
+
+for (const [fontId, diagramFontSize] of [['inter', 14], ['opendyslexic', 22]]) {
+  test(`ejemplos: la tabla de variables no pisa el grafcet (letra ${fontId}, ${diagramFontSize}px)`, async ({ page }) => {
+    await page.setViewportSize({ width: 1400, height: 850 })
+    await page.addInitScript((s) => localStorage.setItem('grafcet-editor:settings', JSON.stringify(s)), { fontId, diagramFontSize })
+    const errors = await openEditor(page)
+    const { EXAMPLES } = await import('../../src/lib/examples.js')
+    for (const ex of EXAMPLES) {
+      await openExample(page, ex.title)
+      // Hueco entre el borde derecho de la tabla y lo más a la izquierda del resto (bucles incluidos).
+      const gap = () =>
+        page.evaluate(() => {
+          const table = document.querySelector('.react-flow__node-variables').getBoundingClientRect()
+          const others = [...document.querySelectorAll('.react-flow__node:not(.react-flow__node-variables), .react-flow__edge path')].map((el) => el.getBoundingClientRect().left)
+          return Math.round(Math.min(...others) - table.right)
+        })
+      await expect.poll(gap, { message: ex.title }).toBeGreaterThan(5)
+    }
+    expectNoErrors(errors)
+  })
+}

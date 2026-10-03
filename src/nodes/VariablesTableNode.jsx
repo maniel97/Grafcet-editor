@@ -150,6 +150,8 @@ export default function VariablesTableNode({ id, data, selected }) {
 
   return (
     <div
+      // Pendiente de colocarse junto al grafcet (ejemplos): lo espera también alguna prueba.
+      data-auto-place={data.autoPlace ? 'pending' : undefined}
       className={`diagram-text min-w-[220px] border-2 bg-white text-[0.85em] ${selected ? 'border-blue-500' : 'border-slate-900'}`}
       onMouseLeave={() => setHighlight(null)}
     >

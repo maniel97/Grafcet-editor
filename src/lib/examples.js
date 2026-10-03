@@ -1040,7 +1040,8 @@ export function documented(project, comments = {}) {
   const drawing = project.nodes.filter((n) => ['step', 'transition', 'frame'].includes(n.type))
   const left = Math.min(...drawing.map((n) => n.position.x))
   const top = Math.min(...drawing.map((n) => n.position.y))
-  const table = { id: TABLE_ID, type: 'variables', position: { x: left - TABLE_GAP, y: top }, data: { showComments: true }, deletable: false }
+  // Posición provisional: al abrirse, el editor la ajusta a su ancho real (autoPlace).
+  const table = { id: TABLE_ID, type: 'variables', position: { x: left - TABLE_GAP, y: top }, data: { showComments: true, autoPlace: 'left' }, deletable: false }
   return { ...project, nodes: [...project.nodes, table], plc: filled }
 }
 

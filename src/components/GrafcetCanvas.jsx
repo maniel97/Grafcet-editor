@@ -1,5 +1,5 @@
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ReactFlow, Background, BackgroundVariant, MiniMap, addEdge, useNodesState, useEdgesState, useReactFlow } from '@xyflow/react'
+import { ReactFlow, Background, BackgroundVariant, MiniMap, addEdge, useNodesInitialized, useNodesState, useEdgesState, useReactFlow } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import { Lock } from 'lucide-react'
 
@@ -172,6 +172,35 @@ export default function GrafcetCanvas() {
     return compiled && sim ? explainTransition(compiled, sim, id) : null
   }, [])
   const { fitDrawn, fitWhenReady } = useFitDrawn(wrapperRef)
+
+  // Tabla de variables de los ejemplos (data.autoPlace = 'left'): se coloca a la izquierda de todo
+  // lo dibujado una vez medida, con su ancho real (depende de la letra, el tamaño y los comentarios)
+  // y contando los bucles de retorno, que se dibujan a la izquierda de las etapas.
+  const nodesInitialized = useNodesInitialized()
+  useEffect(() => {
+    if (!nodesInitialized) return
+    const table = nodes.find((n) => n.data?.autoPlace === 'left' && n.measured?.width)
+    if (!table) return
+    const frame = requestAnimationFrame(() =>
+      requestAnimationFrame(() => {
+        const others = nodes.filter((n) => n.id !== table.id && !n.hidden)
+        let left = Math.min(...others.map((n) => n.position.x))
+        const top = Math.min(...others.filter((n) => n.type !== 'note').map((n) => n.position.y))
+        // Los enlaces (bucles incluidos), en coordenadas del lienzo.
+        for (const path of wrapperRef.current?.querySelectorAll('.react-flow__edge path') ?? []) {
+          try {
+            left = Math.min(left, path.getBBox().x)
+          } catch {
+            /* sin medida */
+          }
+        }
+        const x = Math.round(left - 50 - table.measured.width)
+        setNodes((nds) => nds.map((n) => (n.id === table.id ? { ...n, position: { x, y: Number.isFinite(top) ? top : n.position.y }, data: { ...n.data, autoPlace: undefined } } : n)))
+        fitWhenReady(0)
+      }),
+    )
+    return () => cancelAnimationFrame(frame)
+  }, [nodesInitialized, nodes, setNodes, fitWhenReady])
   const openVariables = useCallback(() => setVariablesOpen(true), [])
   const { symbols, stepNodes, plcIssues, changePlc, tableShown, toggleTable, plcTable, plcView, exportCsv, highlight, setHighlight } =
     usePlcTable({ nodes, plc, setPlc, plcRef, takeSnapshot, onOpenDialog: openVariables })
