@@ -20,6 +20,8 @@ test('instalable, sin conexión y con aviso de versión nueva', async ({ page, c
   await page.getByTitle(/Exportar a PDF/).click()
   await expect(page.getByLabel('Vista previa de la página')).toBeVisible()
   await page.keyboard.press('Escape')
+  // El diálogo de exportación tiene su propio «Cerrar (Esc)»: esperar a que se cierre.
+  await expect(page.getByLabel('Vista previa de la página')).toHaveCount(0)
   await page.getByRole('dialog', { name: 'Ladder generado' }).getByTitle('Cerrar (Esc)').click()
   await page.getByTitle('Abrir un proyecto, un ejemplo o un trabajo anterior').click()
   await page.getByRole('menuitem', { name: /Ejemplos/ }).click()

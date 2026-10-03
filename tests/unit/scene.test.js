@@ -303,3 +303,58 @@ describe('escena: entradas y salidas de la planta', () => {
     expect(io.notInGrafcet).toEqual(['Extra'])
   })
 })
+
+describe('escena: desviador y rampa', () => {
+  // Cinta horizontal (x 0..300, y 85..115); desviador en x 150 que empuja hacia abajo (rot 90),
+  // rampa bajo él que lleva las piezas a la derecha y una recogida al final.
+  const belt = { id: 'c', type: 'conveyor', x: 0, y: 100, rot: 0, motor: 'M', length: 300, time: 3 }
+  const diverter = { id: 'd', type: 'diverter', x: 150, y: 100, rot: 90, gate: 'D', length: 80, time: 0.5 }
+  const piece = (x) => ({ id: 1, x, y: 86, w: 28, h: 28, color: 'amber', material: 'plastic' })
+
+  it('inactivo, la pieza sigue por la cinta; activo, la saca de lado', () => {
+    const scene = { elements: [belt, diverter] }
+    let s = { ...sceneInit(scene), pieces: [piece(120)] }
+    s = run(scene, s, { M: 1 }, 1)
+    expect(s.pieces[0].y).toBe(86) // sigue en la cinta
+    s = { ...sceneInit(scene), pieces: [piece(120)] }
+    s = run(scene, s, { M: 1, D: 1 }, 1.5)
+    expect(s.pieces[0].y).toBeGreaterThan(130) // fuera de la cinta, hacia abajo
+  })
+
+  it('la rampa lleva las piezas hasta su extremo y allí se quedan', () => {
+    const ramp = { id: 'r', type: 'ramp', x: 0, y: 200, rot: 0, length: 120, time: 1 }
+    const scene = { elements: [ramp] }
+    let s = { ...sceneInit(scene), pieces: [{ id: 1, x: 0, y: 186, w: 28, h: 28 }] }
+    s = run(scene, s, {}, 2)
+    // El centro sale de la rampa al llegar al final (x = 120): ahí se para.
+    expect(s.pieces[0].x + 14).toBeGreaterThan(119)
+    expect(s.pieces[0].x + 14).toBeLessThan(130)
+  })
+
+  it('clasificadora: el detector inductivo manda el metal por el desviador a su recogida', () => {
+    // Cinta más larga (x −200..300, 100 px/s) para que quepan dos piezas separadas.
+    const longBelt = { ...belt, x: -200, length: 500, time: 5 }
+    const scene = {
+      elements: [
+        longBelt,
+        diverter,
+        { id: 'ind', type: 'sensor', x: 110, y: 130, rot: 270, variable: 'Metal', kind: 'inductive', range: 20 },
+        { id: 'rm', type: 'sink', x: 150, y: 200, rot: 0 }, // bajo el desviador
+        { id: 'rp', type: 'sink', x: 320, y: 100, rot: 0 }, // al final de la cinta
+      ],
+    }
+    const pieces = [
+      { ...piece(40), id: 1, material: 'metal', color: 'metal' },
+      { ...piece(-120), id: 2 },
+    ]
+    let s = { ...sceneInit(scene), pieces }
+    let gate = 0
+    // Lógica de la clasificadora: el desviador se activa mientras el inductivo ve metal y un poco después.
+    for (let t = 0; t < 8; t += 0.05) {
+      if (sceneInputs(scene, s).Metal) gate = 0.6
+      s = sceneStep(scene, s, { M: 1, D: gate > 0 ? 1 : 0 }, 0.05)
+      gate -= 0.05
+    }
+    expect(s.counts).toEqual({ rm: 1, rp: 1 }) // el metal por el desviador; el plástico, al final
+  })
+})

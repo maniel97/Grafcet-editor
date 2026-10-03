@@ -225,6 +225,34 @@ function HeaterShape({ e, temp, heating }) {
     </g>
   )
 }
+// Desviador: su zona y una compuerta que, activa, se cruza para empujar las piezas en el sentido
+// de la flecha.
+function DiverterShape({ e, active }) {
+  const len = Number(e.length) || 80
+  return (
+    <g>
+      <rect x="0" y="-25" width={len} height="50" rx="3" fill={active ? ON : '#94a3b8'} fillOpacity={active ? 0.18 : 0.08} stroke="#64748b" strokeDasharray="4 3" />
+      <line x1={8} y1="0" x2={len - 10} y2="0" stroke={active ? ON : '#94a3b8'} strokeWidth="2.5" />
+      <path d={`M ${len - 16} -6 L ${len - 6} 0 L ${len - 16} 6`} fill="none" stroke={active ? ON : '#94a3b8'} strokeWidth="2.5" />
+      {/* Compuerta: abierta, en el borde; activa, cruzada sobre la zona. */}
+      <line x1="-4" y1="-25" x2={active ? len * 0.7 : -4} y2={active ? 25 : 25} stroke="#334155" strokeWidth="5" strokeLinecap="round" />
+      <circle cx="-4" cy="-25" r="5" fill="#475569" />
+    </g>
+  )
+}
+// Rampa: superficie inclinada (más alta al principio) por la que resbalan las piezas.
+function RampShape({ e }) {
+  const len = Number(e.length) || 120
+  return (
+    <g>
+      <rect x="0" y="-20" width={len} height="40" rx="2" fill="#e2e8f0" stroke={INK} />
+      <rect x="0" y="-20" width="8" height="40" fill="#94a3b8" />
+      {Array.from({ length: Math.max(1, Math.floor((len - 20) / 26)) }, (_, i) => (
+        <path key={i} d={`M ${18 + i * 26} -8 L ${26 + i * 26} 0 L ${18 + i * 26} 8`} fill="none" stroke="#94a3b8" strokeWidth="2" />
+      ))}
+    </g>
+  )
+}
 function PieceShape({ p }) {
   const metal = p.material === 'metal'
   return (
@@ -343,6 +371,12 @@ function boundsOf(e, pos = 0) {
     }
     case 'scale':
       return r(-40, -8, 80, 40)
+    case 'diverter': {
+      const z = worldRect(e, -10, -30, (Number(e.length) || 80) + 10, 60)
+      return z
+    }
+    case 'ramp':
+      return worldRect(e, 0, -20, Number(e.length) || 120, 40)
     case 'potentiometer':
       return r(-22, -22, 44, 60)
     case 'heater':
@@ -707,6 +741,12 @@ function Properties({ element, variables, onChange, onDelete, onRotate, onCreate
         </>
       )}
       {element.type === 'distance' && number('range', 'Alcance (px) = valor máximo', 20, 10)}
+      {(element.type === 'diverter' || element.type === 'ramp') && (
+        <>
+          {number('length', 'Largo (px)', 30, 10)}
+          {number('time', 'Tiempo en recorrerla (s)', 0.1, 0.1)}
+        </>
+      )}
       {element.type === 'potentiometer' && (
         <label className="block">
           <span className="text-slate-500">Posición al empezar (%)</span>
@@ -867,6 +907,8 @@ const HINTS = {
   'sensor:capacitive': 'Detector capacitivo: detecta cualquier material (plástico, metal…) a poca distancia.',
   'sensor:color': 'Detector de color: solo da 1 con piezas del color elegido. Para clasificar por colores.',
   distance: 'Sensor de distancia (ultrasonidos): valor analógico proporcional a la distancia al primer objeto de su haz.',
+  diverter: 'Desviador: mientras su salida está activa, empuja las piezas de su zona hacia donde apunta la flecha (para sacarlas de una cinta).',
+  ramp: 'Rampa: las piezas resbalan solas hasta su extremo (a la salida de una cinta, hacia una recogida…).',
   scale: 'Báscula: valor analógico con el peso (kg) de las piezas que tiene encima; el metal pesa el triple.',
   potentiometer: 'Potenciómetro: entrada analógica manual (consignas, velocidades…). En modo Usar, arrastra a izquierda o derecha.',
   heater: 'Calentador: la resistencia sube la temperatura (analógica, °C) con inercia; termostato digital opcional.',
@@ -902,6 +944,8 @@ function ModulePreview({ item }) {
     scale: <ScaleShape kg={3} />,
     potentiometer: <PotentiometerShape value={0.65} />,
     heater: <HeaterShape e={e} temp={85} heating />,
+    diverter: <DiverterShape e={e} active />,
+    ramp: <RampShape e={e} />,
   }
   const b = boundsOf(type === 'conveyor' ? { ...e, length: 160 } : type === 'distance' ? { ...e, range: 120 } : e, 1)
   const pad = 12
@@ -931,6 +975,9 @@ const PALETTE_ITEMS = Object.entries(SCENE_TYPES).flatMap(([type, t]) =>
     : [{ key: type, type, group: t.group, label: t.label, preset: {} }],
 )
 const PALETTE = PALETTE_ITEMS.reduce((groups, item) => ({ ...groups, [item.group]: [...(groups[item.group] ?? []), item] }), {})
+// Elementos por los que pasan las piezas: se dibujan debajo de todo.
+const UNDER = ['conveyor', 'sink', 'ramp', 'diverter']
+
 // Pupitre de mando: los mandos y la señalización pueden ir en un panel fijo, aparte del
 // mecanismo (como el cuadro eléctrico real). e.place: 'desk' | 'machine' (por defecto, máquina).
 const DESK_TYPES = ['button', 'switch', 'emergency', 'potentiometer', 'lamp', 'display']
@@ -1332,6 +1379,10 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
         return <DisplayShape value={values[e.variable]} />
       case 'distance':
         return <DistanceShape e={e} distance={measuredDistance(scene, state, e)} />
+      case 'diverter':
+        return <DiverterShape e={e} active={isOn(values, e.gate) && state.faults?.[e.id] !== 'stuck'} />
+      case 'ramp':
+        return <RampShape e={e} />
       case 'scale':
         return <ScaleShape kg={weighed(state, e)} />
       case 'potentiometer':
@@ -1577,7 +1628,7 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
               </text>
             )}
             {/* Las cintas y recogidas, debajo de todo (las piezas van encima). */}
-            {[...machine].sort((a, b) => (a.type === 'conveyor' || a.type === 'sink' ? -1 : 0) - (b.type === 'conveyor' || b.type === 'sink' ? -1 : 0)).map((e) => (
+            {[...machine].sort((a, b) => (UNDER.includes(a.type) ? -1 : 0) - (UNDER.includes(b.type) ? -1 : 0)).map((e) => (
               <g
                 key={e.id}
                 data-element={e.type}

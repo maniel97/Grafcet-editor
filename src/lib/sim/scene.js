@@ -44,6 +44,8 @@ export const SCENE_TYPES = {
   },
   motor: { label: 'Motor', group: 'Actuadores', defaults: { variable: '', reverse: '', pulses: '', text: '' } },
   display: { label: 'Visualizador', group: 'Señalización', defaults: { variable: '', text: '' } },
+  diverter: { label: 'Desviador', group: 'Actuadores', defaults: { gate: '', length: 80, time: 0.5, text: '' } },
+  ramp: { label: 'Rampa', group: 'Proceso', defaults: { length: 120, time: 1, text: '' } },
 }
 
 // Variables de cada tipo: [clave, etiqueta, 'in' (la escena la escribe) | 'out' (la lee)].
@@ -85,6 +87,8 @@ export const SCENE_VARS = {
     ['pulses', 'Encoder: 1 impulso por vuelta (opcional)', 'in'],
   ],
   display: [['variable', 'Valor', 'any']],
+  diverter: [['gate', 'Desviar (salida)', 'out']],
+  ramp: [],
 }
 
 // Tamaño del depósito (anclaje: esquina superior izquierda) y de sus sensores de nivel.
@@ -138,6 +142,10 @@ export const limitZone = (e) => worldRect(e, -8, -22, 16, 14) // el rodillo, enc
 export const sensorZone = (e) => worldRect(e, 10, -6, Number(e.range) || 60, 12) // el haz
 export const distanceBeam = (e) => worldRect(e, 12, -6, Number(e.range) || 200, 12)
 export const scaleRect = (e) => worldRect(e, -40, -8, 80, 16) // el plato
+// Desviador: zona que, activa, empuja las piezas en el sentido de su flecha (desde el anclaje).
+export const diverterRect = (e) => worldRect(e, 0, -25, Number(e.length) || 80, 50)
+// Rampa: las piezas resbalan solas hacia su extremo.
+export const rampRect = (e) => worldRect(e, 0, -20, Number(e.length) || 120, 40)
 export const conveyorRect = (e) => worldRect(e, 0, -15, Number(e.length) || 240, 30)
 export const sinkRect = (e) => worldRect(e, -30, -30, 60, 60)
 
@@ -204,11 +212,18 @@ export function sceneStep(scene, state, values, dt) {
     next.fed[e.id] = order
   }
 
-  // Cintas: las piezas cuyo centro está encima avanzan (sin montarse sobre la de delante).
+  // Lo que mueve piezas: cintas en marcha, desviadores activos (empujan de lado; sobre una cinta,
+  // la pieza sale en diagonal) y rampas (siempre). Las piezas cuyo centro está en la zona avanzan,
+  // sin montarse sobre la de delante.
+  const movers = []
   for (const e of elements) {
-    if (e.type !== 'conveyor' || !on(values, e.motor) || stuck(e)) continue
-    const rect = conveyorRect(e)
-    const speed = (Number(e.length) || 240) / Math.max(0.1, Number(e.time) || 4)
+    if (stuck(e)) continue
+    if (e.type === 'conveyor' && on(values, e.motor)) movers.push([e, conveyorRect(e), Number(e.length) || 240, Number(e.time) || 4])
+    if (e.type === 'diverter' && on(values, e.gate)) movers.push([e, diverterRect(e), Number(e.length) || 80, Number(e.time) || 0.5])
+    if (e.type === 'ramp') movers.push([e, rampRect(e), Number(e.length) || 120, Number(e.time) || 1])
+  }
+  for (const [e, rect, length, time] of movers) {
+    const speed = length / Math.max(0.1, time)
     const [dx, dy] = rotate(speed * dt, 0, e.rot)
     for (const p of next.pieces) {
       if (!inside(center(p), rect)) continue
@@ -393,6 +408,7 @@ export function sceneFaults(e) {
       ]
     case 'conveyor':
     case 'motor':
+    case 'diverter':
       return [{ id: 'stuck', label: 'Atascado' }]
     case 'limit':
     case 'sensor':
@@ -505,6 +521,7 @@ const REQUIRED = {
   tank: ['fill', 'drain'],
   motor: ['variable'],
   display: ['variable'],
+  diverter: ['gate'],
 }
 
 // Resumen de las conexiones entre la escena y el grafcet (variables del modelo, con uses y
