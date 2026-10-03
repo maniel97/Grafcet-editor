@@ -29,7 +29,7 @@ const HINTS = {
 // data: { c, view, numbers: [arriba, abajo] (contactos auxiliares), xref: [{ kind, numbers }],
 //         timed, mode: 'edit' | 'use', onAction(id, action) }
 export default function ElecNode({ data }) {
-  const { c, view, numbers, xref, timed, mode, onAction } = data
+  const { c, view, numbers, xref, timed, mode, onAction, junctions } = data
   const { w, h } = sizeOf(c)
   const terminals = terminalsOf(c)
   const use = mode === 'use'
@@ -43,7 +43,7 @@ export default function ElecNode({ data }) {
   const on = view ? Boolean(view.loads?.[c.id] ?? view.motors?.[c.id]?.running ?? view.closed?.[c.id]) : undefined
   // Números de borne junto a cada borne (los de los contactos auxiliares, calculados).
   const boxed = ['psu', 'phasemonitor', 'vfd', 'softstarter', 'safetyrelay'].includes(c.type)
-  const termLabel = (t, i) => (c.type === 'contact' ? numbers?.[i] : rail || c.type === 'plc' || boxed ? null : t.id)
+  const termLabel = (t, i) => (c.type === 'contact' ? numbers?.[i] : rail || c.type === 'plc' || c.type === 'terminal' || boxed ? null : t.id)
 
   return (
     <div
@@ -73,6 +73,8 @@ export default function ElecNode({ data }) {
             </text>
           )
         })}
+        {/* Puntos de unión: borne con dos o más cables, o toma de un embarrado. */}
+        {terminals.map((t) => junctions?.[t.id] && <circle key={`j${t.id}`} cx={t.x} cy={t.y} r="3.2" fill={INK} />)}
         {rail && (
           <text x="-6" y="14" textAnchor="end" fontSize="12" fontWeight="700" fill={POTENTIAL_COLORS[c.potential] ?? INK}>
             {c.potential}
@@ -82,7 +84,7 @@ export default function ElecNode({ data }) {
       {!rail && c.type !== 'plc' && (
         // Rótulo a la derecha; la descripción se parte en líneas para no pisar al aparato de al lado.
         <div className="pointer-events-none absolute top-[22px] w-[92px] text-[11px] leading-tight text-slate-900" style={{ left: w + 2 }}>
-          <div className="font-semibold">{showTag(tag)}</div>
+          <div className="font-semibold">{c.type === 'terminal' ? `${showTag(tag)}:${c.n ?? 1}` : showTag(tag)}</div>
           {c.text && <div className="text-[10px] text-slate-600">{c.text}</div>}
           {c.type === 'coil' && (c.kind === 'ton' || c.kind === 'tof') && <div className="text-slate-600">{`${c.kind === 'ton' ? 'Conexión' : 'Desconexión'} ${c.preset ?? 0} s`}</div>}
           {c.type === 'sensor3' && <div className="text-slate-600">{`${{ inductive: 'Inductivo', capacitive: 'Capacitivo', optical: 'Óptico' }[c.kind] ?? ''} ${c.output ?? 'PNP'}`}</div>}

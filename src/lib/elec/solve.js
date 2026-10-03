@@ -175,6 +175,9 @@ function network(schematic, ctx) {
       case 'thermal':
         for (const [a, b] of PAIRS) closePair(a, b) // los polos principales siempre conducen
         break
+      case 'terminal':
+        closePair('1', '2')
+        break
       case 'maincontacts':
         if (ctx.deviceOn(c.ref)) for (const [a, b] of PAIRS) closePair(a, b)
         break

@@ -7,6 +7,7 @@ import { potentialColor } from './elecColors'
 import { ELEC_TYPES, GRID, POTENTIALS, contactNumbers, crossReferences, nextTag, showTag, sizeOf, terminalsOf } from '../../lib/elec/catalog'
 import { generatePlcWiring } from '../../lib/elec/generate'
 import { ELEC_TEMPLATES, insertTemplate } from '../../lib/elec/templates'
+import { WIRE_COLORS, WIRE_SECTIONS, junctions as findJunctions, nextTerminalNumber, sectionWidth, wireNumbers } from '../../lib/elec/wiring'
 
 const nodeTypes = { elec: ElecNode }
 const EMPTY = { enabled: false, components: [], wires: [] }
@@ -47,6 +48,13 @@ const PALETTE = [
     ],
   },
   {
+    group: 'Bornas',
+    items: [
+      { key: 'terminal', type: 'terminal', label: 'Borna (regleta -X)', preset: { kind: 'normal' } },
+      { key: 'terminal:pe', type: 'terminal', label: 'Borna de tierra (PE)', preset: { kind: 'pe' } },
+    ],
+  },
+  {
     group: 'Seguridad',
     items: [
       { key: 'safetyrelay', type: 'safetyrelay', label: 'Relé de seguridad', preset: {} },
@@ -69,7 +77,7 @@ const PALETTE = [
   ...['Mando', 'Potencia', 'Autómata'].map((group) => ({
     group,
     items: Object.entries(ELEC_TYPES)
-      .filter(([type, t]) => t.group === group && !['mainswitch', 'psu', 'phasemonitor'].includes(type))
+      .filter(([type, t]) => t.group === group && !['mainswitch', 'psu', 'phasemonitor', 'terminal'].includes(type))
       .flatMap(([type, t]) =>
         type === 'coil'
           ? [
@@ -117,6 +125,7 @@ const HINTS = {
   changeover: 'Conmutador de vivienda: el común C pasa de 1 a 2. Dos conmutadores: encender desde dos sitios.',
   crossover: 'Cruzamiento: une A1-B1 y A2-B2 o los cruza. Entre dos conmutadores: encender desde tres o más sitios.',
   socket: 'Base de enchufe (fase, neutro y tierra).',
+  terminal: 'Borna de la regleta: une el cable de dentro del cuadro con el de fuera (campo). Se numeran solas: -X1:1, -X1:2…',
   mainswitch: 'Interruptor general (seccionador de corte en carga): corta toda la máquina; se puede bloquear con candado para el mantenimiento.',
   psu: 'Fuente de alimentación: con 230 V~ en L-N da 24 V DC (L+ y M) para el mando, los detectores y el autómata.',
   phasemonitor: 'Relé de control de fases: su contacto (-KF1) cierra solo con las tres fases presentes y en orden L1-L2-L3 (evita el giro al revés).',
@@ -160,6 +169,7 @@ const NORMS = {
   changeover: 'Identificador -S · común C, viajeros 1 y 2.',
   crossover: 'Identificador -S · A1 A2 / B1 B2.',
   socket: 'Identificador -X · L, N y PE.',
+  terminal: 'Regleta -X1, borna :n (IEC 81346 / IEC 60947-7-1); las de tierra, verde-amarillo.',
   mainswitch: 'Identificador -Q0 · obligatorio en toda máquina (IEC 60204-1, 5.3), con bloqueo.',
   psu: 'Identificador -G · L, N / L+, M (muy baja tensión de protección, PELV).',
   phasemonitor: 'Identificador -KF · L1, L2, L3.',
@@ -314,15 +324,17 @@ function Inner({ schematic, onChange, elecState, onAction, variables = [], build
         }
       }
     }
+    const strip = item.type === 'terminal' ? ([...components].reverse().find((o) => o.type === 'terminal')?.tag ?? 'X1') : null
     const c = {
       id: newId('e'),
       type: item.type,
       x,
       y,
-      tag: nextTag(components, item.prefix ?? t.prefix),
+      tag: strip ?? nextTag(components, item.prefix ?? t.prefix),
       ...t.defaults,
       ...item.preset,
       ...(ref ? { ref } : {}),
+      ...(strip ? { n: nextTerminalNumber(components, strip) } : {}),
     }
     save({ components: [...components, c] })
     setSelected([c.id])
@@ -396,6 +408,8 @@ function Inner({ schematic, onChange, elecState, onAction, variables = [], build
 
   // Nodos y cables para React Flow.
   const numbers = useMemo(() => contactNumbers(components), [components])
+  const joints = useMemo(() => findJunctions(sch), [sch])
+  const wireLabels = useMemo(() => (sch.wireNumbers ? wireNumbers(sch) : {}), [sch])
   const xrefs = useMemo(() => crossReferences(components), [components])
   const timers = useMemo(() => new Set(components.filter((c) => c.type === 'coil' && (c.kind === 'ton' || c.kind === 'tof')).map((c) => c.tag)), [components])
   const act = useCallback((id, action) => onAction?.(id, action), [onAction])
@@ -405,7 +419,16 @@ function Inner({ schematic, onChange, elecState, onAction, variables = [], build
         id: c.id,
         type: 'elec',
         position: dragPos[c.id] ?? { x: c.x, y: c.y },
-        data: { c, view, numbers: numbers[c.id], xref: xrefs[c.tag], timed: c.type === 'contact' && timers.has(c.ref), mode, onAction: act },
+        data: {
+          c,
+          view,
+          numbers: numbers[c.id],
+          xref: xrefs[c.tag],
+          timed: c.type === 'contact' && timers.has(c.ref),
+          mode,
+          onAction: act,
+          junctions: Object.fromEntries(Object.keys(joints).filter((k) => k.startsWith(`${c.id}:`)).map((k) => [k.slice(c.id.length + 1), true])),
+        },
         selected: selected.includes(c.id),
         draggable: mode === 'edit',
         selectable: mode === 'edit',
@@ -415,7 +438,7 @@ function Inner({ schematic, onChange, elecState, onAction, variables = [], build
         // llegan en cada paso de la simulación hasta volver a medirlos).
         measured: (({ w, h }) => ({ width: w, height: h }))(sizeOf(c)),
       })),
-    [components, dragPos, view, numbers, xrefs, timers, mode, act, selected],
+    [components, dragPos, view, numbers, xrefs, timers, mode, act, selected, joints],
   )
   const edges = useMemo(
     () =>
@@ -431,11 +454,23 @@ function Inner({ schematic, onChange, elecState, onAction, variables = [], build
           type: 'step',
           selected: sel,
           selectable: mode === 'edit',
-          style: { stroke: sel ? '#2563eb' : potentialColor(p ?? ''), strokeWidth: p ? 2.6 : 1.6 },
+          // Al simular, el color de su potencial (con tensión); si no, el que se le haya dado.
+          style: {
+            stroke: sel ? '#2563eb' : p ? potentialColor(p) : (WIRE_COLORS[w.color]?.stroke ?? potentialColor('')),
+            strokeWidth: Math.max(sectionWidth(w.section), p ? 2.4 : 0),
+          },
+          ...(wireLabels[w.id]
+            ? {
+                label: wireLabels[w.id],
+                labelStyle: { fontSize: 9, fontFamily: 'ui-monospace, monospace', fill: '#0f172a' },
+                labelBgStyle: { fill: '#ffffff' },
+                labelBgPadding: [2, 1],
+              }
+            : {}),
           data: { potential: p ?? null },
         }
       }),
-    [wires, view, selectedWires, mode],
+    [wires, view, selectedWires, mode, wireLabels],
   )
 
   const onNodesChange = (changes) => {
@@ -590,6 +625,10 @@ function Inner({ schematic, onChange, elecState, onAction, variables = [], build
           <WandSparkles size={12} /> <span className="hidden @2xl:inline">Conexiones del autómata</span>
           <span className="@2xl:hidden">Autómata</span>
         </button>
+        <label className="flex items-center gap-1 rounded border border-slate-300 px-2 py-0.5" title="Un número por red equipotencial (los de los embarrados, su potencial)">
+          <input type="checkbox" checked={Boolean(sch.wireNumbers)} onChange={(e) => save({ wireNumbers: e.target.checked })} />
+          Nº de cable
+        </label>
         {mode === 'edit' && (
           <select
             value=""
@@ -739,6 +778,15 @@ function Inner({ schematic, onChange, elecState, onAction, variables = [], build
             </p>
           )}
         </div>
+        {mode === 'edit' && !selectedC && selected.length === 0 && selectedWires.length === 1 && (
+          <WireProperties
+            key={selectedWires[0]}
+            wire={wires.find((w) => w.id === selectedWires[0])}
+            number={wireLabels[selectedWires[0]]}
+            onChange={(patch) => save({ wires: wires.map((w) => (w.id === selectedWires[0] ? { ...w, ...patch } : w)) })}
+            onDelete={removeSelected}
+          />
+        )}
         {mode === 'edit' && selectedC && (
           <Properties
             key={selectedC.id}
@@ -775,6 +823,41 @@ function Inner({ schematic, onChange, elecState, onAction, variables = [], build
 }
 
 const field = 'mt-0.5 w-full rounded border border-slate-300 px-1.5 py-0.5'
+
+// Propiedades de un cable: color (IEC 60445) y sección.
+function WireProperties({ wire, number, onChange, onDelete }) {
+  if (!wire) return null
+  return (
+    <aside className="w-48 shrink-0 space-y-2 overflow-y-auto border-l border-slate-200 p-2 text-xs" aria-label="Propiedades del cable">
+      <p className="font-semibold">Cable {number ? `nº ${number}` : ''}</p>
+      <label className="block">
+        <span className="text-slate-500">Color</span>
+        <select value={wire.color ?? 'auto'} onChange={(e) => onChange({ color: e.target.value === 'auto' ? undefined : e.target.value })} className={field}>
+          {Object.entries(WIRE_COLORS).map(([k, v]) => (
+            <option key={k} value={k}>
+              {v.label}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label className="block">
+        <span className="text-slate-500">Sección (mm²)</span>
+        <select value={wire.section ?? ''} onChange={(e) => onChange({ section: e.target.value || undefined })} className={field}>
+          <option value="">Sin indicar</option>
+          {WIRE_SECTIONS.map((s) => (
+            <option key={s} value={s}>
+              {s.replace('.', ',')}
+            </option>
+          ))}
+        </select>
+      </label>
+      <p className="text-slate-500">Mando: 0,75–1 mm²; potencia de motores pequeños: 1,5–2,5 mm².</p>
+      <button type="button" onClick={onDelete} className="flex items-center gap-1 rounded border border-red-200 px-2 py-0.5 text-red-700 hover:bg-red-50">
+        <Trash2 size={12} /> Eliminar el cable
+      </button>
+    </aside>
+  )
+}
 
 // Propiedades del componente seleccionado.
 function Properties({ c, components, variables, onChange, onDelete }) {
@@ -814,7 +897,16 @@ function Properties({ c, components, variables, onChange, onDelete }) {
       <p className="font-semibold">
         {t?.label} {showTag(c.type === 'contact' || c.type === 'maincontacts' ? c.ref : c.tag)}
       </p>
-      {!['rail', 'contact', 'maincontacts'].includes(c.type) && text('tag', 'Identificador (sin el guion)')}
+      {!['rail', 'contact', 'maincontacts'].includes(c.type) && text('tag', c.type === 'terminal' ? 'Regleta (sin el guion)' : 'Identificador (sin el guion)')}
+      {c.type === 'terminal' && (
+        <>
+          {text('n', 'Número de borna', { type: 'number', min: 1, step: 1 })}
+          {select('kind', 'Tipo', [
+            ['normal', 'De paso'],
+            ['pe', 'De tierra (PE)'],
+          ])}
+        </>
+      )}
       {c.type === 'rail' && (
         <>
           {select('potential', 'Potencial', Object.entries(POTENTIALS).map(([k, v]) => [k, v.label]))}

@@ -317,6 +317,18 @@ export const ELEC_TYPES = {
       ...['W2', 'U2', 'V2'].map((id, i) => ({ id, x: 20 + 40 * i, y: 120, side: 'bottom' })),
     ],
   },
+  // Borna de una regleta (-X1:1, -X1:2…): une su borne de arriba con el de abajo. kind: 'pe' (tierra).
+  terminal: {
+    label: 'Borna',
+    group: 'Bornas',
+    prefix: 'X',
+    defaults: { n: 1, kind: 'normal' },
+    size: () => ({ w: 40, h: 40 }),
+    terminals: () => [
+      { id: '1', x: 20, y: 0, side: 'top' },
+      { id: '2', x: 20, y: 40, side: 'bottom' },
+    ],
+  },
   // Instalaciones de interior.
   changeover: {
     label: 'Conmutador (vivienda)',

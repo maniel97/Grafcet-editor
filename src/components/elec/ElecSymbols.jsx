@@ -473,6 +473,14 @@ export function ElecSymbol({ c, view }) {
       return <Crossover on={closed} />
     case 'socket':
       return <Socket />
+    case 'terminal':
+      return (
+        <g>
+          <line x1="20" y1="0" x2="20" y2="40" stroke={INK} strokeWidth="2" />
+          <circle cx="20" cy="20" r="6" fill={c.kind === 'pe' ? '#bef264' : 'white'} stroke={c.kind === 'pe' ? '#65a30d' : INK} strokeWidth="1.8" />
+          {c.kind === 'pe' && <path d="M 16 20 L 24 20 M 17.5 23 L 22.5 23 M 19 26 L 21 26" stroke="#365314" strokeWidth="1.2" />}
+        </g>
+      )
     case 'mainswitch':
       return (
         <g>
