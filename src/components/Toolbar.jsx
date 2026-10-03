@@ -1,6 +1,7 @@
 import InitialStepIcon from './InitialStepIcon'
 import ExportMenu from './ExportMenu'
 import ToolbarDropdown from './ToolbarDropdown'
+import Logo from './Logo'
 import { t } from '../lib/i18n'
 import {
   Square,
@@ -104,8 +105,12 @@ export default function Toolbar({
   const locked = readOnly
   return (
     <header className="flex items-center gap-0.5 overflow-x-auto border-b border-slate-200 bg-white px-3 py-2 shadow-sm">
-      {/* Entre 1280 y 1536 px los botones principales muestran su texto: el rótulo deja sitio. */}
-      <h1 className="mr-2 hidden shrink-0 text-base font-bold tracking-tight sm:block xl:hidden 2xl:block">Grafcet Editor</h1>
+      {/* El logo, siempre; el nombre, solo donde cabe: de 1024 a 1536 px la barra va justa (y desde
+          1280 px los botones principales muestran su texto). */}
+      <h1 className="mr-2 flex shrink-0 items-center gap-2 text-base font-bold tracking-tight" title="Grafcet Editor">
+        <Logo size={24} className="text-slate-900" />
+        <span className="sr-only sm:not-sr-only lg:sr-only 2xl:not-sr-only">Grafcet Editor</span>
+      </h1>
       {/* Nombre del proyecto: da nombre a los archivos guardados y exportados. */}
       <input
         value={projectName}
