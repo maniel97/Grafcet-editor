@@ -528,10 +528,46 @@ function boundsOf(e, pos = 0) {
   }
 }
 
+// Rótulos de la escena (sin girar), colocados para que no pisen otros elementos ni otros rótulos:
+// se prueba debajo (lo normal), encima, a la derecha y a la izquierda, y se queda el primer sitio
+// libre (si no hay ninguno, debajo). En la vista de frente, el de un alimentador va primero a su
+// derecha: debajo es por donde caen las piezas. Los cilindros cuentan con toda su carrera, para que
+// el rótulo no salte mientras se mueve el vástago. items: [{ e, b (contorno), text, lines }].
+const CHAR_W = 6.3
+function layoutLabels(items, gravity) {
+  const boxes = items.map(({ b }) => b)
+  const placed = []
+  const out = new Map()
+  const hits = (r, own) =>
+    items.some((it, i) => it.e.id !== own && overlapsRect(r, boxes[i])) || placed.some((q) => overlapsRect(r, q))
+  for (const { e, b, text, lines = 0 } of items) {
+    if (!String(text ?? '').trim()) continue // sin rótulo (sigue contando como obstáculo)
+    const w = Math.max(8, String(text ?? '').length * CHAR_W)
+    const h = 12 + lines * 12
+    const spots = [
+      { x: b.x + b.w / 2, y: b.y + b.h + 13, anchor: 'middle', r: { x: b.x + b.w / 2 - w / 2, y: b.y + b.h + 2, w, h } },
+      { x: b.x + b.w / 2, y: b.y - 5 - lines * 12, anchor: 'middle', r: { x: b.x + b.w / 2 - w / 2, y: b.y - 4 - h, w, h } },
+      { x: b.x + b.w + 10, y: b.y + b.h / 2 + 4, anchor: 'start', r: { x: b.x + b.w + 8, y: b.y + b.h / 2 - 7, w, h } },
+      { x: b.x - 10, y: b.y + b.h / 2 + 4, anchor: 'end', r: { x: b.x - 8 - w, y: b.y + b.h / 2 - 7, w, h } },
+      // Más lejos, por si a los lados hay algo pegado (un final de carrera en el recorrido de la cabina).
+      { x: b.x - 40, y: b.y + b.h / 2 + 4, anchor: 'end', r: { x: b.x - 38 - w, y: b.y + b.h / 2 - 7, w, h } },
+    ]
+    if (gravity && e.type === 'feeder') spots.unshift(spots.splice(2, 1)[0])
+    const spot = spots.find((c) => !hits(c.r, e.id)) ?? spots[0]
+    placed.push(spot.r)
+    out.set(e.id, spot)
+  }
+  return out
+}
+const overlapsRect = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h
+
 function labelOf(e) {
   const vars = (SCENE_VARS[e.type] ?? []).map(([key]) => e[key]).filter(Boolean)
   // Detector sin variable: su tipo, corto (los rótulos largos se solapan entre detectores juntos).
   const fallback = e.type === 'sensor' ? { optical: tr('Óptico'), inductive: tr('Inductivo'), capacitive: tr('Capacitivo'), color: tr('Color') }[e.kind ?? 'optical'] : null
+  // Una plataforma sin texto (pared, base, tope) no lleva rótulo: son estructura y, con el nombre
+  // del tipo, los rótulos se montarían sobre lo que sostienen.
+  if (e.type === 'platform') return e.text ?? ''
   return e.text || vars[0] || fallback || tr(SCENE_TYPES[e.type].label)
 }
 
@@ -699,7 +735,7 @@ function IOPanel({ io, elements, onSelect }) {
                   <ArrowLeft size={12} className="shrink-0 text-blue-600" aria-label={tr('entrada del grafcet desde la planta')} />
                 )}
                 <span className="font-semibold">{sig.name}</span>
-                <span className="text-slate-500">{sig.address || 'sin dirección'}</span>
+                <span className="text-slate-500">{sig.address || tr('sin dirección')}</span>
               </span>
               <span className="block pl-4">
                 {sig.elements.map((id, i) => (
@@ -1339,6 +1375,10 @@ export function SceneStatic({ scene, variables = [] }) {
   const desk = elements.filter((e) => DESK_TYPES.includes(e.type) && e.place === 'desk')
   const machine = elements.filter((e) => !desk.includes(e))
   const boxes = machine.map((e) => boundsOf(placed(scene, state, e), 1))
+  const spots = layoutLabels(
+    machine.map((e, i) => ({ e, b: boxes[i], text: labelOf(e), lines: io(e).length })),
+    scene?.gravity,
+  )
   const minX = Math.min(0, ...boxes.map((b) => b.x)) - 20
   const minY = Math.min(0, ...boxes.map((b) => b.y)) - 20
   const maxX = Math.max(200, ...boxes.map((b) => b.x + b.w)) + 40
@@ -1355,17 +1395,17 @@ export function SceneStatic({ scene, variables = [] }) {
         .sort((a, b) => (UNDER.includes(a.type) ? -1 : 0) - (UNDER.includes(b.type) ? -1 : 0))
         .map((raw) => {
           const e = placed(scene, state, raw)
-          const b = boundsOf(e, state.pos[e.id] ?? 0)
+          const at = spots.get(e.id)
           return (
             <g key={e.id}>
               <g transform={`translate(${e.x} ${e.y})${turns(e) ? ` rotate(${e.rot ?? 0})` : ''}`}>{drawElement(e, { scene, state, values: {}, time: 0, signals })}</g>
-              {e.type !== 'label' && !((e.type === 'image' || e.type === 'pipe') && !e.text) && (
-                <text x={b.x + b.w / 2} y={b.y + b.h + 13} textAnchor="middle" fontSize="11" fill="#334155">
+              {at && e.type !== 'label' && !((e.type === 'image' || e.type === 'pipe') && !e.text) && (
+                <text x={at.x} y={at.y} textAnchor={at.anchor} fontSize="11" fill="#334155">
                   {labelOf(e)}
                 </text>
               )}
-              {io(e).map((line, i) => (
-                <text key={line} x={b.x + b.w / 2} y={b.y + b.h + 25 + i * 11} textAnchor="middle" fontSize="9" fontFamily="Courier New, monospace" fill="#2563eb">
+              {at && io(e).map((line, i) => (
+                <text key={line} x={at.x} y={at.y + 12 + i * 11} textAnchor={at.anchor} fontSize="9" fontFamily="Courier New, monospace" fill="#2563eb">
                   {line}
                 </text>
               ))}
@@ -1845,6 +1885,11 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
   const shown = elements.map((e) => (drag?.ids.includes(e.id) ? { ...e, x: e.x + drag.dx, y: e.y + drag.dy } : e))
   // Los cilindros montados en el vástago de otro, donde están ahora.
   const machine = shown.filter((e) => !isDesk(e)).map((e) => (e.type === 'cylinder' ? placed(scene ?? { elements: [] }, state, e) : e))
+  const labelled = (e) => !(e.type === 'label' || ((e.type === 'image' || e.type === 'pipe') && !e.text))
+  const labelSpots = layoutLabels(
+    machine.map((e) => ({ e, b: boundsOf(e, 1), text: labelled(e) ? labelOf(e) : '', lines: showIO ? ioLines(e).length : 0 })),
+    scene?.gravity,
+  )
   const deskItems = elements.filter(isDesk)
   const draw = (e) => drawElement(e, { scene, state, values, time, signals })
   // Los mandos y pilotos no se giran (su rótulo se lee siempre).
@@ -1857,7 +1902,7 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
       ref={sectionRef}
       tabIndex={-1}
       onKeyDown={onKeyDown}
-      className={`side-panel @container relative flex outline-none min-w-0 flex-col border-l border-slate-200 bg-white ${maximized ? 'absolute inset-y-0 left-0 right-80 z-20' : 'shrink-0'}`}
+      className={`side-panel @container flex outline-none min-w-0 flex-col border-l border-slate-200 bg-white ${maximized ? 'absolute inset-y-0 left-0 right-80 z-20' : 'relative shrink-0'}`}
       style={maximized ? undefined : { width: width ?? '50%' }}
     >
       {/* Separador: arrastrar para repartir el espacio entre el grafcet y la planta. */}
@@ -1974,7 +2019,7 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
         <button type="button" onClick={fit} title={tr('Ajustar: ver todos los mandos y el mecanismo')} aria-label={tr('Ajustar la vista')} className="rounded p-1 hover:bg-slate-100">
           <Scan size={14} />
         </button>
-        <button type="button" onClick={onToggleMaximize} title={maximized ? 'Vista dividida con el grafcet' : 'Pantalla completa'} className="rounded p-1 hover:bg-slate-100">
+        <button type="button" onClick={onToggleMaximize} title={maximized ? tr('Vista dividida con el grafcet') : tr('Pantalla completa')} className="rounded p-1 hover:bg-slate-100">
           {maximized ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
         </button>
         <button type="button" onClick={onClose} title={tr('Cerrar la planta')} className="rounded p-1 hover:bg-slate-100">
@@ -2180,6 +2225,7 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
               <g
                 key={e.id}
                 data-element={e.type}
+                data-id={e.id}
                 data-pos={e.type === 'cylinder' ? (state.pos[e.id] ?? 0).toFixed(2) : undefined}
                 aria-label={`${tr(SCENE_TYPES[e.type].label)} ${labelOf(e)}`}
                 style={{ cursor: mode === 'edit' ? 'move' : operable(e) ? 'pointer' : 'default' }}
@@ -2192,7 +2238,7 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
                   const b = boundsOf(e, state.pos[e.id] ?? 0)
                   return <rect x={b.x} y={b.y} width={b.w} height={b.h} fill="transparent" />
                 })()}
-                <g transform={`translate(${e.x} ${e.y})${turns(e) ? ` rotate(${e.rot ?? 0})` : ''}`}>{draw(e)}</g>
+                <g data-shape="" transform={`translate(${e.x} ${e.y})${turns(e) ? ` rotate(${e.rot ?? 0})` : ''}`}>{draw(e)}</g>
               </g>
             ))}
             {state.pieces.map((p) => (
@@ -2202,13 +2248,14 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
             {machine.map((e) => {
               // Sin rótulo debajo: los de texto, y las imágenes y tuberías sin nombre propio.
               if (e.type === 'label' || ((e.type === 'image' || e.type === 'pipe') && !e.text)) return null
-              const b = boundsOf(e, state.pos[e.id] ?? 0)
+              const at = labelSpots.get(e.id)
+              if (!at) return null // sin texto (p. ej. una plataforma sin nombre)
               return (
-                <text key={`l-${e.id}`} x={b.x + b.w / 2} y={b.y + b.h + 13} textAnchor="middle" fontSize="11" fill="#334155" pointerEvents="none">
+                <text key={`l-${e.id}`} data-label-of={e.id} x={at.x} y={at.y} textAnchor={at.anchor} fontSize="11" fill="#334155" pointerEvents="none">
                   {labelOf(e)}
                   {showIO &&
                     ioLines(e).map((line) => (
-                      <tspan key={line} x={b.x + b.w / 2} dy="12" fontSize="9.5" fontFamily="ui-monospace, Consolas, monospace" fill="#2563eb">
+                      <tspan key={line} x={at.x} dy="12" fontSize="9.5" fontFamily="ui-monospace, Consolas, monospace" fill="#2563eb">
                         {line}
                       </tspan>
                     ))}

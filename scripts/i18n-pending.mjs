@@ -5,7 +5,9 @@ import { readFileSync } from 'node:fs'
 
 const SPANISH = /[áéíóúñ¿¡]|\b(?:el|la|los|las|de|del|un|una|para|con|sin|que|en|se|no|al|por|y)\s+\p{L}/iu
 const STRING = /'((?:[^'\\\n]|\\.)*)'|"((?:[^"\\\n]|\\.)*)"|`((?:[^`\\]|\\.)*)`/g
-const SKIP_LINE = /^\s*(\/\/|\*|import\s)|className=|console\.|data-testid/
+const SKIP_LINE = /^\s*(\/\/|\*|import\s)|console\.|data-testid/
+// Las clases (className="…" o {`…`}) no son texto: se quitan antes de buscar en la línea.
+const CLASSES = /className=("[^"]*"|\{`[^`]*`\}|\{'[^']*'\})/g
 
 export function pending(file) {
   const out = []
@@ -13,7 +15,7 @@ export function pending(file) {
     .split('\n')
     .forEach((line, i) => {
       if (SKIP_LINE.test(line)) return
-      const code = line.replace(/\/\/.*$/, '')
+      const code = line.replace(/\/\/.*$/, '').replace(CLASSES, '')
       for (const m of code.matchAll(STRING)) {
         const text = m[1] ?? m[2] ?? m[3]
         const before = code.slice(0, m.index)

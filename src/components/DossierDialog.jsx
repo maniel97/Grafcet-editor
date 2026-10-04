@@ -168,7 +168,7 @@ export default function DossierDialog({ nodes, edges, plc, issues, projectName, 
           </aside>
           <div className="flex min-w-0 flex-1 flex-col bg-slate-100">
             <div className="flex items-center gap-2 border-b border-slate-200 bg-white px-4 py-1.5 text-xs">
-              <span className="text-slate-600">{dossier ? `${dossier.pages.length} páginas` : 'Preparando…'}</span>
+              <span className="text-slate-600">{dossier ? t('{n} páginas', { n: dossier.pages.length }) : t('Preparando…')}</span>
               <span className="ml-auto" />
               <button type="button" onClick={() => setZoom((z) => ZOOMS[Math.max(0, ZOOMS.indexOf(z) - 1)])} title={t('Alejar')} className="rounded p-1 hover:bg-slate-100">
                 <Minus size={13} />

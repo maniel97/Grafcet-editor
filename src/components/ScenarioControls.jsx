@@ -78,7 +78,7 @@ export default function ScenarioControls({ simulation, scenarios, onChange }) {
               aria-label={t('Nombre del escenario')}
               className="min-w-0 flex-1 rounded border border-transparent px-1 py-0.5 text-sm hover:border-slate-300 focus:border-blue-500 focus:outline-none"
             />
-            <span className="shrink-0 text-[11px] text-slate-400" title={`${s.events.length} cambios de entradas`}>
+            <span className="shrink-0 text-[11px] text-slate-400" title={t('{n} cambios de entradas', { n: s.events.length })}>
               {s.events.length}× · {fmt(s.duration)}
             </span>
             <button

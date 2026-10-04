@@ -151,3 +151,53 @@ describe('paro inmediato con encapsulación', () => {
     expect(state.values.En_marcha).toBe(0)
   })
 })
+
+describe('cargador por gravedad', () => {
+  it('con 6 piezas repuestas, Marcha saca un lote de 5 y queda 1 en el cargador', () => {
+    const project = normalizeProject(EXAMPLES.find((e) => e.id === 'cargador-gravedad').build())
+    const compiled = compile(buildPlcModel(project.nodes, project.edges, project.plc))
+    const scene = project.plc.scene
+    const world = makeWorld(scene, () => null)
+    let w = world.init()
+    let inputs = world.inputs(w)
+    let state = evolve(compiled, initialState(compiled), inputs, 0).state
+    let time = 0
+    const advance = (seconds) => {
+      for (const end = time + seconds; time < end - 1e-9; ) {
+        time = Math.round((time + 0.1) * 10) / 10
+        const r = advanceWorld(compiled, { state, inputs, world: w }, time, { world })
+        ;({ state, inputs } = r)
+        w = r.world
+      }
+    }
+    for (let i = 0; i < 6; i++) {
+      w = sceneAction(scene, w, 'reponer', 'press')
+      advance(0.2)
+      w = sceneAction(scene, w, 'reponer', 'release')
+      advance(0.6)
+    }
+    expect(w.pieces).toHaveLength(6)
+    w = sceneAction(scene, w, 'marcha', 'press')
+    advance(0.3)
+    w = sceneAction(scene, w, 'marcha', 'release')
+    advance(20)
+    expect(state.values.Lote_listo).toBe(1)
+    expect(state.values.C).toBe(5)
+    advance(4) // la cinta sigue hasta vaciarse
+    expect(w.counts.recogida).toBe(5)
+    expect(w.pieces).toHaveLength(1)
+  })
+})
+
+describe('apilador con trampilla', () => {
+  it('apila de 3 en 3 y descarga cada pila en la recogida', () => {
+    let opened = 0
+    const { world, state } = runExample('apilador-trampilla', 30, { marcha: 'toggle' }, (t, { state: s }) => {
+      if (s.values.Abrir) opened++
+    })
+    expect(opened).toBeGreaterThan(0)
+    expect(world.counts.recogida % 3).toBe(0)
+    expect(world.counts.recogida).toBeGreaterThanOrEqual(6)
+    expect(state.values.C).toBe(world.counts.recogida / 3)
+  })
+})

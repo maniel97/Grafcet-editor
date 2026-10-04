@@ -223,7 +223,17 @@ function supports(scene, state) {
     if (e.type === 'ramp') out.push(rampRect(e))
     if (e.type === 'platform') out.push(platformRect(e))
     if (e.type === 'scale') out.push(scaleRect(e))
-    if (e.type === 'cylinder' && !e.vacuum) out.push(platePlaced(scene, state, e))
+    // La placa y lo que barre desde su posición recogida (la corredera de un expulsor sostiene la
+    // pila de un cargador mientras está fuera; al recogerse, la pieza de encima cae a su sitio).
+    if (e.type === 'cylinder' && !e.vacuum) {
+      const now = platePlaced(scene, state, e)
+      const home = cylinderPlate(placed(scene, state, e), 0)
+      const x = Math.min(now.x, home.x)
+      const y = Math.min(now.y, home.y)
+      out.push({ x, y, w: Math.max(now.x + now.w, home.x + home.w) - x, h: Math.max(now.y + now.h, home.y + home.h) - y })
+    }
+    // Barrera casi cerrada: sostiene lo que tiene encima (como trampilla); al abrirse, cae.
+    if (e.type === 'barrier' && (state.pos?.[e.id] ?? 0) < 0.5) out.push(barrierArm(e))
     if (e.type === 'sink') {
       const r = sinkRect(e)
       out.push({ x: r.x, y: r.y + r.h, w: r.w, h: 1 }) // el fondo: lo que cae dentro se recoge

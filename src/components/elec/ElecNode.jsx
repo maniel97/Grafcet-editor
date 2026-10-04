@@ -116,8 +116,8 @@ export default function ElecNode({ data }) {
           {/* Neumática: identificación ISO 1219-2, sin guion (1V1, A). */}
           <div className="font-semibold">{c.type === 'terminal' ? `${showTag(tag)}:${c.n ?? 1}` : isPneumatic(c.type) ? tag : showTag(tag)}</div>
           {c.text && <div className="text-[10px] text-slate-600">{c.text}</div>}
-          {c.type === 'coil' && (c.kind === 'ton' || c.kind === 'tof') && <div className="text-slate-600">{`${c.kind === 'ton' ? 'Conexión' : 'Desconexión'} ${c.preset ?? 0} s`}</div>}
-          {c.type === 'sensor3' && <div className="text-slate-600">{`${{ inductive: 'Inductivo', capacitive: 'Capacitivo', optical: 'Óptico' }[c.kind] ?? ''} ${c.output ?? 'PNP'}`}</div>}
+          {c.type === 'coil' && (c.kind === 'ton' || c.kind === 'tof') && <div className="text-slate-600">{c.kind === 'ton' ? tr('Conexión {segundos} s', { segundos: c.preset ?? 0 }) : tr('Desconexión {segundos} s', { segundos: c.preset ?? 0 })}</div>}
+          {c.type === 'sensor3' && <div className="text-slate-600">{`${{ inductive: tr('Inductivo'), capacitive: tr('Capacitivo'), optical: tr('Óptico') }[c.kind] ?? ''} ${c.output ?? 'PNP'}`}</div>}
           {/* Referencias cruzadas: bajo la bobina, sus contactos (número y /hoja.columna); bajo el
               contacto, dónde está su bobina. */}
           {xref?.length > 0 && <div className="font-mono text-[9px] text-slate-500">{xref.map((x) => `${x.numbers.join('-')} ${x.where ?? ''}`.trim()).join(' · ')}</div>}
@@ -125,25 +125,25 @@ export default function ElecNode({ data }) {
           {c.signal && <div className="font-mono text-[9px] text-blue-700">↔ {c.signal}</div>}
           {view?.motors?.[c.id]?.mode && <div className="text-green-700">{view.motors[c.id].mode}</div>}
           {view?.motors?.[c.id]?.warning && <div className="text-amber-700">{tr(view.motors[c.id].warning)}</div>}
-          {view?.tripped?.[c.id] && <div className="font-semibold text-red-700">{c.type === 'fuse' ? 'Fundido' : 'Disparado'}</div>}
-          {fault && <div className="font-semibold text-red-700">{fault === 'welded' ? 'Avería: soldado' : ['coil', 'valve', 'lamp', 'buzzer', 'brake'].includes(c.type) || isMotor(c.type) ? 'Avería: cortado' : c.type === 'terminal' ? 'Avería: borna floja' : 'Avería: quemado'}</div>}
-          {c.type === 'counter' && <div className="text-slate-600">{`Preselección ${c.preset ?? 1}`}</div>}
+          {view?.tripped?.[c.id] && <div className="font-semibold text-red-700">{c.type === 'fuse' ? tr('Fundido') : tr('Disparado')}</div>}
+          {fault && <div className="font-semibold text-red-700">{fault === 'welded' ? tr('Avería: soldado') : ['coil', 'valve', 'lamp', 'buzzer', 'brake'].includes(c.type) || isMotor(c.type) ? tr('Avería: cortado') : c.type === 'terminal' ? tr('Avería: borna floja') : tr('Avería: quemado')}</div>}
+          {c.type === 'counter' && <div className="text-slate-600">{tr('Preselección {n}', { n: c.preset ?? 1 })}</div>}
           {c.type === 'coil' && c.kind === 'flash' && <div className="text-slate-600">{`Intermitente ${c.preset ?? 1} s`}</div>}
           {c.type === 'coil' && c.kind === 'impulse' && <div className="text-slate-600">{tr('Telerruptor')}</div>}
-          {c.type === 'coil' && c.interlock && <div className="text-slate-600">{`Enclavamiento mecánico con -${c.interlock}`}</div>}
+          {c.type === 'coil' && c.interlock && <div className="text-slate-600">{tr('Enclavamiento mecánico con {aparato}', { aparato: `-${c.interlock}` })}</div>}
           {c.type === 'emergency' && Number(c.channels) === 2 && <div className="text-slate-600">{tr('Doble canal')}</div>}
           {c.type === 'transmitter' && <div className="text-slate-600">{c.output === '0-10V' ? '0-10 V (3 hilos)' : '4-20 mA (2 hilos)'}</div>}
           {c.type === 'vfd' && <div className="text-slate-600">{`2ª velocidad ${c.speed2 ?? 25} Hz`}</div>}
           {c.type === 'softstarter' && <div className="text-slate-600">{`Rampa ${c.ramp ?? 3} s`}</div>}
           {c.type === 'safetyrelay' && view?.safety?.[c.id]?.discrepancy && <div className="font-semibold text-amber-700">{tr('Discrepancia entre canales')}</div>}
-          {c.type === 'brake' && view && <div className={view.loads?.[c.id] ? 'text-green-700' : 'text-red-700'}>{view.loads?.[c.id] ? 'Suelto' : 'Frenado'}</div>}
-          {c.type === 'pcylinder' && <div className="text-slate-600">{c.acting === 'single' ? 'Simple efecto' : 'Doble efecto'}</div>}
+          {c.type === 'brake' && view && <div className={view.loads?.[c.id] ? 'text-green-700' : 'text-red-700'}>{view.loads?.[c.id] ? tr('Suelto') : tr('Frenado')}</div>}
+          {c.type === 'pcylinder' && <div className="text-slate-600">{c.acting === 'single' ? tr('Simple efecto') : tr('Doble efecto')}</div>}
           {cyl?.note && <div className="text-amber-700">{cyl.note}</div>}
-          {c.type === 'pvalve' && <div className="text-slate-600">{`${c.ways ?? '5/2'} ${c.ways === '5/3' ? `centro ${{ closed: 'cerrado', exhaust: 'a escape', pressure: 'a presión' }[c.center] ?? 'cerrado'}` : c.sol12 ? 'biestable' : c.ways === '3/2' && c.normally === 'NO' ? 'NA' : 'monoestable'}`}</div>}
+          {c.type === 'pvalve' && <div className="text-slate-600">{`${c.ways ?? '5/2'} ${c.ways === '5/3' ? ({ closed: tr('centro cerrado'), exhaust: tr('centro a escape'), pressure: tr('centro a presión') }[c.center] ?? tr('centro cerrado')) : c.sol12 ? tr('biestable') : c.ways === '3/2' && c.normally === 'NO' ? tr('NA') : tr('monoestable')}`}</div>}
           {c.type === 'throttle' && <div className="text-slate-600">{`Abierto ${Math.round((view?.knob?.[c.id] ?? Number(c.setting ?? 0.5)) * 100)} %`}</div>}
           {c.type === 'airsource' && air?.leaks && <div className="font-semibold text-amber-700">{tr('Fuga: el aire sale por un escape')}</div>}
-          {c.type === 'motor1' && <div className="text-slate-600">{c.capacitor === 'start' ? 'Condensador de arranque' : 'Condensador permanente'}</div>}
-          {view?.motors?.[c.id]?.running && view.motors[c.id].speed < 1 && <div className="text-green-700">{`${Math.round(view.motors[c.id].speed * 100)} % de velocidad`}</div>}
+          {c.type === 'motor1' && <div className="text-slate-600">{c.capacitor === 'start' ? tr('Condensador de arranque') : tr('Condensador permanente')}</div>}
+          {view?.motors?.[c.id]?.running && view.motors[c.id].speed < 1 && <div className="text-green-700">{tr('{pct} % de velocidad', { pct: Math.round(view.motors[c.id].speed * 100) })}</div>}
         </div>
       )}
       {rail && <span className="sr-only">{tr(POTENTIALS[c.potential]?.label)}</span>}

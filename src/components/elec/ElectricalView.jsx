@@ -871,7 +871,7 @@ function Inner({ schematic, onChange, elecState, onAction, variables = [], build
         <button type="button" onClick={() => fitView({ padding: 0.15 })} title={tr('Ajustar la vista')} aria-label={tr('Ajustar la vista')} className="rounded p-1 hover:bg-slate-100">
           <Scan size={14} />
         </button>
-        <button type="button" onClick={onToggleMaximize} title={maximized ? 'Vista dividida' : 'Pantalla completa'} className="rounded p-1 hover:bg-slate-100">
+        <button type="button" onClick={onToggleMaximize} title={maximized ? tr('Vista dividida') : tr('Pantalla completa')} className="rounded p-1 hover:bg-slate-100">
           {maximized ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
         </button>
         <button type="button" onClick={onClose} title={tr('Cerrar el esquema')} className="rounded p-1 hover:bg-slate-100">
@@ -882,7 +882,7 @@ function Inner({ schematic, onChange, elecState, onAction, variables = [], build
         <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 bg-slate-50 px-3 py-1 text-xs" role="status" aria-label={tr('Lectura del polímetro')}>
           <Gauge size={13} />
           {probes.length < 2 ? (
-            <span className="text-slate-600">{probes.length ? 'Pulsa el segundo borne (punta negra).' : 'Pulsa un borne para poner la punta roja.'}</span>
+            <span className="text-slate-600">{probes.length ? tr('Pulsa el segundo borne (punta negra).') : tr('Pulsa un borne para poner la punta roja.')}</span>
           ) : (
             (() => {
               const [a, b] = probes
@@ -897,7 +897,7 @@ function Inner({ schematic, onChange, elecState, onAction, variables = [], build
                 <span>
                   <span className="text-red-700">{name(a)}</span> ↔ <span className="font-medium">{name(b)}</span>:{' '}
                   <strong className="font-mono text-sm">{reading.text}</strong>
-                  {analog && <span className="ml-2 font-mono text-blue-700">{`(señal: ${analog.value} ${analog.unit})`}</span>}
+                  {analog && <span className="ml-2 font-mono text-blue-700">{tr('(señal: {valor} {unidad})', { valor: analog.value, unidad: analog.unit })}</span>}
                 </span>
               )
             })()
@@ -1366,7 +1366,7 @@ function Properties({ c, components, variables, onChange, onDelete }) {
       {c.type === 'beacon' &&
         ['red', 'amber', 'green', 'buzzer'].map((k) => (
           <label key={k} className="block">
-            <span className="text-slate-500">{`${{ red: 'Rojo', amber: 'Ámbar', green: 'Verde', buzzer: 'Zumbador' }[k]} mueve en la planta`}</span>
+            <span className="text-slate-500">{tr('{luz} mueve en la planta', { luz: { red: tr('Rojo'), amber: tr('Ámbar'), green: tr('Verde'), buzzer: tr('Zumbador') }[k] })}</span>
             <select value={c[k] ?? ''} onChange={(e) => onChange({ [k]: e.target.value })} className={field}>
               {[['', tr('(sin enlazar)')], ...outputs.map((v) => [v.name, v.name])].map(([value, t]) => (
                 <option key={value} value={value}>

@@ -141,11 +141,20 @@ export default function SimulationPanel({ simulation, scenarios = [], onScenario
     const s = compiled.steps.find((x) => String(x.label) === String(label))
     return s && state.active.has(s.id) ? state.time - (state.activatedAt.get(s.id) ?? state.time) : null
   }
+  const UNIT = { ms: 0.001, s: 1, min: 60, h: 3600 }
+  // Temporizadores: «5s/X2» (desde la activación de la etapa) y los de una temporización t1/a/t2:
+  // «3s/a» cuenta mientras a vale 1 y «a/2s», mientras vale 0 (estado en state.delays).
   const timerInfo = (v) => {
-    const m = /^([\d.]+)(ms|s|min|h)\/X(.+)$/.exec(v.name)
-    if (!m) return null
-    const preset = parseFloat(m[1]) * { ms: 0.001, s: 1, min: 60, h: 3600 }[m[2]]
-    return { preset, elapsed: elapsedOf(m[3]) }
+    const step = /^([\d.]+)(ms|s|min|h)\/X(\d.*)$/.exec(v.name)
+    if (step) return { preset: parseFloat(step[1]) * UNIT[step[2]], elapsed: elapsedOf(step[3]), idle: t('etapa inactiva') }
+    const rising = /^([\d.]+)(ms|s|min|h)\/(.+)$/.exec(v.name)
+    const falling = /^(.+)\/([\d.]+)(ms|s|min|h)$/.exec(v.name)
+    if (!rising && !falling) return null
+    const [preset, name, down] = rising ? [parseFloat(rising[1]) * UNIT[rising[2]], rising[3], false] : [parseFloat(falling[2]) * UNIT[falling[3]], falling[1], true]
+    const key = [...(compiled.delays?.entries() ?? [])].find(([, ast]) => (ast.arg.name ?? `X${ast.arg.step}`) === name)?.[0]
+    const d = key ? state.delays?.get(key) : null
+    const counting = d && d.input !== down
+    return { preset, elapsed: counting ? state.time - d.since : null, idle: t('{variable} a {valor}', { variable: name, valor: down ? 1 : 0 }) }
   }
 
   const signals = [
@@ -404,7 +413,7 @@ export default function SimulationPanel({ simulation, scenarios = [], onScenario
                   <div className="flex justify-between font-mono text-xs">
                     <span>{v.name}</span>
                     <span className="text-slate-500">
-                      {info?.elapsed != null ? `${Math.min(info.elapsed, info.preset).toFixed(1)} / ${info.preset} s` : 'etapa inactiva'}
+                      {info?.elapsed != null ? `${Math.min(info.elapsed, info.preset).toFixed(1)} / ${info.preset} s` : (info?.idle ?? '')}
                     </span>
                   </div>
                   <div className="mt-0.5 h-1.5 rounded bg-slate-100">

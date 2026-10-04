@@ -1011,6 +1011,120 @@ export const EXAMPLES = [
     },
   },
   {
+    id: 'cargador-gravedad',
+    level: 3,
+    title: 'Cargador por gravedad con expulsor (vista de frente)',
+    description: 'Las piezas se apilan en un tubo vertical; el expulsor saca la de abajo a la cinta y la de encima baja sola. Lotes de 5 con un contador.',
+    tags: ['Vista de frente', 'Gravedad', 'Contador', 'Divergencia en O', 'Planta'],
+    build() {
+      const nodes = [
+        step('s0', '0', 200, 0, [{ text: 'C:=0', kind: 'stored-on' }], { initial: true }),
+        trans('t1', '↑Marcha · Hay_pieza · a0', 200, 100),
+        step('s1', '1', 200, 170, ['A+', 'Cinta']),
+        trans('t2', 'a1', 200, 270),
+        step('s2', '2', 200, 340, ['A-', 'Cinta', { text: 'C:=C+1', kind: 'stored-on' }]),
+        trans('t3', 'a0 · [C < 5] · Hay_pieza', 200, 440),
+        trans('t4', 'a0 · [C >= 5]', 520, 440),
+        step('s3', '3', 520, 510, ['Lote_listo', 'Cinta']),
+        trans('t5', 'Marcha', 520, 610),
+        note(
+          'nota',
+          820,
+          0,
+          '# Cargador por gravedad\n**Nivel 3.** Planta **de frente**, con gravedad: las piezas se apilan en el tubo del cargador.\n\n- El expulsor `A` saca la pieza de abajo a la cinta; mientras está fuera, su corredera sostiene la pila y, al recogerse, la pieza de encima **cae a su sitio**.\n- `Hay_pieza` (detector bajo el tubo) evita expulsar en vacío: si se acaba, espera a que repongas.\n- Cada expulsión suma 1 a `C`; con `[C >= 5]` el lote está listo (las condiciones numéricas van entre corchetes, como en la norma).\n\nPruébalo: **Simular**, pulsa **Reponer** varias veces para llenar el cargador y después **Marcha**.',
+          { width: 340, height: 400 },
+        ),
+      ]
+      const edges = links([
+        ['s0', 't1'],
+        ['t1', 's1'],
+        ['s1', 't2'],
+        ['t2', 's2'],
+        ['s2', 't3'],
+        ['s2', 't4'],
+        ['t3', 's1'],
+        ['t4', 's3'],
+        ['s3', 't5'],
+        ['t5', 's0'],
+      ])
+      // Medidas comprobadas en la simulación (tests/unit/exampleRuns.test.js): tubo de 32 px para
+      // piezas de 28, expulsor a la altura de la pieza de abajo.
+      const scene = {
+        gravity: true,
+        elements: [
+          { id: 'pared_i', type: 'platform', x: 210, y: 180, rot: 90, length: 192, text: '' },
+          { id: 'pared_d', type: 'platform', x: 256, y: 180, rot: 90, length: 160, text: '' },
+          { id: 'base', type: 'platform', x: 200, y: 400, rot: 0, length: 60, text: '' },
+          { id: 'expulsor', type: 'cylinder', x: 110, y: 386, rot: 0, extend: 'A+', retract: 'A-', retracted: 'a0', extended: 'a1', stroke: 80, time: 1, text: 'A' },
+          { id: 'cinta', type: 'conveyor', x: 260, y: 415, rot: 0, motor: 'Cinta', length: 300, time: 3, text: 'Cinta' },
+          { id: 'alimentador', type: 'feeder', x: 228, y: 110, rot: 0, trigger: 'Reponer', auto: false, spacing: 0, sizes: 'small', material: 'plastic', color: 'amber' },
+          { id: 'hay', type: 'sensor', x: 228, y: 450, rot: 270, variable: 'Hay_pieza', contact: 'NO', kind: 'optical', range: 70, color: 'amber' },
+          { id: 'recogida', type: 'sink', x: 640, y: 560, rot: 0, text: 'Recogida' },
+          { id: 'marcha', type: 'button', x: 0, y: 0, rot: 0, variable: 'Marcha', contact: 'NO', color: 'green', text: 'Marcha', place: 'desk' },
+          { id: 'reponer', type: 'button', x: 0, y: 0, rot: 0, variable: 'Reponer', contact: 'NO', color: 'blue', text: 'Reponer', place: 'desk' },
+          { id: 'lote', type: 'lamp', x: 0, y: 0, rot: 0, variable: 'Lote_listo', color: 'green', text: 'Lote listo', place: 'desk' },
+          { id: 'contador', type: 'display', x: 0, y: 0, rot: 0, variable: 'C', text: 'Piezas', place: 'desk' },
+        ],
+      }
+      return { nodes, edges, plc: { scene } }
+    },
+  },
+  {
+    id: 'apilador-trampilla',
+    level: 4,
+    title: 'Apilador con trampilla (vista de frente)',
+    description: 'Las cajas caen de la cinta contra un tope y se apilan sobre una trampilla; con 3 en la pila se abre y la pila cae a la recogida. «1s/Pila» descarta las cajas que cruzan el haz al caer.',
+    tags: ['Vista de frente', 'Gravedad', 'Temporización', 'Contador', 'Planta'],
+    build() {
+      const nodes = [
+        step('s0', '0', 200, 0, [], { initial: true }),
+        trans('t1', 'Marcha', 200, 100),
+        step('s1', '1', 200, 170, ['Cinta']),
+        trans('t2', '1s/Pila · Marcha', 200, 270),
+        trans('t5', '!Marcha', 440, 270),
+        step('s2', '2', 200, 340, ['Abrir', { text: 'C:=C+1', kind: 'stored-on' }]),
+        trans('t3', 'b1', 200, 440),
+        step('s3', '3', 200, 510, []),
+        trans('t4', 'b0 · !Pila', 200, 610),
+        note(
+          'nota',
+          760,
+          0,
+          '# Apilador con trampilla\n**Nivel 4.** Planta **de frente**, con gravedad.\n\n- Las cajas salen de la cinta, chocan con el tope y **caen** unas sobre otras encima de la trampilla.\n- `Pila` ve la tercera caja. Pero una caja que cae también cruza el haz un instante: por eso la receptividad es `1s/Pila` (Pila mantenida 1 s, temporización de la norma sobre cualquier variable).\n- Al abrirse la trampilla (`Abrir`) la pila **cae** a la recogida; se cierra sola por su peso y la cinta sigue. `C` cuenta las pilas.\n\nPruébalo: **Simular** y activa Marcha.',
+          { width: 340, height: 380 },
+        ),
+      ]
+      const edges = links([
+        ['s0', 't1'],
+        ['t1', 's1'],
+        ['s1', 't2'],
+        ['s1', 't5'],
+        ['t2', 's2'],
+        ['s2', 't3'],
+        ['t3', 's3'],
+        ['s3', 't4'],
+        ['t4', 's1'],
+        ['t5', 's0'],
+      ])
+      // Medidas comprobadas en la simulación (tests/unit/exampleRuns.test.js): las cajas tocan el
+      // tope y caen rectas sobre la trampilla; el haz de Pila pasa justo por debajo del tope.
+      const scene = {
+        gravity: true,
+        elements: [
+          { id: 'alimentador', type: 'feeder', x: 90, y: 200, rot: 0, auto: true, spacing: 150, sizes: 'small', material: 'plastic', color: 'amber' },
+          { id: 'cinta', type: 'conveyor', x: 60, y: 300, rot: 0, motor: 'Cinta', length: 280, time: 2.8, text: 'Cinta' },
+          { id: 'tope', type: 'platform', x: 414, y: 250, rot: 90, length: 110, text: '' },
+          { id: 'trampilla', type: 'barrier', x: 356, y: 460, rot: 0, open: 'Abrir', close: '', opened: 'b1', closed: 'b0', length: 60, time: 0.6, text: 'Trampilla' },
+          { id: 'pila', type: 'sensor', x: 470, y: 368, rot: 180, variable: 'Pila', contact: 'NO', kind: 'optical', range: 80, color: 'amber' },
+          { id: 'recogida', type: 'sink', x: 386, y: 600, rot: 0, text: 'Recogida' },
+          { id: 'marcha', type: 'switch', x: 0, y: 0, rot: 0, variable: 'Marcha', contact: 'NO', text: 'Marcha', place: 'desk' },
+          { id: 'contador', type: 'display', x: 0, y: 0, rot: 0, variable: 'C', text: 'Pilas', place: 'desk' },
+        ],
+      }
+      return { nodes, edges, plc: { scene } }
+    },
+  },
+  {
     id: 'elevador-frente',
     level: 5,
     title: 'Estación de elevación (vista de frente)',

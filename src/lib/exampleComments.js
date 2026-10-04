@@ -459,6 +459,33 @@ export const EXAMPLE_COMMENTS = {
     },
     steps: { 0: 'Reposo', M1: 'Macroetapa: dosificar y calentar', 2: 'Expulsando', E1: 'Entrada de M1: llenar', 11: 'Calentando 20 s', S1: 'Salida de M1: listo' },
   },
+  'cargador-gravedad': {
+    variables: {
+      Marcha: 'Pulsador de marcha (un lote)',
+      Hay_pieza: 'Detector: pieza abajo en el cargador',
+      a0: 'Detector: expulsor dentro',
+      a1: 'Detector: expulsor fuera',
+      'A+': 'Electroválvula: sacar el expulsor',
+      'A-': 'Electroválvula: meter el expulsor',
+      Cinta: 'Motor de la cinta de salida',
+      Lote_listo: 'Piloto: lote de 5 completo',
+      C: 'Piezas expulsadas en el lote',
+    },
+    steps: { 0: 'Reposo (C a 0)', 1: 'Expulsando', 2: 'Recogiendo el expulsor (C + 1)', 3: 'Lote listo' },
+  },
+  'apilador-trampilla': {
+    variables: {
+      Marcha: 'Interruptor de marcha',
+      Pila: 'Detector: tercera caja de la pila',
+      b0: 'Final de carrera: trampilla cerrada',
+      b1: 'Final de carrera: trampilla abierta',
+      Cinta: 'Motor de la cinta',
+      Abrir: 'Abrir la trampilla (se cierra por su peso)',
+      C: 'Pilas descargadas',
+      '1s/Pila': 'Pila vista durante 1 s (no una caja cayendo)',
+    },
+    steps: { 0: 'Parado', 1: 'Apilando', 2: 'Abriendo la trampilla (C + 1)', 3: 'Cerrándose' },
+  },
   encapsulacion: {
     variables: {
       Marcha: 'Pulsador de marcha',
