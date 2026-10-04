@@ -34,7 +34,7 @@ test('visita guiada: se ofrece la primera vez y se recorre entera', async ({ pag
   await page.waitForSelector('.react-flow__node')
   await expect(page.getByRole('status').filter({ hasText: 'visita guiada' })).toHaveCount(0)
   await page.getByTitle(/^Atajos y notación/).click()
-  await page.getByRole('button', { name: 'Visita guiada' }).click()
+  await page.getByRole('button', { name: 'Visita guiada', exact: true }).click()
   await expect(page.locator('.tour section h2')).toHaveText('Bienvenido al editor GRAFCET')
   await page.keyboard.press('Escape')
   await expect(page.locator('.tour')).toHaveCount(0)

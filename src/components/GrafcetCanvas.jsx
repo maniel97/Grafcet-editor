@@ -49,6 +49,7 @@ import { applySymbols } from '../lib/plc/symbolTable'
 import { buildPlcModel } from '../lib/plcModel'
 import { t } from '../lib/i18n'
 import { FIRST_TOUR, markTourSeen, tourSeen } from '../lib/tours'
+import { tutorialById } from '../lib/tutorials'
 
 // Partes que no hacen falta al abrir el editor: se descargan la primera vez que se usan, para que
 // la carga inicial sea más ligera (importa sobre todo publicado en internet).
@@ -655,6 +656,23 @@ export default function GrafcetCanvas() {
     },
     [replaceProject],
   )
+  // Tutorial de la ayuda: abre su proyecto de partida (vacío: solo la etapa 0) y lo guía.
+  const startTutorial = useCallback(
+    async (id) => {
+      const tutorial = tutorialById(id)
+      if (!tutorial) return
+      setSimulating(false)
+      const { EXAMPLES } = await import('../lib/examples')
+      const example = EXAMPLES.find((ex) => ex.id === tutorial.start)
+      const project = example
+        ? { ...normalizeProject(example.build()), name: example.title }
+        : { nodes: [{ id: 's0', type: 'step', position: { x: 200, y: 40 }, data: { label: '0', actions: [], initial: true } }], edges: [], plc: plcRef.current, name: t(tutorial.title) }
+      replaceProject(project, t('Antes del tutorial «{tutorial}»', { tutorial: t(tutorial.title) }))
+      setHelpOpen(false)
+      setTour(tutorial)
+    },
+    [replaceProject],
+  )
   const restoreRecent = useCallback(
     (entry) => {
       replaceProject(normalizeProject(entry.project), t('Antes de recuperar un trabajo anterior'))
@@ -952,6 +970,15 @@ export default function GrafcetCanvas() {
                 setHelpOpen(false)
                 setTour(FIRST_TOUR)
               }}
+              onExample={async (id) => {
+                const { EXAMPLES } = await import('../lib/examples')
+                const example = EXAMPLES.find((ex) => ex.id === id)
+                if (!example) return
+                setSimulating(false)
+                openExample(example)
+                setHelpOpen(false)
+              }}
+              onTutorial={startTutorial}
             />
           </Suspense>
         )}
@@ -966,7 +993,8 @@ export default function GrafcetCanvas() {
             />
           </Suspense>
         )}
-        {offerTour && !tour && (
+        {/* No a la vez que otro aviso (p. ej. un proyecto compartido por abrir). */}
+        {offerTour && !tour && !incoming && (
           <div role="status" className="fixed top-16 left-1/2 z-[60] flex -translate-x-1/2 items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-xl">
             <Compass size={18} className="shrink-0 text-blue-600" />
             <span>{t('¿Es la primera vez? Una visita guiada te enseña lo principal en un par de minutos.')}</span>

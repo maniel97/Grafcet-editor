@@ -50,6 +50,7 @@ export default function StepNode({ id, data, selected }) {
         </>
       )}
       <div
+        data-active={active ? '' : undefined}
         className={`diagram-step-label relative flex h-[56px] w-[56px] shrink-0 items-center justify-center border-2 font-semibold transition-colors ${border} ${
           active ? 'bg-green-200' : 'bg-white'
         }`}

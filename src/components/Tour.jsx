@@ -7,6 +7,7 @@ import { N_, t } from '../lib/i18n'
 // se señala y una burbuja lo explica. Un paso (lib/tours.js) es { target, title, text, waitFor?,
 // hint? }:
 // - target: ancla o anclas [data-tour] (o selectores CSS); sin target, la burbuja va en el centro.
+// - free: no bloquea lo de fuera (para pasos que usan paneles o menús).
 // - waitFor(): el paso espera a que el usuario haga algo (se comprueba en la página); mientras,
 //   «Siguiente» está desactivado y se muestra `hint`. Al cumplirse, se marca como hecho.
 // Lo señalado se puede usar (el hueco no tapa); lo demás no, para no perderse. Esc cierra.
@@ -68,9 +69,17 @@ export default function Tour({ tour, onClose }) {
     setIndex(next)
   }
 
+  // Tutoriales (tour.auto): un paso cumplido pasa solo al siguiente, tras ver «¡Hecho!» un momento.
+  useEffect(() => {
+    if (!tour.auto || !done || !step.waitFor || last) return
+    const timer = setTimeout(() => setIndex((i) => i + 1), 900)
+    return () => clearTimeout(timer)
+  }, [tour.auto, done, step, last])
+
   useEffect(() => {
     const onKey = (e) => {
-      if (e.key === 'Escape') {
+      // Escribiendo, Esc es del campo (cierra sus sugerencias), no de la visita.
+      if (e.key === 'Escape' && !e.target.closest?.('input, textarea, select, [contenteditable="true"]')) {
         e.stopPropagation()
         onClose(false)
       }
@@ -84,7 +93,11 @@ export default function Tour({ tour, onClose }) {
   const vh = window.innerHeight
   let left = (vw - bubble.w) / 2
   let top = (vh - bubble.h) / 2
-  if (area) {
+  if (step.free) {
+    // En los pasos libres se trabaja en el lienzo y los paneles: la burbuja, en una esquina.
+    left = 64
+    top = vh - bubble.h - 64
+  } else if (area) {
     left = Math.min(Math.max(12, area.x + area.w / 2 - bubble.w / 2), vw - bubble.w - 12)
     if (area.y + area.h + 12 + bubble.h < vh) top = area.y + area.h + 12
     else if (area.y - 12 - bubble.h > 0) top = area.y - 12 - bubble.h
@@ -95,7 +108,8 @@ export default function Tour({ tour, onClose }) {
   }
 
   // Oscurecido en cuatro trozos alrededor del hueco (el hueco deja usar lo señalado).
-  const shade = 'fixed bg-slate-900/45 pointer-events-auto'
+  // Con free (tutoriales), oscurece igual pero deja usar todo (paneles, menús, el lienzo).
+  const shade = `fixed ${step.free ? 'bg-slate-900/25 pointer-events-none' : 'bg-slate-900/45 pointer-events-auto'}`
   const hole = area ?? { x: vw / 2, y: vh / 2, w: 0, h: 0 }
 
   return createPortal(

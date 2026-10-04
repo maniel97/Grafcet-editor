@@ -1,7 +1,11 @@
-import { useEffect, useRef } from 'react'
-import { Compass, X } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { BookOpen, ChevronRight, Compass, Home, Keyboard, Search, Shapes, X } from 'lucide-react'
 import { SHORTCUTS } from '../lib/shortcuts'
 import { N_, t } from '../lib/i18n'
+import Markdown from '../help/Markdown'
+import { ARTICLES, SECTIONS, articleSource, articleTitle } from '../help'
+import { EXAMPLES } from '../lib/examples'
+import { tutorialById } from '../lib/tutorials'
 
 const NOTATION = [
   [N_('Etapa inicial'), N_('Doble cuadrado. Activa al arrancar; debe haber al menos una.'),],
@@ -23,7 +27,7 @@ const NOTATION = [
     N_('Cuadros de texto libres (barra o clic derecho en el lienzo). No forman parte del grafcet: la verificación, la simulación y el ladder las ignoran. Formato: «# Título», «- elemento» para listas, **negrita** entre dobles asteriscos y `Variable` entre comillas invertidas.'),
   ],
   [N_('Ordenar'), N_('Selecciona varios nodos y, con clic derecho: Alinear en columna o Espaciar la secuencia (distancias estándar).'),],
-  [N_('Abrir'), N_('Archivo .json, Ejemplos (taladradora, cilindros, semáforo, mezcladora) o Trabajos anteriores: lo que había antes de abrir o limpiar se guarda solo en este navegador.'),],
+  [N_('Abrir'), N_('Archivo .json, Ejemplos (ordenados por niveles, del 1 al 5) o Trabajos anteriores: lo que había antes de abrir o limpiar se guarda solo en este navegador.')],
   [
     N_('Simulación'),
     N_('Botón Simular. Etapa activa: verde con punto. Transición validada: ámbar; franqueable: verde. Acción emitida: verde. Entradas con interruptor, pulsador o teclas 1–9; «Paso» franquea de uno en uno para ver la evolución fugaz.'),
@@ -69,12 +73,66 @@ const NOTATION = [
   [N_('Transiciones fuente y sumidero'), N_('Una transición sin etapa anterior (fuente) está siempre validada: cada vez que se cumple su receptividad, normalmente un flanco (↑Pieza), activa las etapas siguientes. Una transición sin etapa posterior (sumidero) desactiva sus etapas anteriores.')],
 ]
 
-// Ayuda rápida: atajos de teclado y resumen de la notación IEC 60848 que usa el editor.
-export default function HelpDialog({ onClose, onTour }) {
+// Preguntas frecuentes (inicio de la ayuda): lo que más se pregunta al empezar.
+const FAQ = [
+  [N_('¿Cómo enlazo una etapa con una transición?'), N_('Arrastra desde el punto de abajo de la etapa hasta la transición, o selecciona la etapa y pulsa su +: añade la transición debajo, ya enlazada. Etapas y transiciones se alternan siempre.')],
+  [N_('¿Cómo hago que el grafcet vuelva a empezar (un bucle)?'), N_('Clic derecho en la última transición > «Bucle a etapa» y pulsa la etapa de destino. El enlace sube por la izquierda con una flecha, como manda la norma.')],
+  [N_('¿Cómo hago caminos alternativos (O) o simultáneos (Y)?'), N_('O: clic derecho en la transición > «Añadir alternativa en O»; cada camino lleva su receptividad y deben ser excluyentes (Verificar lo comprueba). Y: clic derecho en la transición > «Divergencia en Y (2 ramas)»; para juntar las ramas, selecciona sus últimas etapas y, con clic derecho, «Converger en Y».')],
+  [N_('¿Qué escribo en una receptividad?'), N_('Variables y operadores de la norma: a · b (Y), a + b (O), !a (negación), ↑a / ↓a (flancos), X2 (etapa 2 activa), 5s/X2 (temporización), [C >= 3] (comparación). Al escribir, el autocompletado propone las variables que ya existen.')],
+  [N_('¿Qué tipos de acción hay?'), N_('Continua (mientras la etapa está activa), condicionada (con una condición encima), memorizada al activarse o al desactivarse la etapa (A:=1, C:=C+1) y al evento (↑b). Se eligen en las propiedades de la etapa (doble clic).')],
+  [N_('¿Por qué Verificar marca un error o un aviso?'), N_('Cada mensaje explica la regla de la norma que no se cumple y qué hacer; púlsalo para ir al elemento. Los errores impiden que el grafcet sea conforme; los avisos señalan algo que probablemente no quieres; los consejos, errores típicos al aprender.')],
+  [N_('¿Cómo pruebo el grafcet sin autómata?'), N_('Pulsa Simular: activa las entradas con un clic o con las teclas 1–9 y mira las etapas activas. Si algo no avanza, pasa el ratón por la transición. En los ejemplos con planta virtual, la máquina se mueve con tus salidas.')],
+  [N_('¿Cómo doy direcciones del autómata a las variables?'), N_('Abre la tabla de variables y pulsa «Rellenar vacías»: asigna direcciones según el formato elegido (S7-200, S7-300/1200 o IEC 61131-3). Puedes cambiar cualquiera a mano.')],
+  [N_('¿Cómo paso el programa al autómata?'), N_('Botón Ladder: ladder, ST, SCL (TIA Portal) y AWL/STL. Para el S7-200, descarga el .awl y, en Micro/WIN, Archivo > Importar; la tabla de símbolos se copia y se pega.')],
+  [N_('¿Dónde se guarda mi trabajo?'), N_('Mientras trabajas se guarda solo en este navegador, y lo anterior queda en Abrir > Trabajos anteriores. Para llevártelo, «Guardar» descarga un archivo .json; también puedes compartirlo por enlace (Exportar > Compartir por enlace).')],
+  [N_('¿Cómo cambio el nombre de una variable en todo el diagrama?'), N_('En la tabla de variables (la del lienzo o la del diálogo), clic en su nombre y escribe el nuevo: cambia en receptividades, acciones, la planta y el esquema, y conserva su dirección y su comentario.')],
+  [N_('¿Cómo cambio el idioma, el tema o el tamaño de letra?'), N_('Botón Opciones (el engranaje de la barra).')],
+]
+
+// Páginas fijas de la ayuda (los artículos de la wiki se añaden aquí).
+const PAGES = [
+  { id: 'inicio', title: N_('Inicio'), icon: Home },
+  { id: 'atajos', title: N_('Atajos de teclado'), icon: Keyboard },
+  { id: 'notacion', title: N_('Notación IEC 60848'), icon: Shapes },
+]
+
+// Sin tildes ni mayúsculas, para buscar.
+const plain = (text) =>
+  String(text)
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+
+// Centro de ayuda: inicio (visita guiada y preguntas frecuentes), atajos, notación y, después, la
+// wiki. Buscador en todo lo escrito (en el idioma elegido).
+// page: 'inicio' | 'atajos' | 'notacion' | 'a:<id de artículo>'.
+export default function HelpDialog({ onClose, onTour, onExample, onTutorial, initialPage = 'inicio' }) {
   const dialogRef = useRef(null)
+  const [page, setPage] = useState(initialPage)
+  const [query, setQuery] = useState('')
+  const [openFaq, setOpenFaq] = useState(null)
   useEffect(() => {
     if (!dialogRef.current.open) dialogRef.current.showModal()
   }, [])
+
+  // Todo lo que se puede buscar: [página, título, texto, índice de la pregunta].
+  const entries = useMemo(
+    () => [
+      ...FAQ.map(([q, a], i) => ['inicio', t(q), t(a), i]),
+      ...SHORTCUTS.map(([keys, what]) => ['atajos', t(keys), t(what)]),
+      ...NOTATION.map(([term, desc]) => ['notacion', t(term), t(desc)]),
+      ...ARTICLES.map((id) => [`a:${id}`, articleTitle(id), articleSource(id).replace(/^#.*$/m, '').replace(/[#*`>[\]()]/g, ' ')]),
+    ],
+    [],
+  )
+  const words = plain(query).split(/\s+/).filter(Boolean)
+  const results = words.length ? entries.filter(([, title, text]) => words.every((w) => plain(`${title} ${text}`).includes(w))) : null
+
+  const go = (id, faq = null) => {
+    setPage(id)
+    setQuery('')
+    setOpenFaq(faq)
+  }
 
   return (
     <dialog
@@ -82,49 +140,182 @@ export default function HelpDialog({ onClose, onTour }) {
       onClose={onClose}
       onClick={(e) => e.target === dialogRef.current && onClose()}
       aria-labelledby="help-title"
-      className="m-auto w-[min(44rem,calc(100vw-2rem))] rounded-xl bg-white p-0 text-slate-900 shadow-2xl backdrop:bg-slate-900/40"
+      className="m-auto h-[min(48rem,calc(100vh-2rem))] w-[min(64rem,calc(100vw-2rem))] overflow-hidden rounded-xl bg-white p-0 text-slate-900 shadow-2xl backdrop:bg-slate-900/40"
     >
-      <div className="flex items-center justify-between border-b border-slate-200 px-5 py-3">
-        <h2 id="help-title" className="text-base font-semibold">
-          {t('Ayuda')}
-        </h2>
-        <span className="ml-auto" />
-        {onTour && (
-          <button
-            type="button"
-            onClick={onTour}
-            className="mr-2 flex items-center gap-1.5 rounded-md border border-blue-200 bg-blue-50 px-3 py-1 text-sm text-blue-800 hover:bg-blue-100"
-          >
-            <Compass size={16} /> {t('Visita guiada')}
+      <div className="flex h-full flex-col">
+        <div className="flex items-center gap-3 border-b border-slate-200 px-5 py-3">
+          <h2 id="help-title" className="flex items-center gap-2 text-base font-semibold">
+            <BookOpen size={18} /> {t('Ayuda')}
+          </h2>
+          <label className="relative ml-4 flex-1">
+            <Search size={14} className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              type="search"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder={t('Buscar en la ayuda…')}
+              aria-label={t('Buscar en la ayuda')}
+              className="w-full max-w-md rounded-md border border-slate-300 py-1 pl-7 pr-2 text-sm focus:border-blue-500 focus:outline-none"
+            />
+          </label>
+          {onTour && (
+            <button
+              type="button"
+              onClick={onTour}
+              className="flex shrink-0 items-center gap-1.5 rounded-md border border-blue-200 bg-blue-50 px-3 py-1 text-sm text-blue-800 hover:bg-blue-100"
+            >
+              <Compass size={16} /> {t('Visita guiada')}
+            </button>
+          )}
+          <button type="button" onClick={onClose} title={t('Cerrar (Esc)')} className="rounded-md p-1 text-slate-500 hover:bg-slate-100">
+            <X size={18} />
           </button>
-        )}
-        <button type="button" onClick={onClose} title={t('Cerrar (Esc)')} className="rounded-md p-1 text-slate-500 hover:bg-slate-100">
-          <X size={18} />
-        </button>
-      </div>
-      <div className="grid max-h-[75vh] gap-6 overflow-y-auto px-5 py-4 md:grid-cols-2">
-        <section>
-          <h3 className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-500">{t('Atajos')}</h3>
-          <dl className="space-y-1.5 text-sm">
-            {SHORTCUTS.map(([keys, what]) => (
-              <div key={keys} className="flex gap-3">
-                <dt className="w-40 shrink-0 font-mono text-xs leading-5 text-slate-600">{t(keys)}</dt>
-                <dd>{t(what)}</dd>
-              </div>
+        </div>
+        <div className="flex min-h-0 flex-1">
+          <nav aria-label={t('Secciones de la ayuda')} className="w-56 shrink-0 overflow-y-auto border-r border-slate-200 bg-slate-50 p-2 text-sm max-sm:hidden">
+            {PAGES.map(({ id, title, icon: Icon }) => (
+              <button
+                key={id}
+                type="button"
+                aria-current={page === id && !results ? 'page' : undefined}
+                onClick={() => go(id)}
+                className={`flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left ${page === id && !results ? 'bg-blue-100 text-blue-900' : 'text-slate-700 hover:bg-slate-200'}`}
+              >
+                <Icon size={15} className="shrink-0" /> {t(title)}
+              </button>
             ))}
-          </dl>
-        </section>
-        <section>
-          <h3 className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-500">{t('Notación IEC 60848')}</h3>
-          <dl className="space-y-2 text-sm">
-            {NOTATION.map(([term, desc]) => (
-              <div key={term}>
-                <dt className="font-medium">{t(term)}</dt>
-                <dd className="text-slate-600">{t(desc)}</dd>
-              </div>
-            ))}
-          </dl>
-        </section>
+            {SECTIONS.map((section) => {
+              const ids = section.articles.filter((id) => ARTICLES.includes(id))
+              if (!ids.length) return null
+              return (
+                <div key={section.title} className="mt-3">
+                  <p className="px-2 pb-1 text-[11px] font-semibold uppercase tracking-wide text-slate-400">{t(section.title)}</p>
+                  {ids.map((id) => (
+                    <button
+                      key={id}
+                      type="button"
+                      aria-current={page === `a:${id}` && !results ? 'page' : undefined}
+                      onClick={() => go(`a:${id}`)}
+                      className={`block w-full rounded-md px-2 py-1 text-left ${page === `a:${id}` && !results ? 'bg-blue-100 text-blue-900' : 'text-slate-700 hover:bg-slate-200'}`}
+                    >
+                      {articleTitle(id)}
+                    </button>
+                  ))}
+                </div>
+              )
+            })}
+          </nav>
+          <main className="min-w-0 flex-1 overflow-y-auto px-6 py-5 text-sm leading-relaxed">
+            {/* En pantallas estrechas no cabe el índice: un desplegable. */}
+            <select
+              aria-label={t('Secciones de la ayuda')}
+              value={page}
+              onChange={(e) => go(e.target.value)}
+              className="mb-4 w-full rounded-md border border-slate-300 px-2 py-1 sm:hidden"
+            >
+              {PAGES.map(({ id, title }) => (
+                <option key={id} value={id}>
+                  {t(title)}
+                </option>
+              ))}
+              {SECTIONS.map((section) => (
+                <optgroup key={section.title} label={t(section.title)}>
+                  {section.articles
+                    .filter((id) => ARTICLES.includes(id))
+                    .map((id) => (
+                      <option key={id} value={`a:${id}`}>
+                        {articleTitle(id)}
+                      </option>
+                    ))}
+                </optgroup>
+              ))}
+            </select>
+            {results ? (
+              <section aria-label={t('Resultados de la búsqueda')}>
+                <h3 className="mb-3 text-base font-semibold">{t('{n} resultados', { n: results.length })}</h3>
+                {results.length === 0 && <p className="text-slate-500">{t('Nada coincide. Prueba con otras palabras.')}</p>}
+                <ul className="space-y-2">
+                  {results.map(([id, title, text, faq], i) => (
+                    <li key={i}>
+                      <button type="button" onClick={() => go(id, faq ?? null)} className="w-full rounded-md border border-slate-200 p-2 text-left hover:border-blue-300 hover:bg-blue-50">
+                        <span className="block font-medium">{title}</span>
+                        <span className="line-clamp-2 text-slate-600">{text}</span>
+                        <span className="mt-0.5 block text-xs text-slate-400">{id.startsWith('a:') ? t('Wiki') : t(PAGES.find((p) => p.id === id)?.title ?? '')}</span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            ) : page.startsWith('a:') ? (
+              <article>
+                <Markdown
+                  source={articleSource(page.slice(2)) ?? ''}
+                  ctx={{
+                    onArticle: (id) => go(`a:${id}`),
+                    example: (id) => EXAMPLES.find((ex) => ex.id === id),
+                    tutorial: tutorialById,
+                    onExample,
+                    onTutorial,
+                  }}
+                />
+              </article>
+            ) : page === 'inicio' ? (
+              <section>
+                <h3 className="mb-1 text-lg font-semibold">{t('¿Por dónde empiezo?')}</h3>
+                <p className="mb-3 text-slate-600">
+                  {t('La visita guiada enseña lo principal en un par de minutos. Después, abre un ejemplo (Abrir > Ejemplos): están ordenados por niveles y cada uno trae una nota con lo que enseña.')}
+                </p>
+                {onTour && (
+                  <button type="button" onClick={onTour} className="mb-6 flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 font-medium text-white hover:bg-blue-700">
+                    <Compass size={16} /> {t('Hacer la visita guiada')}
+                  </button>
+                )}
+                <h3 className="mb-2 text-lg font-semibold">{t('Preguntas frecuentes')}</h3>
+                <p className="mb-2 text-slate-600">{t('Y en la wiki (en el índice), cada parte del programa con su porqué y su cómo, ejemplos que se abren en el editor y tutoriales guiados.')}</p>
+                <ul className="divide-y divide-slate-200 rounded-md border border-slate-200">
+                  {FAQ.map(([q, a], i) => (
+                    <li key={q}>
+                      <button
+                        type="button"
+                        aria-expanded={openFaq === i}
+                        onClick={() => setOpenFaq(openFaq === i ? null : i)}
+                        className="flex w-full items-center gap-2 px-3 py-2 text-left font-medium hover:bg-slate-50"
+                      >
+                        <ChevronRight size={15} className={`shrink-0 transition-transform ${openFaq === i ? 'rotate-90' : ''}`} />
+                        {t(q)}
+                      </button>
+                      {openFaq === i && <p className="px-9 pb-3 text-slate-600">{t(a)}</p>}
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            ) : page === 'atajos' ? (
+              <section>
+                <h3 className="mb-3 text-lg font-semibold">{t('Atajos de teclado')}</h3>
+                <dl className="space-y-1.5">
+                  {SHORTCUTS.map(([keys, what]) => (
+                    <div key={keys} className="flex gap-3">
+                      <dt className="w-48 shrink-0 font-mono text-xs leading-5 text-slate-600">{t(keys)}</dt>
+                      <dd>{t(what)}</dd>
+                    </div>
+                  ))}
+                </dl>
+              </section>
+            ) : (
+              <section>
+                <h3 className="mb-3 text-lg font-semibold">{t('Notación IEC 60848')}</h3>
+                <dl className="space-y-3">
+                  {NOTATION.map(([term, desc]) => (
+                    <div key={term}>
+                      <dt className="font-medium">{t(term)}</dt>
+                      <dd className="text-slate-600">{t(desc)}</dd>
+                    </div>
+                  ))}
+                </dl>
+              </section>
+            )}
+          </main>
+        </div>
       </div>
     </dialog>
   )

@@ -685,9 +685,11 @@ test('idioma: la ayuda y Verificar (mensajes con partes variables) también se t
   await page.keyboard.press('Escape')
   await page.getByTitle('Shortcuts and notation (?)').click()
   const help = page.getByRole('dialog', { name: 'Help' })
-  await expect(help.getByRole('heading', { name: 'Shortcuts' })).toBeVisible()
-  await expect(help.getByText('OR divergence', { exact: true })).toBeVisible()
+  await expect(help.getByRole('heading', { name: 'Frequently asked questions' })).toBeVisible()
+  await help.getByRole('navigation').getByRole('button', { name: 'Keyboard shortcuts' }).click()
   await expect(help.getByText('Duplicate the selection')).toBeVisible()
+  await help.getByRole('navigation').getByRole('button', { name: 'IEC 60848 notation' }).click()
+  await expect(help.getByText('OR divergence', { exact: true })).toBeVisible()
   await page.keyboard.press('Escape')
   // Un paso sin transición de salida: el aviso lleva el número de la etapa en su sitio.
   await page.getByRole('button', { name: 'Step', exact: true }).click()

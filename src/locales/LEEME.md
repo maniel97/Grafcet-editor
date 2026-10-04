@@ -60,3 +60,11 @@ Después ejecuta `npm run i18n -- --check` y `npm test` para comprobarlo.
 
 El formato es «JSON plano clave-valor» (monolingüe, con `es.json` como origen), el que admiten
 Weblate, Crowdin y Tolgee sin configuración especial.
+
+## Artículos de la ayuda (wiki)
+
+Los artículos no van en estos JSON: son archivos Markdown en `src/help/<idioma>/<id>.md`. Para
+traducir uno, copia `src/help/es/<id>.md` a la carpeta del idioma (`src/help/en/`…) y tradúcelo
+entero, título incluido. Lo que no esté traducido se muestra en español. No traduzcas lo que va
+entre acentos graves (`5s/X2`), los destinos de los enlaces `[texto](destino)` ni la primera
+línea de los bloques ```` ```ejemplo … ```` y ```` ```tutorial … ````.
