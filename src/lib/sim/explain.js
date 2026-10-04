@@ -20,6 +20,8 @@ export function showExpression(ast, parent = null) {
       return `X${ast.step}`
     case 'timer':
       return `${num(ast.seconds)}s/X${ast.step}`
+    case 'delay':
+      return `${num(ast.on)}s/${showExpression(ast.arg)}${ast.off ? `/${num(ast.off)}s` : ''}`
     case 'not':
       return `!${wrap(ast.arg)}`
     case 'rise':
@@ -71,6 +73,18 @@ function explainTerm(ast, ctx, info) {
       const left = Math.max(0, ast.seconds - ctx.elapsed(ast.step))
       return { text, ok, detail: ok ? tr('tiempo cumplido') : tr('quedan {segundos} s', { segundos: num(left) }) }
     }
+    case 'delay': {
+      const arg = showExpression(ast.arg)
+      if (ok) return { text, ok, detail: tr('verdadera') }
+      const now = truthy(evaluate(ast.arg, ctx))
+      return {
+        text,
+        ok,
+        detail: now
+          ? tr('{variable} vale 1: tiene que mantenerse {segundos} s', { variable: arg, segundos: num(ast.on) })
+          : tr('{variable} vale 0: tiene que pasar a 1 y mantenerse {segundos} s', { variable: arg, segundos: num(ast.on) }),
+      }
+    }
     case 'rise':
     case 'fall': {
       const arg = wrap(ast.arg)
@@ -117,7 +131,7 @@ export function explainTransition(compiled, sim, transitionId) {
   const { state, inputs } = sim
   const values = { ...state.values, ...inputs }
   const prev = state.prev ? { ...state.prev, activatedAt: state.activatedAt } : null
-  const ctx = makeContext(compiled, values, state.active, state.activatedAt, state.time, prev)
+  const ctx = makeContext(compiled, values, state.active, state.activatedAt, state.time, prev, state.delays)
   const variable = (id) => compiled.steps.find((s) => s.id === id)?.variable ?? '?'
   const steps = t.from.map((id) => ({ id, variable: variable(id), active: state.active.has(id) }))
   const types = new Map(compiled.variables.map((v) => [v.name, v.type]))

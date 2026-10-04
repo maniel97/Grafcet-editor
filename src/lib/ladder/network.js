@@ -5,6 +5,7 @@
 //    | { type: 'compare', op, a, b }        (caja de comparación)
 //    | { type: 'true' } | { type: 'false' }  (siempre / nunca: se simplifican)
 // Operando: { kind: 'var', name } | { kind: 'step', label } | { kind: 'timer', key, seconds, step }
+//         | { kind: 'timer', key, seconds, network, delay, falling }  (TON de una temporización t1/a/t2)
 //         | { kind: 'aux', name } | { kind: 'num', value }
 //
 // Las negaciones se llevan hasta los contactos (forma normal negada, leyes de De Morgan):
@@ -61,6 +62,9 @@ export function toNetwork(ast, ctx, negated = false) {
     case 'step':
     case 'timer':
       return contact(operandOf(ast), negated ? 'NC' : 'NO')
+    case 'delay':
+      // t1/a/t2: el contacto de su temporizador o de su marca (ctx.delayFor, en generate.js).
+      return contact(ctx.delayFor(ast), negated ? 'NC' : 'NO')
     case 'not':
       return toNetwork(ast.arg, ctx, !negated)
     case 'and':

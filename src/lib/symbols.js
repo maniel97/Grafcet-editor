@@ -1,9 +1,11 @@
 import { normalizeAction } from './actions'
 import { isForcing } from './forcing'
+import { durationText } from './sim/expression'
 
 // Detección de las variables que usa el grafcet, para la tabla de variables:
 // - receptividades y condiciones de acción -> entradas (identificadores)
 // - temporizaciones "5s/X2"                 -> temporizadores (con su preselección y etapa)
+// - temporizaciones "3s/a/2s" (t1/a/t2)      -> temporizadores "3s/a" (subida) y "a/2s" (bajada)
 // - acciones "Motor ON", "A+"               -> salidas (el texto completo es el símbolo)
 // - acciones de asignación "A:=1", "C:=C+1" -> marcas (la variable de la izquierda)
 // "X2" se refiere a la etapa 2 (su variable de etapa), no es un símbolo propio.
@@ -13,6 +15,11 @@ const TIMER = /(\d+(?:[.,]\d+)?)\s*(ms|s|min|h)\s*\/\s*X\s*([\p{L}\p{N}_.]+)/giu
 // No debe ir pegado a una cifra: en "5s" la "s" es la unidad, no una variable.
 const IDENTIFIER = /(?<![\p{L}\p{N}_.])[\p{L}_][\p{L}\p{N}_.]*/gu
 const STEP_VARIABLE = /^X[\p{N}]/u
+
+// Temporización sobre cualquier variable (o con retardo a la bajada): t1/a, t1/a/t2.
+const DELAY = /(\d+(?:[.,]\d+)?)\s*(ms|s|min|h)\s*\/\s*([\p{L}_][\p{L}\p{N}_.]*)(?:\s*\/\s*(\d+(?:[.,]\d+)?)\s*(ms|s|min|h))?/giu
+const UNIT_SECONDS = { ms: 0.001, s: 1, min: 60, h: 3600 }
+const seconds = (value, unit) => parseFloat(value.replace(',', '.')) * UNIT_SECONDS[unit.toLowerCase()]
 
 // Clave estable de un temporizador: "5s/X2".
 export const timerKey = (value, unit, step) => `${value.replace(',', '.')}${unit.toLowerCase()}/X${step}`
@@ -24,9 +31,18 @@ const COMPARED =
 // Símbolos de una expresión booleana (receptividad o condición de acción).
 export function parseExpression(text) {
   const timers = []
-  const rest = String(text ?? '').replace(TIMER, (_, value, unit, step) => {
-    timers.push({ key: timerKey(value, unit, step), preset: `${value.replace(',', '.')}${unit.toLowerCase()}`, step })
-    return ' '
+  const rest = String(text ?? '').replace(DELAY, (match, value, unit, name, offValue, offUnit) => {
+    const step = /^X([\p{N}][\p{L}\p{N}_.]*)$/u.exec(name)?.[1]
+    if (step && !offValue) {
+      timers.push({ key: timerKey(value, unit, step), preset: `${value.replace(',', '.')}${unit.toLowerCase()}`, step })
+      return ' '
+    }
+    // t1/a/t2: "t1/a" retrasa la subida y "a/t2" la bajada (los que no sean 0).
+    const on = seconds(value, unit)
+    const off = offValue ? seconds(offValue, offUnit) : 0
+    if (on) timers.push({ key: `${durationText(on)}/${name}`, preset: durationText(on), signal: name })
+    if (off) timers.push({ key: `${name}/${durationText(off)}`, preset: durationText(off), signal: name, falling: true })
+    return step ? ' ' : ` ${name} `
   })
   const inputs = (rest.match(IDENTIFIER) ?? []).filter((id) => !KEYWORDS.has(id.toUpperCase()) && !STEP_VARIABLE.test(id))
   const numeric = new Set([...rest.matchAll(COMPARED)].map((m) => m[1] ?? m[2]).filter((id) => !STEP_VARIABLE.test(id)))

@@ -37,11 +37,18 @@ export function ladderLive(ladder, compiled, state) {
       case 'step':
         return active.has(stepId(op.label))
       case 'timer': {
+        // TON de una temporización t1/a/t2: a lleva `seconds` a 1 (o a 0, el de la bajada).
+        if (op.delay) {
+          const d = state.delays?.get(op.delay)
+          return Boolean(d) && d.input !== op.falling && state.time - d.since >= op.seconds - 1e-9
+        }
         const id = stepId(op.step)
         return state.active.has(id) && state.time - (state.activatedAt.get(id) ?? state.time) >= op.seconds - 1e-9
       }
       case 'trans':
       case 'aux': {
+        // Marca de una temporización t1/a/t2 (con S y R, no con bobina): su salida.
+        if (op.delay) return Boolean(state.delays?.get(op.delay)?.out)
         const key = `${op.kind}:${op.name}`
         if (!marks.has(key)) {
           marks.set(key, false) // por si hubiera un ciclo

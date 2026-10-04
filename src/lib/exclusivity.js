@@ -7,7 +7,7 @@ import { t } from './i18n'
 // - etapas (X3): activa o no; temporizaciones (5s/X3): antes y después de cumplirse;
 // - flancos (↑a): también el valor del ciclo anterior.
 
-import { ExpressionError, evaluate, parseCondition, truthy } from './sim/expression'
+import { delayKey, ExpressionError, evaluate, parseCondition, truthy } from './sim/expression'
 
 export const MAX_COMBINATIONS = 1 << 16
 
@@ -25,6 +25,11 @@ function collect(ast, domain, underEdge = false) {
     case 'timer':
       domain.steps.add(ast.step)
       domain.timers.set(ast.step, new Set([...(domain.timers.get(ast.step) ?? [0]), ast.seconds]))
+      break
+    case 'delay':
+      // t1/a/t2: depende de la historia de a, así que puede valer 0 o 1 con cualquier valor de a.
+      domain.delays.add(delayKey(ast))
+      collect(ast.arg, domain, underEdge)
       break
     case 'cmp':
       for (const [side, other] of [
@@ -70,7 +75,7 @@ export function checkExclusive(textA, textB) {
     if (err instanceof ExpressionError) return { exclusive: null, reason: 'syntax' }
     throw err
   }
-  const domain = { vars: new Map(), steps: new Set(), timers: new Map(), prevVars: new Set(), prevSteps: new Set() }
+  const domain = { vars: new Map(), steps: new Set(), timers: new Map(), prevVars: new Set(), prevSteps: new Set(), delays: new Set() }
   collect(a, domain)
   collect(b, domain)
 
@@ -81,6 +86,7 @@ export function checkExclusive(textA, textB) {
     ...[...domain.steps].map((s) => [`s:${s}`, [0, 1]]),
     ...[...domain.prevSteps].map((s) => [`ps:${s}`, [0, 1]]),
     ...[...domain.timers].map(([s, values]) => [`t:${s}`, [...values].sort((x, y) => x - y)]),
+    ...[...domain.delays].map((key) => [`d:${key}`, [0, 1]]),
   ]
   const total = dims.reduce((n, [, values]) => n * values.length, 1)
   if (total > MAX_COMBINATIONS) return { exclusive: null, reason: 'size' }
@@ -90,6 +96,7 @@ export function checkExclusive(textA, textB) {
     value: (name) => pick.get(`${prefix}:${name}`) ?? pick.get(`v:${name}`) ?? 0,
     step: (label) => (pick.get(`${stepPrefix}:${label}`) ?? pick.get(`s:${label}`) ?? 0) === 1,
     elapsed: (label) => pick.get(`t:${label}`) ?? 0,
+    delay: (key) => pick.get(`d:${key}`) === 1,
   })
   const ctx = { ...ctxFor('v', 's'), prev: ctxFor('pv', 'ps') }
 
@@ -111,6 +118,7 @@ export function checkExclusive(textA, textB) {
     else if (kind === 'pv') example.before[name] = v
     else if (kind === 's') example.steps[name] = v
     else if (kind === 't') example.steps[`t${name}`] = v
+    else if (kind === 'd') example.now[name] = v
   }
   return { exclusive: false, example }
 }

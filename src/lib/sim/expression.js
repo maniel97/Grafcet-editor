@@ -69,6 +69,11 @@ export function tokenize(text) {
       push(ch, ch, 1)
       continue
     }
+    // Corchetes de la norma para las condiciones numéricas («[C >= 3] · a»): como paréntesis.
+    if (ch === '[' || ch === ']') {
+      push(ch === '[' ? '(' : ')', ch === '[' ? '(' : ')', 1)
+      continue
+    }
     const number = /^(\d+(?:[.,]\d+)?)(ms|s|min|h)?(?![\p{L}\p{N}_])/u.exec(rest)
     if (number) {
       const value = parseFloat(number[1].replace(',', '.'))
@@ -158,13 +163,20 @@ export function parseCondition(text) {
     }
     if (t.type === 'duration') {
       take()
-      // Temporización normalizada "5s/X2"
+      // Temporizaciones normalizadas: "5s/X2" (desde la activación de la etapa) y, sobre cualquier
+      // variable, "t1/a/t2": sube t1 después de que suba a y baja t2 después de que baje
+      // ("3s/a" sin retardo a la bajada; "0s/a/2s" sin retardo a la subida).
       if (peek()?.type === 'slash') {
         take()
-        const step = take('ident')
-        const m = /^X(.+)$/.exec(step.value)
-        if (!m) throw new ExpressionError(`En «${t.value}s/${step.value}» se esperaba una etapa (X2, X10…).`)
-        return { op: 'timer', seconds: t.value, step: m[1] }
+        const id = take('ident')
+        const m = /^X(\p{N}[\p{L}\p{N}_.]*)$/u.exec(id.value)
+        let off = 0
+        if (peek()?.type === 'slash' && tokens[pos + 1]?.type === 'duration') {
+          take()
+          off = take().value
+        }
+        if (m && !off) return { op: 'timer', seconds: t.value, step: m[1] }
+        return { op: 'delay', on: t.value, off, arg: m ? { op: 'step', step: m[1] } : { op: 'var', name: id.value } }
       }
       return { op: 'num', value: t.value }
     }
@@ -195,6 +207,35 @@ export function parseCondition(text) {
 const describe = (type) =>
   ({ ')': '«)»', ident: 'un nombre', number: 'un número' })[type] ?? 'algo más'
 
+// Duración en texto, como en las claves de los temporizadores: 500ms, 3s, 2.5s.
+export const durationText = (seconds) => (seconds < 1 ? `${Math.round(seconds * 1000)}ms` : `${+seconds.toFixed(3)}s`)
+const argText = (arg) => (arg.op === 'step' ? `X${arg.step}` : arg.name)
+// Temporización t1/a/t2: su clave ("3s/a/2s") y las de sus dos temporizadores en la tabla de
+// variables: "3s/a" (retardo a la subida) y "a/2s" (retardo a la bajada), si los hay.
+export const delayKey = (ast) => `${durationText(ast.on)}/${argText(ast.arg)}${ast.off ? `/${durationText(ast.off)}` : ''}`
+export const delayTimers = (ast) => [
+  ...(ast.on ? [{ key: `${durationText(ast.on)}/${argText(ast.arg)}`, seconds: ast.on, falling: false }] : []),
+  ...(ast.off ? [{ key: `${argText(ast.arg)}/${durationText(ast.off)}`, seconds: ast.off, falling: true }] : []),
+]
+
+// Temporizaciones t1/a/t2 de una expresión (para que el simulador lleve su estado).
+export function collectDelays(ast, out = new Map()) {
+  if (!ast) return out
+  if (ast.op === 'delay') out.set(delayKey(ast), ast)
+  for (const k of ['arg', 'left', 'right']) if (ast[k]) collectDelays(ast[k], out)
+  return out
+}
+
+// Un ciclo de una temporización t1/a/t2: sube cuando a lleva t1 a 1 y baja cuando lleva t2 a 0.
+// state = { input, since, out } (since: instante del último cambio de a).
+export function stepDelay(state, input, time, { on, off }) {
+  const s = state ?? { input: false, since: time, out: false }
+  const since = input === s.input ? s.since : time
+  const held = time - since + 1e-9
+  const out = input ? s.out || held >= on : s.out && held < off
+  return { input, since, out }
+}
+
 // ctx: { value(name), step(label), elapsed(label), prev?: ctx }
 // `prev` es el contexto del ciclo anterior, para los flancos; sin él, no hay flancos.
 export function evaluate(ast, ctx) {
@@ -207,6 +248,9 @@ export function evaluate(ast, ctx) {
       return ctx.step(ast.step) ? 1 : 0
     case 'timer':
       return ctx.step(ast.step) && ctx.elapsed(ast.step) >= ast.seconds - 1e-9 ? 1 : 0
+    case 'delay':
+      // El estado de la temporización lo lleva el simulador (sim/engine.js), ciclo a ciclo.
+      return ctx.delay?.(delayKey(ast)) ? 1 : 0
     case 'not':
       return truthy(evaluate(ast.arg, ctx)) ? 0 : 1
     case 'and':

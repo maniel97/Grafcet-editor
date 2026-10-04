@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { evaluate, parseAssignment, parseCondition, evaluateArithmetic } from '../../src/lib/sim/expression'
+import { evaluate, parseAssignment, parseCondition, evaluateArithmetic, stepDelay } from '../../src/lib/sim/expression'
 import { compile, evolve, initialState, inspect } from '../../src/lib/sim/engine'
 import { buildPlcModel } from '../../src/lib/plcModel'
 import { EMPTY_PLC } from '../../src/lib/addressing'
@@ -28,7 +28,7 @@ describe('intérprete de receptividades', () => {
     ['a b', /Falta un operador antes de «b»/],
     ['a ·', /incompleta/],
     ['(a + b', /Falta «\)»/],
-    ['5s/b', /se esperaba una etapa/],
+    ['5s/', /Falta un nombre al final/],
     ['a $ b', /Carácter no válido «\$»/],
   ])('error claro en «%s»', (expr, message) => expect(() => parseCondition(expr)).toThrow(message))
 
@@ -41,6 +41,37 @@ describe('intérprete de receptividades', () => {
 })
 
 const compiled = (nodes, edges) => compile(buildPlcModel(nodes, edges, EMPTY_PLC))
+
+// IEC 60848: temporización sobre cualquier variable, con retardo a la subida y a la bajada
+// (t1/a/t2), y condiciones numéricas entre corchetes.
+describe('temporizaciones t1/a/t2 y corchetes', () => {
+  it('se interpretan', () => {
+    expect(parseCondition('3s/a/2s')).toEqual({ op: 'delay', on: 3, off: 2, arg: { op: 'var', name: 'a' } })
+    expect(parseCondition('500ms/b')).toEqual({ op: 'delay', on: 0.5, off: 0, arg: { op: 'var', name: 'b' } })
+    expect(parseCondition('5s/X2')).toEqual({ op: 'timer', seconds: 5, step: '2' })
+    expect(parseCondition('0s/X2/1s').op).toBe('delay')
+    expect(evaluate(parseCondition('[C >= 3] · a'), { value: (n) => ({ C: 4, a: 1 })[n], step: () => false })).toBe(1)
+  })
+  it('sube t1 después de a y baja t2 después', () => {
+    let st = null
+    const d = { on: 2, off: 1 }
+    const trace = [[0, 1], [1, 1], [2, 1], [3, 0], [3.5, 0], [4, 0], [5, 1], [6, 0]].map(([time, a]) => {
+      st = stepDelay(st, Boolean(a), time, d)
+      return st.out ? 1 : 0
+    })
+    // 0 s: a sube; 2 s: sale; 3 s: a baja; 4 s: 1 s después, cae; 5–6 s: pulso corto, no sale.
+    expect(trace).toEqual([0, 0, 1, 1, 1, 0, 0, 0])
+  })
+  it('en la simulación: un pulso corto de a no franquea «2s/a»; mantenido, sí', () => {
+    const nodes = [step('s0', '0', 0, { initial: true }), transition('t1', '2s/a', 100), step('s1', '1', 200), transition('t2', 'b', 300)]
+    const c = compiled(nodes, links([['s0', 't1'], ['t1', 's1'], ['s1', 't2'], ['t2', 's0']]))
+    let s = initialState(c)
+    for (const [time, a] of [[0, 1], [1, 1], [1.5, 0], [2.5, 0]]) s = evolve(c, s, { a }, time).state
+    expect(active(c, s)).toEqual(['0'])
+    for (const [time, a] of [[3, 1], [4, 1], [5.1, 1]]) s = evolve(c, s, { a }, time).state
+    expect(active(c, s)).toEqual(['1'])
+  })
+})
 const active = (c, state) => [...state.active].map((id) => c.steps.find((s) => s.id === id).label).sort()
 
 describe('motor de evolución (IEC 60848)', () => {

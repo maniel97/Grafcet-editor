@@ -155,12 +155,19 @@ export function validateGrafcet(nodes, edges) {
     if (!tn.data.condition?.trim()) {
       add('error', t('Transición sin receptividad: toda transición la necesita (usa 1 si siempre se cumple).'), [tn.id])
     }
-    if (incoming(tn.id).length === 0) {
-      add('error', t('{transicion} no tiene etapa anterior: nunca podrá franquearse.', { transicion: transitionName(tn) }), [tn.id])
-    }
+    // Transición fuente (sin etapa anterior) y sumidero (sin etapa posterior), IEC 60848: la fuente
+    // está siempre validada y activa sus etapas siguientes; el sumidero desactiva las anteriores.
     const out = outgoing(tn.id)
-    if (out.length === 0) {
-      add('error', t('{transicion} no tiene etapa posterior: al franquearla no se activaría nada.', { transicion: transitionName(tn) }), [tn.id])
+    if (incoming(tn.id).length === 0 && out.length === 0) {
+      add('error', t('{transicion} no está unida a ninguna etapa.', { transicion: transitionName(tn) }), [tn.id])
+    } else if (incoming(tn.id).length === 0 && !/[↑↓]/.test(tn.data.condition ?? '')) {
+      add(
+        'warning',
+        t('{transicion} es una transición fuente (sin etapa anterior): está siempre validada y, sin un flanco en su receptividad (↑a), se franquea en cada ciclo mientras se cumpla.', {
+          transicion: transitionName(tn),
+        }),
+        [tn.id],
+      )
     }
     const loops = out.filter((e) => y(e.target) < y(tn.id))
     if (loops.length && out.length > loops.length) {

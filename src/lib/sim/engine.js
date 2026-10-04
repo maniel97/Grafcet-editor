@@ -19,7 +19,7 @@
 import { normalizeAction } from '../actions'
 import { actionSymbol } from '../symbols'
 import { describeForcing } from '../forcing'
-import { ExpressionError, evaluate, evaluateArithmetic, parseAssignment, parseCondition, truthy } from './expression'
+import { collectDelays, ExpressionError, evaluate, evaluateArithmetic, parseAssignment, parseCondition, stepDelay, truthy } from './expression'
 
 const MAX_ITERATIONS = 100
 
@@ -89,7 +89,11 @@ export function compile(model) {
   // Macroetapas: activas mientras lo esté alguna etapa de su expansión.
   const macroMembers = new Map((model.macros ?? []).map((m) => [m.stepId, m.members]))
 
-  return { steps, transitions, stepByLabel, driven, variables: model.variables, errors, grafcets, grafcetOf, forcings, macroMembers }
+  // Temporizaciones t1/a/t2 de receptividades y condiciones: su estado se lleva ciclo a ciclo.
+  const delays = new Map()
+  for (const t of transitions) collectDelays(t.ast, delays)
+  for (const s of steps) for (const a of s.actions) collectDelays(a.conditionAst, delays)
+  return { steps, transitions, stepByLabel, driven, variables: model.variables, errors, grafcets, grafcetOf, forcings, macroMembers, delays }
 }
 
 // Etapas activas vistas desde fuera: incluye las macroetapas con alguna etapa activa.
@@ -132,11 +136,12 @@ export function initialState(compiled) {
     activatedAt: new Map([...active].map((id) => [id, 0])),
     values,
     prev: null, // { values, active } del ciclo anterior, para los flancos
+    delays: new Map(), // clave "3s/a/2s" -> { input, since, out }
     unstable: false,
   }
 }
 
-export function makeContext(compiled, values, active, activatedAt, time, prev) {
+export function makeContext(compiled, values, active, activatedAt, time, prev, delays) {
   const stepActive = (label) => {
     const id = compiled.stepByLabel.get(String(label))
     const members = compiled.macroMembers?.get(id)
@@ -149,7 +154,8 @@ export function makeContext(compiled, values, active, activatedAt, time, prev) {
       const id = compiled.stepByLabel.get(String(label))
       return active.has(id) ? time - (activatedAt.get(id) ?? time) : 0
     },
-    prev: prev ? makeContext(compiled, prev.values, prev.active, prev.activatedAt, time, null) : null,
+    delay: (key) => Boolean(delays?.get(key)?.out),
+    prev: prev ? makeContext(compiled, prev.values, prev.active, prev.activatedAt, time, null, prev.delays ?? delays) : null,
   }
 }
 
@@ -175,13 +181,25 @@ export function evolve(compiled, state, inputs, time, { singleStep = false } = {
   // Los flancos solo existen en la primera evaluación: en la evolución fugaz posterior las
   // entradas no han cambiado.
   let prev = state.prev ? { ...state.prev, activatedAt: state.activatedAt } : null
+  // Temporizaciones t1/a/t2: se actualizan una vez por ciclo, con las entradas de este instante.
+  const delays = new Map(state.delays ?? [])
+  if (compiled.delays?.size) {
+    const now = makeContext(compiled, values, active, activatedAt, time, null, state.delays)
+    for (const [key, d] of compiled.delays) delays.set(key, stepDelay(delays.get(key), truthy(evaluate(d.arg, now)), time, d))
+  }
 
   for (let iteration = 0; ; iteration++) {
-    const ctx = makeContext(compiled, values, active, activatedAt, time, prev)
+    const ctx = makeContext(compiled, values, active, activatedAt, time, prev, delays)
     // Las transiciones de un grafcet forzado no se franquean.
     const forced = forcingOrders(compiled, active)
+    // Una transición fuente (sin etapas anteriores) está siempre validada; si sus etapas siguientes
+    // ya están activas, franquearla no cambia nada y no se cuenta (si no, la evolución no acabaría).
     const firable = compiled.transitions.filter(
-      (t) => t.from.every((id) => active.has(id)) && !t.from.some((id) => forced.has(compiled.grafcetOf.get(id))) && evalBool(t.ast, ctx),
+      (t) =>
+        t.from.every((id) => active.has(id)) &&
+        !(t.from.length ? t.from : t.to).some((id) => forced.has(compiled.grafcetOf.get(id))) &&
+        !(t.from.length === 0 && t.to.every((id) => active.has(id))) &&
+        evalBool(t.ast, ctx),
     )
 
     const deactivated = new Set(firable.flatMap((t) => t.from))
@@ -219,7 +237,7 @@ export function evolve(compiled, state, inputs, time, { singleStep = false } = {
         events.push({ time, transitionId: null, forcing: order.text, stepId: order.stepId, from: before, to: after })
       }
     }
-    prev = { values: { ...values }, active, activatedAt: new Map(activatedAt) }
+    prev = { values: { ...values }, active, activatedAt: new Map(activatedAt), delays }
     active = next
 
     if (singleStep) break
@@ -230,7 +248,7 @@ export function evolve(compiled, state, inputs, time, { singleStep = false } = {
   }
 
   // Situación estable: acciones continuas, condicionadas y al evento.
-  const ctx = makeContext(compiled, values, active, activatedAt, time, state.prev ? { ...state.prev } : null)
+  const ctx = makeContext(compiled, values, active, activatedAt, time, state.prev ? { ...state.prev } : null, delays)
   for (const name of compiled.driven) values[name] = 0
   for (const step of compiled.steps) {
     if (!active.has(step.id)) continue
@@ -248,7 +266,8 @@ export function evolve(compiled, state, inputs, time, { singleStep = false } = {
       active,
       activatedAt,
       values,
-      prev: { values: { ...values }, active: new Set(active), activatedAt: new Map(activatedAt) },
+      prev: { values: { ...values }, active: new Set(active), activatedAt: new Map(activatedAt), delays },
+      delays,
       unstable,
     },
     events,
@@ -258,13 +277,13 @@ export function evolve(compiled, state, inputs, time, { singleStep = false } = {
 
 // Vista instantánea para pintar el lienzo: transiciones validadas y con receptividad verdadera.
 export function inspect(compiled, state) {
-  const ctx = makeContext(compiled, state.values, state.active, state.activatedAt, state.time, null)
+  const ctx = makeContext(compiled, state.values, state.active, state.activatedAt, state.time, null, state.delays)
   const enabled = new Set()
   const ready = new Set()
   // En un grafcet forzado ninguna transición está validada.
   const forced = forcingOrders(compiled, state.active)
   for (const t of compiled.transitions) {
-    if (!t.from.every((id) => state.active.has(id)) || t.from.some((id) => forced.has(compiled.grafcetOf.get(id)))) continue
+    if (!t.from.every((id) => state.active.has(id)) || (t.from.length ? t.from : t.to).some((id) => forced.has(compiled.grafcetOf.get(id)))) continue
     enabled.add(t.id)
     if (evalBool(t.ast, ctx)) ready.add(t.id)
   }

@@ -20,6 +20,7 @@ import { buildPlcModel } from '../plcModel'
 import { compile } from '../sim/engine'
 import { parseAddress, formatBit } from '../addressing'
 import { contact, parallel, series, toNetwork, walk } from './network'
+import { delayKey, delayTimers } from '../sim/expression'
 import { resolveStepPrefix, stepVar } from '../stepNames'
 import { analogConfig, describeRange, isAnalog, rawRange, toRaw } from '../analog'
 
@@ -60,13 +61,31 @@ export function generateLadder(nodes, edges, plc) {
   })
   const trName = new Map(transitions.map((t, i) => [t.id, `Tr${i + 1}`]))
 
-  // Marcas auxiliares para flancos de expresiones compuestas.
+  // Marcas auxiliares para flancos de expresiones compuestas y temporizaciones t1/a/t2.
   const auxRungs = []
+  let auxCount = 0
+  const delayMarks = new Map()
   const ctx = {
     auxFor: (ast) => {
-      const name = `Aux${auxRungs.length + 1}`
+      const name = `Aux${++auxCount}`
       auxRungs.push({ comment: `${name}: expresión auxiliar para detectar su flanco`, network: toNetwork(ast, ctx), outputs: [{ type: 'coil', operand: { kind: 'aux', name } }] })
       return name
+    },
+    // t1/a/t2 (IEC 60848): sin t2, el contacto del TON «t1/a» (a mantenida t1); con t2, una marca
+    // que pone a 1 ese TON (o a, si t1 = 0) y a 0 el TON «a/t2» (a a 0 durante t2).
+    delayFor: (ast) => {
+      const key = delayKey(ast)
+      const timer = (t) => ({ kind: 'timer', key: t.key, seconds: t.seconds, network: toNetwork(ast.arg, ctx, t.falling), delay: key, falling: t.falling })
+      const [rising, falling] = [false, true].map((f) => delayTimers(ast).find((t) => t.falling === f))
+      if (!falling) return timer(rising)
+      if (delayMarks.has(key)) return delayMarks.get(key)
+      const mark = { kind: 'aux', name: `Aux${++auxCount}`, delay: key }
+      delayMarks.set(key, mark)
+      auxRungs.push(
+        { comment: `${mark.name}: ${key} sube`, network: rising ? contact(timer(rising)) : toNetwork(ast.arg, ctx), outputs: [{ type: 'set', operand: mark }] },
+        { comment: `${mark.name}: ${key} baja`, network: contact(timer(falling)), outputs: [{ type: 'reset', operand: mark }] },
+      )
+      return mark
     },
   }
   const safeNetwork = (ast, where) => {
@@ -221,8 +240,10 @@ export function generateLadder(nodes, edges, plc) {
     id: 'timers',
     title: 'Temporizaciones',
     rungs: [...timers.values()].map((t) => ({
-      comment: `${t.key}: ${t.seconds} s desde la activación de ${stepVar(t.step, P)}`,
-      network: contact(stepOp(t.step)),
+      comment: t.network
+        ? `${t.key}: ${t.seconds} s ${t.falling ? 'a 0' : 'a 1'} (${t.delay})`
+        : `${t.key}: ${t.seconds} s desde la activación de ${stepVar(t.step, P)}`,
+      network: t.network ?? contact(stepOp(t.step)),
       outputs: [{ type: 'ton', operand: { kind: 'timer', key: t.key }, seconds: t.seconds }],
       nodeIds: [],
     })),
