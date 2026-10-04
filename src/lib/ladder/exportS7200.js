@@ -8,10 +8,14 @@
 // aritmética de palabras MOVW, +I, -I, *I, /I (OUT := OUT op IN).
 
 import { parseAddress, S7200 } from '../addressing'
+import { realLiteral } from '../analog'
 
 const HEADER = 'Generado por Grafcet Editor (IEC 60848 -> método SET/RESET por etapas)'
 // Palabras temporales para los cálculos (VW900, VW902...): lejos de las de usuario (VW100...).
 const TEMP_WORD = 900
+// Escalado de analógicas en REAL: cálculos en VD940… y operandos de las comparaciones en VD960….
+const TEMP_REAL = 940
+const CMP_REAL = 960
 
 // Base de tiempo de los temporizadores TON/TOF del S7-200 según su número (s).
 export function timerBase(number) {
@@ -143,6 +147,7 @@ export function toS7200(ladder, plc, { title = '' } = {}) {
         if (n.kind === 'P' || n.kind === 'N') return [pad('LD', at(n.operand)), n.kind === 'P' ? 'EU' : 'ED']
         return [pad(n.kind === 'NC' ? 'LDN' : 'LD', at(n.operand))]
       case 'compare':
+        if (n.real) return [pad(`LDR${CMP[n.op]}`, n.real.slots.join(', '))]
         return [pad(`LDW${CMP[n.op]}`, `${at(n.a)}, ${at(n.b)}`)]
       case 'not':
         return [...block(n.item), 'NOT']
@@ -154,10 +159,12 @@ export function toS7200(ladder, plc, { title = '' } = {}) {
         throw new Error(`Red no soportada: ${n.type}`)
     }
   }
+  const compareItem = (n, op) =>
+    n.real ? [pad(`${op}R${CMP[n.op]}`, n.real.slots.join(', '))] : [pad(`${op}W${CMP[n.op]}`, `${at(n.a)}, ${at(n.b)}`)]
   const andItem = (n) =>
-    simple(n) ? [pad(n.kind === 'NC' ? 'AN' : 'A', at(n.operand))] : n.type === 'compare' ? [pad(`AW${CMP[n.op]}`, `${at(n.a)}, ${at(n.b)}`)] : [...block(n), 'ALD']
+    simple(n) ? [pad(n.kind === 'NC' ? 'AN' : 'A', at(n.operand))] : n.type === 'compare' ? compareItem(n, 'A') : [...block(n), 'ALD']
   const orItem = (n) =>
-    simple(n) ? [pad(n.kind === 'NC' ? 'ON' : 'O', at(n.operand))] : n.type === 'compare' ? [pad(`OW${CMP[n.op]}`, `${at(n.a)}, ${at(n.b)}`)] : [...block(n), 'OLD']
+    simple(n) ? [pad(n.kind === 'NC' ? 'ON' : 'O', at(n.operand))] : n.type === 'compare' ? compareItem(n, 'O') : [...block(n), 'OLD']
 
   // Aritmética de palabras: el resultado se calcula en VW900... y se copia al destino.
   const OPS = { '+': '+I', '-': '-I', '*': '*I', '/': '/I' }
@@ -169,6 +176,57 @@ export function toS7200(ladder, plc, { title = '' } = {}) {
     if (ast.right.op !== 'arith') return { lines: [...left.lines, pad(OPS[ast.fn], `${word(ast.right)}, ${target}`)], target }
     const right = compute(ast.right, depth + 1)
     return { lines: [...left.lines, ...right.lines, pad(OPS[ast.fn], `${right.target}, ${target}`)], target }
+  }
+
+  // Escalado de analógicas en REAL (generate.js): la palabra se pasa a doble entero y a REAL
+  // (ITD, DTR) y se opera con +R −R *R /R (OUT := OUT op IN, como con los enteros).
+  const ROPS = { '+': '+R', '-': '-R', '*': '*R', '/': '/R' }
+  const realCompute = (ast, depth = 0) => {
+    const target = `VD${TEMP_REAL + depth * 4}`
+    if (ast.op === 'num') return { lines: [pad('MOVR', `${realLiteral(ast.value)}, ${target}`)], target }
+    if (ast.op === 'var') return { lines: [pad('ITD', `${at({ kind: 'var', name: ast.name })}, ${target}`), pad('DTR', `${target}, ${target}`)], target }
+    const left = realCompute(ast.left, depth)
+    if (ast.right.op === 'num') return { lines: [...left.lines, pad(ROPS[ast.fn], `${realLiteral(ast.right.value)}, ${target}`)], target }
+    const right = realCompute(ast.right, depth + 1)
+    return { lines: [...left.lines, ...right.lines, pad(ROPS[ast.fn], `${right.target}, ${target}`)], target }
+  }
+  // Asignación REAL: recortada a [lo, hi] (LPS/LRD/LPP: la condición de la red sigue arriba),
+  // redondeada (ROUND) y pasada a palabra (DTI).
+  const realAssign = (o) => {
+    const { lines, target } = realCompute(o.value)
+    const [lo, hi] = o.real.clamp.map(realLiteral)
+    return [
+      ...lines,
+      'LPS',
+      pad('AR>', `${target}, ${hi}`),
+      pad('MOVR', `${hi}, ${target}`),
+      'LRD',
+      pad('AR<', `${target}, ${lo}`),
+      pad('MOVR', `${lo}, ${target}`),
+      'LPP',
+      pad('ROUND', `${target}, ${target}`),
+      pad('DTI', `${target}, ${at(o.operand)}`),
+    ]
+  }
+  // Comparaciones REAL de una red: sus dos operandos se calculan antes, en una red propia, y se
+  // dejan en VD960… (n.real.slots).
+  const realCompares = (net) => {
+    const found = []
+    const walk = (n) => {
+      if (n.type === 'compare' && n.real) found.push(n)
+      n.items?.forEach(walk)
+      if (n.item) walk(n.item)
+    }
+    walk(net)
+    const lines = []
+    found.forEach((n, i) => {
+      n.real.slots = [`VD${CMP_REAL + i * 8}`, `VD${CMP_REAL + i * 8 + 4}`]
+      for (const [k, ast] of [n.real.a, n.real.b].entries()) {
+        const { lines: code, target } = realCompute(ast)
+        lines.push(...code, pad('MOVR', `${target}, ${n.real.slots[k]}`))
+      }
+    })
+    return lines
   }
 
   const timerLine = (o) => {
@@ -185,6 +243,8 @@ export function toS7200(ladder, plc, { title = '' } = {}) {
   let number = 0
   for (const s of ladder.sections) {
     for (const r of s.rungs) {
+      const scaling = realCompares(r.network)
+      if (scaling.length) body.push(`Network ${++number} // Escalado (REAL) para las comparaciones de la red siguiente`, pad('LD', 'SM0.0'), ...scaling)
       body.push(`Network ${++number} // ${ansiText(r.comment).slice(0, 120)}`)
       if (number === 1 || s.rungs[0] === r) body.push(`// ${ansiText(s.title)}`)
       body.push(...block(r.network))
@@ -193,6 +253,7 @@ export function toS7200(ladder, plc, { title = '' } = {}) {
         else if (o.type === 'set') body.push(pad('S', `${at(o.operand)}, 1`))
         else if (o.type === 'reset') body.push(pad('R', `${at(o.operand)}, 1`))
         else if (o.type === 'ton') body.push(timerLine(o))
+        else if (o.type === 'assign' && o.real) body.push(`// ${ansiText(o.operand.name)} := ${ansiText(o.text)}`, ...realAssign(o))
         else if (o.type === 'assign') {
           const { lines, target } = compute(o.value)
           body.push(`// ${ansiText(o.operand.name)} := ${ansiText(o.text)}`, ...lines, pad('MOVW', `${target}, ${at(o.operand)}`))

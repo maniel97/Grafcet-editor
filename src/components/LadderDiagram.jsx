@@ -181,7 +181,7 @@ function Compare({ x, y, node, ctx }) {
         <rect data-live={closed ? 'cerrado' : 'abierto'} x={x + 12} y={y - 22} width={W - 24} height={44} fill={closed ? LIVE_ON : LIVE_OFF} fillOpacity={closed ? 0.25 : 0.1} />
       )}
       <text x={x + W / 2} y={y - 9} textAnchor="middle" fontSize="10" fontWeight="600" fontFamily={FONT} fill={INK}>
-        CMP {node.op}
+        CMP {node.op}{node.real ? 'R' : ''}
       </text>
       <text x={x + W / 2} y={y + 5} textAnchor="middle" fontSize="10" fontFamily={MONO} fill={INK}>
         {clip(name(node.a), 11)}
@@ -201,8 +201,8 @@ function Output({ x, y, output, ctx, energized }) {
   )
   const text = labels(output.operand, ctx.resolver, ctx.mode)
   if (output.type === 'ton' || output.type === 'assign') {
-    const title = output.type === 'ton' ? 'TON' : 'CALC'
-    const body = output.type === 'ton' ? `PT ${+output.seconds.toFixed(3)} s` : clip(`${output.operand.name} := ${output.text}`, 15)
+    const title = output.type === 'ton' ? 'TON' : output.real ? 'CALC REAL' : 'CALC'
+    const body = output.type === 'ton' ? `PT ${+output.seconds.toFixed(3)} s` : clip(`${output.operand.name} := ${output.text}`, 13)
     return (
       <g>
         <line x1={x} y1={y} x2={x + 8} y2={y} stroke={INK} strokeWidth="1.5" />

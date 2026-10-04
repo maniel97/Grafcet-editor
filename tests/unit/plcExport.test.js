@@ -15,11 +15,12 @@ const VALUES = { A: 7, B: 3, C: 20, D: 2 }
 // Lo que debe dar cada fórmula (división entera de S7, truncando hacia cero).
 const EXPECTED = { R: 10, Q: 24, S: 4, U: 155 } // S: 17 / 4 = 4,25 -> 4
 
+// Receptividades sin comparar A–D con números (si no, serían entradas analógicas y se calcularía en REAL).
 const nodes = [
   step('s0', '0', 0, { initial: true, actions: Object.entries(FORMULAS).map(([v, f]) => ({ text: `${v}:=${f}`, kind: 'stored-on' })) }),
-  transition('t1', 'A > 0', 100),
+  transition('t1', 'Marcha', 100),
   step('s1', '1', 200),
-  transition('t2', 'B > 0', 300),
+  transition('t2', 'Paro', 300),
 ]
 const edges = links([['s0', 't1'], ['t1', 's1'], ['s1', 't2'], ['t2', 's0']])
 const plc = autoAssign(EMPTY_PLC, nodes.filter((n) => n.type === 'step'), projectVariables(nodes, {}))

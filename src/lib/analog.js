@@ -39,3 +39,9 @@ export const describeRange = (entry) => {
   const { signal, min, max, unit } = analogConfig(entry)
   return `${SIGNALS.find((s) => s.id === signal)?.label ?? signal}, ${min}–${max}${unit ? ` ${unit}` : ''}`
 }
+
+// Literal REAL con punto decimal (6400.0, 0.00390625), para escalar en el autómata.
+export const realLiteral = (value) => {
+  const v = Number(Number(value).toPrecision(7))
+  return Number.isInteger(v) ? `${v}.0` : String(v)
+}

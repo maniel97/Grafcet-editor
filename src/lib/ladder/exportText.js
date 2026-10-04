@@ -6,6 +6,7 @@
 
 import { walk } from './network'
 import { edgeMemoryName } from './generate'
+import { realLiteral } from '../analog'
 
 const HEADER = 'Generado por Grafcet Editor (IEC 60848 -> método SET/RESET por etapas)'
 
@@ -36,6 +37,10 @@ function stName(op, P = 'X') {
 const edgeInstance = (node, P) => ident(edgeMemoryName(node, P).replace(/^FP_/, 'RT_').replace(/^FN_/, 'FT_'))
 
 // Traducción de redes y expresiones; en SCL de TIA Portal las variables locales llevan «#».
+// Literal REAL de STEP 7 (AWL): 6.400000e+003.
+const s7Real = (value) => Number(value).toExponential(6).replace(/e([+-])(\d+)$/, (m, sign, digits) => `e${sign}${digits.padStart(3, '0')}`)
+
+
 function makeSt(P, tia) {
   const local = (name) => (tia ? `#${name}` : name)
   const ref = (op) => (op.kind === 'num' ? String(op.value) : local(stName(op, P)))
@@ -53,6 +58,7 @@ function makeSt(P, tia) {
       case 'not':
         return `NOT (${expr(net.item)})`
       case 'compare':
+        if (net.real) return `(${realArith(net.real.a)} ${net.op} ${realArith(net.real.b)})`
         return `(${ref(net.a)} ${net.op} ${ref(net.b)})`
       case 'series':
         return net.items.map(expr).join(' AND ')
@@ -64,7 +70,16 @@ function makeSt(P, tia) {
   }
   const arith = (ast) =>
     ast.op === 'num' ? String(ast.value) : ast.op === 'var' ? local(ident(ast.name)) : `(${arith(ast.left)} ${ast.fn} ${arith(ast.right)})`
-  return { local, ref, expr, arith }
+  // Escalado de analógicas (generate.js): las palabras se pasan a REAL y se calcula en REAL.
+  const realArith = (ast) =>
+    ast.op === 'num'
+      ? realLiteral(ast.value)
+      : ast.op === 'var'
+        ? `INT_TO_REAL(${local(ident(ast.name))})`
+        : `(${realArith(ast.left)} ${ast.fn} ${realArith(ast.right)})`
+  // Resultado redondeado a entero y recortado (al rango del módulo, si es una salida analógica).
+  const realAssign = (o) => `REAL_TO_INT(LIMIT(${realLiteral(o.real.clamp[0])}, ${realArith(o.value)}, ${realLiteral(o.real.clamp[1])}))`
+  return { local, ref, expr, arith, realAssign }
 }
 
 const timeLiteral = (seconds) => `T#${Math.round(seconds * 1000)}MS`
@@ -190,7 +205,7 @@ export function toStructuredText(ladder, plc, { dialect = 'iec' } = {}) {
         else if (o.type === 'ton') lines.push(`${name}(IN := ${expr}, PT := ${timeLiteral(o.seconds)});`)
         else if (o.type === 'set') actions.push(`    ${name} := TRUE;`)
         else if (o.type === 'reset') actions.push(`    ${name} := FALSE;`)
-        else if (o.type === 'assign') actions.push(`    ${name} := ${st.arith(o.value)};`)
+        else if (o.type === 'assign') actions.push(`    ${name} := ${o.real ? st.realAssign(o) : st.arith(o.value)};`)
       }
       if (actions.length) lines.push(`IF ${expr} THEN`, ...actions, 'END_IF;')
     }
@@ -243,6 +258,11 @@ export function toAWL(ladder, { mnemonic = 'de', useAddresses = true } = {}) {
         return [`${net.kind === 'NC' ? neg : pos} ${operand(net.operand)}`]
       }
       case 'compare':
+        if (net.real) {
+          // A la izquierda en ACCU2 y a la derecha en ACCU1, como en la comparación de enteros.
+          realTemps.add('#RealCmp')
+          return [`${pos}(`, ...realCode(net.real.a), 'T #RealCmp', ...realCode(net.real.b), 'L #RealCmp', 'TAK', CMP[net.op].replace(/I$/, 'R'), ')']
+        }
         return [`${pos}(`, `L ${operand(net.a)}`, `L ${operand(net.b)}`, CMP[net.op], ')']
       case 'not':
         return [`${pos}(`, ...item(net.item, 'A'), 'NOT', ')']
@@ -274,6 +294,33 @@ export function toAWL(ladder, { mnemonic = 'de', useAddresses = true } = {}) {
     return [...arith(ast.left, depth + 1), `T #Arit${depth}`, ...arith(ast.right, depth + 1), `L #Arit${depth}`, 'TAK', op]
   }
 
+  // Escalado de analógicas en REAL (generate.js): la palabra se pasa a DINT y a REAL (ITD, DTR).
+  const realTemps = new Set()
+  const realLeaf = (ast) => (ast.op === 'num' ? [`L ${s7Real(ast.value)}`] : [`L ${operand({ kind: 'var', name: ast.name })}`, 'ITD', 'DTR'])
+  const realCode = (ast, depth = 1) => {
+    if (ast.op !== 'arith') return realLeaf(ast)
+    const op = { '+': '+R', '-': '-R', '*': '*R', '/': '/R' }[ast.fn]
+    const simple = (a) => a.op !== 'arith'
+    if (simple(ast.right)) return [...realCode(ast.left, depth), ...realLeaf(ast.right), op]
+    if (simple(ast.left)) return [...realCode(ast.right, depth), ...realLeaf(ast.left), 'TAK', op]
+    realTemps.add(`#Real${depth}`)
+    return [...realCode(ast.left, depth + 1), `T #Real${depth}`, ...realCode(ast.right, depth + 1), `L #Real${depth}`, 'TAK', op]
+  }
+  // Resultado recortado a [lo, hi], redondeado (RND) y escrito en la palabra de destino.
+  const realAssign = (o, target) => {
+    realTemps.add('#RealOut')
+    const [lo, hi] = o.real.clamp
+    const a = `M${String(++label).padStart(3, '0')}`
+    const b = `M${String(++label).padStart(3, '0')}`
+    return [
+      ...realCode(o.value),
+      'T #RealOut',
+      'L #RealOut', `L ${s7Real(hi)}`, '>R', `${M.JCN} ${a}`, `L ${s7Real(hi)}`, 'T #RealOut',
+      `${a}: L #RealOut`, `L ${s7Real(lo)}`, '<R', `${M.JCN} ${b}`, `L ${s7Real(lo)}`, 'T #RealOut',
+      `${b}: L #RealOut`, 'RND', `T ${target}`,
+    ]
+  }
+
   const lines = [`// ${HEADER}`, `// AWL para S7-300/400 (nemotécnica ${mnemonic === 'de' ? 'alemana' : 'inglesa'}). Pegar en OB1/FC.`]
   lines.push('// La marca "PrimerCiclo" debe valer 1 solo en el primer ciclo (p. ej. activarla en OB100).', '')
   for (const s of sections) {
@@ -288,10 +335,10 @@ export function toAWL(ladder, { mnemonic = 'de', useAddresses = true } = {}) {
         else if (o.type === 'reset') lines.push(`      R ${target}`)
         else if (o.type === 'ton') lines.push(`      L ${s5time(o.seconds)}`, `      ${M.SD} ${target}`)
         else if (o.type === 'assign') {
-          const code = arith(o.value)
           lines.push(`      // ${o.operand.name} := ${o.text}`)
           const l = `M${String(++label).padStart(3, '0')}`
-          lines.push(`      ${M.JCN} ${l}`, ...code.map((c) => `      ${c}`), `      T ${target}`, `${l}: NOP 0`)
+          const code = o.real ? realAssign(o, target) : [...arith(o.value), `T ${target}`]
+          lines.push(`      ${M.JCN} ${l}`, ...code.map((c) => (/^M\d{3}: /.test(c) ? c : `      ${c}`)), `${l}: NOP 0`)
         }
       }
       lines.push('')
@@ -301,5 +348,6 @@ export function toAWL(ladder, { mnemonic = 'de', useAddresses = true } = {}) {
     const list = Array.from({ length: temps }, (_, i) => `#Arit${i + 1}`).join(', ')
     lines.splice(3, 0, `// Variables temporales (TEMP) del bloque, de tipo INT: ${list}.`)
   }
+  if (realTemps.size) lines.splice(3, 0, `// Variables temporales (TEMP) del bloque, de tipo REAL: ${[...realTemps].sort().join(', ')}.`)
   return lines.join('\r\n')
 }

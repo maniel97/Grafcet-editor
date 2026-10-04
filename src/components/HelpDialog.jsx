@@ -42,7 +42,7 @@ const NOTATION = [
   ],
   [
     N_('Analógicas'),
-    N_('Una entrada comparada con números (Temperatura > 60) es analógica. En Variables se elige su señal (4–20 mA o 0–10 V) y su rango físico; la simulación usa un deslizador en esas unidades y el programa del autómata compara con el valor bruto ya calculado (p. ej. AIW0 > 21760).'),
+    N_('Una entrada comparada con números (Temperatura > 60) es analógica. En Variables se elige su señal (4–20 mA o 0–10 V) y su rango físico; la simulación usa un deslizador en esas unidades. En el programa del autómata, las comparaciones con números se hacen con el valor bruto ya calculado (p. ej. AIW0 > 21760); comparar dos analógicas (Peso >= Consigna) o calcular con ellas (Velocidad := Consigna / 2) se escala en el autómata, en REAL.'),
   ],
   [
     N_('Grafcets parciales y forzado'),

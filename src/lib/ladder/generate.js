@@ -21,7 +21,7 @@ import { compile } from '../sim/engine'
 import { parseAddress, formatBit } from '../addressing'
 import { contact, parallel, series, toNetwork, walk } from './network'
 import { resolveStepPrefix, stepVar } from '../stepNames'
-import { describeRange, isAnalog, toRaw } from '../analog'
+import { analogConfig, describeRange, isAnalog, rawRange, toRaw } from '../analog'
 
 const FIRST_CYCLE = 'PrimerCiclo'
 const AUX_START_BYTE = 20
@@ -233,7 +233,9 @@ export function generateLadder(nodes, edges, plc) {
   // inicialización, antes de que se usen.
   if (auxRungs.length) sections.splice(1, 0, { id: 'aux', title: 'Auxiliares', rungs: auxRungs })
 
-  scaleAnalog(sections, plc, new Map(compiled.variables.map((v) => [v.name, v.type])), warnings)
+  const typeOf = new Map(compiled.variables.map((v) => [v.name, v.type]))
+  numericSetReset(sections, plc, typeOf)
+  scaleAnalog(sections, plc, typeOf)
 
   const visible = sections.filter((s) => s.rungs.length)
   let n = 0
@@ -242,23 +244,84 @@ export function generateLadder(nodes, edges, plc) {
   return { sections: visible, resolver: makeResolver(plc, compiled, visible, P), warnings, stepPrefix: P }
 }
 
-// Analógicas (lib/analog.js): las comparaciones con constantes y las asignaciones constantes a
-// salidas analógicas se pasan a valor bruto, así el autómata compara y escribe enteros sin
-// cálculos («Temperatura > 60» -> «AIW0 > 22016»). Lo que necesitaría escalar en el PLC (comparar
-// analógicas de distinta escala, calcular con ellas) se avisa.
-function scaleAnalog(sections, plc, typeOf, warnings) {
-  const analog = (op) => op?.kind === 'var' && isAnalog(typeOf.get(op.name) ?? plc.variables[op.name]?.type)
-  const entry = (op) => plc.variables[op.name] ?? {}
+// «C:=0» y «C:=1» se traducen como R y S, que en una palabra (un contador, una salida analógica)
+// no valen: en las variables numéricas (las que reciben un cálculo, se comparan o son analógicas)
+// pasan a ser asignaciones de 0 y 1. También el reset del primer ciclo de las acciones memorizadas.
+function numericSetReset(sections, plc, typeOf) {
+  const numeric = new Set()
+  const visit = (node) => {
+    if (node.type === 'compare') for (const op of [node.a, node.b]) if (op.kind === 'var') numeric.add(op.name)
+    node.items?.forEach(visit)
+    if (node.item) visit(node.item)
+  }
+  for (const s of sections) {
+    for (const r of s.rungs) {
+      visit(r.network)
+      for (const o of r.outputs) if (o.type === 'assign') numeric.add(o.operand.name)
+    }
+  }
+  const isNumeric = (op) => op.kind === 'var' && (numeric.has(op.name) || isAnalog(typeOf.get(op.name) ?? plc.variables[op.name]?.type))
+  for (const s of sections) {
+    for (const r of s.rungs) {
+      r.outputs = r.outputs.map((o) =>
+        (o.type === 'set' || o.type === 'reset') && isNumeric(o.operand)
+          ? { type: 'assign', operand: o.operand, value: { op: 'num', value: o.type === 'set' ? 1 : 0 }, text: o.type === 'set' ? '1' : '0' }
+          : o,
+      )
+    }
+  }
+}
+
+// Analógicas (lib/analog.js). Lo sencillo, sin cálculos en el autómata: las comparaciones con
+// constantes y las asignaciones constantes a salidas analógicas se pasan a valor bruto
+// («Temperatura > 60» -> «AIW0 > 22016»). Lo demás se escala en el autómata, en REAL:
+// - comparar una analógica con otra variable (otra analógica de distinta escala, una consigna…):
+//   node.real = { a, b }, árboles aritméticos en unidades físicas;
+// - asignar un cálculo con analógicas, o un cálculo a una salida analógica: o.real = { clamp },
+//   o.value en unidades físicas y, si el destino es analógico, pasado de vuelta a valor bruto y
+//   recortado al rango del módulo.
+// En los árboles REAL, una hoja «var» es una palabra entera que se convierte a REAL, y el
+// resultado de una asignación se redondea a entero.
+function scaleAnalog(sections, plc, typeOf) {
+  const analog = (op) => op?.kind === 'var' && isAnalogName(op.name)
+  const isAnalogName = (name) => isAnalog(typeOf.get(name) ?? plc.variables[name]?.type)
+  const entry = (name) => plc.variables[name] ?? {}
+  const num = (value) => ({ op: 'num', value })
+  const calc = (fn, left, right) => ({ op: 'arith', fn, left, right })
+  // Valor bruto -> unidades físicas: min + (x − r0)·(max − min)/(r1 − r0).
+  const toPhysical = (name) => {
+    const { min, max, signal } = analogConfig(entry(name))
+    const [r0, r1] = rawRange(signal, plc.scheme)
+    let node = { op: 'var', name }
+    if (r0) node = calc('-', node, num(r0))
+    node = calc('*', node, num((max - min) / (r1 - r0)))
+    return min ? calc('+', node, num(min)) : node
+  }
+  // Unidades físicas -> valor bruto: r0 + (v − min)·(r1 − r0)/(max − min), recortado al módulo.
+  const toRawTree = (value, name) => {
+    const { min, max, signal } = analogConfig(entry(name))
+    const [r0, r1] = rawRange(signal, plc.scheme)
+    let node = min ? calc('-', value, num(min)) : value
+    node = calc('*', node, num(max === min ? 0 : (r1 - r0) / (max - min)))
+    return { tree: r0 ? calc('+', node, num(r0)) : node, clamp: [Math.min(r0, r1), Math.max(r0, r1)] }
+  }
+  const physical = (ast) =>
+    ast.op === 'var' && isAnalogName(ast.name) ? toPhysical(ast.name) : ast.op === 'arith' ? { ...ast, left: physical(ast.left), right: physical(ast.right) } : ast
+  const hasAnalog = (ast) => (ast.op === 'var' ? isAnalogName(ast.name) : ast.op === 'arith' && (hasAnalog(ast.left) || hasAnalog(ast.right)))
+  const leaf = (op) => (op.kind === 'num' ? num(op.value) : { op: 'var', name: op.name })
+
   const visit = (node) => {
     if (node.type === 'compare') {
-      for (const [v, c, side] of [
-        [node.a, node.b, 'b'],
-        [node.b, node.a, 'a'],
-      ]) {
-        if (analog(v) && c.kind === 'num') node[side] = { kind: 'num', value: toRaw(c.value, entry(v), plc.scheme), physical: c.value }
-      }
-      if (analog(node.a) && analog(node.b) && describeRange(entry(node.a)) !== describeRange(entry(node.b))) {
-        warnings.push({ nodeId: null, message: `${node.a.name} y ${node.b.name} tienen distinta escala: compararlas necesitaría escalar en el autómata.` })
+      const sameScale = analog(node.a) && analog(node.b) && describeRange(entry(node.a.name)) === describeRange(entry(node.b.name))
+      if ((analog(node.a) || analog(node.b)) && node.a.kind === 'var' && node.b.kind === 'var' && !sameScale) {
+        node.real = { a: physical(leaf(node.a)), b: physical(leaf(node.b)) }
+      } else {
+        for (const [v, c, side] of [
+          [node.a, node.b, 'b'],
+          [node.b, node.a, 'a'],
+        ]) {
+          if (analog(v) && c.kind === 'num') node[side] = { kind: 'num', value: toRaw(c.value, entry(v.name), plc.scheme), physical: c.value }
+        }
       }
     }
     node.items?.forEach(visit)
@@ -268,9 +331,22 @@ function scaleAnalog(sections, plc, typeOf, warnings) {
     for (const r of s.rungs) {
       visit(r.network)
       for (const o of r.outputs) {
-        if (o.type !== 'assign' || !analog(o.operand)) continue
-        if (o.value.op === 'num') o.value = { op: 'num', value: toRaw(o.value.value, entry(o.operand), plc.scheme) }
-        else warnings.push({ nodeId: null, message: `${o.operand.name} := ${o.text}: calcular una salida analógica necesitaría escalar en el autómata (solo se admiten valores constantes).` })
+        if (o.type !== 'assign') continue
+        const target = analog(o.operand)
+        if (target && o.value.op === 'num') {
+          o.value = num(toRaw(o.value.value, entry(o.operand.name), plc.scheme))
+          continue
+        }
+        if (!target && !hasAnalog(o.value)) continue
+        const value = physical(o.value)
+        if (target) {
+          const { tree, clamp } = toRawTree(value, o.operand.name)
+          o.value = tree
+          o.real = { clamp }
+        } else {
+          o.value = value
+          o.real = { clamp: [-32768, 32767] }
+        }
       }
     }
   }

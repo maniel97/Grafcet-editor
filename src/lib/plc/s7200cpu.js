@@ -7,9 +7,10 @@
 //   Tiempos:   TON TOF TONR (base según el número: T0/T64 1 ms, T1–T4… 10 ms, el resto 100 ms)
 //   Contadores: CTU CTD CTUD (C0…)
 //   Palabras:  LDW= AW<> OW>=… (comparaciones), MOVW MOVB, +I −I *I /I, INCW DECW
+//   REAL:      LDR= AR<> OR>=…, MOVR MOVD, ITD DTI DTR ROUND TRUNC, +R −R *R /R (en VD, MD, AC0–AC3)
 //   Programa:  CALL SBRn, RET, CRET, END, MEND; bloques OB1, SBR e INT (las interrupciones no se usan)
 //   Marcas especiales: SM0.0 (siempre 1), SM0.1 (primer ciclo), SM0.4 (reloj de 1 min), SM0.5 (de 1 s)
-// Operandos: direcciones (I0.0, Q0.1, M0.0, V10.3, VW100, AIW0, AQW0, T37, C0) o símbolos de la tabla
+// Operandos: direcciones (I0.0, Q0.1, M0.0, V10.3, VW100, VD200, AIW0, AQW0, T37, C0) o símbolos de la tabla
 // de variables del editor (con o sin comillas). Lo que no entiende se dice con su línea.
 
 import { timerBase } from '../ladder/exportS7200'
@@ -26,6 +27,9 @@ const WORD = /^(VW|MW|IW|QW|AIW|AQW|SMW)(\d+)$/
 const BYTE = /^(VB|MB|IB|QB|SMB)(\d+)$/
 const TC = /^(T|C)(\d+)$/
 const NUM = /^[+-]?\d+$/
+// Dobles palabras (doble entero o REAL; sin solaparse con las palabras de la misma zona).
+const DWORD = /^(VD|MD|SMD)(\d+)$|^AC[0-3]$/
+const REAL = /^[+-]?(\d+\.\d*|\.\d+)(E[+-]?\d+)?$/i
 
 // Programa -> { blocks: { OB1: [ins], SBR0: [...] }, errors } con ins = { op, args, line }.
 export function parseProgram(text, resolve = (s) => s) {
@@ -63,7 +67,7 @@ export function parseProgram(text, resolve = (s) => s) {
           .filter(Boolean)
           .map((a) => {
             const up = a.toUpperCase().replace(/^%/, '')
-            if (BIT.test(up) || WORD.test(up) || BYTE.test(up) || TC.test(up) || NUM.test(a) || /^SBR_?\d+$/.test(up)) return up
+            if (BIT.test(up) || WORD.test(up) || BYTE.test(up) || DWORD.test(up) || TC.test(up) || NUM.test(a) || REAL.test(a) || /^SBR_?\d+$/.test(up)) return up
             const r = resolve(a)
             if (!r) errors.push(new PlcError(`«${a}» no es una dirección ni un símbolo de la tabla de variables.`, line))
             return r ? r.toUpperCase() : up
@@ -97,13 +101,13 @@ export function createCpu(program) {
     return Boolean(bits.get(a))
   }
   const getWord = (a, line) => {
-    if (NUM.test(a)) return Number(a)
+    if (NUM.test(a) || REAL.test(a)) return Number(a)
     if (/^T\d+$/.test(a)) {
       const t = timers.get(a)
       return t ? Math.floor(t.acc / timerBase(Number(a.slice(1))) + 1e-9) : 0
     }
     if (/^C\d+$/.test(a)) return counters.get(a)?.cv ?? 0
-    if (!WORD.test(a) && !BYTE.test(a)) throw new PlcError(`«${a}» no es una palabra.`, line)
+    if (!WORD.test(a) && !BYTE.test(a) && !DWORD.test(a)) throw new PlcError(`«${a}» no es una palabra.`, line)
     return words.get(a) ?? 0
   }
   const setBits = (a, value, n = 1, line) => {
@@ -254,6 +258,38 @@ export function createCpu(program) {
             words.set(args[1], clamp16(op === '+I' ? a + b : op === '-I' ? a - b : op === '*I' ? a * b : a / b))
           }
           break
+        case 'MOVR':
+        case 'MOVD':
+          if (top()) words.set(args[1], getWord(args[0], line))
+          break
+        case 'ITD':
+        case 'DTR':
+          if (top()) words.set(args[1], getWord(args[0], line))
+          break
+        case 'DTI': {
+          // Fuera del rango de un entero (desbordamiento), la salida no cambia.
+          const v = getWord(args[0], line)
+          if (top() && v >= -32768 && v <= 32767) words.set(args[1], Math.trunc(v))
+          break
+        }
+        case 'ROUND':
+        case 'TRUNC':
+          if (top()) {
+            const v = getWord(args[0], line)
+            words.set(args[1], op === 'TRUNC' ? Math.trunc(v) : Math.sign(v) * Math.round(Math.abs(v)))
+          }
+          break
+        case '+R':
+        case '-R':
+        case '*R':
+        case '/R':
+          if (top()) {
+            const a = getWord(args[1], line)
+            const b = getWord(args[0], line)
+            if (op === '/R' && b === 0) throw new PlcError('división por cero.', line)
+            words.set(args[1], Math.fround(op === '+R' ? a + b : op === '-R' ? a - b : op === '*R' ? a * b : a / b))
+          }
+          break
         case 'INCW':
         case 'DECW':
           if (top()) words.set(args[0], clamp16(getWord(args[0], line) + (op === 'INCW' ? 1 : -1)))
@@ -270,7 +306,7 @@ export function createCpu(program) {
           if (top()) return
           break
         default:
-          if ((m = /^(LD|A|O)(W|B)(=|==|<>|>=|<=|>|<)$/.exec(op))) {
+          if ((m = /^(LD|A|O)(W|B|D|R)(=|==|<>|>=|<=|>|<)$/.exec(op))) {
             const v = cmp(m[3], getWord(args[0], line), getWord(args[1], line))
             if (m[1] === 'LD') stack.push(v)
             else setTop(m[1] === 'A' ? top() && v : top() || v)
