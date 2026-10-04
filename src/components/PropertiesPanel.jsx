@@ -1,5 +1,5 @@
 import { useRef } from 'react'
-import { Plus, Trash2, X } from 'lucide-react'
+import { CircleHelp, Plus, Trash2, X } from 'lucide-react'
 import { ACTION_KINDS, ACTION_PRESETS, actionKind, normalizeAction } from '../lib/actions'
 import AutocompleteInput from './AutocompleteInput'
 import { useDraft } from './useDraft'
@@ -252,7 +252,7 @@ function TransitionFields({ data, onChange, previousSteps, vocabulary }) {
   )
 }
 
-export default function PropertiesPanel({ node, onChange, onCommitLabel, onClose, previousSteps = [], vocabulary = [] }) {
+export default function PropertiesPanel({ node, onChange, onCommitLabel, onClose, onHelp, previousSteps = [], vocabulary = [] }) {
   if (!node) return null
   const isStep = node.type === 'step'
 
@@ -260,6 +260,18 @@ export default function PropertiesPanel({ node, onChange, onCommitLabel, onClose
     <aside className="side-panel flex w-72 shrink-0 flex-col border-l border-slate-200 bg-white">
       <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
         <h2 className="text-sm font-semibold">{isStep ? t('Etapa') : t('Transición')}</h2>
+        {/* Ayuda del tema: acciones (lo que se edita en una etapa) o receptividades. */}
+        {onHelp && (
+          <button
+            type="button"
+            onClick={() => onHelp(isStep ? 'acciones' : 'transiciones')}
+            title={isStep ? t('Ayuda: acciones') : t('Ayuda: transiciones y receptividades')}
+            aria-label={isStep ? t('Ayuda: acciones') : t('Ayuda: transiciones y receptividades')}
+            className="ml-auto mr-1 rounded-md p-1 text-slate-500 hover:bg-slate-100"
+          >
+            <CircleHelp size={16} />
+          </button>
+        )}
         <button type="button" onClick={onClose} title={t('Cerrar')} className="rounded-md p-1 text-slate-500 hover:bg-slate-100">
           <X size={16} />
         </button>

@@ -17,7 +17,9 @@ const nameOf = (n) => (n.type === 'step' ? stepName(n) : transitionName(n))
 
 export function validateGrafcet(nodes, edges) {
   const issues = []
-  const add = (severity, message, nodeIds = []) => issues.push({ severity, message, nodeIds })
+  // topic: el artículo de la ayuda que explica la regla (src/help); cambia en cada grupo de reglas.
+  let topic = 'grafcets-parciales'
+  const add = (severity, message, nodeIds = []) => issues.push({ severity, message, nodeIds, topic })
   if (!nodes.length) return issues
 
   const byId = new Map(nodes.map((n) => [n.id, n]))
@@ -48,6 +50,7 @@ export function validateGrafcet(nodes, edges) {
   for (const [name, list] of byFrameName) {
     if (list.length > 1) add('error', t('El nombre {nombre} está repetido en {n} marcos.', { nombre: name, n: list.length }), list.map((f) => f.id))
   }
+  topic = 'macroetapas'
   // Expansiones: entrada E.. y salida S.. (o la etapa sin entrada / sin salida dentro del marco).
   const expansions = new Map() // id de la macroetapa -> { entry, exit, members }
   const expansionRole = new Map() // id de etapa -> 'entry' | 'exit'
@@ -73,6 +76,7 @@ export function validateGrafcet(nodes, edges) {
       add('warning', t('Macroetapa {macro} sin expansión: dibuja un marco «{macro}» con sus etapas (de E a S). Mientras tanto se simula como una etapa normal.', { macro: macroName(s.data.label) }), [s.id])
     }
   }
+  topic = 'encapsulacion'
   // Encapsulación (IEC 60848): la etapa encapsulante «5» y su marco (data.step = '5'), con al menos
   // una etapa de su nivel con enlace de activación (*) y sin enlaces que crucen el marco.
   const encapsulated = new Set() // etapas dentro de algún marco de encapsulación
@@ -112,6 +116,7 @@ export function validateGrafcet(nodes, edges) {
     if (s.data.encapsulating && s.data.macro) add('error', t('{etapa}: una etapa no puede ser a la vez macroetapa y encapsulante.', { etapa: stepName(s) }), [s.id])
   }
 
+  topic = 'grafcets-parciales'
   // Forzados: grafcet destino existente, distinto del propio y con esas etapas.
   const grafcetSteps = new Map()
   for (const s of steps) {
@@ -148,6 +153,7 @@ export function validateGrafcet(nodes, edges) {
   }
   const forcedTargets = new Set([...forcedOn.values()].flat())
 
+  topic = 'etapas'
   // Situación inicial: sin etapa inicial el grafcet no puede arrancar.
   if (steps.length && !steps.some((s) => s.data.initial)) {
     add('error', t('No hay ninguna etapa inicial: el grafcet no puede arrancar. Marca al menos una (doble cuadrado).'))
@@ -168,6 +174,7 @@ export function validateGrafcet(nodes, edges) {
     if (s.data.macro && s.data.initial) add('error', t('{etapa}: una macroetapa no puede ser inicial.', { etapa: stepName(s) }), [s.id])
   }
 
+  topic = 'que-es-grafcet'
   // Alternancia etapa / transición.
   for (const e of edges) {
     const s = byId.get(e.source)
@@ -181,6 +188,7 @@ export function validateGrafcet(nodes, edges) {
     }
   }
 
+  topic = 'etapas'
   for (const s of steps) {
     if (!s.data.initial && incoming(s.id).length === 0 && expansionRole.get(s.id) !== 'entry' && !forcedTargets.has(s.id) && !s.data.activationLink) {
       add('warning', t('{etapa} no tiene enlace de entrada: nunca se activará.', { etapa: stepName(s) }), [s.id])
@@ -192,6 +200,7 @@ export function validateGrafcet(nodes, edges) {
   }
 
   for (const tn of transitions) {
+    topic = 'transiciones'
     if (!tn.data.condition?.trim()) {
       add('error', t('Transición sin receptividad: toda transición la necesita (usa 1 si siempre se cumple).'), [tn.id])
     }
@@ -209,6 +218,7 @@ export function validateGrafcet(nodes, edges) {
         [tn.id],
       )
     }
+    topic = 'bucles'
     const loops = out.filter((e) => y(e.target) < y(tn.id))
     if (loops.length && out.length > loops.length) {
       add(
@@ -226,6 +236,7 @@ export function validateGrafcet(nodes, edges) {
     }
   }
 
+  topic = 'divergencias'
   // Divergencias en O: las receptividades de una elección deben ser excluyentes; si no, se
   // franquearían varias transiciones a la vez y se activarían varias ramas.
   for (const s of steps) {
@@ -257,6 +268,7 @@ export function validateGrafcet(nodes, edges) {
     }
   }
 
+  topic = 'etapas'
   // Accesibilidad: etapas a las que no se puede llegar desde ninguna etapa inicial.
   const reached = new Set()
   const queue = steps.filter((s) => s.data.initial).map((s) => s.id)

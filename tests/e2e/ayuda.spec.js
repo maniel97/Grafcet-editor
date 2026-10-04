@@ -189,3 +189,20 @@ test('tutorial «Probar con la planta» de principio a fin', async ({ page }) =>
   await expect(page.locator('.tour')).toHaveCount(0)
   expectNoErrors(errors)
 })
+
+// Ayuda contextual: desde un aviso de Verificar y desde el panel de propiedades, al artículo.
+test('ayuda contextual: Verificar y propiedades llevan a su artículo', async ({ page }) => {
+  const errors = await openEditor(page)
+  await page.getByRole('button', { name: 'Etapa', exact: true }).click() // etapa suelta: avisos
+  await page.locator('[data-tour="Verificar"]').click()
+  const panel = page.locator('aside').filter({ hasText: 'Verificación IEC 60848' })
+  await panel.getByText(/no tiene enlace de entrada/).first().locator('xpath=ancestor::li').getByRole('button', { name: 'Más en la ayuda' }).click()
+  const help = page.getByRole('dialog', { name: 'Ayuda' })
+  await expect(help.getByRole('heading', { name: 'Etapas', level: 2 })).toBeVisible()
+  await page.keyboard.press('Escape')
+
+  await page.locator('.react-flow__node-step').first().dblclick()
+  await page.getByRole('button', { name: 'Ayuda: acciones' }).click()
+  await expect(help.getByRole('heading', { name: 'Acciones', level: 2 })).toBeVisible()
+  expectNoErrors(errors)
+})

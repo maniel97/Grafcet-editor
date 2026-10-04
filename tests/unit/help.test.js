@@ -57,3 +57,17 @@ describe('tutoriales', () => {
     }
   })
 })
+
+describe('ayuda contextual', () => {
+  test('cada tema de Verificar (validation.js, tips.js) es un artículo de la wiki', async () => {
+    const { readFileSync } = await import('fs')
+    const topics = new Set()
+    for (const file of ['src/lib/validation.js', 'src/lib/tips.js']) {
+      const source = readFileSync(file, 'utf-8')
+      for (const [, id] of source.matchAll(/topic = '([\w-]+)'/g)) topics.add(id)
+      for (const [, id] of source.matchAll(/^\s+'([\w-]+)',\n\s+\)/gm)) topics.add(id)
+    }
+    expect(topics.size).toBeGreaterThan(8)
+    for (const id of topics) expect(ARTICLES, id).toContain(id)
+  })
+})

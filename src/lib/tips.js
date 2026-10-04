@@ -63,7 +63,8 @@ export function studentTips(nodes, edges, plc) {
     return []
   }
   const tips = []
-  const add = (message, why, nodeIds) => tips.push({ severity: 'tip', message, why, nodeIds })
+  // topic: el artículo de la ayuda que lo explica (src/help).
+  const add = (message, why, nodeIds, topic = 'transiciones') => tips.push({ severity: 'tip', message, why, nodeIds, topic })
   const types = new Map(compiled.variables.map((v) => [v.name, v.type]))
   const stepById = new Map(compiled.steps.map((s) => [s.id, s]))
   const name = (id) => stepById.get(id)?.variable ?? '?'
@@ -97,6 +98,7 @@ export function studentTips(nodes, edges, plc) {
             propuesta: from.length ? `${timer.seconds}s/X${from[0]}` : tr('t/X de la etapa anterior'),
           }),
           [t.id],
+          'temporizaciones',
         )
       }
     }
@@ -168,6 +170,7 @@ export function studentTips(nodes, edges, plc) {
       }),
       tr('Una acción continua asigna la salida en cada instante (1 mientras la etapa está activa, 0 si no); una memorizada la deja en un valor hasta que otra la cambie. Mezclar las dos en la misma salida hace que la continua tape a la memorizada. Elige un solo tipo para cada salida.'),
       [...new Set([...steps, ...stored].map((s) => s.id))],
+      'acciones',
     )
   }
   return tips

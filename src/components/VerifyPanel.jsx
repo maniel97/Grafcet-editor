@@ -1,8 +1,8 @@
 import { useState } from 'react'
-import { AlertTriangle, CircleCheck, CircleX, Lightbulb, X } from 'lucide-react'
+import { AlertTriangle, BookOpen, CircleCheck, CircleX, Lightbulb, X } from 'lucide-react'
 import { t } from '../lib/i18n'
 
-function IssueItem({ issue, onFocus }) {
+function IssueItem({ issue, onFocus, onHelp }) {
   const [open, setOpen] = useState(false)
   const Icon = issue.severity === 'error' ? CircleX : issue.severity === 'tip' ? Lightbulb : AlertTriangle
   const color = issue.severity === 'error' ? 'text-red-600' : issue.severity === 'tip' ? 'text-blue-500' : 'text-amber-500'
@@ -17,11 +17,21 @@ function IssueItem({ issue, onFocus }) {
         <Icon size={16} className={`mt-0.5 shrink-0 ${color}`} />
         <span className="text-slate-700">{issue.message}</span>
       </button>
-      {issue.why && (
+      {(issue.why || (issue.topic && onHelp)) && (
         <div className="pl-8 pr-2">
-          <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open} className="text-xs text-blue-600 hover:underline">
-            {open ? t('Ocultar') : t('¿Por qué?')}
-          </button>
+          <div className="flex gap-3">
+            {issue.why && (
+              <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open} className="text-xs text-blue-600 hover:underline">
+                {open ? t('Ocultar') : t('¿Por qué?')}
+              </button>
+            )}
+            {/* El artículo de la ayuda que explica la regla (issue.topic, lib/validation.js y tips.js). */}
+            {issue.topic && onHelp && (
+              <button type="button" onClick={() => onHelp(issue.topic)} className="flex items-center gap-1 text-xs text-blue-600 hover:underline">
+                <BookOpen size={12} /> {t('Más en la ayuda')}
+              </button>
+            )}
+          </div>
           {open && <p className="mt-1 rounded bg-blue-50 p-2 text-xs text-slate-700">{issue.why}</p>}
         </div>
       )}
@@ -31,7 +41,7 @@ function IssueItem({ issue, onFocus }) {
 
 // Resultado de la verificación de conformidad (lib/validation.js) y consejos (lib/tips.js). Se
 // recalcula en vivo mientras se edita; al pulsar un problema se seleccionan y encuadran los nodos.
-export default function VerifyPanel({ issues, onFocus, onClose }) {
+export default function VerifyPanel({ issues, onFocus, onHelp, onClose }) {
   const errors = issues.filter((i) => i.severity === 'error')
   const warnings = issues.filter((i) => i.severity === 'warning')
   const tips = issues.filter((i) => i.severity === 'tip')
@@ -59,7 +69,7 @@ export default function VerifyPanel({ issues, onFocus, onClose }) {
 
         <ul className="space-y-1" aria-label={t('Problemas')}>
           {[...errors, ...warnings].map((issue, i) => (
-            <IssueItem key={i} issue={issue} onFocus={onFocus} />
+            <IssueItem key={i} issue={issue} onFocus={onFocus} onHelp={onHelp} />
           ))}
         </ul>
 
@@ -70,7 +80,7 @@ export default function VerifyPanel({ issues, onFocus, onClose }) {
             </h3>
             <ul className="space-y-1">
               {tips.map((issue, i) => (
-                <IssueItem key={i} issue={issue} onFocus={onFocus} />
+                <IssueItem key={i} issue={issue} onFocus={onFocus} onHelp={onHelp} />
               ))}
             </ul>
           </section>

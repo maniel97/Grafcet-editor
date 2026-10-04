@@ -119,7 +119,8 @@ export default function GrafcetCanvas() {
   const [loopSourceId, setLoopSourceId] = useState(null)
   const [variablesOpen, setVariablesOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
-  const [helpOpen, setHelpOpen] = useState(false)
+  const [helpOpen, setHelpOpen] = useState(false) // false | true | página de la ayuda ('a:<artículo>')
+  const openArticle = useCallback((id) => setHelpOpen(`a:${id}`), [])
   // Visita guiada (lib/tours.js): la de bienvenida se ofrece la primera vez.
   const [tour, setTour] = useState(null)
   const [offerTour, setOfferTour] = useState(() => !tourSeen())
@@ -967,6 +968,7 @@ export default function GrafcetCanvas() {
         {helpOpen && (
           <Suspense fallback={<Loading />}>
             <HelpDialog
+              initialPage={typeof helpOpen === 'string' ? helpOpen : 'inicio'}
               onClose={() => setHelpOpen(false)}
               onTour={() => {
                 setHelpOpen(false)
@@ -1219,9 +1221,10 @@ export default function GrafcetCanvas() {
                 onCommitLabel={() => commitRenumber(editingId)}
                 vocabulary={vocabulary}
                 onClose={() => setEditingId(null)}
+                onHelp={openArticle}
                 previousSteps={previousSteps}
               />
-              {verifyOpen && <VerifyPanel issues={issues} onFocus={focusIssue} onClose={() => setVerifyOpen(false)} />}
+              {verifyOpen && <VerifyPanel issues={issues} onFocus={focusIssue} onHelp={openArticle} onClose={() => setVerifyOpen(false)} />}
             </>
           )}
         </div>
