@@ -16,6 +16,9 @@ test('planta: ningún ejemplo tiene rótulos que se pisen', async ({ page }) => 
     await page.getByTitle(/^Simular el grafcet/).click()
     await expect(page.locator('svg[aria-label="Escena"]')).toBeVisible()
     await page.waitForTimeout(300)
+    // Con y sin relieve: las caras del volumen cuentan como parte de su elemento.
+    for (const relief of [false, true]) {
+      if (relief) await page.getByRole('button', { name: 'Relieve' }).click()
     const found = await page.evaluate(() => {
       const hit = (a, b) => a.left < b.right - 1 && b.left < a.right - 1 && a.top < b.bottom - 1 && b.top < a.bottom - 1
       const labels = [...document.querySelectorAll('[data-label-of]')]
@@ -26,6 +29,7 @@ test('planta: ningún ejemplo tiene rótulos que se pisen', async ({ page }) => 
         type: g.dataset.element,
         r: g.querySelector(':scope > [data-shape]').getBoundingClientRect(),
       }))
+      for (const f of document.querySelectorAll('[data-relief-of]')) shapes.push({ id: f.dataset.reliefOf, type: 'relieve de', r: f.getBoundingClientRect() })
       const issues = []
       for (const l of labels) {
         for (const s of shapes) if (s.id !== l.id && hit(l.r, s.r)) issues.push(`«${l.text}» pisa ${s.type} ${s.id}`)
@@ -33,7 +37,9 @@ test('planta: ningún ejemplo tiene rótulos que se pisen', async ({ page }) => 
       }
       return issues
     })
-    expect(found, ex.id).toEqual([])
+      expect.soft(found, `${ex.id}${relief ? ' (relieve)' : ''}`).toEqual([])
+    }
+    await page.getByRole('button', { name: 'Relieve' }).click() // se guarda en el proyecto: se deja como estaba
     await page.getByTitle(/^Detener la simulación/).first().click()
   }
 })

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import { closest } from '../lib/autocomplete'
-import { ArrowLeft, ArrowRight, BookmarkPlus, Cable, ChevronDown, Copy, Download, Hand, Maximize2, Upload, Tag, Minimize2, Minus, MousePointer2, Plus, RotateCw, Scan, Trash2, WandSparkles, X, ArrowDownToLine } from 'lucide-react'
+import { ArrowLeft, ArrowRight, BookmarkPlus, Box, Cable, ChevronDown, Copy, Download, Hand, Maximize2, Upload, Tag, Minimize2, Minus, MousePointer2, Plus, RotateCw, Scan, Trash2, WandSparkles, X, ArrowDownToLine } from 'lucide-react'
 import {
   PIECE_SIZES,
   SCENE_TYPES,
@@ -28,6 +28,7 @@ import {
   SCENE_FLOOR,
 } from '../lib/sim/scene'
 import { copyToClipboard, pasteFromClipboard } from '../lib/sim/sceneClipboard'
+import { faces, pieceBox, reliefBoxes, reliefOrder } from '../lib/sim/relief'
 import { exportGroups, importGroups, loadGroups, makeGroup, placeGroup, storeGroups } from '../lib/sim/sceneLibrary'
 import { downloadFile } from '../lib/projectFile'
 import { N_, t as tr } from '../lib/i18n'
@@ -365,10 +366,48 @@ function ImageShape({ e }) {
     </g>
   )
 }
-function PieceShape({ p }) {
+// Vista en relieve (lib/sim/relief.js): caras de arriba y de la derecha, detrás de los dibujos.
+const RELIEF_TONES = {
+  belt: ['#cbd5e1', '#94a3b8'],
+  body: ['#f1f5f9', '#cbd5e1'],
+  rod: ['#94a3b8', '#64748b'],
+  plate: ['#64748b', '#475569'],
+  steel: ['#e2e8f0', '#94a3b8'],
+  bin: ['#f1f5f9', '#cbd5e1'],
+  arm: ['#fecaca', '#f87171'],
+  tank: ['#f8fafc', '#cbd5e1'],
+}
+const pts = (list) => list.map(([x, y]) => `${x},${y}`).join(' ')
+function BoxFaces({ box, color, of }) {
+  const { top, side } = faces(box)
+  const [light, dark] = color ? [color, color] : (RELIEF_TONES[box.tone] ?? RELIEF_TONES.steel)
+  return (
+    <g data-relief-of={of}>
+      <polygon points={pts(top)} fill={light} stroke={INK} strokeWidth="0.8" strokeLinejoin="round" />
+      {color && <polygon points={pts(top)} fill="white" opacity="0.35" />}
+      <polygon points={pts(side)} fill={dark} stroke={INK} strokeWidth="0.8" strokeLinejoin="round" />
+      {color && <polygon points={pts(side)} fill="black" opacity="0.22" />}
+    </g>
+  )
+}
+function ReliefLayer({ scene, state, elements }) {
+  const boxes = elements.flatMap((e) => reliefBoxes(scene, state, e).map((box) => ({ ...box, of: e.id }))).sort(reliefOrder)
+  return (
+    <g data-relief="" pointerEvents="none">
+      {boxes.map((box, i) => (
+        <BoxFaces key={i} box={box} of={box.of} />
+      ))}
+    </g>
+  )
+}
+// Contorno de un elemento con su volumen (para colocar los rótulos sin pisarlo).
+const withRelief = (b, on) => (on ? { x: b.x, y: b.y - 25, w: b.w + 25, h: b.h + 25 } : b)
+
+function PieceShape({ p, relief = false }) {
   const metal = p.material === 'metal'
   return (
     <g pointerEvents="none" data-piece={p.id} data-material={p.material ?? 'plastic'}>
+      {relief && <BoxFaces box={pieceBox(p)} color={COLORS[p.color] ?? COLORS.amber} />}
       <rect x={p.x} y={p.y} width={p.w} height={p.h} rx="3" fill={COLORS[p.color] ?? COLORS.amber} stroke={metal ? '#334155' : INK} />
       {metal && <line x1={p.x + 4} y1={p.y + p.h - 5} x2={p.x + p.w - 5} y2={p.y + 4} stroke="white" strokeWidth="2" opacity="0.6" />}
     </g>
@@ -549,11 +588,25 @@ function layoutLabels(items, gravity) {
       { x: b.x + b.w / 2, y: b.y - 5 - lines * 12, anchor: 'middle', r: { x: b.x + b.w / 2 - w / 2, y: b.y - 4 - h, w, h } },
       { x: b.x + b.w + 10, y: b.y + b.h / 2 + 4, anchor: 'start', r: { x: b.x + b.w + 8, y: b.y + b.h / 2 - 7, w, h } },
       { x: b.x - 10, y: b.y + b.h / 2 + 4, anchor: 'end', r: { x: b.x - 8 - w, y: b.y + b.h / 2 - 7, w, h } },
+      // En las esquinas de los lados, arriba y abajo.
+      { x: b.x + b.w + 10, y: b.y + 10, anchor: 'start', r: { x: b.x + b.w + 8, y: b.y, w, h } },
+      { x: b.x + b.w + 10, y: b.y + b.h, anchor: 'start', r: { x: b.x + b.w + 8, y: b.y + b.h - 10, w, h } },
+      { x: b.x - 10, y: b.y + 10, anchor: 'end', r: { x: b.x - 8 - w, y: b.y, w, h } },
+      { x: b.x - 10, y: b.y + b.h, anchor: 'end', r: { x: b.x - 8 - w, y: b.y + b.h - 10, w, h } },
       // Más lejos, por si a los lados hay algo pegado (un final de carrera en el recorrido de la cabina).
       { x: b.x - 40, y: b.y + b.h / 2 + 4, anchor: 'end', r: { x: b.x - 38 - w, y: b.y + b.h / 2 - 7, w, h } },
+      { x: b.x + b.w + 40, y: b.y + b.h / 2 + 4, anchor: 'start', r: { x: b.x + b.w + 38, y: b.y + b.h / 2 - 7, w, h } },
+      { x: b.x + b.w / 2, y: b.y + b.h + 33, anchor: 'middle', r: { x: b.x + b.w / 2 - w / 2, y: b.y + b.h + 22, w, h } },
     ]
     if (gravity && e.type === 'feeder') spots.unshift(spots.splice(2, 1)[0])
-    const spot = spots.find((c) => !hits(c.r, e.id)) ?? spots[0]
+    // El primero libre; si no hay ninguno, el que menos pisa.
+    const covered = (r) =>
+      [...items.filter((it) => it.e.id !== e.id).map((it) => it.b), ...placed].reduce((sum, o) => {
+        const x = Math.min(r.x + r.w, o.x + o.w) - Math.max(r.x, o.x)
+        const y = Math.min(r.y + r.h, o.y + o.h) - Math.max(r.y, o.y)
+        return sum + (x > 0 && y > 0 ? x * y : 0)
+      }, 0)
+    const spot = spots.find((c) => !hits(c.r, e.id)) ?? spots.reduce((best, c) => (covered(c.r) < covered(best.r) ? c : best))
     placed.push(spot.r)
     out.set(e.id, spot)
   }
@@ -1376,7 +1429,7 @@ export function SceneStatic({ scene, variables = [] }) {
   const machine = elements.filter((e) => !desk.includes(e))
   const boxes = machine.map((e) => boundsOf(placed(scene, state, e), 1))
   const spots = layoutLabels(
-    machine.map((e, i) => ({ e, b: boxes[i], text: labelOf(e), lines: io(e).length })),
+    machine.map((e, i) => ({ e, b: withRelief(boxes[i], scene?.relief), text: labelOf(e), lines: io(e).length })),
     scene?.gravity,
   )
   const minX = Math.min(0, ...boxes.map((b) => b.x)) - 20
@@ -1391,6 +1444,7 @@ export function SceneStatic({ scene, variables = [] }) {
   return (
     <svg xmlns="http://www.w3.org/2000/svg" width={width} height={height} viewBox={`${minX} ${minY} ${width} ${height}`} fontFamily="Inter, Helvetica, Arial, sans-serif">
       <rect x={minX} y={minY} width={width} height={height} fill="white" />
+      {scene?.relief && <ReliefLayer scene={scene} state={state} elements={machine} />}
       {[...machine]
         .sort((a, b) => (UNDER.includes(a.type) ? -1 : 0) - (UNDER.includes(b.type) ? -1 : 0))
         .map((raw) => {
@@ -1887,7 +1941,7 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
   const machine = shown.filter((e) => !isDesk(e)).map((e) => (e.type === 'cylinder' ? placed(scene ?? { elements: [] }, state, e) : e))
   const labelled = (e) => !(e.type === 'label' || ((e.type === 'image' || e.type === 'pipe') && !e.text))
   const labelSpots = layoutLabels(
-    machine.map((e) => ({ e, b: boundsOf(e, 1), text: labelled(e) ? labelOf(e) : '', lines: showIO ? ioLines(e).length : 0 })),
+    machine.map((e) => ({ e, b: withRelief(boundsOf(e, 1), scene?.relief), text: labelled(e) ? labelOf(e) : '', lines: showIO ? ioLines(e).length : 0 })),
     scene?.gravity,
   )
   const deskItems = elements.filter(isDesk)
@@ -2003,7 +2057,17 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
           }
           className={`flex items-center gap-1 rounded border px-2 py-0.5 ${scene?.gravity ? 'border-blue-300 bg-blue-50 text-blue-800' : 'border-slate-300 hover:bg-slate-100'}`}
         >
-          <ArrowDownToLine size={12} /> <span className="hidden @3xl:inline">{tr('Gravedad')}</span>
+          <ArrowDownToLine size={12} /> <span className="hidden @4xl:inline">{tr('Gravedad')}</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => onChange({ ...(scene ?? {}), relief: !scene?.relief })}
+          aria-pressed={Boolean(scene?.relief)}
+          aria-label={tr('Relieve')}
+          title={tr('Vista en relieve: cada elemento con su volumen (solo cambia el dibujo)')}
+          className={`flex items-center gap-1 rounded border px-2 py-0.5 ${scene?.relief ? 'border-blue-300 bg-blue-50 text-blue-800' : 'border-slate-300 hover:bg-slate-100'}`}
+        >
+          <Box size={12} /> <span className="hidden @4xl:inline">{tr('Relieve')}</span>
         </button>
         <button type="button" onClick={() => onAction(null, 'clear')} title={tr('Quita de la escena todas las piezas (cilindros, cintas y demás elementos se quedan)')} className="rounded border border-slate-300 px-2 py-0.5 hover:bg-slate-100">
           {tr('Quitar piezas')}
@@ -2220,6 +2284,7 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
                 {tr('Pulsa «Editar» y añade elementos: pulsadores, cilindros, cintas, detectores…')}
               </text>
             )}
+            {scene?.relief && <ReliefLayer scene={scene} state={state} elements={machine} />}
             {/* Las cintas y recogidas, debajo de todo (las piezas van encima). */}
             {[...machine].sort((a, b) => (a.type === 'image' ? -2 : UNDER.includes(a.type) ? -1 : 0) - (b.type === 'image' ? -2 : UNDER.includes(b.type) ? -1 : 0)).map((e) => (
               <g
@@ -2242,7 +2307,7 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
               </g>
             ))}
             {state.pieces.map((p) => (
-              <PieceShape key={p.id} p={p} />
+              <PieceShape key={p.id} p={p} relief={Boolean(scene?.relief)} />
             ))}
             {/* Rótulos (sin girar) */}
             {machine.map((e) => {
