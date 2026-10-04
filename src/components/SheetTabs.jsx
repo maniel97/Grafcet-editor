@@ -13,7 +13,7 @@ export default function SheetTabs({ sheets, current, counts, onSelect, onAdd, on
     setEditing(null)
   }
   return (
-    <div className="editor-only absolute bottom-3 left-16 z-10 flex max-w-[60%] items-center gap-0.5 overflow-x-auto rounded-md border border-slate-200 bg-white p-0.5 text-xs shadow-sm" role="tablist" aria-label={t('Hojas')}>
+    <div className="editor-only absolute bottom-3 left-16 z-10 flex max-w-[60%] items-center gap-0.5 overflow-x-auto rounded-md border border-slate-200 bg-white p-0.5 text-xs shadow-sm" role="tablist" aria-label={t('Hojas')} data-tour="hojas">
       {sheets.map((s) =>
         editing === s.id ? (
           <input

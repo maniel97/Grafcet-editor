@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { X } from 'lucide-react'
+import { Compass, X } from 'lucide-react'
 import { SHORTCUTS } from '../lib/shortcuts'
 import { N_, t } from '../lib/i18n'
 
@@ -70,7 +70,7 @@ const NOTATION = [
 ]
 
 // Ayuda rápida: atajos de teclado y resumen de la notación IEC 60848 que usa el editor.
-export default function HelpDialog({ onClose }) {
+export default function HelpDialog({ onClose, onTour }) {
   const dialogRef = useRef(null)
   useEffect(() => {
     if (!dialogRef.current.open) dialogRef.current.showModal()
@@ -88,6 +88,16 @@ export default function HelpDialog({ onClose }) {
         <h2 id="help-title" className="text-base font-semibold">
           {t('Ayuda')}
         </h2>
+        <span className="ml-auto" />
+        {onTour && (
+          <button
+            type="button"
+            onClick={onTour}
+            className="mr-2 flex items-center gap-1.5 rounded-md border border-blue-200 bg-blue-50 px-3 py-1 text-sm text-blue-800 hover:bg-blue-100"
+          >
+            <Compass size={16} /> {t('Visita guiada')}
+          </button>
+        )}
         <button type="button" onClick={onClose} title={t('Cerrar (Esc)')} className="rounded-md p-1 text-slate-500 hover:bg-slate-100">
           <X size={18} />
         </button>

@@ -5,8 +5,10 @@ export const fixture = (name) => fileURLToPath(new URL(`./fixtures/${name}`, imp
 
 // Abre el editor (perfil nuevo: sin autoguardado previo, con el diagrama de ejemplo) y, si se
 // indica, carga un proyecto. Registra los errores de la consola para comprobarlos al final.
-export async function openEditor(page, project) {
+// tour: dejar que se ofrezca la visita guiada de la primera vez (por defecto, ya vista).
+export async function openEditor(page, project, { tour = false } = {}) {
   const errors = []
+  if (!tour) await page.addInitScript(() => localStorage.setItem('grafcet-tour', 'visto'))
   page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`))
   page.on('console', (m) => m.type() === 'error' && errors.push(`console: ${m.text()}`))
   await page.goto('/')

@@ -61,10 +61,12 @@ function useToolbarLabels(ref) {
   return labels
 }
 
-function ToolButton({ icon: Icon, label, onClick, disabled, title, active, badge, primary, iconOnly }) {
+// tour: ancla de la visita guiada (data-tour); por defecto, el nombre interno del botón.
+function ToolButton({ icon: Icon, label, onClick, disabled, title, active, badge, primary, iconOnly, tour }) {
   return (
     <button
       type="button"
+      data-tour={tour ?? label}
       onClick={onClick}
       disabled={disabled}
       title={t(title ?? label)}
@@ -205,6 +207,7 @@ export default function Toolbar({
       />
       <ToolButton
         icon={simulating ? CircleStop : Play}
+        tour="Simular"
         label={simulating ? N_('Detener') : N_('Simular')}
         title={simulating ? N_('Detener la simulación y volver a editar') : N_('Simular el grafcet (IEC 60848)')}
         onClick={onToggleSimulation}

@@ -1,7 +1,7 @@
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ReactFlow, Background, BackgroundVariant, MiniMap, addEdge, useNodesInitialized, useNodesState, useEdgesState, useReactFlow } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
-import { Lock } from 'lucide-react'
+import { Compass, Lock } from 'lucide-react'
 
 import Toolbar from './Toolbar'
 import PropertiesPanel from './PropertiesPanel'
@@ -48,11 +48,13 @@ import { clearSharedHash, decodeProject, sharedData } from '../lib/share'
 import { applySymbols } from '../lib/plc/symbolTable'
 import { buildPlcModel } from '../lib/plcModel'
 import { t } from '../lib/i18n'
+import { FIRST_TOUR, markTourSeen, tourSeen } from '../lib/tours'
 
 // Partes que no hacen falta al abrir el editor: se descargan la primera vez que se usan, para que
 // la carga inicial sea más ligera (importa sobre todo publicado en internet).
 const SettingsDialog = lazy(() => import('./SettingsDialog'))
 const HelpDialog = lazy(() => import('./HelpDialog'))
+const Tour = lazy(() => import('./Tour'))
 const SimulationPanel = lazy(() => import('./SimulationPanel'))
 const SceneView = lazy(() => import('./SceneView'))
 const ElectricalView = lazy(() => import('./elec/ElectricalView'))
@@ -117,6 +119,9 @@ export default function GrafcetCanvas() {
   const [variablesOpen, setVariablesOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [helpOpen, setHelpOpen] = useState(false)
+  // Visita guiada (lib/tours.js): la de bienvenida se ofrece la primera vez.
+  const [tour, setTour] = useState(null)
+  const [offerTour, setOfferTour] = useState(() => !tourSeen())
   const [verifyOpen, setVerifyOpen] = useState(false)
   const [ladderOpen, setLadderOpen] = useState(false)
   // Escena de la planta durante la simulación: null | 'split' (junto al grafcet) | 'full'.
@@ -941,13 +946,57 @@ export default function GrafcetCanvas() {
         )}
         {helpOpen && (
           <Suspense fallback={<Loading />}>
-            <HelpDialog onClose={() => setHelpOpen(false)} />
+            <HelpDialog
+              onClose={() => setHelpOpen(false)}
+              onTour={() => {
+                setHelpOpen(false)
+                setTour(FIRST_TOUR)
+              }}
+            />
           </Suspense>
+        )}
+        {tour && (
+          <Suspense fallback={null}>
+            <Tour
+              tour={tour}
+              onClose={() => {
+                markTourSeen()
+                setTour(null)
+              }}
+            />
+          </Suspense>
+        )}
+        {offerTour && !tour && (
+          <div role="status" className="fixed top-16 left-1/2 z-[60] flex -translate-x-1/2 items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-xl">
+            <Compass size={18} className="shrink-0 text-blue-600" />
+            <span>{t('¿Es la primera vez? Una visita guiada te enseña lo principal en un par de minutos.')}</span>
+            <button
+              type="button"
+              onClick={() => {
+                setOfferTour(false)
+                setTour(FIRST_TOUR)
+              }}
+              className="rounded-md bg-blue-600 px-3 py-1 font-medium text-white hover:bg-blue-700"
+            >
+              {t('Empezar')}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                markTourSeen()
+                setOfferTour(false)
+              }}
+              className="rounded-md px-2 py-1 text-slate-600 hover:bg-slate-100"
+            >
+              {t('Ahora no')}
+            </button>
+          </div>
         )}
         <div className="relative flex min-h-0 flex-1">
           <div
             ref={wrapperRef}
             onPointerDownCapture={() => setLastPanel(null)}
+            data-tour="lienzo"
             className={`relative min-w-[160px] flex-1 ${loopSource ? 'loop-picking' : ''} ${readOnly ? 'read-only' : ''}`}
           >
             {editLocked && !simulating && (

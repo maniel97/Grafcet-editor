@@ -55,6 +55,7 @@ export default function ToolbarDropdown({ icon: Icon, label, title, menuLabel, i
       <button
         ref={buttonRef}
         type="button"
+        data-tour={label}
         onClick={() => setOpen((o) => !o)}
         disabled={disabled}
         title={t(title)}

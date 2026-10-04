@@ -14,10 +14,10 @@ import { t } from '../lib/i18n'
 
 const SPEEDS = [0.25, 0.5, 1, 2, 5, 10]
 
-function Section({ title, count, children, defaultOpen = true }) {
+function Section({ title, count, children, defaultOpen = true, tour }) {
   const [open, setOpen] = useState(defaultOpen)
   return (
-    <section className="border-b border-slate-100">
+    <section data-tour={tour} className="border-b border-slate-100">
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
@@ -164,7 +164,7 @@ export default function SimulationPanel({ simulation, scenarios = [], onScenario
   ]
 
   return (
-    <aside className="side-panel flex w-80 shrink-0 flex-col border-l border-slate-200 bg-white">
+    <aside data-tour="simulacion" className="side-panel flex w-80 shrink-0 flex-col border-l border-slate-200 bg-white">
       <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
         <h2 className="flex items-center gap-2 text-sm font-semibold">
           <span className={`h-2 w-2 rounded-full ${playing ? 'animate-pulse bg-green-500' : 'bg-amber-500'}`} />
@@ -320,7 +320,7 @@ export default function SimulationPanel({ simulation, scenarios = [], onScenario
           </button>
         </div>
 
-        <Section title={t('Entradas')} count={allInputs.length}>
+        <Section title={t('Entradas')} count={allInputs.length} tour="entradas">
           {allInputs.length === 0 && <p className="text-xs text-slate-400">{t('No hay entradas: escribe receptividades como «Marcha».')}</p>}
           {inputs.map((v, i) => (
             <InputRow key={v.name} variable={v} value={sim.inputs[v.name]} onChange={(on) => setInput(v.name, on)} hotkey={i < 9 ? i + 1 : null} />
