@@ -13,6 +13,13 @@ Ao simular abre-se junto ao grafcet, se o projeto tiver planta; no painel de sim
 
 «Ligações» mostra o que está ligado e o que falta: entradas do grafcet que ninguém dá, saídas que não movem nada.
 
+## Diagrama espaço-fase
+
+Enquanto simula, a secção **«Diagrama espaço-fase»** do painel desenha o que os cilindros fizeram: uma linha por cilindro com as suas posições 0 (recolhido) e 1 (avançado) e uma coluna por fase, com cada movimento na diagonal. É o diagrama dos apontamentos de pneumática, mas do que faz o **seu** programa: compare-o com o que pede o enunciado.
+
+- **Fases** ou **Tempo**: o eixo horizontal por fases (etapas) ou em segundos (diagrama espaço-tempo).
+- Se no fim todos voltarem à posição inicial, a última fase marca-se «5=1»: o ciclo fecha-se.
+
 ## Mais realismo
 
 - **Gravidade**: vista de frente; as peças caem, apoiam-se em plataformas e na haste dos cilindros.

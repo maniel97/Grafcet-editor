@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { AlertTriangle, ChevronDown, ChevronRight, Factory, Pause, Play, RotateCcw, SkipForward, Square, Timer, Zap } from 'lucide-react'
 import Chronogram from './Chronogram'
+import SpacePhase from './SpacePhase'
+import { buildSpacePhase } from '../lib/sim/spacePhase'
 import ScenarioControls from './ScenarioControls'
 import CpuControls from './CpuControls'
 import { chronogramCsv } from '../lib/sim/scenario'
@@ -95,6 +97,22 @@ function chronogramSource(samples, signals, now) {
   )
 }
 
+// Fuente de exportación del diagrama espacio-fase (o espacio-tiempo) con los datos de este momento.
+function spacePhaseSource(diagram, mode) {
+  return svgMarkupSource(
+    async () => {
+      const { renderToStaticMarkup } = await import('react-dom/server')
+      const width = Math.round(Math.min(2400, Math.max(480, 64 + diagram.phases.length * 70)))
+      return renderToStaticMarkup(<SpacePhase diagram={diagram} mode={mode} width={width} standalone />)
+    },
+    {
+      kind: 'espacio-fase',
+      title: `${getProjectName().trim() || 'Grafcet'} · ${mode === 'fase' ? t('diagrama espacio-fase') : t('diagrama espacio-tiempo')}`,
+      name: (ext) => fileName(ext, mode === 'fase' ? 'espacio-fase' : 'espacio-tiempo'),
+    },
+  )
+}
+
 const fmtTime = (v) => (v < 60 ? `${v.toFixed(1)} s` : `${Math.floor(v / 60)} min ${(v % 60).toFixed(1)} s`)
 
 // Panel de control de la simulación.
@@ -109,6 +127,9 @@ export default function SimulationPanel({ simulation, scenarios = [], onScenario
   // Lo que espera el grafcet ahora (transiciones validadas y lo que les falta).
   const waiting = useMemo(() => (compiled && sim ? waitingFor(compiled, sim) : null), [compiled, sim])
   const [chronoExport, setChronoExport] = useState(null)
+  // Diagrama espacio-fase de los cilindros de la planta (lib/sim/spacePhase.js), por fases o en el tiempo.
+  const [phaseMode, setPhaseMode] = useState('fase')
+  const spacePhase = useMemo(() => buildSpacePhase(sim?.motion, simulation.cylinders ?? []), [sim?.motion, simulation.cylinders])
 
   // Teclas 1–9: cambian las primeras entradas (fuera de los campos de texto).
   useEffect(() => {
@@ -468,6 +489,48 @@ export default function SimulationPanel({ simulation, scenarios = [], onScenario
             </button>
           </div>
         </Section>
+
+        {simulation.cylinders?.length > 0 && (
+          <Section title={t('Diagrama espacio-fase')} tour="espacio-fase">
+            <div className="mb-1 flex items-center gap-1 text-xs" role="radiogroup" aria-label={t('Eje horizontal')}>
+              {[
+                ['fase', t('Fases')],
+                ['tiempo', t('Tiempo')],
+              ].map(([id, label]) => (
+                <button
+                  key={id}
+                  type="button"
+                  role="radio"
+                  aria-checked={phaseMode === id}
+                  onClick={() => setPhaseMode(id)}
+                  className={`rounded border px-1.5 py-0.5 ${phaseMode === id ? 'border-blue-300 bg-blue-50 text-blue-800' : 'border-slate-300 text-slate-600 hover:bg-slate-100'}`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            {spacePhase ? (
+              <>
+                <div className="paper overflow-hidden rounded border border-slate-200">
+                  <SpacePhase diagram={spacePhase} mode={phaseMode} />
+                </div>
+                <div className="mt-1 flex items-center gap-1 text-xs">
+                  <span className="text-slate-400">{t('Exportar:')}</span>
+                  <button
+                    type="button"
+                    onClick={() => setChronoExport(spacePhaseSource(spacePhase, phaseMode))}
+                    title={t('PNG, SVG o PDF, con vista previa')}
+                    className="rounded border border-slate-300 px-1.5 py-0.5 text-slate-600 hover:bg-slate-100"
+                  >
+                    {t('Imagen o PDF')}
+                  </button>
+                </div>
+              </>
+            ) : (
+              <p className="text-xs text-slate-500">{t('Aparece cuando se mueve algún cilindro de la planta: haz un ciclo.')}</p>
+            )}
+          </Section>
+        )}
 
         <Section title={t('Registro de franqueos')} count={sim.log.length} defaultOpen={false}>
           {sim.log.length === 0 && <p className="text-xs text-slate-400">{t('Aún no se ha franqueado ninguna transición.')}</p>}

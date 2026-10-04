@@ -4,6 +4,7 @@ import { compile, evolve, initialState, inspect, withMacros } from './engine'
 import { recordEvent } from './scenario'
 import { sceneAction } from './scene'
 import { advanceWorld, makeWorld } from './world'
+import { cylindersOf, motionSample, pushMotion } from './spacePhase'
 import { SCAN, advanceCpu, makeCpuRunner } from '../plc/cpuRun'
 import { generateLadder } from '../ladder/generate'
 import { toS7200 } from '../ladder/exportS7200'
@@ -45,6 +46,8 @@ export function useSimulation(nodes, edges, plc, enabled) {
     () => makeWorld(enabled ? scene : null, analogRange, enabled ? plc.electrical : null, compiled?.variables ?? []),
     [enabled, scene, analogRange, plc.electrical, compiled],
   )
+  // Cilindros de la planta, para el diagrama espacio-fase (spacePhase.js).
+  const cylinders = useMemo(() => cylindersOf(enabled ? scene : null), [enabled, scene])
 
   // Modo «Autómata» (plc.cpu.enabled): la lógica la pone un programa S7-200 (el generado del grafcet
   // o uno de Micro/WIN) en la CPU simulada, en lugar del grafcet. Solo se rehace (y la CPU vuelve a
@@ -63,6 +66,8 @@ export function useSimulation(nodes, edges, plc, enabled) {
     [cpuText, addressKey],
   )
   const cpuRunner = cpuSetup?.runner ?? null
+  // Fase = etapas activas (con el autómata no hay etapas: null).
+  const phaseOf = useCallback((state) => (cpuSetup ? null : [...state.active].sort().join(',')), [cpuSetup])
 
   // { state, inputs, log, samples, recording: [eventos] | null, playback: { scenario, next } | null,
   //   world: estado de la escena de la planta }
@@ -117,11 +122,12 @@ export function useSimulation(nodes, edges, plc, enabled) {
       const last = current.samples[current.samples.length - 1]
       const samples =
         last && sameSample(last.values, sample) ? current.samples : [...current.samples, { t: time, values: sample }].slice(-MAX_SAMPLES)
-      const next = { ...current, cpuError, state, inputs, world: worldState, log, samples, playback: playback && !finished ? { ...playback, next: nextEvent } : null }
+      const motion = pushMotion(current.motion, motionSample(time, worldState, cylinders, phaseOf(state)))
+      const next = { ...current, cpuError, state, inputs, world: worldState, log, samples, motion, playback: playback && !finished ? { ...playback, next: nextEvent } : null }
       simRef.current = next
       setSim(next)
     },
-    [compiled, world, cpuSetup, cpuRunner],
+    [compiled, world, cpuSetup, cpuRunner, cylinders, phaseOf],
   )
 
   const reset = useCallback(() => {
@@ -135,15 +141,20 @@ export function useSimulation(nodes, edges, plc, enabled) {
     }
     const worldState = world.init()
     Object.assign(inputs, world.inputs(worldState))
-    const first = { state, inputs, world: worldState, log: [], samples: [], recording: null, playback: null }
+    const first = { state, inputs, world: worldState, log: [], samples: [], motion: [], recording: null, playback: null }
     simRef.current = first
     // Evolución inicial (p. ej. receptividades "1" desde la situación inicial). Con el autómata,
     // ninguna etapa: las salidas las da el programa.
     const settled = cpuSetup ? { ...state, active: new Set(), activatedAt: new Map(), values: { ...state.values, ...inputs } } : evolve(compiled, state, inputs, 0).state
-    const ready = { ...first, state: settled, samples: [{ t: 0, values: sampleOf(compiled, settled) }] }
+    const ready = {
+      ...first,
+      state: settled,
+      samples: [{ t: 0, values: sampleOf(compiled, settled) }],
+      motion: pushMotion([], motionSample(0, worldState, cylinders, phaseOf(settled))),
+    }
     simRef.current = ready
     setSim(ready)
-  }, [compiled, world, cpuSetup, cpuRunner])
+  }, [compiled, world, cpuSetup, cpuRunner, cylinders, phaseOf])
 
   // Al cambiar de lógica o de programa, la simulación vuelve a empezar.
   const cpuKeyRef = useRef(cpuSetup)
@@ -286,6 +297,7 @@ export function useSimulation(nodes, edges, plc, enabled) {
     sceneDo,
     elecDo,
     world,
+    cylinders,
     sceneCount: scene?.elements?.length ?? 0,
   }
 }

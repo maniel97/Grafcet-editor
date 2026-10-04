@@ -13,6 +13,13 @@ When simulating, it opens next to the grafcet if the project has a plant; in the
 
 “Connections” shows what is connected and what is missing: grafcet inputs nobody gives, outputs that move nothing.
 
+## Displacement-step diagram
+
+While you simulate, the **“Displacement-step diagram”** section of the panel draws what the cylinders have done: one row per cylinder with its positions 0 (retracted) and 1 (extended) and one column per step, with each movement as a diagonal. It is the diagram of the pneumatics textbooks, but of what **your** program does: compare it with the one the exercise asks for.
+
+- **Steps** or **Time**: the horizontal axis by steps or in seconds (displacement-time diagram).
+- If at the end everything is back in its initial position, the last step is marked “5=1”: the cycle is closed.
+
 ## More realism
 
 - **Gravity**: front view; parts fall, rest on platforms and on cylinder rods.

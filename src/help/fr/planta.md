@@ -13,6 +13,13 @@ En simulation, elle s’ouvre à côté du grafcet si le projet en a une ; dans 
 
 « Raccordements » montre ce qui est raccordé et ce qui manque : entrées du grafcet que personne ne donne, sorties qui ne font rien bouger.
 
+## Diagramme espace-phase
+
+Pendant la simulation, la section **« Diagramme espace-phase »** du panneau dessine ce qu’ont fait les vérins : une ligne par vérin avec ses positions 0 (rentré) et 1 (sorti) et une colonne par phase, chaque mouvement en diagonale. C’est le diagramme des cours de pneumatique, mais de ce que fait **votre** programme : comparez-le avec celui que demande l’énoncé.
+
+- **Phases** ou **Temps** : l’axe horizontal par phases (étapes) ou en secondes (diagramme espace-temps).
+- Si à la fin tout est revenu en position initiale, la dernière phase est notée « 5=1 » : le cycle est bouclé.
+
 ## Plus de réalisme
 
 - **Gravité** : vue de face ; les pièces tombent, reposent sur des plateformes et sur la tige des vérins.
