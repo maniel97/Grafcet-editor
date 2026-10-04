@@ -1,16 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { expect, test } from '@playwright/test'
-import { download, expectNoErrors, openEditor, openExample, openExport, openVariables, saveFromDialog } from './helpers'
-
-// Carga un proyecto desde un objeto (sin archivo en disco).
-export async function loadProject(page, project) {
-  await page.locator('input[type=file]').setInputFiles({
-    name: 'proyecto.json',
-    mimeType: 'application/json',
-    buffer: Buffer.from(JSON.stringify({ format: 'grafcet-editor', version: 1, ...project })),
-  })
-  await page.waitForTimeout(400)
-}
+import { download, expectNoErrors, loadProject, openEditor, openExample, openExport, openVariables, saveFromDialog } from './helpers'
 
 const position = (page, id) =>
   page.locator(`.react-flow__node[data-id="${id}"]`).evaluate((el) => {

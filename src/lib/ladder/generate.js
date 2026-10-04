@@ -145,11 +145,11 @@ export function generateLadder(nodes, edges, plc) {
     id: 'deactivation',
     title: 'Desactivación de etapas',
     rungs: transitions
-      .filter((t) => t.from.length)
+      .filter((t) => t.from.length || t.alsoReset?.length)
       .map((t) => ({
-        comment: `${trName.get(t.id)} franqueada: desactiva ${t.from.map((id) => stepVar(label(id), P)).join(', ')}`,
+        comment: `${trName.get(t.id)} franqueada: desactiva ${[...t.from, ...(t.alsoReset ?? [])].map((id) => stepVar(label(id), P)).join(', ')}`,
         network: contact(transOp(trName.get(t.id))),
-        outputs: t.from.map((id) => ({ type: 'reset', operand: stepOp(label(id)) })),
+        outputs: [...t.from, ...(t.alsoReset ?? [])].map((id) => ({ type: 'reset', operand: stepOp(label(id)) })),
         nodeIds: [t.id],
       })),
   })
@@ -159,9 +159,9 @@ export function generateLadder(nodes, edges, plc) {
     rungs: transitions
       .filter((t) => t.to.length)
       .map((t) => ({
-        comment: `${trName.get(t.id)} franqueada: activa ${t.to.map((id) => stepVar(label(id), P)).join(', ')}`,
+        comment: `${trName.get(t.id)} franqueada: activa ${[...t.to, ...(t.alsoSet ?? [])].map((id) => stepVar(label(id), P)).join(', ')}`,
         network: contact(transOp(trName.get(t.id))),
-        outputs: t.to.map((id) => ({ type: 'set', operand: stepOp(label(id)) })),
+        outputs: [...t.to, ...(t.alsoSet ?? [])].map((id) => ({ type: 'set', operand: stepOp(label(id)) })),
         nodeIds: [t.id],
       })),
   })
@@ -188,12 +188,25 @@ export function generateLadder(nodes, edges, plc) {
       }),
   })
 
+  // Encapsulación (IEC 60848): con la etapa encapsulante inactiva, ninguna encapsulada queda activa
+  // (aunque una transición interna se franquee en el mismo ciclo en que sale la encapsulante).
+  sections.push({
+    id: 'encapsulation',
+    title: 'Encapsulación',
+    rungs: (model.encapsulations ?? []).map((e) => ({
+      comment: `${stepVar(label(e.stepId), P)} inactiva: desactiva ${e.members.map((id) => stepVar(label(id), P)).join(', ')}`,
+      network: contact(stepOp(label(e.stepId)), 'NC'),
+      outputs: e.members.map((id) => ({ type: 'reset', operand: stepOp(label(id)) })),
+      nodeIds: [e.stepId],
+    })),
+  })
+
   // 7 y 8 se construyen antes que 6 para recoger todas las temporizaciones usadas.
   const storedRungs = []
   const outputBranches = new Map() // símbolo -> [red]
   for (const step of compiled.steps) {
-    const entering = transitions.filter((t) => t.to.includes(step.id)).map((t) => contact(transOp(trName.get(t.id))))
-    const leaving = transitions.filter((t) => t.from.includes(step.id)).map((t) => contact(transOp(trName.get(t.id))))
+    const entering = transitions.filter((t) => t.to.includes(step.id) || t.alsoSet?.includes(step.id)).map((t) => contact(transOp(trName.get(t.id))))
+    const leaving = transitions.filter((t) => t.from.includes(step.id) || t.alsoReset?.includes(step.id)).map((t) => contact(transOp(trName.get(t.id))))
     if (step.initial) entering.push(contact(firstOp))
     for (const action of step.actions) {
       if (action.kind === 'stored-on' && entering.length) {

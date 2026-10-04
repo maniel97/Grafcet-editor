@@ -135,10 +135,24 @@ function StepFields({ data, onChange, onCommitLabel, vocabulary }) {
           <input
             type="checkbox"
             checked={!!data.macro}
-            onChange={(e) => onChange({ macro: e.target.checked, ...(e.target.checked ? { initial: false } : {}) })}
+            onChange={(e) => onChange({ macro: e.target.checked, ...(e.target.checked ? { initial: false, encapsulating: false } : {}) })}
           />
           {t('Macroetapa')}
-          <span className="text-xs text-slate-400">(se detalla en otro grafcet; p. ej. M1)</span>
+          <span className="text-xs text-slate-400">{t('(se detalla en otro grafcet; p. ej. M1)')}</span>
+        </label>
+        <label className="flex items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            checked={!!data.encapsulating}
+            onChange={(e) => onChange({ encapsulating: e.target.checked, ...(e.target.checked ? { macro: false } : {}) })}
+          />
+          {t('Etapa encapsulante')}
+          <span className="text-xs text-slate-400">{t('(clic derecho en la etapa para crear su grafcet encapsulado)')}</span>
+        </label>
+        <label className="flex items-center gap-2 text-sm">
+          <input type="checkbox" checked={!!data.activationLink} onChange={(e) => onChange({ activationLink: e.target.checked })} />
+          {t('Enlace de activación (*)')}
+          <span className="text-xs text-slate-400">{t('(se activa al activarse su etapa encapsulante)')}</span>
         </label>
       </div>
 

@@ -65,6 +65,7 @@ const NOTATION = [
     N_('X2 vale 1 con la etapa 2 activa (IEC 60848). En Variables puedes elegir que la tabla, el ladder, el ST, el AWL y la simulación usen E2; en las receptividades se sigue escribiendo X2 y 5s/X2.'),
   ],
   [N_('Receptividades'), N_('!a = a negada (raya encima) · ↑a / ↓a = flancos · a · b = Y · a + b = O · 5s/X2 = 5 s tras activarse la etapa 2 · 3s/a = a lleva 3 s a 1 · 3s/a/2s = sube 3 s después de a y baja 2 s después de que a baje · [C >= 3] = condición numérica.')],
+  [N_('Encapsulación'), N_('Una etapa encapsulante (esquinas cortadas) tiene su grafcet encapsulado en un marco: al activarse, se activan las etapas con enlace de activación (*); al desactivarse, todo lo encapsulado. Clic derecho en una etapa > Convertir en etapa encapsulante.')],
   [N_('Transiciones fuente y sumidero'), N_('Una transición sin etapa anterior (fuente) está siempre validada: cada vez que se cumple su receptividad, normalmente un flanco (↑Pieza), activa las etapas siguientes. Una transición sin etapa posterior (sumidero) desactiva sus etapas anteriores.')],
 ]
 

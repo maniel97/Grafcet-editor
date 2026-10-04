@@ -11,6 +11,8 @@ import { t } from '../lib/i18n'
 // rectángulos contiguos. Variantes (IEC 60848):
 // - inicial: doble cuadrado
 // - macroetapa: cuadrado con dos trazos horizontales arriba y abajo
+// - encapsulante: cuadrado con las cuatro esquinas cortadas por un trazo (inicial: en el interior)
+// - enlace de activación de una etapa encapsulada: asterisco a su izquierda
 // La geometría va en px (no rem) para que el tamaño de la interfaz no deforme el diagrama;
 // el texto usa el tamaño de letra del diagrama de las opciones.
 export default function StepNode({ id, data, selected }) {
@@ -55,8 +57,21 @@ export default function StepNode({ id, data, selected }) {
         {active && (
           <span
             aria-label={t('Etapa activa')}
-            className="pointer-events-none absolute right-[6px] top-[6px] h-[9px] w-[9px] rounded-full bg-slate-900"
+            className={`pointer-events-none absolute top-[6px] h-[9px] w-[9px] rounded-full bg-slate-900 ${
+              data.encapsulating ? 'left-[calc(50%-4.5px)]' : 'right-[6px]'
+            }`}
           />
+        )}
+        {data.encapsulating && <EncapsulatingCorners initial={!!data.initial} color={color} />}
+        {data.activationLink && (
+          <span
+            aria-label={t('Enlace de activación')}
+            title={t('Enlace de activación: se activa al activarse su etapa encapsulante')}
+            className="pointer-events-none absolute left-[-20px] top-1/2 -translate-y-1/2 text-[20px] font-bold leading-none"
+            style={{ color }}
+          >
+            *
+          </span>
         )}
         {data.initial && <div className={`pointer-events-none absolute inset-[4px] border-2 ${border}`} />}
         {data.macro && !data.initial && (
@@ -86,5 +101,26 @@ export default function StepNode({ id, data, selected }) {
         </>
       )}
     </div>
+  )
+}
+
+// Etapa encapsulante (IEC 60848): un trazo corta cada esquina del cuadrado (el interior, si es
+// inicial). Medidas sobre el interior del borde (52 px).
+function EncapsulatingCorners({ initial, color }) {
+  const o = initial ? 6 : 0
+  const l = initial ? 12 : 16
+  const far = 52 - o
+  const corners = [
+    [o + l, o, o, o + l],
+    [far - l, o, far, o + l],
+    [o, far - l, o + l, far],
+    [far, far - l, far - l, far],
+  ]
+  return (
+    <svg className="pointer-events-none absolute inset-0" width="52" height="52" viewBox="0 0 52 52" aria-hidden="true">
+      {corners.map(([x1, y1, x2, y2], i) => (
+        <line key={i} x1={x1} y1={y1} x2={x2} y2={y2} stroke={color} strokeWidth="2" />
+      ))}
+    </svg>
   )
 }

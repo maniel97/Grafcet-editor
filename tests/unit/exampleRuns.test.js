@@ -120,3 +120,34 @@ describe('ejemplos documentados: tabla de variables, direcciones y comentarios',
     })
   }
 })
+
+describe('paro inmediato con encapsulación', () => {
+  it('Marcha cicla el cilindro; Paro a media carrera desactiva todo lo encapsulado', () => {
+    const project = normalizeProject(EXAMPLES.find((e) => e.id === 'encapsulacion').build())
+    const compiled = compile(buildPlcModel(project.nodes, project.edges, project.plc))
+    const scene = project.plc.scene
+    const world = makeWorld(scene, () => null)
+    let w = world.init()
+    let inputs = world.inputs(w)
+    let state = evolve(compiled, initialState(compiled), inputs, 0).state
+    const labels = () => [...state.active].map((id) => compiled.steps.find((s) => s.id === id).label).sort()
+    const advance = (from, to) => {
+      for (let t = from + 0.1; t <= to + 1e-9; t += 0.1) {
+        const r = advanceWorld(compiled, { state, inputs, world: w }, t, { world })
+        ;({ state, inputs } = r)
+        w = r.world
+      }
+    }
+    w = sceneAction(scene, w, 'marcha', 'press')
+    advance(0, 0.3)
+    w = sceneAction(scene, w, 'marcha', 'release')
+    expect(labels()).toEqual(['1', '11'])
+    advance(0.3, 2.5) // A sale (1,5 s) y empieza a entrar
+    expect(labels()).toEqual(['1', '12'])
+    w = sceneAction(scene, w, 'paro', 'press')
+    advance(2.5, 2.8)
+    expect(labels()).toEqual(['0'])
+    expect(state.values['A-']).toBe(0)
+    expect(state.values.En_marcha).toBe(0)
+  })
+})

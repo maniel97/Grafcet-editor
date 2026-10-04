@@ -93,7 +93,7 @@ export function compile(model) {
   const delays = new Map()
   for (const t of transitions) collectDelays(t.ast, delays)
   for (const s of steps) for (const a of s.actions) collectDelays(a.conditionAst, delays)
-  return { steps, transitions, stepByLabel, driven, variables: model.variables, errors, grafcets, grafcetOf, forcings, macroMembers, delays }
+  return { steps, transitions, stepByLabel, driven, variables: model.variables, errors, grafcets, grafcetOf, forcings, macroMembers, delays, encapsulations: model.encapsulations ?? [] }
 }
 
 // Etapas activas vistas desde fuera: incluye las macroetapas con alguna etapa activa.
@@ -123,6 +123,25 @@ function applyForcing(compiled, active, orders) {
     next = result
   }
   return next
+}
+// Encapsulación (IEC 60848): con la etapa encapsulante inactiva no queda activa ninguna de sus
+// encapsuladas; al activarse, se activan las de su nivel con enlace de activación (*). Se aplica
+// a la situación que resulta (también tras un forzado), hasta que no cambie nada (anidadas).
+function encapsulate(compiled, before, next) {
+  for (let changed = true; changed; ) {
+    changed = false
+    for (const e of compiled.encapsulations) {
+      if (!next.has(e.stepId)) {
+        for (const id of e.members) if (next.delete(id)) changed = true
+      } else if (!before.has(e.stepId)) {
+        for (const id of e.links) {
+          if (next.has(id)) continue
+          next.add(id)
+          changed = true
+        }
+      }
+    }
+  }
 }
 const sameSet = (a, b) => a.size === b.size && [...a].every((x) => b.has(x))
 
@@ -208,7 +227,8 @@ export function evolve(compiled, state, inputs, time, { singleStep = false } = {
     for (const id of activated) evolved.add(id)
     // Forzados ordenados por la nueva situación.
     const orders = forcingOrders(compiled, evolved)
-    const next = applyForcing(compiled, evolved, orders)
+    const next = new Set(applyForcing(compiled, evolved, orders))
+    encapsulate(compiled, active, next)
     if (!firable.length && sameSet(next, active)) break
     for (const id of next) if (!evolved.has(id)) activated.add(id)
 

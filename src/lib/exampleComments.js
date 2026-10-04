@@ -459,4 +459,16 @@ export const EXAMPLE_COMMENTS = {
     },
     steps: { 0: 'Reposo', M1: 'Macroetapa: dosificar y calentar', 2: 'Expulsando', E1: 'Entrada de M1: llenar', 11: 'Calentando 20 s', S1: 'Salida de M1: listo' },
   },
+  encapsulacion: {
+    variables: {
+      Marcha: 'Pulsador de marcha',
+      Paro: 'Pulsador de paro (inmediato)',
+      a0: 'Detector: cilindro A dentro',
+      a1: 'Detector: cilindro A fuera',
+      En_marcha: 'Piloto: en marcha',
+      'A+': 'Electroválvula: sacar A',
+      'A-': 'Electroválvula: meter A',
+    },
+    steps: { 0: 'Parado', 1: 'En marcha (encapsula G1)', 11: 'Sale A (enlace de activación)', 12: 'Entra A' },
+  },
 }

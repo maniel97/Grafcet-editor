@@ -6,6 +6,7 @@ import { defaultEdgeOptions } from './initialDiagram'
 import { normalizeAction } from './actions'
 import { alignColumn, spaceSequence } from './align'
 import { measureBoxes, spreadFactor, spreadNodes } from './spread'
+import { nextFrameName } from './frames'
 
 const link = (source, target) => ({ ...defaultEdgeOptions, id: `e-${source}-${target}`, source, target })
 
@@ -131,7 +132,58 @@ export function useStructureActions() {
       const step = getNode(stepId)
       if (!step) return
       takeSnapshot()
-      updateNodeData(stepId, step.data.macro ? { macro: false } : { macro: true, initial: false })
+      updateNodeData(stepId, step.data.macro ? { macro: false } : { macro: true, initial: false, encapsulating: false })
+    },
+    [getNode, takeSnapshot, updateNodeData],
+  )
+
+  // Etapa encapsulante (IEC 60848). Al convertirla, si aún no tiene su grafcet encapsulado, se
+  // crea a su derecha un marco «G5» con una primera etapa con enlace de activación (*).
+  const toggleEncapsulating = useCallback(
+    (stepId) => {
+      const step = getNode(stepId)
+      if (!step) return
+      takeSnapshot()
+      if (step.data.encapsulating) {
+        updateNodeData(stepId, { encapsulating: false })
+        return
+      }
+      const nodes = getNodes()
+      const label = String(step.data.label)
+      const hasFrame = nodes.some((n) => n.type === 'frame' && n.data.kind === 'encapsulation' && String(n.data.step) === label)
+      const created = []
+      if (!hasFrame) {
+        const size = { width: 240, height: 200 }
+        // A la derecha de la etapa y de sus acciones, donde no pise otros elementos.
+        const rects = nodes
+          .filter((n) => n.type !== 'frame')
+          .map((n) => ({ x: n.position.x, y: n.position.y, w: n.measured?.width ?? 56, h: n.measured?.height ?? 56 }))
+        const at = { x: step.position.x + (step.measured?.width ?? 56) + 80, y: step.position.y - 40 }
+        const hits = () => rects.some((r) => r.x < at.x + size.width && at.x < r.x + r.w && r.y < at.y + size.height && at.y < r.y + r.h)
+        for (let i = 0; i < 40 && hits(); i++) at.x += 80
+        const names = new Set(nodes.filter((n) => n.type === 'frame').map((n) => String(n.data.name).toUpperCase()))
+        const name = names.has(`G${label}`.toUpperCase()) ? nextFrameName('encapsulation', nodes) : `G${label}`
+        created.push(
+          { id: crypto.randomUUID(), type: 'frame', position: at, ...size, zIndex: -1, data: { kind: 'encapsulation', step: label, name } },
+          {
+            id: crypto.randomUUID(),
+            type: 'step',
+            position: { x: at.x + 60, y: at.y + 50 },
+            data: { label: nextStepLabel(nodes), actions: [], activationLink: true },
+          },
+        )
+      }
+      setNodes((nds) => [...nds.map((n) => (n.id === stepId ? { ...n, data: { ...n.data, encapsulating: true, macro: false } } : n)), ...created])
+    },
+    [getNode, getNodes, setNodes, takeSnapshot, updateNodeData],
+  )
+
+  const toggleActivationLink = useCallback(
+    (stepId) => {
+      const step = getNode(stepId)
+      if (!step) return
+      takeSnapshot()
+      updateNodeData(stepId, { activationLink: !step.data.activationLink })
     },
     [getNode, takeSnapshot, updateNodeData],
   )
@@ -187,6 +239,8 @@ export function useStructureActions() {
     converge,
     toggleInitial,
     toggleMacro,
+    toggleEncapsulating,
+    toggleActivationLink,
     addAction,
     remove,
   }

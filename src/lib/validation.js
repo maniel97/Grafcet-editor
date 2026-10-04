@@ -73,6 +73,45 @@ export function validateGrafcet(nodes, edges) {
       add('warning', t('Macroetapa {macro} sin expansión: dibuja un marco «{macro}» con sus etapas (de E a S). Mientras tanto se simula como una etapa normal.', { macro: macroName(s.data.label) }), [s.id])
     }
   }
+  // Encapsulación (IEC 60848): la etapa encapsulante «5» y su marco (data.step = '5'), con al menos
+  // una etapa de su nivel con enlace de activación (*) y sin enlaces que crucen el marco.
+  const encapsulated = new Set() // etapas dentro de algún marco de encapsulación
+  const encapsulationLinks = new Map() // etapa encapsulante -> etapas de su nivel con *
+  for (const f of frames.filter((x) => x.data.kind === 'encapsulation')) {
+    const owner = steps.find((s) => s.data.encapsulating && String(s.data.label) === String(f.data.step))
+    if (!owner) {
+      add('error', t('El grafcet encapsulado {grafcet} no tiene etapa encapsulante: marca la etapa {etapa} como encapsulante o cambia el marco.', { grafcet: frameName(f), etapa: f.data.step ?? '?' }), [f.id])
+      continue
+    }
+    const inner = [...membersOf(f, steps)].filter((s) => s.id !== owner.id)
+    inner.forEach((s) => encapsulated.add(s.id))
+    const level = inner.filter((s) => frameOf(s, frames, 'encapsulation')?.id === f.id)
+    encapsulationLinks.set(owner.id, level.filter((s) => s.data.activationLink).map((s) => s.id))
+    if (!level.some((s) => s.data.activationLink)) {
+      add('error', t('El grafcet encapsulado {grafcet} no tiene ninguna etapa con enlace de activación (*): al activarse {etapa} no se activaría nada dentro.', { grafcet: frameName(f), etapa: stepName(owner) }), [f.id])
+    }
+    if (inner.some((s) => s.data.initial) && !owner.data.initial) {
+      add('error', t('{etapa} encapsula etapas iniciales, así que también tiene que ser inicial (una encapsulada no puede estar activa sin su encapsulante).', { etapa: stepName(owner) }), [owner.id])
+    }
+    // Enlaces que entran o salen del marco: el grafcet encapsulado es independiente.
+    const insideIds = new Set(membersOf(f, nodes).map((n) => n.id))
+    for (const e of edges) {
+      if (!byId.has(e.source) || !byId.has(e.target)) continue
+      if (insideIds.has(e.source) !== insideIds.has(e.target) && e.source !== owner.id && e.target !== owner.id) {
+        add('error', t('Un enlace cruza el marco del grafcet encapsulado {grafcet}: sus etapas solo se activan por el enlace de activación (*) y se desactivan con {etapa}.', { grafcet: frameName(f), etapa: stepName(owner) }), [e.source, e.target])
+      }
+    }
+  }
+  for (const s of steps) {
+    if (s.data.encapsulating && !frames.some((f) => f.data.kind === 'encapsulation' && String(f.data.step) === String(s.data.label))) {
+      add('warning', t('{etapa} es encapsulante pero no tiene su grafcet encapsulado: dibújalo en un marco de encapsulación de la etapa {numero}. Mientras tanto se simula como una etapa normal.', { etapa: stepName(s), numero: s.data.label }), [s.id])
+    }
+    if (s.data.activationLink && !encapsulated.has(s.id)) {
+      add('warning', t('{etapa} tiene enlace de activación (*) pero no está dentro de ningún grafcet encapsulado.', { etapa: stepName(s) }), [s.id])
+    }
+    if (s.data.encapsulating && s.data.macro) add('error', t('{etapa}: una etapa no puede ser a la vez macroetapa y encapsulante.', { etapa: stepName(s) }), [s.id])
+  }
+
   // Forzados: grafcet destino existente, distinto del propio y con esas etapas.
   const grafcetSteps = new Map()
   for (const s of steps) {
@@ -143,10 +182,11 @@ export function validateGrafcet(nodes, edges) {
   }
 
   for (const s of steps) {
-    if (!s.data.initial && incoming(s.id).length === 0 && expansionRole.get(s.id) !== 'entry' && !forcedTargets.has(s.id)) {
+    if (!s.data.initial && incoming(s.id).length === 0 && expansionRole.get(s.id) !== 'entry' && !forcedTargets.has(s.id) && !s.data.activationLink) {
       add('warning', t('{etapa} no tiene enlace de entrada: nunca se activará.', { etapa: stepName(s) }), [s.id])
     }
-    if (outgoing(s.id).length === 0 && expansionRole.get(s.id) !== 'exit') {
+    // Una etapa encapsulada sin salida es válida: la desactiva su etapa encapsulante.
+    if (outgoing(s.id).length === 0 && expansionRole.get(s.id) !== 'exit' && !encapsulated.has(s.id)) {
       add('warning', t('{etapa} no tiene transición de salida: una vez activa no se desactiva nunca.', { etapa: stepName(s) }), [s.id])
     }
   }
@@ -229,6 +269,7 @@ export function validateGrafcet(nodes, edges) {
     const expansion = expansions.get(id)
     if (expansion) queue.push(...expansion.members.map((m) => m.id))
     queue.push(...(forcedOn.get(id) ?? []))
+    queue.push(...(encapsulationLinks.get(id) ?? []))
   }
   if (reached.size) {
     for (const s of steps) {

@@ -83,3 +83,13 @@ export async function openVariables(page) {
   await page.getByTitle(/Tabla de variables: direcciones/).click()
   return page.getByRole('dialog', { name: 'Tabla de variables' })
 }
+
+// Carga un proyecto desde un objeto (sin archivo en disco).
+export async function loadProject(page, project) {
+  await page.locator('input[type=file]').setInputFiles({
+    name: 'proyecto.json',
+    mimeType: 'application/json',
+    buffer: Buffer.from(JSON.stringify({ format: 'grafcet-editor', version: 1, ...project })),
+  })
+  await page.waitForTimeout(400)
+}

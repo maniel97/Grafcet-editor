@@ -25,6 +25,8 @@ import {
   Group,
   Scissors,
   MoveHorizontal,
+  Layers,
+  Asterisk,
 } from 'lucide-react'
 import ContextMenu from './ContextMenu'
 import { useQuickConnect } from '../lib/useQuickConnect'
@@ -41,7 +43,7 @@ import { FRAME_KINDS } from '../lib/frames'
 export default function GrafcetContextMenu({ menu, onClose, onEdit, onAddNodeAt, onFrameAround, sheets = [], onMoveToSheet, onShowInLadder }) {
   const { getNode, getEdges, updateNodeData, setEdges, deleteElements } = useReactFlow()
   const quickConnect = useQuickConnect()
-  const { arrange, spread, addBranch, predecessorsOf, addAlternative, converge, toggleInitial, toggleMacro, addAction, remove } =
+  const { arrange, spread, addBranch, predecessorsOf, addAlternative, converge, toggleInitial, toggleMacro, toggleEncapsulating, toggleActivationLink, addAction, remove } =
     useStructureActions()
   const { startLoop, plcTable, toggleTable, setEditingNoteId, takeSnapshot } = useEditor()
 
@@ -222,6 +224,18 @@ export default function GrafcetContextMenu({ menu, onClose, onEdit, onAddNodeAt,
           label: node.data.macro ? N_('Convertir en etapa normal') : N_('Convertir en macroetapa'),
           icon: Rows3,
           onSelect: () => toggleMacro(node.id),
+        },
+        {
+          label: node.data.encapsulating ? N_('Quitar la encapsulación') : N_('Convertir en etapa encapsulante'),
+          hint: node.data.encapsulating ? undefined : N_('crea su grafcet encapsulado'),
+          icon: Layers,
+          onSelect: () => toggleEncapsulating(node.id),
+        },
+        {
+          label: node.data.activationLink ? N_('Quitar el enlace de activación (*)') : N_('Enlace de activación (*)'),
+          hint: node.data.activationLink ? undefined : N_('se activa con su encapsulante'),
+          icon: Asterisk,
+          onSelect: () => toggleActivationLink(node.id),
         },
       ]
     } else {

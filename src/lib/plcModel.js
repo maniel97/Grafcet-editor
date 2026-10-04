@@ -10,11 +10,12 @@ import { analogConfig, isAnalog } from './analog'
 // prevista para el simulador y para la traducción a ladder:
 //
 // {
-//   steps:       [{ id, label, initial, macro, variable, address, grafcet, actions: [...], forcings: [...] }]
-//   transitions: [{ id, condition, from: [stepId], to: [stepId], inputs, timers }]
+//   steps:       [{ id, label, initial, macro, encapsulating, activationLink, variable, address, grafcet, actions: [...], forcings: [...] }]
+//   transitions: [{ id, condition, from: [stepId], to: [stepId], alsoSet: [stepId], alsoReset: [stepId], inputs, timers }]
 //   variables:   [{ name, type, address, preset, comment, uses: [nodeId] }]
 //   grafcets:    [{ name, frameId, steps: [stepId] }]   grafcets parciales (marcos G1, G2...)
 //   macros:      [{ stepId, name, frameId, entry, exit, members: [stepId] }]
+//   encapsulations: [{ stepId, name, frameId, members: [stepId], links: [stepId] }]
 // }
 //
 // Macroetapas (IEC 60848): si M1 tiene expansión (marco «M1» con E1 ... S1), las transiciones que
@@ -38,6 +39,8 @@ export function buildPlcModel(nodes, edges, plc) {
       label: n.data.label,
       initial: !!n.data.initial,
       macro: !!n.data.macro,
+      encapsulating: !!n.data.encapsulating,
+      activationLink: !!n.data.activationLink,
       variable: stepVar(n.data.label, P),
       address: plc.steps[n.id]?.address ?? '',
       comment: plc.steps[n.id]?.comment ?? '',
@@ -86,6 +89,24 @@ export function buildPlcModel(nodes, edges, plc) {
     const exit = byLabel(/^S/i) ?? members.find((id) => !linkedInside(id, 'out')) ?? null
     macros.push({ stepId: s.id, name, frameId: frame.id, entry, exit, members })
   }
+  // Encapsulaciones (IEC 60848): la etapa encapsulante «5» y su marco (data.step = '5'). Al
+  // activarse se activan las etapas de su nivel con enlace de activación (*); al desactivarse, todas
+  // las encapsuladas (también las de encapsulaciones anidadas dentro del marco).
+  const encapsulations = []
+  for (const s of steps.filter((x) => x.encapsulating)) {
+    const frame = frames.find((f) => f.data.kind === 'encapsulation' && String(f.data.step) === String(s.label))
+    if (!frame) continue
+    const members = membersOf(frame, stepNodes).map((n) => n.id).filter((id) => id !== s.id)
+    const links = members.filter((id) => byId.get(id).data.activationLink && frameOf(byId.get(id), frames, 'encapsulation')?.id === frame.id)
+    encapsulations.push({ stepId: s.id, name: String(frame.data.name ?? ''), frameId: frame.id, members, links })
+  }
+  // Situación inicial: una etapa encapsulante inicial sin etapas iniciales dentro activa sus enlaces.
+  const initialLinks = encapsulationActivations(
+    encapsulations,
+    encapsulations.filter((e) => steps.find((x) => x.id === e.stepId)?.initial && !e.members.some((id) => steps.find((x) => x.id === id)?.initial)).map((e) => e.stepId),
+  )
+  for (const s of steps) if (initialLinks.includes(s.id)) s.initial = true
+
   const entryOf = new Map(macros.filter((m) => m.entry).map((m) => [m.stepId, m.entry]))
   const exitOf = new Map(macros.filter((m) => m.exit).map((m) => [m.stepId, m.exit]))
 
@@ -102,6 +123,13 @@ export function buildPlcModel(nodes, edges, plc) {
         timers: timers.map((t) => t.key),
       }
     })
+  // Lo que además hace cada transición por las encapsulaciones: activar los enlaces de las
+  // encapsulantes que activa y desactivar lo encapsulado por las que desactiva.
+  for (const t of transitions) {
+    t.alsoSet = encapsulationActivations(encapsulations, t.to).filter((id) => !t.to.includes(id))
+    const leaving = t.from.filter((id) => !t.to.includes(id))
+    t.alsoReset = [...new Set(encapsulations.filter((e) => leaving.includes(e.stepId)).flatMap((e) => e.members))].filter((id) => !t.to.includes(id) && !t.alsoSet.includes(id))
+  }
 
   const variables = [...symbols].map(([name, found]) => {
     const entry = plc.variables[name] ?? {}
@@ -119,5 +147,23 @@ export function buildPlcModel(nodes, edges, plc) {
     }
   })
 
-  return { steps, transitions, variables, grafcets, macros }
+  return { steps, transitions, variables, grafcets, macros, encapsulations }
+}
+
+// Etapas que se activan al activarse unas etapas encapsulantes: sus enlaces de activación (*) y,
+// si alguno es a su vez encapsulante, los de este, etc.
+export function encapsulationActivations(encapsulations, stepIds) {
+  const byStep = new Map(encapsulations.map((e) => [e.stepId, e]))
+  const out = []
+  const queue = [...stepIds]
+  while (queue.length) {
+    const e = byStep.get(queue.shift())
+    if (!e) continue
+    for (const id of e.links) {
+      if (out.includes(id)) continue
+      out.push(id)
+      queue.push(id)
+    }
+  }
+  return out
 }

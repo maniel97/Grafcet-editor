@@ -1128,6 +1128,52 @@ export const EXAMPLES = [
     },
   },
   {
+    id: 'encapsulacion',
+    level: 5,
+    title: 'Paro inmediato con encapsulación',
+    description: 'La etapa 1 encapsula el ciclo del cilindro (G1): al activarse empieza por la etapa 11 (*); con Paro sale de 1 y todo lo encapsulado se desactiva, esté donde esté.',
+    tags: ['Encapsulación', 'Neumática', 'Planta'],
+    build() {
+      const nodes = [
+        step('s0', '0', 0, 0, [], { initial: true }),
+        trans('t1', 'Marcha', 0, 100),
+        step('s1', '1', 0, 170, ['En_marcha'], { encapsulating: true }),
+        trans('t2', 'Paro', 0, 270),
+        { ...frame('fg1', 'G1', 'encapsulation', 340, -40, 300, 400), data: { kind: 'encapsulation', step: '1', name: 'G1' } },
+        step('s11', '11', 400, 20, ['A+'], { activationLink: true }),
+        trans('t11', 'a1', 400, 120),
+        step('s12', '12', 400, 190, ['A-']),
+        trans('t12', 'a0', 400, 290),
+        note(
+          'nota',
+          700,
+          0,
+          '# Encapsulación (IEC 60848)\n**Nivel 5.** La etapa **1** es **encapsulante** (esquinas cortadas): mientras está activa, lo está su grafcet encapsulado **G1**.\n\n- Al activarse 1 se activa la etapa marcada con un asterisco (enlace de activación), la 11.\n- Con `Paro` se desactiva 1 y, con ella, **todo** lo encapsulado: el ciclo se corta en el acto, esté donde esté.\n- Entradas: `Marcha`, `Paro`, `a0`, `a1` · Salidas: `En_marcha`, `A+`, `A-`\n\nPruébalo: **Simular**, pulsa Marcha y, a mitad de ciclo, Paro.',
+          { width: 320, height: 330 },
+        ),
+      ]
+      const edges = links([
+        ['s0', 't1'],
+        ['t1', 's1'],
+        ['s1', 't2'],
+        ['t2', 's0'],
+        ['s11', 't11'],
+        ['t11', 's12'],
+        ['s12', 't12'],
+        ['t12', 's11'],
+      ])
+      const scene = {
+        elements: [
+          { id: 'marcha', type: 'button', x: 0, y: 0, rot: 0, variable: 'Marcha', contact: 'NO', color: 'green', text: 'Marcha', place: 'desk' },
+          { id: 'paro', type: 'button', x: 0, y: 0, rot: 0, variable: 'Paro', contact: 'NO', color: 'red', text: 'Paro', place: 'desk' },
+          { id: 'piloto', type: 'lamp', x: 0, y: 0, rot: 0, variable: 'En_marcha', color: 'green', text: 'En marcha', place: 'desk' },
+          { id: 'A', type: 'cylinder', x: 200, y: 100, rot: 0, text: 'A', extend: 'A+', retract: 'A-', retracted: 'a0', extended: 'a1', stroke: 100, time: 1.5 },
+        ],
+      }
+      return { nodes, edges, plc: { scene } }
+    },
+  },
+  {
     id: 'luz-pulsador',
     level: 1,
     title: 'Luz con un solo pulsador',
