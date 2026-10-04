@@ -36,7 +36,7 @@ function VariableName({ name, onRename }) {
           type="button"
           onClick={() => setDraft(name)}
           title={t('Renombrar en todo el diagrama')}
-          aria-label={`Renombrar ${name}`}
+          aria-label={t('Renombrar {nombre}', { nombre: name })}
           className="rounded p-0.5 text-slate-400 opacity-0 hover:bg-slate-100 group-hover:opacity-100 focus:opacity-100"
         >
           <Pencil size={12} />

@@ -201,7 +201,7 @@ export default function GrafcetContextMenu({ menu, onClose, onEdit, onAddNodeAt,
             })),
             'separator',
             { label: N_('Rellenar direcciones vacías'), icon: WandSparkles, onSelect: plcTable.autoFill },
-            { label: N_('Abrir tabla completa…'), icon: Maximize2, onSelect: plcTable.openDialog },
+            { label: N_('Abrir tabla completa'), icon: Maximize2, onSelect: plcTable.openDialog },
             'separator',
             { label: N_('Ocultar del lienzo'), icon: EyeOff, onSelect: plcTable.hideTable },
           ]}
@@ -261,7 +261,7 @@ export default function GrafcetContextMenu({ menu, onClose, onEdit, onAddNodeAt,
           ? [{ label: N_('Añadir alternativa en O'), hint: N_('elegir'), icon: Split, onSelect: () => addAlternative(node.id) }]
           : []),
         ...(output === null
-          ? [{ label: N_('Bucle a etapa…'), icon: CornerLeftUp, onSelect: () => startLoop(node.id) }]
+          ? [{ label: N_('Bucle a etapa'), icon: CornerLeftUp, onSelect: () => startLoop(node.id) }]
           : []),
       ]
     }
@@ -270,7 +270,7 @@ export default function GrafcetContextMenu({ menu, onClose, onEdit, onAddNodeAt,
       items.push({ label: N_('Ver en el ladder'), icon: Cpu, onSelect: () => onShowInLadder(node.id) })
     }
     items.push(
-      { label: N_('Editar…'), icon: Pencil, onSelect: () => onEdit(node.id) },
+      { label: N_('Editar'), icon: Pencil, onSelect: () => onEdit(node.id) },
       'separator',
       { label: N_('Eliminar'), icon: Trash2, danger: true, onSelect: () => remove([node.id]) },
     )

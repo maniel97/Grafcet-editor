@@ -457,7 +457,7 @@ export default function SimulationPanel({ simulation, scenarios = [], onScenario
               title={t('PNG, SVG o PDF, con vista previa')}
               className="rounded border border-slate-300 px-1.5 py-0.5 text-slate-600 hover:bg-slate-100"
             >
-              {t('Imagen o PDF…')}
+              {t('Imagen o PDF')}
             </button>
             <button
               type="button"

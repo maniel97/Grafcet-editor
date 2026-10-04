@@ -49,10 +49,10 @@ export default function CpuControls({ config = {}, status, onChange, onApplySymb
           </fieldset>
           <div className="flex flex-wrap gap-1">
             <button type="button" onClick={() => fileRef.current?.click()} className="flex items-center gap-1 rounded border border-slate-300 px-2 py-0.5 hover:bg-slate-100">
-              <FileUp size={12} />{' '}{t('Cargar .awl…')}
+              <FileUp size={12} />{' '}{t('Cargar .awl')}
             </button>
             <button type="button" onClick={() => setPasting((p) => !p)} aria-expanded={pasting} className="flex items-center gap-1 rounded border border-slate-300 px-2 py-0.5 hover:bg-slate-100">
-              <Table2 size={12} />{' '}{t('Pegar tabla de símbolos…')}
+              <Table2 size={12} />{' '}{t('Pegar tabla de símbolos')}
             </button>
             <input
               ref={fileRef}

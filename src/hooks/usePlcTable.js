@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useReactFlow } from '@xyflow/react'
 import { VARIABLES_TABLE_ID } from '../nodes'
 import {
@@ -10,7 +10,8 @@ import {
   renameVariable,
   validatePlc,
 } from '../lib/addressing'
-import { projectVariables } from '../lib/symbols'
+import { extractSymbols, projectVariables } from '../lib/symbols'
+import { renameVariable as renameEverywhere } from '../lib/rename'
 import { diagramContentKey } from '../lib/contentKey'
 import { downloadFile } from '../lib/projectFile'
 import { fileName } from '../lib/fileNames'
@@ -31,6 +32,34 @@ export function usePlcTable({ nodes, plc, setPlc, plcRef, takeSnapshot, onOpenDi
   // Incluye las variables añadidas a mano en la tabla aunque aún no se usen en el diagrama.
   const symbols = useMemo(() => projectVariables(contentNodes, plc.variables), [contentNodes, plc.variables])
   const stepNodes = useMemo(() => contentNodes.filter((n) => n.type === 'step'), [contentNodes])
+
+  // Renombrar escribiendo: si un cambio del diagrama hace desaparecer una sola variable en uso y
+  // aparecer una sola nueva del mismo tipo («Marcha» -> «Inicio» en una receptividad), es la
+  // misma variable con otro nombre: su dirección, comentario y demás pasan a la nueva (y no queda
+  // huérfana en la tabla). Mientras se escribe, los datos siguen al nombre letra a letra. Sin
+  // instantánea propia: deshacer devuelve a la vez el texto y la tabla.
+  // Si se borra el nombre entero y luego se escribe otro, entre medias no hay variable: la que
+  // desaparece queda pendiente y la siguiente que aparezca (sola y del mismo tipo) la hereda.
+  const usedBefore = useRef(null)
+  const pending = useRef(null)
+  useEffect(() => {
+    const used = new Map([...extractSymbols(contentNodes)].map(([name, f]) => [name, f.type]))
+    const before = usedBefore.current
+    usedBefore.current = used
+    if (!before) return
+    const gone = [...before.keys()].filter((name) => !used.has(name))
+    const added = [...used.keys()].filter((name) => !before.has(name))
+    const hasData = (entry) => Boolean(entry && (entry.address || entry.comment))
+    const variables = plcRef.current.variables ?? {}
+    let from = null
+    if (gone.length === 1 && added.length === 1 && before.get(gone[0]) === used.get(added[0])) from = gone[0]
+    else if (!gone.length && added.length === 1 && pending.current?.type === used.get(added[0])) from = pending.current.name
+    pending.current = gone.length === 1 && !added.length && hasData(variables[gone[0]]) ? { name: gone[0], type: before.get(gone[0]) } : null
+    if (!from || used.has(from)) return
+    const to = added[0]
+    if (!hasData(variables[from]) || hasData(variables[to])) return
+    setPlc((p) => renameEverywhere([], p, from, to).plc)
+  }, [contentNodes, plcRef, setPlc])
   const plcIssues = useMemo(() => validatePlc(plc, stepNodes, symbols), [plc, stepNodes, symbols])
 
   const changePlc = useCallback(

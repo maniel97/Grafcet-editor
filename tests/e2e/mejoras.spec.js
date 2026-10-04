@@ -333,7 +333,7 @@ test('escenarios: grabar, guardar en el proyecto, reproducir y exportar el crono
 
   const csv = await download(page, () => panel.getByRole('button', { name: 'CSV', exact: true }).click())
   expect(csv.suggestedFilename()).toBe('cronograma.csv')
-  await panel.getByRole('button', { name: 'Imagen o PDF…' }).click()
+  await panel.getByRole('button', { name: 'Imagen o PDF' }).click()
   const svg = await saveFromDialog(page, 'svg')
   expect(svg.suggestedFilename()).toBe('cronograma.svg')
   const svgText = readFileSync(await svg.path(), 'utf8')

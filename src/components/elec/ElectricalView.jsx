@@ -18,6 +18,7 @@ import { voltageBetween } from '../../lib/elec/solve'
 import { ELEC_TEMPLATES, insertTemplate } from '../../lib/elec/templates'
 import { WIRE_COLORS, WIRE_SECTIONS, junctions as findJunctions, nextTerminalNumber, sectionWidth, wireNumbers } from '../../lib/elec/wiring'
 import { N_, t as tr } from '../../lib/i18n'
+import { maxPanelWidth } from '../panelWidth'
 
 const nodeTypes = { elec: ElecNode, elecframe: ElecFrameNode }
 const edgeTypes = { wire: WireEdge }
@@ -702,9 +703,9 @@ function Inner({ schematic, onChange, elecState, onAction, variables = [], build
       }}
       // relative y absolute no pueden ir juntas (en el CSS generado ganaría relative).
       className={`side-panel @container flex min-w-0 flex-col border-l border-slate-200 bg-white outline-none ${
-        maximized ? `absolute inset-y-0 left-0 z-20 ${simulating ? 'right-80' : 'right-0'}` : 'relative shrink-0'
+        maximized ? `absolute inset-y-0 left-0 z-20 ${simulating ? 'right-80' : 'right-0'}` : 'relative'
       }`}
-      style={maximized ? undefined : { width: width ?? '50%' }}
+      style={maximized ? undefined : { width: width ?? '50%', flexShrink: 1, minWidth: MIN_WIDTH }}
     >
       {/* Separador: arrastrar para repartir el espacio con el grafcet (doble clic: mitad y mitad). */}
       {!maximized && (
@@ -715,9 +716,9 @@ function Inner({ schematic, onChange, elecState, onAction, variables = [], build
           title={tr('Arrastra para cambiar el ancho del esquema (doble clic: mitad y mitad)')}
           className="absolute inset-y-0 -left-1 z-10 w-2 cursor-col-resize hover:bg-blue-400/40"
           onPointerDown={(ev) => {
+            ev.preventDefault() // sin seleccionar el texto de alrededor al arrastrar
             const right = sectionRef.current.getBoundingClientRect().right
-            const total = sectionRef.current.parentElement.getBoundingClientRect().width
-            resizing.current = { right, max: total - 320 - MIN_WIDTH, frame: 0, width: null }
+            resizing.current = { right, max: maxPanelWidth(sectionRef.current), frame: 0, width: null }
             ev.currentTarget.setPointerCapture(ev.pointerId)
           }}
           onPointerMove={(ev) => {
@@ -832,7 +833,7 @@ function Inner({ schematic, onChange, elecState, onAction, variables = [], build
             }}
             className="rounded border border-slate-300 px-1 py-0.5"
           >
-            <option value="">{tr('Insertar montaje…')}</option>
+            <option value="">{tr('Insertar montaje')}</option>
             {ELEC_TEMPLATES.map((t) => (
               <option key={t.id} value={t.id}>
                 {tr(t.title)}

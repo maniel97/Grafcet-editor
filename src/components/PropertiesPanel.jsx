@@ -2,6 +2,7 @@ import { useRef } from 'react'
 import { Plus, Trash2, X } from 'lucide-react'
 import { ACTION_KINDS, ACTION_PRESETS, actionKind, normalizeAction } from '../lib/actions'
 import AutocompleteInput from './AutocompleteInput'
+import { useDraft } from './useDraft'
 import { t, N_ } from '../lib/i18n'
 
 const inputClass =
@@ -61,7 +62,7 @@ function ActionRow({ action, onChange, onRemove, vocabulary, otherTexts }) {
             otherTexts={[...otherTexts, action.condition ?? '']}
             className={inputClass}
             value={action.text}
-            placeholder="p. ej. Motor ON, A:=1, F/G2{3}"
+            placeholder={t('p. ej. Motor ON, A:=1, F/G2{3}')}
             aria-label={t('Texto de la acción')}
             onChange={(text) => onChange({ text })}
           />
@@ -105,6 +106,7 @@ function ActionRow({ action, onChange, onRemove, vocabulary, otherTexts }) {
 }
 
 function StepFields({ data, onChange, onCommitLabel, vocabulary }) {
+  const label = useDraft(data.label)
   const actions = (data.actions ?? []).map(normalizeAction)
   const setActions = (next) => onChange({ actions: next })
 
@@ -114,9 +116,16 @@ function StepFields({ data, onChange, onCommitLabel, vocabulary }) {
         {/* Al terminar de editar el número se actualizan las referencias a la etapa (X5, 5s/X5). */}
         <input
           className={inputClass}
-          value={data.label ?? ''}
-          onChange={(e) => onChange({ label: e.target.value })}
-          onBlur={onCommitLabel}
+          value={label.text}
+          onFocus={label.focus}
+          onChange={(e) => {
+            label.set(e.target.value)
+            onChange({ label: e.target.value })
+          }}
+          onBlur={() => {
+            label.blur()
+            onCommitLabel?.()
+          }}
           onKeyDown={(e) => e.key === 'Enter' && onCommitLabel?.()}
           autoFocus
         />

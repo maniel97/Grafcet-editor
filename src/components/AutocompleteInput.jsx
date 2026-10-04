@@ -1,22 +1,29 @@
 import { useRef, useState } from 'react'
 import { closest, currentWord, replaceWord, suggest, typos } from '../lib/autocomplete'
 import { parseExpression } from '../lib/symbols'
-import { t } from '../lib/i18n'
+import { N_, t } from '../lib/i18n'
+import { useDraft } from './useDraft'
 
-const TYPE_LABEL = { input: 'entrada', output: 'salida', memory: 'marca', timer: 'temporizador', counter: 'contador', step: 'etapa' }
+const TYPE_LABEL = { input: N_('entrada'), output: N_('salida'), memory: N_('marca'), timer: N_('temporizador'), counter: N_('contador'), step: N_('etapa') }
 
 // Campo de texto con autocompletado de variables y etapas.
 // - mode 'expression' (receptividades, condiciones): completa la palabra en el cursor.
 // - mode 'action': «A:=expr» completa como una expresión; si no, el texto entero es la salida.
 // Avisa de erratas: «Marha» es nueva y se parece a «Marcha» (con un botón para corregirla).
-export default function AutocompleteInput({ value, onChange, vocabulary = [], otherTexts = [], mode = 'expression', inputRef, className, ...props }) {
+export default function AutocompleteInput({ value, onChange: report, vocabulary = [], otherTexts = [], mode = 'expression', inputRef, className, onFocus, onBlur, ...props }) {
   const ownRef = useRef(null)
   const ref = inputRef ?? ownRef
   const [open, setOpen] = useState(false)
   const [active, setActive] = useState(0)
   const [caret, setCaret] = useState(null)
 
-  const text = value ?? ''
+  // Mientras se escribe, el borrador (el cursor no salta al final): useDraft.
+  const draft = useDraft(value)
+  const text = draft.text
+  const onChange = (next) => {
+    draft.set(next)
+    report(next)
+  }
   const whole = mode === 'action' && !text.includes(':=')
   const at = whole ? (text.trim() ? { start: 0, end: text.length, word: text } : null) : currentWord(text, caret ?? text.length)
   const pool = whole ? vocabulary.filter((v) => v.type === 'output') : vocabulary
@@ -60,7 +67,15 @@ export default function AutocompleteInput({ value, onChange, vocabulary = [], ot
         }}
         onKeyUp={(e) => ['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key) && setCaret(e.currentTarget.selectionStart)}
         onClick={(e) => setCaret(e.currentTarget.selectionStart)}
-        onBlur={() => setOpen(false)}
+        onFocus={(e) => {
+          draft.focus()
+          onFocus?.(e)
+        }}
+        onBlur={(e) => {
+          setOpen(false)
+          draft.blur()
+          onBlur?.(e)
+        }}
         onKeyDown={(e) => {
           if (!options.length) return
           if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
@@ -93,18 +108,18 @@ export default function AutocompleteInput({ value, onChange, vocabulary = [], ot
               className={`flex cursor-pointer items-center justify-between gap-2 px-2 py-1 ${i === active ? 'bg-blue-50 text-blue-800' : 'text-slate-700'}`}
             >
               <span className="truncate font-mono">{o.name}</span>
-              <span className="shrink-0 text-xs text-slate-400">{TYPE_LABEL[o.type] ?? o.type}</span>
+              <span className="shrink-0 text-xs text-slate-400">{TYPE_LABEL[o.type] ? t(TYPE_LABEL[o.type]) : o.type}</span>
             </li>
           ))}
         </ul>
       )}
       {warnings.map((w) => (
         <p key={w.word} className="mt-1 text-xs text-amber-700">
-          «{w.word}» es una variable nueva. ¿Querías decir{' '}
+          {t('«{variable}» es una variable nueva. ¿Querías decir', { variable: w.word })}{' '}
           <button
             type="button"
             className="font-mono font-medium underline hover:text-amber-900"
-            onClick={() => onChange(whole ? w.suggestion : fixWord(text, w.word, w.suggestion))}
+            onClick={() => report(whole ? w.suggestion : fixWord(text, w.word, w.suggestion))}
           >
             {w.suggestion}
           </button>

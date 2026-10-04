@@ -3,7 +3,9 @@ import { Plus, X } from 'lucide-react'
 import { t } from '../lib/i18n'
 
 // Pestañas de hojas (abajo del lienzo): cambiar de hoja, añadir, renombrar (doble clic) y borrar.
-export default function SheetTabs({ sheets, current, counts, onSelect, onAdd, onRename, onDelete, readOnly }) {
+// readOnly (simulando): sin añadir ni borrar; renombrar sí (no cambia el diagrama), salvo con
+// la edición bloqueada (renameLocked).
+export default function SheetTabs({ sheets, current, counts, onSelect, onAdd, onRename, onDelete, readOnly, renameLocked = false }) {
   const [editing, setEditing] = useState(null)
   const [draft, setDraft] = useState('')
   const finish = (save) => {
@@ -36,10 +38,14 @@ export default function SheetTabs({ sheets, current, counts, onSelect, onAdd, on
               type="button"
               role="tab"
               aria-selected={s.id === current}
-              title={t('{hoja}: {n} elementos (doble clic para renombrar)', { hoja: s.name, n: counts.get(s.id) ?? 0 })}
+              title={
+                renameLocked
+                  ? t('{hoja}: {n} elementos', { hoja: s.name, n: counts.get(s.id) ?? 0 })
+                  : t('{hoja}: {n} elementos (doble clic para renombrar)', { hoja: s.name, n: counts.get(s.id) ?? 0 })
+              }
               onClick={() => onSelect(s.id)}
               onDoubleClick={() => {
-                if (readOnly) return
+                if (renameLocked) return
                 setDraft(s.name)
                 setEditing(s.id)
               }}

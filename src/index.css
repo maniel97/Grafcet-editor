@@ -176,6 +176,16 @@ body {
   font-size: calc(var(--diagram-font-size) * 1.3);
 }
 
+/* Barra de herramientas: nombres que no caben (Toolbar.jsx, useToolbarLabels). */
+.toolbar[data-labels='primary'] .tb-secondary,
+.toolbar[data-labels='none'] .tb-label {
+  display: none;
+}
+.toolbar[data-labels='none'] .tb-sep {
+  margin-left: 2px;
+  margin-right: 2px;
+}
+
 /* Pantallas estrechas (móvil): los paneles laterales (propiedades, verificar, simulación) pasan a
    ser paneles inferiores que ocupan como mucho la mitad de la pantalla, para que el diagrama siga
    visible; el minimapa se oculta. */

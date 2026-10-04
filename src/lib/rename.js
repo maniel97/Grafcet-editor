@@ -7,6 +7,7 @@
 import { normalizeAction } from './actions'
 import { parseForcing } from './forcing'
 
+const KEEP = new Set(['id', 'type', 'text', 'tag', 'ref', 'kind', 'color', 'place'])
 const IDENTIFIER = /(?<![\p{L}\p{N}_.])[\p{L}_][\p{L}\p{N}_.]*/gu
 const NAME = /^[\p{L}_][\p{L}\p{N}_.]*$/u
 
@@ -55,11 +56,30 @@ export function renameVariable(nodes, plc, from, to) {
   })
   const variables = { ...plc.variables }
   if (variables[from]) {
-    variables[to] = { ...variables[from], ...variables[to] }
+    // Los datos de la variable renombrada mandan (una entrada vacía con el nombre nuevo no los borra).
+    variables[to] = { ...variables[to], ...variables[from] }
     delete variables[from]
   }
   const scenarios = (plc.scenarios ?? []).map((s) => ({ ...s, events: s.events.map((e) => (e.name === from ? { ...e, name: to } : e)) }))
-  return { nodes: out, plc: { ...plc, variables, ...(plc.scenarios ? { scenarios } : {}) }, changed }
+  // Planta y esquema eléctrico: sus enlaces con las variables van por nombre (variable, extend,
+  // motor, signal…). Se cambian los campos que valen el nombre viejo; el texto, el identificador y
+  // el tipo, no.
+  const relink = (item) => {
+    let next = item
+    for (const [key, value] of Object.entries(item)) {
+      if (KEEP.has(key) || value !== from) continue
+      next = next === item ? { ...item } : next
+      next[key] = to
+    }
+    return next
+  }
+  const scene = plc.scene?.elements ? { ...plc.scene, elements: plc.scene.elements.map(relink) } : plc.scene
+  const electrical = plc.electrical?.components ? { ...plc.electrical, components: plc.electrical.components.map(relink) } : plc.electrical
+  return {
+    nodes: out,
+    plc: { ...plc, variables, ...(plc.scenarios ? { scenarios } : {}), ...(plc.scene ? { scene } : {}), ...(plc.electrical ? { electrical } : {}) },
+    changed,
+  }
 }
 
 // Al cambiar el número de una etapa, actualiza lo que se refiere a ella. `grafcetOf(node)` da el

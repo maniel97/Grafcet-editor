@@ -1,3 +1,4 @@
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import InitialStepIcon from './InitialStepIcon'
 import ExportMenu from './ExportMenu'
 import ToolbarDropdown from './ToolbarDropdown'
@@ -30,10 +31,35 @@ import {
   Zap,
 } from 'lucide-react'
 
-// `primary`: el texto se ve desde 1280 px; el resto solo en pantallas anchas (2xl),
-// para que la barra quepa entera. `iconOnly`: nunca muestra texto. El nombre siempre está en el
+// Nombres de los botones: la barra se mide a sí misma (useToolbarLabels) y, si no cabe, quita
+// primero los secundarios y después todos; vuelve a intentarlo al cambiar el ancho. `primary`:
+// de los que más aguantan. `iconOnly`: nunca muestra texto. El nombre siempre está en el
 // tooltip y en aria-label (lectores de pantalla).
-const labelClass = (primary) => `hidden ${primary ? 'xl:inline' : '2xl:inline'}`
+const labelClass = (primary) => `tb-label ${primary ? 'tb-primary' : 'tb-secondary'}`
+
+// 'all' | 'primary' | 'none': los nombres que caben sin barra de desplazamiento.
+function useToolbarLabels(ref) {
+  const [labels, setLabels] = useState('all')
+  // Antes de pintar: si se desborda, un paso menos (hasta que quepa o solo queden iconos).
+  useLayoutEffect(() => {
+    const el = ref.current
+    if (el && labels !== 'none' && el.scrollWidth > el.clientWidth + 1) setLabels(labels === 'all' ? 'primary' : 'none')
+  })
+  // Al cambiar el ancho (ventana, escalado), se vuelve a probar desde todos los nombres.
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    let width = el.clientWidth
+    const observer = new ResizeObserver(() => {
+      if (el.clientWidth === width) return
+      width = el.clientWidth
+      setLabels('all')
+    })
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [ref])
+  return labels
+}
 
 function ToolButton({ icon: Icon, label, onClick, disabled, title, active, badge, primary, iconOnly }) {
   return (
@@ -55,7 +81,7 @@ function ToolButton({ icon: Icon, label, onClick, disabled, title, active, badge
   )
 }
 
-const Separator = () => <div className="mx-1 h-6 w-px shrink-0 bg-slate-200" />
+const Separator = () => <div className="tb-sep mx-1 h-6 w-px shrink-0 bg-slate-200" />
 
 // Contador del botón Verificar: rojo con errores, ámbar con solo avisos, verde si es conforme.
 function VerifyBadge({ errors, warnings }) {
@@ -106,13 +132,18 @@ export default function Toolbar({
 }) {
   // En solo lectura (simulando o con la edición bloqueada) se desactiva lo que modifica el diagrama.
   const locked = readOnly
+  const headerRef = useRef(null)
+  const labels = useToolbarLabels(headerRef)
   return (
-    <header className="flex items-center gap-0.5 overflow-x-auto border-b border-slate-200 bg-white px-3 py-2 shadow-sm">
-      {/* El logo, siempre; el nombre, solo donde cabe: de 1024 a 1536 px la barra va justa (y desde
-          1280 px los botones principales muestran su texto). */}
+    <header
+      ref={headerRef}
+      data-labels={labels}
+      className="toolbar flex items-center gap-0.5 overflow-x-auto border-b border-slate-200 bg-white px-3 py-2 shadow-sm"
+    >
+      {/* El logo, siempre; el nombre de la aplicación, como un nombre secundario (si cabe). */}
       <h1 className="mr-2 flex shrink-0 items-center gap-2 text-base font-bold tracking-tight" title={t('Grafcet Editor')}>
         <Logo size={24} className="text-slate-900" />
-        <span className="sr-only sm:not-sr-only lg:sr-only 2xl:not-sr-only">{t('Grafcet Editor')}</span>
+        <span className="tb-label tb-secondary">{t('Grafcet Editor')}</span>
       </h1>
       {/* Nombre del proyecto: da nombre a los archivos guardados y exportados. */}
       <input
@@ -152,11 +183,11 @@ export default function Toolbar({
         labelClass={labelClass(false)}
         disabled={locked}
         items={[
-          { id: 'new', label: N_('Nuevo…'), hint: N_('Proyecto en blanco: título, autómata y tabla de variables'), icon: FilePlus, onSelect: onNew },
-          { id: 'file', label: N_('Abrir archivo…'), hint: N_('Proyecto .json guardado (Ctrl+O)'), icon: FileJson, onSelect: onOpen },
-          { id: 'examples', label: N_('Ejemplos…'), hint: N_('Grafcets típicos listos para usar'), icon: BookOpen, onSelect: onOpenExamples },
-          { id: 'recent', label: N_('Trabajos anteriores…'), hint: N_('Recuperar lo que había antes de abrir o limpiar'), icon: History, onSelect: onOpenRecent },
-          { id: 'pneumatic', label: N_('Secuencia neumática…'), hint: N_('Crear el grafcet y la planta de una secuencia como A+ B+ B− A−'), icon: Wind, onSelect: onOpenPneumatic },
+          { id: 'new', label: N_('Nuevo'), hint: N_('Proyecto en blanco: título, autómata y tabla de variables'), icon: FilePlus, onSelect: onNew },
+          { id: 'file', label: N_('Abrir archivo'), hint: N_('Proyecto .json guardado (Ctrl+O)'), icon: FileJson, onSelect: onOpen },
+          { id: 'examples', label: N_('Ejemplos'), hint: N_('Grafcets típicos listos para usar'), icon: BookOpen, onSelect: onOpenExamples },
+          { id: 'recent', label: N_('Trabajos anteriores'), hint: N_('Recuperar lo que había antes de abrir o limpiar'), icon: History, onSelect: onOpenRecent },
+          { id: 'pneumatic', label: N_('Secuencia neumática'), hint: N_('Crear el grafcet y la planta de una secuencia como A+ B+ B− A−'), icon: Wind, onSelect: onOpenPneumatic },
         ]}
       />
 

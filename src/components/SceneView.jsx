@@ -32,6 +32,7 @@ import { faces, pieceBox, reliefBoxes, reliefOrder } from '../lib/sim/relief'
 import { exportGroups, importGroups, loadGroups, makeGroup, placeGroup, storeGroups } from '../lib/sim/sceneLibrary'
 import { downloadFile } from '../lib/projectFile'
 import { N_, t as tr } from '../lib/i18n'
+import { maxPanelWidth } from './panelWidth'
 
 const W = 1200
 const H = 800
@@ -1956,8 +1957,8 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
       ref={sectionRef}
       tabIndex={-1}
       onKeyDown={onKeyDown}
-      className={`side-panel @container flex outline-none min-w-0 flex-col border-l border-slate-200 bg-white ${maximized ? 'absolute inset-y-0 left-0 right-80 z-20' : 'relative shrink-0'}`}
-      style={maximized ? undefined : { width: width ?? '50%' }}
+      className={`side-panel @container flex outline-none min-w-0 flex-col border-l border-slate-200 bg-white ${maximized ? 'absolute inset-y-0 left-0 right-80 z-20' : 'relative'}`}
+      style={maximized ? undefined : { width: width ?? '50%', flexShrink: 1, minWidth: MIN_WIDTH }}
     >
       {/* Separador: arrastrar para repartir el espacio entre el grafcet y la planta. */}
       {!maximized && (
@@ -1968,9 +1969,9 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
           title={tr('Arrastra para cambiar el ancho de la planta (doble clic: mitad y mitad)')}
           className="absolute inset-y-0 -left-1 z-10 w-2 cursor-col-resize hover:bg-blue-400/40"
           onPointerDown={(ev) => {
+            ev.preventDefault() // sin seleccionar el texto de alrededor al arrastrar
             const right = sectionRef.current.getBoundingClientRect().right
-            const total = sectionRef.current.parentElement.getBoundingClientRect().width
-            resizing.current = { right, max: total - 320 - MIN_WIDTH, frame: 0, width: null }
+            resizing.current = { right, max: maxPanelWidth(sectionRef.current), frame: 0, width: null }
             ev.currentTarget.setPointerCapture(ev.pointerId)
           }}
           onPointerMove={(ev) => {

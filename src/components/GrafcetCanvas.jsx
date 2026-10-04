@@ -340,9 +340,13 @@ export default function GrafcetCanvas() {
 
   // Lo que los nodos necesitan del editor (ver lib/editorContext.js). Solo debe cambiar cuando
   // cambia algo que los nodos muestran: si cambia, se vuelven a dibujar todos.
+  // Renombrar una variable en todo el diagrama (renameVar, más abajo), para la tabla del lienzo.
+  const renameVarRef = useRef(null)
+  const renameEverywhere = useCallback((from, to) => renameVarRef.current?.(from, to) ?? null, [])
   const editorApi = useMemo(
     () => ({
       takeSnapshot,
+      renameEverywhere,
       startLoop: setLoopSourceId,
       setPreview,
       issuesByNode: markedIssues,
@@ -359,7 +363,7 @@ export default function GrafcetCanvas() {
       sim: simulating ? simulation.view : null,
       explainTransition: simulating ? explainNow : null,
     }),
-    [takeSnapshot, markedIssues, plcView, plcTable, highlight, setHighlight, toggleTable, simulating, readOnly, connecting, editingNoteId, simulation.view, explainNow],
+    [takeSnapshot, renameEverywhere, markedIssues, plcView, plcTable, highlight, setHighlight, toggleTable, simulating, readOnly, connecting, editingNoteId, simulation.view, explainNow],
   )
 
   // --- Edición -----------------------------------------------------------------------------------
@@ -508,6 +512,7 @@ export default function GrafcetCanvas() {
     },
     [symbols, takeSnapshot, getNodes, setNodes, setPlc, plcRef],
   )
+  renameVarRef.current = renameVar
 
   // Encierra unos nodos en un marco nuevo (grafcet parcial o expansión de macroetapa).
   const frameAroundNodes = useCallback(
@@ -943,7 +948,7 @@ export default function GrafcetCanvas() {
           <div
             ref={wrapperRef}
             onPointerDownCapture={() => setLastPanel(null)}
-            className={`relative flex-1 ${loopSource ? 'loop-picking' : ''} ${readOnly ? 'read-only' : ''}`}
+            className={`relative min-w-[160px] flex-1 ${loopSource ? 'loop-picking' : ''} ${readOnly ? 'read-only' : ''}`}
           >
             {editLocked && !simulating && (
               <div className="absolute left-1/2 top-3 z-10 flex -translate-x-1/2 items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-sm text-amber-900 shadow">
@@ -1025,9 +1030,13 @@ export default function GrafcetCanvas() {
                 current={currentSheet}
                 counts={sheetCounts}
                 readOnly={readOnly}
+                renameLocked={editLocked}
                 onSelect={selectSheet}
                 onAdd={addSheet}
-                onRename={(id, name) => setPlc((p) => ({ ...p, sheets: sheetsOf(p).map((s) => (s.id === id ? { ...s, name } : s)) }))}
+                onRename={(id, name) => {
+                  takeSnapshot()
+                  setPlc((p) => ({ ...p, sheets: sheetsOf(p).map((s) => (s.id === id ? { ...s, name } : s)) }))
+                }}
                 onDelete={deleteSheet}
               />
               <CanvasControls

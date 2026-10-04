@@ -87,7 +87,7 @@ export default function S7200Config({ plc, symbols, onChange }) {
               value=""
               onChange={(e) => e.target.value && set({ ...config, modules: [...config.modules, e.target.value] })}
             >
-              <option value="">{t('Añadir módulo…')}</option>
+              <option value="">{t('Añadir módulo')}</option>
               {MODULES.map((m) => (
                 <option key={m.id} value={m.id}>
                   {t(m.label)}

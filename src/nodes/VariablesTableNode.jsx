@@ -11,8 +11,10 @@ const DRAG_MIME = 'application/x-grafcet-variable'
 // Celda que se edita al hacer clic: Intro o salir del campo confirma, Esc cancela.
 // `autoEdit` la abre en edición al aparecer (variable recién añadida). Si `onCommit` devuelve
 // false (p. ej. nombre repetido), el valor no se acepta.
+// onCommit puede devolver un texto de error: el campo sigue abierto, en rojo, con el motivo.
 function EditableCell({ value, placeholder, onCommit, className = '', invalid, autoEdit, title = N_('Clic para editar'), readOnly }) {
   const [draft, setDraft] = useState(autoEdit && !readOnly ? (value ?? '') : null)
+  const [error, setError] = useState(null)
   if (readOnly) {
     return (
       <span className={`block truncate px-1 ${invalid ? 'bg-red-50 text-red-700' : ''} ${value ? '' : 'text-slate-300'} ${className}`}>
@@ -22,21 +24,29 @@ function EditableCell({ value, placeholder, onCommit, className = '', invalid, a
   }
   if (draft !== null) {
     const commit = () => {
-      if (draft !== (value ?? '')) onCommit(draft)
+      const problem = draft !== (value ?? '') ? onCommit(draft) : null
+      if (typeof problem === 'string' && problem) return setError(problem)
+      setError(null)
       setDraft(null)
     }
     return (
       <input
         autoFocus
         onFocus={(e) => e.target.select()}
-        className={`nodrag nopan w-full min-w-0 rounded border border-blue-500 bg-white px-1 outline-none ${className}`}
+        className={`nodrag nopan w-full min-w-0 rounded border bg-white px-1 outline-none ${error ? 'border-red-500' : 'border-blue-500'} ${className}`}
+        title={error ?? undefined}
+        aria-invalid={Boolean(error)}
         value={draft}
-        onChange={(e) => setDraft(e.target.value)}
+        onChange={(e) => {
+          setDraft(e.target.value)
+          setError(null)
+        }}
         onBlur={commit}
         onKeyDown={(e) => {
           if (e.key === 'Enter') commit()
           if (e.key === 'Escape') {
             e.stopPropagation()
+            setError(null)
             setDraft(null)
           }
         }}
@@ -77,7 +87,7 @@ function HeaderButton({ icon: Icon, title, onClick, active }) {
 // arrastrar una variable a otra sección cambia su tipo.
 export default function VariablesTableNode({ id, data, selected }) {
   // En solo lectura (simulando o con la edición bloqueada) la tabla se ve pero no se edita.
-  const { plcTable, setHighlight, readOnly } = useEditor()
+  const { plcTable, setHighlight, readOnly, renameEverywhere } = useEditor()
   const [dragging, setDragging] = useState(null) // nombre de la variable que se arrastra
   const [dropTarget, setDropTarget] = useState(null)
   if (!plcTable) return null
@@ -104,6 +114,7 @@ export default function VariablesTableNode({ id, data, selected }) {
     .sort((a, b) => String(a.data.label).localeCompare(String(b.data.label), 'es', { numeric: true }))
     .map((s) => ({
       key: s.id,
+      step: true,
       name: stepVar(s.data.label, resolveStepPrefix(plc)),
       address: plc.steps[s.id]?.address,
       comment: plc.steps[s.id]?.comment,
@@ -206,6 +217,7 @@ export default function VariablesTableNode({ id, data, selected }) {
           {section.rows.map((row) => (
             <div
               key={row.key}
+              data-row={row.name}
               draggable={row.draggable && !readOnly}
               onDragStart={(e) => {
                 e.dataTransfer.setData(DRAG_MIME, row.name)
@@ -237,10 +249,19 @@ export default function VariablesTableNode({ id, data, selected }) {
                     className="italic text-slate-500"
                     onCommit={(v) => renameVariable(row.name, v)}
                   />
-                ) : (
+                ) : row.step || !/^[\p{L}_][\p{L}\p{N}_.]*$/u.test(row.name) ? (
+                  // Etapas (su nombre es su número) y temporizadores («5s/X2»): no se renombran aquí.
                   <span className="truncate" title={row.name}>
                     {row.name}
                   </span>
+                ) : (
+                  // En uso: se renombra en todo el diagrama (y la tabla, la planta y el esquema).
+                  <EditableCell
+                    readOnly={readOnly}
+                    value={row.name}
+                    title={t('Renombrar en todo el diagrama')}
+                    onCommit={(v) => renameEverywhere(row.name, v)}
+                  />
                 )}
                 {row.extra && <span className="shrink-0 text-[0.85em] text-slate-400">({row.extra})</span>}
                 {row.unused && !readOnly && (
