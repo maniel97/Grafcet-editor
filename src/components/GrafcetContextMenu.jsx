@@ -53,7 +53,7 @@ export default function GrafcetContextMenu({ menu, onClose, onEdit, onAddNodeAt,
     const node = getNode(menu.nodeIds[0])
     if (!node) return null
     title = node.type === 'step' ? t('Etapa {etapa}', { etapa: node.data.label }) : N_('Transición')
-    items = [{ label: 'Ver en el ladder', icon: Cpu, onSelect: () => onShowInLadder(node.id) }]
+    items = [{ label: N_('Ver en el ladder'), icon: Cpu, onSelect: () => onShowInLadder(node.id) }]
     return <ContextMenu x={menu.x} y={menu.y} title={title} items={items} onClose={onClose} />
   }
 
@@ -87,7 +87,7 @@ export default function GrafcetContextMenu({ menu, onClose, onEdit, onAddNodeAt,
       { label: N_('Marco de grafcet parcial aquí'), hint: 'G1', icon: SquareDashed, onSelect: () => onAddNodeAt('frame', { kind: 'grafcet' }, at) },
       { label: N_('Marco de expansión aquí'), hint: 'M1', icon: SquareDashed, onSelect: () => onAddNodeAt('frame', { kind: 'macro' }, at) },
       'separator',
-      { label: 'Separar columnas', hint: 'que los textos no se pisen', icon: MoveHorizontal, onSelect: () => spread() },
+      { label: N_('Separar columnas'), hint: N_('que los textos no se pisen'), icon: MoveHorizontal, onSelect: () => spread() },
       ...(plcTable && !getNode(VARIABLES_TABLE_ID)
         ? ['separator', { label: N_('Tabla de variables aquí'), icon: Table2, onSelect: () => toggleTable(at) }]
         : []),
@@ -99,14 +99,14 @@ export default function GrafcetContextMenu({ menu, onClose, onEdit, onAddNodeAt,
     title = `${nodes.length} elementos`
     if (steps.length >= 2)
       items.push({
-        label: `Converger ${steps.length} etapas en Y`,
+        label: t('Converger {n} etapas en Y', { n: steps.length }),
         hint: N_('sincronizar'),
         icon: Merge,
         onSelect: () => converge(steps.map((n) => n.id), 'step'),
       })
     if (transitions.length >= 2)
       items.push({
-        label: `Converger ${transitions.length} transiciones en O`,
+        label: t('Converger {n} transiciones en O', { n: transitions.length }),
         icon: Merge,
         onSelect: () => converge(transitions.map((n) => n.id), 'transition'),
       })
@@ -115,7 +115,7 @@ export default function GrafcetContextMenu({ menu, onClose, onEdit, onAddNodeAt,
       items.push(
         { label: N_('Alinear en columna'), icon: AlignHorizontalJustifyCenter, onSelect: () => arrange(menu.nodeIds, 'column') },
         { label: N_('Espaciar la secuencia'), hint: N_('distancia estándar'), icon: AlignVerticalSpaceAround, onSelect: () => arrange(menu.nodeIds, 'space') },
-        { label: 'Separar columnas', hint: 'que los textos no se pisen', icon: MoveHorizontal, onSelect: () => spread(menu.nodeIds) },
+        { label: N_('Separar columnas'), hint: N_('que los textos no se pisen'), icon: MoveHorizontal, onSelect: () => spread(menu.nodeIds) },
       )
     }
     if (steps.length + transitions.length >= 1) {
@@ -139,13 +139,13 @@ export default function GrafcetContextMenu({ menu, onClose, onEdit, onAddNodeAt,
         <ContextMenu
           x={menu.x}
           y={menu.y}
-          title="Nota"
+          title={t('Nota')}
           onClose={onClose}
           items={[
             { label: N_('Editar texto'), icon: Pencil, onSelect: () => setEditingNoteId(node.id) },
             'separator',
             ...Object.entries(NOTE_COLORS).map(([id, c]) => ({
-              label: `Color ${c.label.toLowerCase()}`,
+              label: t('Color {color}', { color: t(c.label).toLowerCase() }),
               icon: () => <span className="h-4 w-4 rounded-sm border" style={{ background: c.bg, borderColor: c.border }} />,
               hint: (node.data.color ?? 'yellow') === id ? N_('actual') : undefined,
               onSelect: () => {
@@ -169,7 +169,7 @@ export default function GrafcetContextMenu({ menu, onClose, onEdit, onAddNodeAt,
           onClose={onClose}
           items={[
             {
-              label: `Convertir en ${FRAME_KINDS[other].label.toLowerCase()}`,
+              label: t('Convertir en {tipo}', { tipo: t(FRAME_KINDS[other].label).toLowerCase() }),
               icon: SquareDashed,
               onSelect: () => {
                 takeSnapshot()
@@ -187,15 +187,15 @@ export default function GrafcetContextMenu({ menu, onClose, onEdit, onAddNodeAt,
         <ContextMenu
           x={menu.x}
           y={menu.y}
-          title="Tabla de variables"
+          title={t('Tabla de variables')}
           onClose={onClose}
           items={[
             // Variables previstas pero aún no usadas en el diagrama (p. ej. una seta de emergencia).
-            ...VARIABLE_TYPES.map((t) => ({
-              label: `Añadir ${t.label.toLowerCase()}`,
-              hint: plcTable.plc.scheme === 'iec' && ['I', 'Q', 'M'].includes(t.area) ? `%${t.area}X` : t.area,
+            ...VARIABLE_TYPES.map((x) => ({
+              label: t('Añadir {tipo}', { tipo: t(x.label).toLowerCase() }),
+              hint: plcTable.plc.scheme === 'iec' && ['I', 'Q', 'M'].includes(x.area) ? `%${x.area}X` : x.area,
               icon: Plus,
-              onSelect: () => plcTable.addVariable(t.id),
+              onSelect: () => plcTable.addVariable(x.id),
             })),
             'separator',
             { label: N_('Rellenar direcciones vacías'), icon: WandSparkles, onSelect: plcTable.autoFill },
@@ -253,7 +253,7 @@ export default function GrafcetContextMenu({ menu, onClose, onEdit, onAddNodeAt,
     }
     // Ver los segmentos del ladder que genera esta etapa o transición.
     if (onShowInLadder && (node.type === 'step' || node.type === 'transition')) {
-      items.push({ label: 'Ver en el ladder', icon: Cpu, onSelect: () => onShowInLadder(node.id) })
+      items.push({ label: N_('Ver en el ladder'), icon: Cpu, onSelect: () => onShowInLadder(node.id) })
     }
     items.push(
       { label: N_('Editar…'), icon: Pencil, onSelect: () => onEdit(node.id) },

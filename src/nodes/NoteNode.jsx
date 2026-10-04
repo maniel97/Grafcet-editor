@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { NodeResizer, useReactFlow } from '@xyflow/react'
 import { useEditor } from '../lib/editorContext'
 import { NOTE_COLORS, parseNote } from '../lib/notes'
+import { t } from '../lib/i18n'
 
 // Texto de la nota con su formato ligero (lib/notes.js: títulos, listas, negrita, variables).
 function NoteText({ text }) {
@@ -99,7 +100,7 @@ export default function NoteNode({ id, data, selected }) {
         {draft !== null ? (
           <textarea
             autoFocus
-            aria-label="Texto de la nota"
+            aria-label={t('Texto de la nota')}
             className="nodrag nopan nowheel diagram-text h-full w-full resize-none bg-transparent outline-none"
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
@@ -114,7 +115,7 @@ export default function NoteNode({ id, data, selected }) {
           />
         ) : (
           <div ref={contentRef} className={`diagram-text break-words ${data.text ? 'text-slate-800' : 'italic text-slate-400'}`}>
-            {data.text ? <NoteText text={data.text} /> : <span className="canvas-hint">Doble clic para escribir</span>}
+            {data.text ? <NoteText text={data.text} /> : <span className="canvas-hint">{t('Doble clic para escribir')}</span>}
           </div>
         )}
       </div>

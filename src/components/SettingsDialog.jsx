@@ -25,7 +25,7 @@ export default function SettingsDialog({ settings, onChange, onReset, onClose })
     >
       <div className="flex items-center justify-between border-b border-slate-200 px-5 py-3">
         <h2 id="settings-title" className="text-base font-semibold">
-          Opciones
+          {t('Opciones')}
         </h2>
         <button type="button" onClick={onClose} title={t('Cerrar (Esc)')} className="rounded-md p-1 text-slate-500 hover:bg-slate-100">
           <X size={18} />
@@ -54,7 +54,7 @@ export default function SettingsDialog({ settings, onChange, onReset, onClose })
                     className="sr-only"
                   />
                   <span style={{ fontFamily: font.stack }} className="text-base">
-                    {font.label}
+                    {t(font.label)}
                   </span>
                   {font.hint && <span className="text-xs text-slate-500">{font.hint}</span>}
                 </label>
@@ -66,14 +66,15 @@ export default function SettingsDialog({ settings, onChange, onReset, onClose })
         <fieldset className="space-y-2">
           <legend className={sectionTitle}>{t('Idioma')}</legend>
           <select
-            aria-label="Idioma"
+            // Fijo en español: el selector de idioma se reconoce en cualquier idioma (y lo usan las pruebas).
+            aria-label={'Idioma'}
             className="rounded-md border border-slate-300 px-2 py-1 text-sm"
             value={settings.lang ?? 'es'}
             onChange={(e) => onChange({ lang: e.target.value })}
           >
             {LANGUAGES.map((l) => (
               <option key={l.id} value={l.id}>
-                {l.label}
+                {t(l.label)}
               </option>
             ))}
           </select>
@@ -103,7 +104,7 @@ export default function SettingsDialog({ settings, onChange, onReset, onClose })
               </button>
             ))}
           </div>
-          <p className="text-xs text-slate-500">Automático sigue al sistema. La hoja del diagrama sigue blanca, como se exporta.</p>
+          <p className="text-xs text-slate-500">{t('Automático sigue al sistema. La hoja del diagrama sigue blanca, como se exporta.')}</p>
         </fieldset>
 
         <fieldset className="space-y-2">
@@ -125,7 +126,7 @@ export default function SettingsDialog({ settings, onChange, onReset, onClose })
               </button>
             ))}
           </div>
-          <p className="text-xs text-slate-500">Barra de herramientas, paneles y avisos.</p>
+          <p className="text-xs text-slate-500">{t('Barra de herramientas, paneles y avisos.')}</p>
         </fieldset>
 
         <fieldset className="space-y-2">
@@ -145,7 +146,7 @@ export default function SettingsDialog({ settings, onChange, onReset, onClose })
           </div>
           <div className="rounded-md border border-dashed border-slate-300 px-3 py-2">
             <span className="diagram-text">
-              Motor ON · a AND <span className="overline decoration-1">b</span>
+              {t('Motor ON · a AND')}{' '}<span className="overline decoration-1">b</span>
             </span>
           </div>
           <p className="text-xs text-slate-500">Acciones y receptividades; también se aplica al exportar.</p>
@@ -165,7 +166,7 @@ export default function SettingsDialog({ settings, onChange, onReset, onClose })
           onClick={onClose}
           className="rounded-md bg-blue-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-blue-700"
         >
-          Listo
+          {t('Listo')}
         </button>
       </div>
     </dialog>

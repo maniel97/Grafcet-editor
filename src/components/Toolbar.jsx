@@ -110,9 +110,9 @@ export default function Toolbar({
     <header className="flex items-center gap-0.5 overflow-x-auto border-b border-slate-200 bg-white px-3 py-2 shadow-sm">
       {/* El logo, siempre; el nombre, solo donde cabe: de 1024 a 1536 px la barra va justa (y desde
           1280 px los botones principales muestran su texto). */}
-      <h1 className="mr-2 flex shrink-0 items-center gap-2 text-base font-bold tracking-tight" title="Grafcet Editor">
+      <h1 className="mr-2 flex shrink-0 items-center gap-2 text-base font-bold tracking-tight" title={t('Grafcet Editor')}>
         <Logo size={24} className="text-slate-900" />
-        <span className="sr-only sm:not-sr-only lg:sr-only 2xl:not-sr-only">Grafcet Editor</span>
+        <span className="sr-only sm:not-sr-only lg:sr-only 2xl:not-sr-only">{t('Grafcet Editor')}</span>
       </h1>
       {/* Nombre del proyecto: da nombre a los archivos guardados y exportados. */}
       <input
@@ -137,7 +137,7 @@ export default function Toolbar({
         label={N_('Acción')}
         onClick={onAddAction}
         disabled={locked || !canAddAction}
-        title={canAddAction ? 'Añadir acción a la etapa seleccionada' : 'Selecciona una etapa para añadirle una acción'}
+        title={canAddAction ? N_('Añadir acción a la etapa seleccionada') : N_('Selecciona una etapa para añadirle una acción')}
       />
       <ToolButton icon={StickyNote} label={N_('Nota')} title={N_('Añadir una nota de texto')} disabled={locked} onClick={() => onAdd('note')} />
 
@@ -152,11 +152,11 @@ export default function Toolbar({
         labelClass={labelClass(false)}
         disabled={locked}
         items={[
-          { id: 'new', label: 'Nuevo…', hint: 'Proyecto en blanco: título, autómata y tabla de variables', icon: FilePlus, onSelect: onNew },
-          { id: 'file', label: N_('Abrir archivo…'), hint: 'Proyecto .json guardado (Ctrl+O)', icon: FileJson, onSelect: onOpen },
-          { id: 'examples', label: N_('Ejemplos…'), hint: 'Grafcets típicos listos para usar', icon: BookOpen, onSelect: onOpenExamples },
-          { id: 'recent', label: N_('Trabajos anteriores…'), hint: 'Recuperar lo que había antes de abrir o limpiar', icon: History, onSelect: onOpenRecent },
-          { id: 'pneumatic', label: 'Secuencia neumática…', hint: 'Crear el grafcet y la planta de una secuencia como A+ B+ B− A−', icon: Wind, onSelect: onOpenPneumatic },
+          { id: 'new', label: N_('Nuevo…'), hint: N_('Proyecto en blanco: título, autómata y tabla de variables'), icon: FilePlus, onSelect: onNew },
+          { id: 'file', label: N_('Abrir archivo…'), hint: N_('Proyecto .json guardado (Ctrl+O)'), icon: FileJson, onSelect: onOpen },
+          { id: 'examples', label: N_('Ejemplos…'), hint: N_('Grafcets típicos listos para usar'), icon: BookOpen, onSelect: onOpenExamples },
+          { id: 'recent', label: N_('Trabajos anteriores…'), hint: N_('Recuperar lo que había antes de abrir o limpiar'), icon: History, onSelect: onOpenRecent },
+          { id: 'pneumatic', label: N_('Secuencia neumática…'), hint: N_('Crear el grafcet y la planta de una secuencia como A+ B+ B− A−'), icon: Wind, onSelect: onOpenPneumatic },
         ]}
       />
 
@@ -175,7 +175,7 @@ export default function Toolbar({
       <ToolButton
         icon={simulating ? CircleStop : Play}
         label={simulating ? N_('Detener') : N_('Simular')}
-        title={simulating ? 'Detener la simulación y volver a editar' : 'Simular el grafcet (IEC 60848)'}
+        title={simulating ? N_('Detener la simulación y volver a editar') : N_('Simular el grafcet (IEC 60848)')}
         onClick={onToggleSimulation}
         active={simulating}
         primary

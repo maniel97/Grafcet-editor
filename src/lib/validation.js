@@ -184,7 +184,7 @@ export function validateGrafcet(nodes, edges) {
   for (const s of steps) {
     const options = outgoing(s.id)
       .map((e) => byId.get(e.target))
-      .filter((t) => t?.type === 'transition' && t.data.condition?.trim())
+      .filter((v) => v?.type === 'transition' && v.data.condition?.trim())
     for (let i = 0; i < options.length; i++) {
       for (let j = i + 1; j < options.length; j++) {
         const [a, b] = [options[i], options[j]].sort((x, y) => x.position.x - y.position.x)

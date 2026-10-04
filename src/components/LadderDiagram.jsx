@@ -1,4 +1,5 @@
 import { forwardRef } from 'react'
+import { t } from '../lib/i18n'
 
 // Dibujo SVG del ladder generado (lib/ladder/generate.js): un único SVG con todas las secciones
 // y segmentos, listo para verse y para exportarse tal cual (SVG, PNG, PDF).
@@ -119,7 +120,7 @@ function layout(net, ctx) {
           <>
             <line x1={x} y1={y} x2={x + 30} y2={y} stroke={INK} strokeWidth="1.5" />
             <text x={x + W / 2} y={y + 4} textAnchor="middle" fontSize="11" fill="#dc2626" fontFamily={FONT}>
-              sin condición
+              {t('sin condición')}
             </text>
           </>
         ),
@@ -286,12 +287,12 @@ const LadderDiagram = forwardRef(function LadderDiagram({ ladder, mode = 'both',
           {highlightNodeId && rung.nodeIds?.includes(highlightNodeId) && (
             <rect data-live="resaltado" x={MARGIN / 2} y={y - 4} width={width - MARGIN} height={top + rows * H + 8 - y} rx="6" fill="#3b82f6" fillOpacity="0.12" stroke="#3b82f6" strokeWidth="1.5" />
           )}
-          {onRungClick && linked && <title>Clic: ver en el grafcet</title>}
+          {onRungClick && linked && <title>{t('Clic: ver en el grafcet')}</title>}
           <text x={MARGIN} y={y + 14} fontSize="11" fontFamily={FONT} fill={rung.error ? '#dc2626' : MUTED}>
             <tspan fontWeight="700" fill={rung.error ? '#dc2626' : INK}>
               {rung.number}
             </tspan>
-            {`  ${rung.comment}${rung.error ? '  (receptividad no válida)' : ''}`}
+            {`  ${rung.comment}${rung.error ? `  ${t('(receptividad no válida)')}` : ''}`}
           </text>
           {/* Raíles de alimentación */}
           <line x1={x0} y1={railTop} x2={x0} y2={railBottom} stroke={INK} strokeWidth="3" />

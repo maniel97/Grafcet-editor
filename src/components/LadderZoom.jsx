@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Maximize2, Minus, Plus } from "lucide-react";
+import { t } from '../lib/i18n'
 
 // Niveles de zoom de los botones − / +.
 const STEPS = [0.5, 0.75, 1, 1.25, 1.5, 2, 2.5, 3, 4];
@@ -59,15 +60,15 @@ export default function LadderZoom({ naturalWidth, children }) {
         <div
           className="flex items-center gap-0.5 rounded-md border border-slate-200 bg-white p-0.5 text-xs shadow-sm"
           role="group"
-          aria-label="Zoom del esquema"
+          aria-label={t('Zoom del esquema')}
         >
           <button
             type="button"
             className={button}
             onClick={() => stepTo(-1)}
             disabled={scale <= STEPS[0] + 0.01}
-            aria-label="Alejar el esquema"
-            title="Alejar (Ctrl + rueda)"
+            aria-label={t('Alejar el esquema')}
+            title={t('Alejar (Ctrl + rueda)')}
           >
             <Minus size={14} />
           </button>
@@ -75,8 +76,8 @@ export default function LadderZoom({ naturalWidth, children }) {
             type="button"
             onClick={() => setZoom("fit")}
             className={`min-w-14 rounded px-1.5 py-1 tabular-nums hover:bg-slate-100 ${zoom === "fit" ? "font-semibold text-blue-700" : "text-slate-700"}`}
-            title="Ajustar al ancho"
-            aria-label="Ajustar al ancho"
+            title={t('Ajustar al ancho')}
+            aria-label={t('Ajustar al ancho')}
             data-zoom={scale.toFixed(2)}
           >
             {Math.round(scale * 100)} %
@@ -86,8 +87,8 @@ export default function LadderZoom({ naturalWidth, children }) {
             className={button}
             onClick={() => stepTo(1)}
             disabled={scale >= STEPS.at(-1) - 0.01}
-            aria-label="Acercar el esquema"
-            title="Acercar (Ctrl + rueda)"
+            aria-label={t('Acercar el esquema')}
+            title={t('Acercar (Ctrl + rueda)')}
           >
             <Plus size={14} />
           </button>
@@ -95,8 +96,8 @@ export default function LadderZoom({ naturalWidth, children }) {
             type="button"
             className={button}
             onClick={() => setZoom("fit")}
-            aria-label="Ajustar el esquema al ancho"
-            title="Ajustar al ancho"
+            aria-label={t('Ajustar el esquema al ancho')}
+            title={t('Ajustar al ancho')}
           >
             <Maximize2 size={14} />
           </button>

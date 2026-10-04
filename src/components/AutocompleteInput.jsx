@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
 import { closest, currentWord, replaceWord, suggest, typos } from '../lib/autocomplete'
 import { parseExpression } from '../lib/symbols'
+import { t } from '../lib/i18n'
 
 const TYPE_LABEL = { input: 'entrada', output: 'salida', memory: 'marca', timer: 'temporizador', counter: 'contador', step: 'etapa' }
 
@@ -23,7 +24,7 @@ export default function AutocompleteInput({ value, onChange, vocabulary = [], ot
   // Lo que solo existe por lo escrito en este campo no cuenta como variable conocida; lo que está
   // en otra acción del mismo elemento, sí.
   const names = vocabulary
-    .filter((v) => v.type !== 'step' && (!v.here || otherTexts.some((t) => mentions(t, v.name))))
+    .filter((v) => v.type !== 'step' && (!v.here || otherTexts.some((s) => mentions(s, v.name))))
     .map((v) => v.name)
   const checked = whole ? text.trim() : mode === 'action' ? text.split(':=')[1] ?? '' : text
   // Erratas: en una acción de texto entero se compara todo el texto con las salidas existentes.
@@ -77,7 +78,7 @@ export default function AutocompleteInput({ value, onChange, vocabulary = [], ot
         {...props}
       />
       {options.length > 0 && (
-        <ul role="listbox" aria-label="Sugerencias" className="absolute left-0 right-0 top-full z-30 mt-1 max-h-56 overflow-y-auto rounded-md border border-slate-200 bg-white py-1 text-sm shadow-lg">
+        <ul role="listbox" aria-label={t('Sugerencias')} className="absolute left-0 right-0 top-full z-30 mt-1 max-h-56 overflow-y-auto rounded-md border border-slate-200 bg-white py-1 text-sm shadow-lg">
           {options.map((o, i) => (
             <li
               key={o.name}

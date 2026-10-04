@@ -1,6 +1,7 @@
 import { useReactFlow, ViewportPortal } from '@xyflow/react'
 import ConditionText from './ConditionText'
 import { planQuickConnect } from '../lib/useQuickConnect'
+import { t } from '../lib/i18n'
 
 const GHOST = 'border-2 border-dashed border-blue-500 bg-blue-50/80 text-blue-700'
 const STUB = 20
@@ -29,7 +30,7 @@ export default function GhostPreview({ preview }) {
         >
           {!hasActions && <div className="h-[2px] w-[20px] bg-blue-500" />}
           <div className={`diagram-text flex h-[56px] min-w-[96px] items-center justify-center px-[12px] ${GHOST}`}>
-            Acción
+            {t('Acción')}
           </div>
         </div>
       </ViewportPortal>
@@ -52,7 +53,7 @@ export default function GhostPreview({ preview }) {
       <div className="ghost-preview absolute" style={{ transform: `translate(${position.x}px, ${position.y}px)` }}>
         {type === 'step' ? (
           <div className={`diagram-step-label flex h-[56px] w-[56px] items-center justify-center font-semibold ${GHOST}`}>
-            {data.label}
+            {t(data.label)}
           </div>
         ) : (
           <div className="relative flex h-[24px] w-[56px] items-center">

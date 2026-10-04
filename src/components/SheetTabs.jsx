@@ -36,7 +36,7 @@ export default function SheetTabs({ sheets, current, counts, onSelect, onAdd, on
               type="button"
               role="tab"
               aria-selected={s.id === current}
-              title={`${s.name}: ${counts.get(s.id) ?? 0} elementos (doble clic para renombrar)`}
+              title={t('{hoja}: {n} elementos (doble clic para renombrar)', { hoja: s.name, n: counts.get(s.id) ?? 0 })}
               onClick={() => onSelect(s.id)}
               onDoubleClick={() => {
                 if (readOnly) return

@@ -1,4 +1,5 @@
 import { TITLE_BLOCK } from './titleBlock'
+import { N_ } from './i18n'
 
 // Maquetación de la exportación a PDF: dónde y a qué escala va el diagrama en la página.
 // Es una función pura que usan por igual la vista previa y el PDF, así que lo que se ve en la
@@ -7,19 +8,19 @@ import { TITLE_BLOCK } from './titleBlock'
 // Formatos de página en mm, en vertical. A4 como mínimo: más pequeño no se leen bien ni el
 // grafcet ni el ladder.
 export const PAGE_SIZES = [
-  { id: 'a4', label: 'A4', width: 210, height: 297 },
-  { id: 'a3', label: 'A3', width: 297, height: 420 },
-  { id: 'letter', label: 'Carta (EE. UU.)', width: 215.9, height: 279.4 },
+  { id: 'a4', label: N_('A4'), width: 210, height: 297 },
+  { id: 'a3', label: N_('A3'), width: 297, height: 420 },
+  { id: 'letter', label: N_('Carta (EE. UU.)'), width: 215.9, height: 279.4 },
 ]
 
 // Tamaño por id; uno que ya no existe (p. ej. A5 guardado de antes) pasa a A4.
 const pageSize = (id) => PAGE_SIZES.find((p) => p.id === id) ?? PAGE_SIZES.find((p) => p.id === 'a4')
 
-export const PAGE_OPTIONS = [{ id: 'auto', label: 'Automático (A4 o A3)' }, ...PAGE_SIZES]
+export const PAGE_OPTIONS = [{ id: 'auto', label: N_('Automático (A4 o A3)') }, ...PAGE_SIZES]
 export const ORIENTATIONS = [
-  { id: 'auto', label: 'Automática' },
-  { id: 'portrait', label: 'Vertical' },
-  { id: 'landscape', label: 'Apaisada' },
+  { id: 'auto', label: N_('Automática') },
+  { id: 'portrait', label: N_('Vertical') },
+  { id: 'landscape', label: N_('Apaisada') },
 ]
 
 export const DEFAULT_PDF_OPTIONS = { page: 'auto', orientation: 'auto', footer: true, vector: true, titleBlock: false, title: 'Grafcet (IEC 60848)' }

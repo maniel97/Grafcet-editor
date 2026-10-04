@@ -5,6 +5,7 @@ import ActionBox from './ActionBox'
 import IssueBadge from './IssueBadge'
 import { useEditor } from '../lib/editorContext'
 import { useHighlightClass } from './useHighlighted'
+import { t } from '../lib/i18n'
 
 // Etapa Grafcet: cuadrado con número y, pegadas a su derecha, las acciones asociadas como
 // rectángulos contiguos. Variantes (IEC 60848):
@@ -39,8 +40,8 @@ export default function StepNode({ id, data, selected }) {
             disabled={hasTransition}
             title={
               hasTransition
-                ? 'Ya tiene transición. Para una alternativa en O: clic derecho en la transición'
-                : 'Añadir transición'
+                ? t('Ya tiene transición. Para una alternativa en O: clic derecho en la transición')
+                : t('Añadir transición')
             }
           />
           <AddActionButton nodeId={id} />
@@ -53,7 +54,7 @@ export default function StepNode({ id, data, selected }) {
       >
         {active && (
           <span
-            aria-label="Etapa activa"
+            aria-label={t('Etapa activa')}
             className="pointer-events-none absolute right-[6px] top-[6px] h-[9px] w-[9px] rounded-full bg-slate-900"
           />
         )}
@@ -65,7 +66,7 @@ export default function StepNode({ id, data, selected }) {
           </>
         )}
         <span className="flex flex-col items-center leading-none">
-          {data.label}
+          {t(data.label)}
           {address && <span className="plc-address mt-[3px]">{address}</span>}
         </span>
         <IssueBadge nodeId={id} />

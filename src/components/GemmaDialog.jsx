@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { Plus, Trash2, Wand2, X } from 'lucide-react'
 import { FAMILIES, FORCINGS, GEMMA_STATES, TYPICAL_GEMMA, checkGemma } from '../lib/gemma'
+import { t } from '../lib/i18n'
 
 const input = 'rounded-md border border-slate-300 px-1.5 py-1 text-sm'
 
@@ -20,9 +21,9 @@ export default function GemmaDialog({ gemma, onChange, grafcets, onGenerate, onC
     const states = { ...gemma.states }
     if (on) states[id] = states[id] ?? ''
     else delete states[id]
-    set({ states, transitions: on ? gemma.transitions : gemma.transitions.filter((t) => t.from !== id && t.to !== id) })
+    set({ states, transitions: on ? gemma.transitions : gemma.transitions.filter((v) => v.from !== id && v.to !== id) })
   }
-  const setTransition = (i, patch) => set({ transitions: gemma.transitions.map((t, j) => (j === i ? { ...t, ...patch } : t)) })
+  const setTransition = (i, patch) => set({ transitions: gemma.transitions.map((v, j) => (j === i ? { ...v, ...patch } : v)) })
 
   return (
     <dialog
@@ -33,16 +34,16 @@ export default function GemmaDialog({ gemma, onChange, grafcets, onGenerate, onC
     >
       <div className="flex items-center justify-between border-b border-slate-200 px-5 py-3">
         <h2 id="gemma-title" className="text-base font-semibold">
-          Asistente GEMMA
+          {t('Asistente GEMMA')}
         </h2>
         <button
           type="button"
           onClick={() => set({ ...TYPICAL_GEMMA, production: gemma.production || TYPICAL_GEMMA.production })}
           className="ml-auto mr-2 rounded-md border border-slate-300 px-2 py-1 text-sm hover:bg-slate-100"
         >
-          Cargar el ejemplo típico
+          {t('Cargar el ejemplo típico')}
         </button>
-        <button type="button" onClick={onClose} title="Cerrar (Esc)" className="rounded-md p-1 text-slate-500 hover:bg-slate-100">
+        <button type="button" onClick={onClose} title={t('Cerrar (Esc)')} className="rounded-md p-1 text-slate-500 hover:bg-slate-100">
           <X size={18} />
         </button>
       </div>
@@ -63,7 +64,7 @@ export default function GemmaDialog({ gemma, onChange, grafcets, onGenerate, onC
                   </label>
                   {s.id in gemma.states && (
                     <select
-                      aria-label={`Orden de forzado en ${s.id}`}
+                      aria-label={t('Orden de forzado en {estado}', { estado: s.id })}
                       className={`${input} w-40 text-xs`}
                       value={gemma.states[s.id]}
                       onChange={(e) => set({ states: { ...gemma.states, [s.id]: e.target.value } })}
@@ -83,9 +84,9 @@ export default function GemmaDialog({ gemma, onChange, grafcets, onGenerate, onC
 
         <div className="space-y-3">
           <label className="flex items-center gap-2 text-sm">
-            Grafcet de producción
+            {t('Grafcet de producción')}
             <input
-              aria-label="Grafcet de producción"
+              aria-label={t('Grafcet de producción')}
               list="gemma-grafcets"
               className={`${input} w-24 font-mono`}
               value={gemma.production}
@@ -105,15 +106,15 @@ export default function GemmaDialog({ gemma, onChange, grafcets, onGenerate, onC
           )}
 
           <fieldset className="space-y-1">
-            <legend className="text-xs font-medium uppercase tracking-wide text-slate-500">Transiciones entre estados</legend>
-            {gemma.transitions.map((t, i) => (
+            <legend className="text-xs font-medium uppercase tracking-wide text-slate-500">{t('Transiciones entre estados')}</legend>
+            {gemma.transitions.map((x, i) => (
               <div key={i} className="flex items-center gap-1 text-sm">
                 {['from', 'to'].map((side) => (
                   <select
                     key={side}
-                    aria-label={side === 'from' ? `Desde (transición ${i + 1})` : `Hacia (transición ${i + 1})`}
+                    aria-label={side === 'from' ? t('Desde (transición {n})', { n: i + 1 }) : t('Hacia (transición {n})', { n: i + 1 })}
                     className={`${input} font-mono`}
-                    value={t[side]}
+                    value={x[side]}
                     onChange={(e) => setTransition(i, { [side]: e.target.value })}
                   >
                     {used.map((id) => (
@@ -124,15 +125,15 @@ export default function GemmaDialog({ gemma, onChange, grafcets, onGenerate, onC
                   </select>
                 ))}
                 <input
-                  aria-label={`Condición (transición ${i + 1})`}
+                  aria-label={t('Condición (transición {n})', { n: i + 1 })}
                   className={`${input} min-w-0 flex-1 font-mono`}
-                  value={t.condition}
-                  placeholder="Condición"
+                  value={x.condition}
+                  placeholder={t('Condición')}
                   onChange={(e) => setTransition(i, { condition: e.target.value })}
                 />
                 <button
                   type="button"
-                  aria-label={`Quitar la transición ${i + 1}`}
+                  aria-label={t('Quitar la transición {n}', { n: i + 1 })}
                   onClick={() => set({ transitions: gemma.transitions.filter((_, j) => j !== i) })}
                   className="rounded p-1 text-slate-400 hover:text-red-600"
                 >
@@ -146,13 +147,13 @@ export default function GemmaDialog({ gemma, onChange, grafcets, onGenerate, onC
                 onClick={() => set({ transitions: [...gemma.transitions, { from: used[0], to: used[1], condition: '' }] })}
                 className="flex items-center gap-1 rounded-md px-2 py-1 text-sm text-blue-700 hover:bg-blue-50"
               >
-                <Plus size={14} /> Añadir transición
+                <Plus size={14} />{' '}{t('Añadir transición')}
               </button>
             )}
           </fieldset>
 
           {problems.length > 0 && (
-            <ul className="space-y-0.5 rounded bg-slate-50 p-2 text-xs text-slate-600" aria-label="Pendiente">
+            <ul className="space-y-0.5 rounded bg-slate-50 p-2 text-xs text-slate-600" aria-label={t('Pendiente')}>
               {problems.map((p) => (
                 <li key={p}>• {p}</li>
               ))}
@@ -162,9 +163,9 @@ export default function GemmaDialog({ gemma, onChange, grafcets, onGenerate, onC
       </div>
 
       <div className="flex items-center justify-end gap-2 border-t border-slate-200 px-5 py-3">
-        <span className="mr-auto text-xs text-slate-500">Se genera en la hoja «GEMMA», dentro de un marco «GC» (se sustituye lo generado antes).</span>
+        <span className="mr-auto text-xs text-slate-500">{t('Se genera en la hoja «GEMMA», dentro de un marco «GC» (se sustituye lo generado antes).')}</span>
         <button type="button" onClick={onClose} className="rounded-md px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-100">
-          Cerrar
+          {t('Cerrar')}
         </button>
         <button
           type="button"
@@ -172,7 +173,7 @@ export default function GemmaDialog({ gemma, onChange, grafcets, onGenerate, onC
           disabled={problems.length > 0}
           className="flex items-center gap-1.5 rounded-md bg-blue-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
         >
-          <Wand2 size={16} /> Generar grafcet de conducción
+          <Wand2 size={16} />{' '}{t('Generar grafcet de conducción')}
         </button>
       </div>
     </dialog>

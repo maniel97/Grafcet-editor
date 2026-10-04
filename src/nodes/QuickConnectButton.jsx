@@ -4,6 +4,7 @@ import { CornerLeftUp, Plus } from 'lucide-react'
 import { useQuickConnect } from '../lib/useQuickConnect'
 import { useStructureActions } from '../lib/useStructureActions'
 import { useEditor } from '../lib/editorContext'
+import { t } from '../lib/i18n'
 
 // En pantallas táctiles los botones son mayores para poder pulsarlos con el dedo.
 const COARSE = typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches
@@ -91,7 +92,7 @@ export function AddActionButton({ nodeId }) {
   return (
     <FloatingButton
       position={Position.Right}
-      title="Añadir acción"
+      title={t('Añadir acción')}
       preview={{ kind: 'action', nodeId }}
       onClick={() => addAction(nodeId)}
     />

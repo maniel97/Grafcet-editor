@@ -1,7 +1,7 @@
 // Ayuda para pasar un componente a los textos traducibles (lib/i18n.js): en los atributos JSX con
-// texto (title, label, aria-label, placeholder, alt, hint…) cambia "Texto" por {t('Texto')} en los
-// elementos HTML y por {N_('Texto')} en los componentes (que lo traducen por dentro), y añade el
-// import. Uso: node scripts/i18n-wrap.mjs src/components/Archivo.jsx […]. Revisa el diff después.
+// texto (title, label, aria-label, placeholder, alt, hint…) cambia "Texto" por {t('Texto')}, y
+// también los textos entre etiquetas; añade el import.
+// Uso: node scripts/i18n-wrap.mjs src/components/Archivo.jsx […]. Revisa el diff después.
 import { readFileSync, writeFileSync } from 'node:fs'
 
 const ATTRS = ['title', 'label', 'aria-label', 'placeholder', 'alt', 'hint', 'menuLabel', 'description']
@@ -9,19 +9,36 @@ const ATTR = new RegExp(`(\\s(?:${ATTRS.join('|')})=)"([^"{}]*\\p{L}[^"{}]*)"`, 
 
 export function wrap(source, importPath) {
   let usedT = false
-  let usedN = false
-  const out = source.replace(ATTR, (all, attr, text, offset) => {
-    // Etiqueta a la que pertenece el atributo: la última «<Nombre» antes de él.
-    const tag = [...source.slice(0, offset).matchAll(/<([A-Za-z][\w.]*)/g)].pop()?.[1] ?? 'div'
-    const literal = `'${text.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`
-    if (/^[A-Z]/.test(tag)) {
-      usedN = true
-      return `${attr}{N_(${literal})}`
-    }
+  const quote = (text) => `'${text.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`
+  // (También en los componentes propios: si el componente vuelve a traducirlo, el texto ya traducido
+  // no es una clave y queda igual.)
+  const attrs = source.replace(ATTR, (all, attr, text) => {
     usedT = true
-    return `${attr}{t(${literal})}`
+    return `${attr}{t(${quote(text)})}`
   })
-  const needed = [usedT && 't', usedN && 'N_'].filter(Boolean)
+  // Textos entre etiquetas sin {…}: «>Texto<» -> «>{t('Texto')}<». Como JSX, se juntan las líneas
+  // y se conservan los espacios del principio o del final si están en la misma línea (junto a otra
+  // etiqueta: «<b>x</b> texto»). Solo tras el cierre de una etiqueta («…">», «<b>», «</b>», «}>»),
+  // no tras «a >»; tampoco «=>» ni comparaciones (el texto no puede llevar = ;).
+  // (También el «>» que cierra en su propia línea una etiqueta de varias líneas.)
+  const out = attrs.replace(/(?:(?<=[\w"'}/])|(?<=\n[ \t]*))>([^<>{}=;]*\p{L}[^<>{}=;]*)<(?=\/|[A-Za-z])/gu, (all, text) => {
+    if (/&&|\|\||\(\)|\breturn\b|\bconst\b|\.map\b/.test(text)) return all
+    // Código entre dos etiquetas (p. ej. un ternario: «</code> ) : x ? ( <strong»).
+    if (/^\s*[)\]]|\?\s*\(|\s:\s*\(/.test(text)) return all
+    const collapsed = text
+      .split('\n')
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .join(' ')
+    if (!/\p{L}{2,}/u.test(collapsed)) return all
+    const lead = /^[ \t]+\S/.test(text) && !text.startsWith('\n') ? "{' '}" : ''
+    const trail = /\S[ \t]+$/.test(text) && !text.endsWith('\n') ? "{' '}" : ''
+    usedT = true
+    const keepIndent = (s) => (s.match(/^\s*\n[ \t]*/)?.[0] ?? '')
+    const lastIndent = text.match(/\n[ \t]*$/)?.[0] ?? ''
+    return `>${keepIndent(text)}${lead}{t(${quote(collapsed)})}${trail}${lastIndent}<`
+  })
+  const needed = usedT ? ['t'] : []
   if (!needed.length) return out
   const imp = /import \{([^}]*)\} from '([^']*i18n)'/
   const m = out.match(imp)

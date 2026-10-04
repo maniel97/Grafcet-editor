@@ -1,5 +1,6 @@
 // Cronograma de las señales binarias (etapas, entradas, salidas) durante los últimos
 // `window` segundos de simulación. `samples` son cambios: [{ t, values }], escalonados.
+import { t as tr } from '../lib/i18n'
 const ROW = 18
 const LABEL_W = 68
 const MIN_SPAN = 2 // s: al empezar, la gráfica se estira a lo transcurrido en vez de a toda la ventana
@@ -22,7 +23,7 @@ export default function Chronogram({ samples, signals, now, window = 20, width: 
     <svg
       {...(standalone
         ? { xmlns: 'http://www.w3.org/2000/svg', width: WIDTH, height, fontFamily: 'Consolas, monospace', fontSize: 10 }
-        : { width: '100%', className: 'font-mono text-[10px]', role: 'img', 'aria-label': 'Cronograma' })}
+        : { width: '100%', className: 'font-mono text-[10px]', role: 'img', 'aria-label': tr('Cronograma') })}
       viewBox={`0 0 ${WIDTH} ${height}`}
     >
       {standalone && <rect width="100%" height="100%" fill="white" />}

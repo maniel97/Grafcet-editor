@@ -3,6 +3,7 @@ import { AlertTriangle, ChevronLeft, ChevronRight, Download, Maximize2, Minus, P
 import { DEFAULT_PDF_OPTIONS, ORIENTATIONS, PAGE_MARGIN, PAGE_OPTIONS, exportLayout } from '../lib/pdfLayout'
 import { savePdf } from '../lib/exportImage'
 import { TITLE_BLOCK_FIELDS, titleBlockCells, titleBlockOrigin, titleBlockValues } from '../lib/titleBlock'
+import { t, N_ } from '../lib/i18n'
 
 const STORAGE_KEY = 'grafcet-editor:pdf-options'
 const PREVIEW = { width: 440, height: 440 } // área de la vista previa (px)
@@ -11,14 +12,14 @@ const PX_TO_MM = 25.4 / 96
 const ZOOMS = [1, 1.5, 2, 3, 4, 6]
 
 const FORMATS = [
-  { id: 'png', label: 'PNG', help: 'Imagen para documentos y webs' },
-  { id: 'svg', label: 'SVG', help: 'Vectorial: se amplía sin perder calidad' },
-  { id: 'pdf', label: 'PDF', help: 'Para imprimir: tamaño, orientación y páginas' },
+  { id: 'png', label: 'PNG', help: N_('Imagen para documentos y webs') },
+  { id: 'svg', label: 'SVG', help: N_('Vectorial: se amplía sin perder calidad') },
+  { id: 'pdf', label: 'PDF', help: N_('Para imprimir: tamaño, orientación y páginas') },
 ]
 const PNG_SCALES = [
-  { id: 1, label: 'Normal (1×)' },
-  { id: 2, label: 'Alta (2×)' },
-  { id: 3, label: 'Impresión (3×)' },
+  { id: 1, label: N_('Normal (1×)') },
+  { id: 2, label: N_('Alta (2×)') },
+  { id: 3, label: N_('Impresión (3×)') },
 ]
 
 function readOptions() {
@@ -37,12 +38,12 @@ function readOptions() {
 function Choice({ legend, name, value, options, onChange }) {
   return (
     <fieldset className="space-y-1">
-      <legend className="text-xs font-medium uppercase tracking-wide text-slate-500">{legend}</legend>
+      <legend className="text-xs font-medium uppercase tracking-wide text-slate-500">{t(legend)}</legend>
       <div className="flex flex-col gap-0.5">
         {options.map((o) => (
           <label key={o.id} className="flex cursor-pointer items-center gap-2 rounded px-1 py-0.5 text-sm hover:bg-slate-50">
             <input type="radio" name={name} value={o.id} checked={value === o.id} onChange={() => onChange(o.id)} />
-            {o.label}
+            {t(o.label)}
           </label>
         ))}
       </div>
@@ -114,7 +115,7 @@ export default function ExportDialog({ source, initialFormat = 'pdf', fileName, 
       .then((img) => !cancelled && setImage(img ?? null))
       .catch((err) => {
         if (cancelled) return
-        alert(`No se pudo preparar la vista previa: ${err.message}`)
+        alert(t('No se pudo preparar la vista previa: {error}', { error: err.message }))
         setImage(null)
       })
     return () => {
@@ -170,7 +171,7 @@ export default function ExportDialog({ source, initialFormat = 'pdf', fileName, 
       else await source.save(format, options)
       onClose()
     } catch (err) {
-      alert(`No se pudo exportar: ${err.message}`)
+      alert(t('No se pudo exportar: {error}', { error: err.message }))
       setSaving(false)
     }
   }
@@ -180,7 +181,7 @@ export default function ExportDialog({ source, initialFormat = 'pdf', fileName, 
   const k = layout ? Math.min(PREVIEW.width / layout.pageW, PREVIEW.height / layout.pageH) * zoom : 1
   // Imagen (PNG/SVG): ajustada al ancho (y al alto si no es muy alargada).
   const imageFit = image ? Math.min(PREVIEW.width / image.width, image.height > image.width * 2 ? Infinity : PREVIEW.height / image.height) : 1
-  const orientationLabel = layout?.orientation === 'landscape' ? 'apaisado' : 'vertical'
+  const orientationLabel = layout?.orientation === 'landscape' ? t('apaisado') : t('vertical')
   const pngSize = image && `${Math.round(image.width * options.pngScale)} × ${Math.round(image.height * options.pngScale)} px`
 
   return (
@@ -193,27 +194,27 @@ export default function ExportDialog({ source, initialFormat = 'pdf', fileName, 
     >
       <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-5 py-3">
         <h2 id="export-title" className="text-base font-semibold">
-          Exportar
+          {t('Exportar')}
         </h2>
-        <div className="flex rounded-md border border-slate-300 p-0.5 text-sm" role="radiogroup" aria-label="Formato">
+        <div className="flex rounded-md border border-slate-300 p-0.5 text-sm" role="radiogroup" aria-label={t('Formato')}>
           {FORMATS.map((f) => (
             <button
               key={f.id}
               type="button"
               role="radio"
               aria-checked={format === f.id}
-              title={f.help}
+              title={t(f.help)}
               onClick={() => {
                 setFormat(f.id)
                 setZoomValue(1)
               }}
               className={`rounded px-3 py-1 ${format === f.id ? 'bg-blue-600 text-white' : 'text-slate-600 hover:bg-slate-100'}`}
             >
-              {f.label}
+              {t(f.label)}
             </button>
           ))}
         </div>
-        <button type="button" onClick={onClose} title="Cerrar (Esc)" className="ml-auto rounded-md p-1 text-slate-500 hover:bg-slate-100">
+        <button type="button" onClick={onClose} title={t('Cerrar (Esc)')} className="ml-auto rounded-md p-1 text-slate-500 hover:bg-slate-100">
           <X size={18} />
         </button>
       </div>
@@ -221,23 +222,23 @@ export default function ExportDialog({ source, initialFormat = 'pdf', fileName, 
       <div className="flex max-h-[75vh] flex-col gap-5 overflow-y-auto px-5 py-4 md:flex-row">
         <div className="w-full space-y-4 md:w-52 md:shrink-0">
           {format === 'png' && (
-            <Choice legend="Resolución" name="png-scale" value={options.pngScale} options={PNG_SCALES} onChange={(pngScale) => update({ pngScale })} />
+            <Choice legend={N_('Resolución')} name="png-scale" value={options.pngScale} options={PNG_SCALES} onChange={(pngScale) => update({ pngScale })} />
           )}
           {format === 'svg' && (
             <p className="text-sm text-slate-600">
-              Dibujo vectorial: se puede ampliar sin perder calidad y editar en programas como Inkscape o Illustrator.
+              {t('Dibujo vectorial: se puede ampliar sin perder calidad y editar en programas como Inkscape o Illustrator.')}
             </p>
           )}
           {format === 'pdf' && (
             <>
               {source.captureAll && (
                 <Choice
-                  legend="Hojas"
+                  legend={N_('Hojas')}
                   name="pdf-sheets"
                   value={allSheets ? 'all' : 'one'}
                   options={[
-                    { id: 'one', label: 'Esta hoja' },
-                    { id: 'all', label: 'Todas las hojas' },
+                    { id: 'one', label: N_('Esta hoja') },
+                    { id: 'all', label: N_('Todas las hojas') },
                   ]}
                   onChange={(v) => {
                     setAllSheets(v === 'all')
@@ -245,31 +246,31 @@ export default function ExportDialog({ source, initialFormat = 'pdf', fileName, 
                   }}
                 />
               )}
-              <Choice legend="Tamaño de página" name="pdf-page" value={options.page} options={PAGE_OPTIONS} onChange={(p) => update({ page: p })} />
+              <Choice legend={N_('Tamaño de página')} name="pdf-page" value={options.page} options={PAGE_OPTIONS} onChange={(p) => update({ page: p })} />
               <Choice
-                legend="Orientación"
+                legend={N_('Orientación')}
                 name="pdf-orientation"
                 value={options.orientation}
                 options={ORIENTATIONS}
                 onChange={(orientation) => update({ orientation })}
               />
               <fieldset className="space-y-1">
-                <legend className="text-xs font-medium uppercase tracking-wide text-slate-500">Calidad</legend>
+                <legend className="text-xs font-medium uppercase tracking-wide text-slate-500">{t('Calidad')}</legend>
                 <label className="flex items-start gap-2 px-1 text-sm">
                   <input type="checkbox" className="mt-1" checked={options.vector !== false} onChange={(e) => update({ vector: e.target.checked })} />
                   <span>
-                    Vectorial
+                    {t('Vectorial')}
                     <span className="block text-xs text-slate-500">
-                      Nítido a cualquier zoom y con el texto seleccionable. Sin marcar: imagen a alta resolución.
+                      {t('Nítido a cualquier zoom y con el texto seleccionable. Sin marcar: imagen a alta resolución.')}
                     </span>
                   </span>
                 </label>
               </fieldset>
               <fieldset className="space-y-1">
-                <legend className="text-xs font-medium uppercase tracking-wide text-slate-500">Cajetín</legend>
+                <legend className="text-xs font-medium uppercase tracking-wide text-slate-500">{t('Cajetín')}</legend>
                 <label className="flex items-center gap-2 px-1 text-sm">
                   <input type="checkbox" checked={!!options.titleBlock} onChange={(e) => update({ titleBlock: e.target.checked })} />
-                  Incluir cajetín
+                  {t('Incluir cajetín')}
                 </label>
                 {options.titleBlock && (
                   <div className="space-y-1">
@@ -278,30 +279,30 @@ export default function ExportDialog({ source, initialFormat = 'pdf', fileName, 
                         key={f.id}
                         className="w-full rounded-md border border-slate-300 px-2 py-1 text-sm focus:border-blue-500 focus:outline-none"
                         value={titleBlock[f.id] ?? ''}
-                        placeholder={f.id === 'project' ? projectName || f.label : f.id === 'date' ? today : f.label}
-                        aria-label={`Cajetín: ${f.label}`}
-                        title={f.label}
+                        placeholder={f.id === 'project' ? projectName || t(f.label) : f.id === 'date' ? today : t(f.label)}
+                        aria-label={t('Cajetín: {campo}', { campo: t(f.label) })}
+                        title={t(f.label)}
                         onChange={(e) => onTitleBlockChange?.({ ...titleBlock, [f.id]: e.target.value })}
                       />
                     ))}
-                    <p className="text-xs text-slate-500">Se guarda con el proyecto. La hoja se numera sola.</p>
+                    <p className="text-xs text-slate-500">{t('Se guarda con el proyecto. La hoja se numera sola.')}</p>
                   </div>
                 )}
               </fieldset>
               {!options.titleBlock && (
               <fieldset className="space-y-1">
-                <legend className="text-xs font-medium uppercase tracking-wide text-slate-500">Pie de página</legend>
+                <legend className="text-xs font-medium uppercase tracking-wide text-slate-500">{t('Pie de página')}</legend>
                 <label className="flex items-center gap-2 px-1 text-sm">
                   <input type="checkbox" checked={options.footer} onChange={(e) => update({ footer: e.target.checked })} />
-                  Título y fecha
+                  {t('Título y fecha')}
                 </label>
                 {options.footer && (
                   <input
                     className="w-full rounded-md border border-slate-300 px-2 py-1 text-sm focus:border-blue-500 focus:outline-none"
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
-                    placeholder="Título"
-                    aria-label="Título del pie de página"
+                    placeholder={t('Título')}
+                    aria-label={t('Título del pie de página')}
                   />
                 )}
               </fieldset>
@@ -316,22 +317,22 @@ export default function ExportDialog({ source, initialFormat = 'pdf', fileName, 
             className={`flex overflow-auto rounded-lg bg-slate-100 p-3 ${zoom > 1 ? 'cursor-zoom-out' : 'cursor-zoom-in'}`}
             style={{ width: PREVIEW.width + 24, height: PREVIEW.height + 24 }}
             onDoubleClick={() => setZoom(zoom > 1 ? 1 : 2.5)}
-            title="Doble clic o Ctrl + rueda para ampliar"
+            title={t('Doble clic o Ctrl + rueda para ampliar')}
           >
-            {image === undefined && <p className="m-auto text-sm text-slate-500">Preparando la vista previa…</p>}
-            {image === null && <p className="m-auto text-sm text-slate-500">No hay nada que exportar.</p>}
+            {image === undefined && <p className="m-auto text-sm text-slate-500">{t('Preparando la vista previa…')}</p>}
+            {image === null && <p className="m-auto text-sm text-slate-500">{t('No hay nada que exportar.')}</p>}
             {image && format !== 'pdf' && (
               <img
                 src={image.dataUrl}
-                alt="Dibujo tal como se exportará"
-                aria-label="Vista previa de la imagen"
+                alt={t('Dibujo tal como se exportará')}
+                aria-label={t('Vista previa de la imagen')}
                 className="paper m-auto max-w-none shrink-0 bg-white shadow-md"
                 style={{ width: image.width * imageFit * zoom }}
               />
             )}
             {layout && page && format === 'pdf' && (
               <div
-                aria-label="Vista previa de la página"
+                aria-label={t('Vista previa de la página')}
                 data-page={`${layout.page.id}-${layout.orientation}`}
                 className="paper relative m-auto shrink-0 bg-white shadow-md"
                 style={{ width: layout.pageW * k, height: layout.pageH * k }}
@@ -340,7 +341,7 @@ export default function ExportDialog({ source, initialFormat = 'pdf', fileName, 
                 <div className="absolute overflow-hidden" style={{ left: layout.x * k, top: layout.y * k, width: layout.w * k, height: page.h * k }}>
                   <img
                     src={pageImage.dataUrl}
-                    alt="Diagrama tal como quedará en el PDF"
+                    alt={t('Diagrama tal como quedará en el PDF')}
                     className="absolute left-0 max-w-none"
                     style={{ top: -page.top * layout.scale * PX_TO_MM * k, width: layout.w * k }}
                   />
@@ -362,7 +363,7 @@ export default function ExportDialog({ source, initialFormat = 'pdf', fileName, 
                     className="absolute truncate text-slate-500"
                     style={{ left: PAGE_MARGIN * k, bottom: (PAGE_MARGIN / 2 - 1) * k, fontSize: Math.max(6, 2.9 * k), right: PAGE_MARGIN * k }}
                   >
-                    {[title.trim(), pageImage.sheetName, today, totalPages > 1 ? `página ${pageIndex + 1} de ${totalPages}` : null]
+                    {[title.trim(), pageImage.sheetName, today, totalPages > 1 ? t('página {n} de {total}', { n: pageIndex + 1, total: totalPages }) : null]
                       .filter(Boolean)
                       .join(' · ')}
                   </span>
@@ -372,28 +373,28 @@ export default function ExportDialog({ source, initialFormat = 'pdf', fileName, 
           </div>
 
           {image && (
-            <div className="flex items-center gap-0.5 rounded-md border border-slate-200 p-0.5 text-xs" role="group" aria-label="Zoom de la vista previa">
-              <button type="button" onClick={() => stepZoom(-1)} disabled={zoom <= ZOOMS[0]} aria-label="Alejar la vista previa" className="rounded p-1 hover:bg-slate-100 disabled:opacity-30">
+            <div className="flex items-center gap-0.5 rounded-md border border-slate-200 p-0.5 text-xs" role="group" aria-label={t('Zoom de la vista previa')}>
+              <button type="button" onClick={() => stepZoom(-1)} disabled={zoom <= ZOOMS[0]} aria-label={t('Alejar la vista previa')} className="rounded p-1 hover:bg-slate-100 disabled:opacity-30">
                 <Minus size={14} />
               </button>
-              <button type="button" onClick={() => setZoom(1)} title="Ajustar" aria-label="Zoom de la vista previa: ajustar" className={`min-w-12 rounded px-1.5 py-1 tabular-nums hover:bg-slate-100 ${zoom === 1 ? 'font-semibold text-blue-700' : ''}`}>
+              <button type="button" onClick={() => setZoom(1)} title={t('Ajustar')} aria-label={t('Zoom de la vista previa: ajustar')} className={`min-w-12 rounded px-1.5 py-1 tabular-nums hover:bg-slate-100 ${zoom === 1 ? 'font-semibold text-blue-700' : ''}`}>
                 {Math.round(zoom * 100)} %
               </button>
-              <button type="button" onClick={() => stepZoom(1)} disabled={zoom >= ZOOMS.at(-1)} aria-label="Ampliar la vista previa" className="rounded p-1 hover:bg-slate-100 disabled:opacity-30">
+              <button type="button" onClick={() => stepZoom(1)} disabled={zoom >= ZOOMS.at(-1)} aria-label={t('Ampliar la vista previa')} className="rounded p-1 hover:bg-slate-100 disabled:opacity-30">
                 <Plus size={14} />
               </button>
-              <button type="button" onClick={() => setZoom(1)} aria-label="Ajustar la vista previa" title="Ajustar" className="rounded p-1 hover:bg-slate-100">
+              <button type="button" onClick={() => setZoom(1)} aria-label={t('Ajustar la vista previa')} title={t('Ajustar')} className="rounded p-1 hover:bg-slate-100">
                 <Maximize2 size={14} />
               </button>
             </div>
           )}
           {format === 'pdf' && layout && totalPages > 1 && (
-            <div className="flex items-center gap-2 text-sm" aria-label="Páginas">
+            <div className="flex items-center gap-2 text-sm" aria-label={t('Páginas')}>
               <button
                 type="button"
                 onClick={() => setPageIndex((i) => Math.max(0, i - 1))}
                 disabled={pageIndex === 0}
-                aria-label="Página anterior"
+                aria-label={t('Página anterior')}
                 className="rounded p-1 hover:bg-slate-100 disabled:opacity-30"
               >
                 <ChevronLeft size={16} />
@@ -405,7 +406,7 @@ export default function ExportDialog({ source, initialFormat = 'pdf', fileName, 
                 type="button"
                 onClick={() => setPageIndex((i) => Math.min(totalPages - 1, i + 1))}
                 disabled={pageIndex >= totalPages - 1}
-                aria-label="Página siguiente"
+                aria-label={t('Página siguiente')}
                 className="rounded p-1 hover:bg-slate-100 disabled:opacity-30"
               >
                 <ChevronRight size={16} />
@@ -417,15 +418,15 @@ export default function ExportDialog({ source, initialFormat = 'pdf', fileName, 
             {format === 'svg' && image && `Vectorial · ${Math.round(image.width)} × ${Math.round(image.height)} px`}
             {format === 'pdf' && layout && (
               <>
-                {layout.page.label} {orientationLabel} · escala {Math.round(layout.scale * 100)} %{layout.scale === 1 && ' (tamaño real)'}
-                {totalPages > 1 && ` · ${totalPages} páginas`}
+                {t(layout.page.label)} {orientationLabel} · {t('escala {n} %', { n: Math.round(layout.scale * 100) })}{layout.scale === 1 && ` ${t('(tamaño real)')}`}
+                {totalPages > 1 && ` · ${t('{n} páginas', { n: totalPages })}`}
               </>
             )}
           </p>
           {format === 'pdf' && layout?.small && (
             <p className="flex items-start gap-1 rounded bg-amber-50 p-2 text-xs text-amber-900">
               <AlertTriangle size={14} className="mt-0.5 shrink-0" />
-              El dibujo queda muy reducido y puede leerse mal impreso. Prueba con una página mayor o con otra orientación.
+              {t('El dibujo queda muy reducido y puede leerse mal impreso. Prueba con una página mayor o con otra orientación.')}
             </p>
           )}
         </div>
@@ -433,7 +434,7 @@ export default function ExportDialog({ source, initialFormat = 'pdf', fileName, 
 
       <div className="flex justify-end gap-2 border-t border-slate-200 px-5 py-3">
         <button type="button" onClick={onClose} className="rounded-md px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-100">
-          Cancelar
+          {t('Cancelar')}
         </button>
         <button
           type="button"
@@ -441,7 +442,7 @@ export default function ExportDialog({ source, initialFormat = 'pdf', fileName, 
           disabled={!image || saving}
           className="flex items-center gap-1.5 rounded-md bg-blue-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
         >
-          <Download size={16} /> {saving ? 'Guardando…' : `Guardar ${format.toUpperCase()}`}
+          <Download size={16} /> {saving ? t('Guardando…') : t('Guardar {formato}', { formato: format.toUpperCase() })}
         </button>
       </div>
     </dialog>
@@ -451,15 +452,15 @@ export default function ExportDialog({ source, initialFormat = 'pdf', fileName, 
 // Cajetín en la vista previa: las mismas celdas (mm) que el PDF, escaladas a la página.
 function TitleBlockPreview({ k, origin, cells }) {
   return (
-    <div aria-label="Cajetín" className="absolute border-2 border-slate-900" style={{ left: origin.x * k, top: origin.y * k, width: 120 * k, height: 22 * k }}>
+    <div aria-label={t('Cajetín')} className="absolute border-2 border-slate-900" style={{ left: origin.x * k, top: origin.y * k, width: 120 * k, height: 22 * k }}>
       {cells.map((c) => (
         <div
-          key={c.label}
+          key={t(c.label)}
           className="absolute overflow-hidden border border-slate-700 bg-white leading-none"
           style={{ left: c.x * k, top: c.y * k, width: c.w * k, height: c.h * k, padding: 1.2 * k }}
         >
           <div className="text-slate-500" style={{ fontSize: Math.max(4, 1.9 * k) }}>
-            {c.label}
+            {t(c.label)}
           </div>
           <div className={`truncate text-slate-900 ${c.strong ? 'font-bold' : ''}`} style={{ fontSize: Math.max(5, (c.strong ? 3.2 : 2.8) * k), marginTop: 1.2 * k }}>
             {c.value}

@@ -43,4 +43,5 @@ describe('catálogos (src/locales, npm run i18n)', () => {
   })
   it('las traducciones conservan los marcadores {nombre}', () => expect(a.badPlaceholders).toEqual([]))
   it('ningún t() con texto variable (se usan marcadores)', () => expect(a.dynamic).toEqual([]))
+  it('ninguna variable local «t» tapa a la función t() (fallaría al ejecutarse)', () => expect(a.shadowed).toEqual([]))
 })

@@ -10,6 +10,7 @@ import { downloadFile } from '../lib/projectFile'
 import { fileName, getProjectName } from '../lib/fileNames'
 import { svgMarkupSource } from '../lib/svgExport'
 import ExportDialog from './ExportDialog'
+import { t } from '../lib/i18n'
 
 const SPEEDS = [0.25, 0.5, 1, 2, 5, 10]
 
@@ -46,7 +47,7 @@ function InputRow({ variable, value, onChange, hotkey }) {
         role="switch"
         aria-checked={!!value}
         onClick={() => onChange(!value)}
-        title="Interruptor: clic para cambiar"
+        title={t('Interruptor: clic para cambiar')}
         className={`relative h-5 w-9 shrink-0 rounded-full transition-colors ${value ? 'bg-green-500' : 'bg-slate-300'}`}
       >
         <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-all ${value ? 'left-4.5' : 'left-0.5'}`} />
@@ -57,7 +58,7 @@ function InputRow({ variable, value, onChange, hotkey }) {
       </span>
       <button
         type="button"
-        title="Pulsador: activo mientras lo mantienes pulsado"
+        title={t('Pulsador: activo mientras lo mantienes pulsado')}
         onPointerDown={(e) => {
           onChange(true)
           // Captura el puntero para recibir el "soltar" aunque se salga del botón. Algunos
@@ -72,7 +73,7 @@ function InputRow({ variable, value, onChange, hotkey }) {
         onPointerCancel={() => onChange(false)}
         className="rounded border border-slate-300 px-1.5 py-0.5 text-xs text-slate-600 select-none hover:bg-slate-100 active:bg-green-100"
       >
-        pulsar
+        {t('pulsar')}
       </button>
       {hotkey && <kbd className="w-4 text-center text-[10px] text-slate-400">{hotkey}</kbd>}
     </div>
@@ -90,11 +91,11 @@ function chronogramSource(samples, signals, now) {
       const width = Math.round(Math.min(4000, Math.max(600, 72 + span * 40)))
       return renderToStaticMarkup(<Chronogram samples={samples} signals={signals} now={span} window={span} width={width} standalone />)
     },
-    { kind: 'cronograma', title: `${getProjectName().trim() || 'Grafcet'} · cronograma de la simulación`, name: (ext) => fileName(ext, 'cronograma') },
+    { kind: 'cronograma', title: `${getProjectName().trim() || 'Grafcet'} · ${t('cronograma de la simulación')}`, name: (ext) => fileName(ext, 'cronograma') },
   )
 }
 
-const fmtTime = (t) => (t < 60 ? `${t.toFixed(1)} s` : `${Math.floor(t / 60)} min ${(t % 60).toFixed(1)} s`)
+const fmtTime = (v) => (v < 60 ? `${v.toFixed(1)} s` : `${Math.floor(v / 60)} min ${(v % 60).toFixed(1)} s`)
 
 // Panel de control de la simulación.
 export default function SimulationPanel({ simulation, scenarios = [], onScenariosChange, cpuConfig, onCpuChange, onApplySymbols, sceneOpen, onToggleScene, elecOpen, onToggleElec, exportProps, onFocusNode, onClose }) {
@@ -113,8 +114,8 @@ export default function SimulationPanel({ simulation, scenarios = [], onScenario
   useEffect(() => {
     const onKeyDown = (e) => {
       if (e.ctrlKey || e.metaKey || e.altKey) return
-      const t = e.target
-      if (t instanceof HTMLElement && ['INPUT', 'TEXTAREA', 'SELECT'].includes(t.tagName)) return
+      const v = e.target
+      if (v instanceof HTMLElement && ['INPUT', 'TEXTAREA', 'SELECT'].includes(v.tagName)) return
       const index = Number(e.key) - 1
       if (!Number.isInteger(index) || index < 0 || index >= Math.min(9, inputs.length)) return
       e.preventDefault()
@@ -158,15 +159,15 @@ export default function SimulationPanel({ simulation, scenarios = [], onScenario
       <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
         <h2 className="flex items-center gap-2 text-sm font-semibold">
           <span className={`h-2 w-2 rounded-full ${playing ? 'animate-pulse bg-green-500' : 'bg-amber-500'}`} />
-          Simulación {playing ? 'en marcha' : 'en pausa'}
+          {playing ? t('Simulación en marcha') : t('Simulación en pausa')}
         </h2>
         <button
           type="button"
           onClick={onClose}
-          title="Detener la simulación y volver a editar"
+          title={t('Detener la simulación y volver a editar')}
           className="flex items-center gap-1 rounded-md px-2 py-1 text-sm text-slate-600 hover:bg-slate-100"
         >
-          <Square size={14} /> Salir
+          <Square size={14} />{' '}{t('Salir')}
         </button>
       </div>
 
@@ -177,13 +178,13 @@ export default function SimulationPanel({ simulation, scenarios = [], onScenario
             onClick={() => setPlaying(!playing)}
             className={`flex items-center gap-1 rounded-md px-3 py-1.5 text-sm font-medium text-white ${playing ? 'bg-amber-500 hover:bg-amber-600' : 'bg-green-600 hover:bg-green-700'}`}
           >
-            {playing ? <Pause size={16} /> : <Play size={16} />} {playing ? 'Pausa' : 'Marcha'}
+            {playing ? <Pause size={16} /> : <Play size={16} />} {playing ? t('Pausa') : t('Marcha')}
           </button>
           <button
             type="button"
             onClick={step}
             disabled={playing}
-            title="Paso: un franqueo (muestra la evolución fugaz paso a paso)"
+            title={t('Paso: un franqueo (muestra la evolución fugaz paso a paso)')}
             className="rounded-md border border-slate-300 p-1.5 hover:bg-slate-100 disabled:opacity-40"
           >
             <SkipForward size={16} />
@@ -192,7 +193,7 @@ export default function SimulationPanel({ simulation, scenarios = [], onScenario
             type="button"
             onClick={() => advance(1)}
             disabled={playing}
-            title="Avanzar el tiempo 1 s (para las temporizaciones)"
+            title={t('Avanzar el tiempo 1 s (para las temporizaciones)')}
             className="flex items-center rounded-md border border-slate-300 px-1.5 py-1 text-xs hover:bg-slate-100 disabled:opacity-40"
           >
             <Timer size={14} />
@@ -204,7 +205,7 @@ export default function SimulationPanel({ simulation, scenarios = [], onScenario
               setPlaying(false)
               reset()
             }}
-            title="Reiniciar: vuelve a la situación inicial"
+            title={t('Reiniciar: vuelve a la situación inicial')}
             className="rounded-md border border-slate-300 p-1.5 hover:bg-slate-100"
           >
             <RotateCcw size={16} />
@@ -213,8 +214,8 @@ export default function SimulationPanel({ simulation, scenarios = [], onScenario
             value={speed}
             onChange={(e) => setSpeed(Number(e.target.value))}
             className="ml-auto rounded-md border border-slate-300 px-1 py-1 text-xs"
-            aria-label="Velocidad"
-            title="Velocidad del tiempo simulado"
+            aria-label={t('Velocidad')}
+            title={t('Velocidad del tiempo simulado')}
           >
             {SPEEDS.map((s) => (
               <option key={s} value={s}>
@@ -228,13 +229,12 @@ export default function SimulationPanel({ simulation, scenarios = [], onScenario
         {state.unstable && (
           <p className="flex gap-1 rounded bg-red-50 p-2 text-xs text-red-700">
             <AlertTriangle size={14} className="shrink-0" />
-            Ciclo inestable: las transiciones se franquean sin fin con las mismas entradas (p. ej. receptividades «1» en
-            bucle).
+            {t('Ciclo inestable: las transiciones se franquean sin fin con las mismas entradas (p. ej. receptividades «1» en bucle).')}
           </p>
         )}
         {compiled.errors.length > 0 && (
           <div className="rounded bg-amber-50 p-2 text-xs text-amber-800">
-            <p className="mb-1 font-medium">Expresiones no válidas (se toman como falsas):</p>
+            <p className="mb-1 font-medium">{t('Expresiones no válidas (se toman como falsas):')}</p>
             {compiled.errors.map((err, i) => (
               <button key={i} type="button" onClick={() => onFocusNode(err.nodeId)} className="block text-left hover:underline">
                 {err.message}
@@ -247,13 +247,13 @@ export default function SimulationPanel({ simulation, scenarios = [], onScenario
       <div className="min-h-0 flex-1 overflow-y-auto">
         <CpuControls config={cpuConfig} status={simulation.cpu} onChange={onCpuChange} onApplySymbols={onApplySymbols} />
         {!simulation.cpu && (
-        <Section title="Qué espera el grafcet" count={waiting.list.length}>
+        <Section title={t('Qué espera el grafcet')} count={waiting.list.length}>
           {waiting.stuck && (
             <p className="rounded bg-red-50 p-2 text-xs text-red-700">
-              Ninguna transición está validada: el grafcet ya no puede evolucionar. Revisa los enlaces que salen de las etapas activas.
+              {t('Ninguna transición está validada: el grafcet ya no puede evolucionar. Revisa los enlaces que salen de las etapas activas.')}
             </p>
           )}
-          <ul className="space-y-1" aria-label="Qué espera el grafcet">
+          <ul className="space-y-1" aria-label={t('Qué espera el grafcet')}>
             {waiting.list.map((e) => {
               const missing = e.receptivity && firstFailure(e.receptivity)
               return (
@@ -261,7 +261,7 @@ export default function SimulationPanel({ simulation, scenarios = [], onScenario
                   <button
                     type="button"
                     onClick={() => onFocusNode(e.id)}
-                    title="Ver la transición (pasa el ratón por ella para ver el detalle)"
+                    title={t('Ver la transición (pasa el ratón por ella para ver el detalle)')}
                     className="block w-full rounded px-1 py-0.5 text-left text-xs hover:bg-slate-50"
                   >
                     <span className="flex items-center gap-1.5">
@@ -272,9 +272,11 @@ export default function SimulationPanel({ simulation, scenarios = [], onScenario
                     </span>
                     <span className="block pl-3.5 text-slate-500">
                       {e.status === 'ready'
-                        ? 'se franquea en el próximo ciclo'
+                        ? t('se franquea en el próximo ciclo')
                         : missing
-                          ? `falta ${missing.text}${missing.detail ? `: ${missing.detail}` : ''}`
+                          ? missing.detail
+                            ? t('falta {condicion}: {detalle}', { condicion: missing.text, detalle: missing.detail })
+                            : t('falta {condicion}', { condicion: missing.text })
                           : e.summary}
                     </span>
                   </button>
@@ -290,44 +292,44 @@ export default function SimulationPanel({ simulation, scenarios = [], onScenario
             type="button"
             onClick={onToggleScene}
             aria-pressed={sceneOpen}
-            title="Escena de la planta junto al grafcet: pulsadores, cilindros, cintas, detectores…"
+            title={t('Escena de la planta junto al grafcet: pulsadores, cilindros, cintas, detectores…')}
             className={`flex w-full items-center gap-1.5 rounded-md border px-2 py-1 text-sm ${sceneOpen ? 'border-blue-300 bg-blue-50 text-blue-800' : 'border-slate-300 hover:bg-slate-50'}`}
           >
-            <Factory size={14} /> Planta virtual
+            <Factory size={14} />{' '}{t('Planta virtual')}
             <span className="ml-auto text-xs text-slate-500">
-              {simulation.sceneCount ? `${simulation.sceneCount} elementos` : 'sin elementos'}
+              {simulation.sceneCount ? t('{n} elementos', { n: simulation.sceneCount }) : t('sin elementos')}
             </span>
           </button>
           <button
             type="button"
             onClick={onToggleElec}
             aria-pressed={elecOpen}
-            title="Esquema eléctrico junto al grafcet: mando, potencia y conexiones del autómata"
+            title={t('Esquema eléctrico junto al grafcet: mando, potencia y conexiones del autómata')}
             className={`mt-1 flex w-full items-center gap-1.5 rounded-md border px-2 py-1 text-sm ${elecOpen ? 'border-blue-300 bg-blue-50 text-blue-800' : 'border-slate-300 hover:bg-slate-50'}`}
           >
-            <Zap size={14} /> Esquema eléctrico
+            <Zap size={14} />{' '}{t('Esquema eléctrico')}
           </button>
         </div>
 
-        <Section title="Entradas" count={allInputs.length}>
-          {allInputs.length === 0 && <p className="text-xs text-slate-400">No hay entradas: escribe receptividades como «Marcha».</p>}
+        <Section title={t('Entradas')} count={allInputs.length}>
+          {allInputs.length === 0 && <p className="text-xs text-slate-400">{t('No hay entradas: escribe receptividades como «Marcha».')}</p>}
           {inputs.map((v, i) => (
             <InputRow key={v.name} variable={v} value={sim.inputs[v.name]} onChange={(on) => setInput(v.name, on)} hotkey={i < 9 ? i + 1 : null} />
           ))}
           {plantInputsShown.map((v) => (
-            <div key={v.name} className="flex items-center gap-2 py-1" title="La da la planta virtual">
+            <div key={v.name} className="flex items-center gap-2 py-1" title={t('La da la planta virtual')}>
               <Lamp on={Boolean(sim.inputs[v.name])} color="bg-blue-500" />
               <span className="min-w-0 flex-1 truncate font-mono text-sm">{v.name}</span>
-              <span className="rounded bg-blue-50 px-1.5 text-[11px] text-blue-700">planta</span>
+              <span className="rounded bg-blue-50 px-1.5 text-[11px] text-blue-700">{t('planta')}</span>
             </div>
           ))}
           {!playing && inputs.length > 0 && (
-            <p className="mt-1 text-[11px] text-slate-400">En pausa, los cambios se aplican con «Paso» o «+1s».</p>
+            <p className="mt-1 text-[11px] text-slate-400">{t('En pausa, los cambios se aplican con «Paso» o «+1s».')}</p>
           )}
         </Section>
 
         {analogInputs.length > 0 && (
-          <Section title="Entradas analógicas" count={analogInputs.length}>
+          <Section title={t('Entradas analógicas')} count={analogInputs.length}>
             {analogInputs.map((v) => {
               const { min, max, unit } = v.analog
               const value = Number(sim.inputs[v.name] ?? min)
@@ -347,7 +349,7 @@ export default function SimulationPanel({ simulation, scenarios = [], onScenario
                     value={value}
                     aria-label={`Valor de ${v.name}`}
                     disabled={plantDriven.has(v.name)}
-                    title={plantDriven.has(v.name) ? 'La da la planta virtual' : undefined}
+                    title={plantDriven.has(v.name) ? t('La da la planta virtual') : undefined}
                     onChange={(e) => setInput(v.name, Number(e.target.value))}
                     className="w-full accent-blue-600"
                   />
@@ -357,8 +359,8 @@ export default function SimulationPanel({ simulation, scenarios = [], onScenario
           </Section>
         )}
 
-        <Section title="Salidas" count={outputs.length}>
-          {outputs.length === 0 && <p className="text-xs text-slate-400">Sin salidas.</p>}
+        <Section title={t('Salidas')} count={outputs.length}>
+          {outputs.length === 0 && <p className="text-xs text-slate-400">{t('Sin salidas.')}</p>}
           {outputs.map((v) => (
             <div key={v.name} className="flex items-center gap-2 py-0.5">
               <Lamp on={Number(values[v.name]) !== 0} />
@@ -369,7 +371,7 @@ export default function SimulationPanel({ simulation, scenarios = [], onScenario
         </Section>
 
         {analogOutputs.length > 0 && (
-          <Section title="Salidas analógicas" count={analogOutputs.length}>
+          <Section title={t('Salidas analógicas')} count={analogOutputs.length}>
             {analogOutputs.map((v) => (
               <div key={v.name} className="flex items-center gap-2 py-0.5 font-mono text-sm">
                 <span className="flex-1 truncate">{v.name}</span>
@@ -382,7 +384,7 @@ export default function SimulationPanel({ simulation, scenarios = [], onScenario
         )}
 
         {memories.length > 0 && (
-          <Section title="Marcas y contadores" count={memories.length}>
+          <Section title={t('Marcas y contadores')} count={memories.length}>
             {memories.map((v) => (
               <div key={v.name} className="flex items-center gap-2 py-0.5 font-mono text-sm">
                 <span className="flex-1 truncate">{v.name}</span>
@@ -393,7 +395,7 @@ export default function SimulationPanel({ simulation, scenarios = [], onScenario
         )}
 
         {timers.length > 0 && (
-          <Section title="Temporizaciones" count={timers.length}>
+          <Section title={t('Temporizaciones')} count={timers.length}>
             {timers.map((v) => {
               const info = timerInfo(v)
               const progress = info?.elapsed != null ? Math.min(1, info.elapsed / info.preset) : 0
@@ -415,9 +417,9 @@ export default function SimulationPanel({ simulation, scenarios = [], onScenario
         )}
 
         {!simulation.cpu && (
-        <Section title="Etapas activas" count={activeSteps.length}>
+        <Section title={t('Etapas activas')} count={activeSteps.length}>
           <div className="flex flex-wrap gap-1">
-            {activeSteps.length === 0 && <span className="text-xs text-slate-400">Ninguna</span>}
+            {activeSteps.length === 0 && <span className="text-xs text-slate-400">{t('Ninguna')}</span>}
             {activeSteps.map((s) => (
               <button
                 key={s.id}
@@ -432,34 +434,34 @@ export default function SimulationPanel({ simulation, scenarios = [], onScenario
         </Section>
         )}
 
-        <Section title="Escenarios de prueba" count={scenarios.length}>
+        <Section title={t('Escenarios de prueba')} count={scenarios.length}>
           <ScenarioControls simulation={simulation} scenarios={scenarios} onChange={onScenariosChange} />
         </Section>
 
-        <Section title="Cronograma" defaultOpen>
+        <Section title={t('Cronograma')} defaultOpen>
           <Chronogram samples={sim.samples} signals={signals} now={state.time} />
           <div className="mt-1 flex items-center gap-1 text-xs">
-            <span className="text-slate-400">Exportar todo:</span>
+            <span className="text-slate-400">{t('Exportar todo:')}</span>
             <button
               type="button"
               onClick={() => setChronoExport(chronogramSource(sim.samples, signals, state.time))}
-              title="PNG, SVG o PDF, con vista previa"
+              title={t('PNG, SVG o PDF, con vista previa')}
               className="rounded border border-slate-300 px-1.5 py-0.5 text-slate-600 hover:bg-slate-100"
             >
-              Imagen o PDF…
+              {t('Imagen o PDF…')}
             </button>
             <button
               type="button"
               onClick={() => downloadFile(`﻿${chronogramCsv(sim.samples, signals)}`, fileName('csv', 'cronograma'), 'text/csv;charset=utf-8')}
               className="rounded border border-slate-300 px-1.5 py-0.5 text-slate-600 hover:bg-slate-100"
             >
-              CSV
+              {t('CSV')}
             </button>
           </div>
         </Section>
 
-        <Section title="Registro de franqueos" count={sim.log.length} defaultOpen={false}>
-          {sim.log.length === 0 && <p className="text-xs text-slate-400">Aún no se ha franqueado ninguna transición.</p>}
+        <Section title={t('Registro de franqueos')} count={sim.log.length} defaultOpen={false}>
+          {sim.log.length === 0 && <p className="text-xs text-slate-400">{t('Aún no se ha franqueado ninguna transición.')}</p>}
           <ol className="space-y-0.5 font-mono text-[11px]">
             {[...sim.log].reverse().map((entry, i) => (
               <li key={i}>

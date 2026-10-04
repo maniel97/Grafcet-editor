@@ -47,6 +47,7 @@ import { EMPTY_GEMMA, generateConduction } from '../lib/gemma'
 import { clearSharedHash, decodeProject, sharedData } from '../lib/share'
 import { applySymbols } from '../lib/plc/symbolTable'
 import { buildPlcModel } from '../lib/plcModel'
+import { t } from '../lib/i18n'
 
 // Partes que no hacen falta al abrir el editor: se descargan la primera vez que se usan, para que
 // la carga inicial sea más ligera (importa sobre todo publicado en internet).
@@ -74,7 +75,7 @@ const ProjectsDialog = lazy(() => import('./ProjectsDialog'))
 function Loading({ panel }) {
   return panel ? (
     <aside className="side-panel flex w-80 shrink-0 items-center justify-center border-l border-slate-200 bg-white text-sm text-slate-400">
-      Cargando…
+      {t('Cargando…')}
     </aside>
   ) : null
 }
@@ -293,7 +294,7 @@ export default function GrafcetCanvas() {
       type: plc.variables[name]?.type ?? found.type,
       here: ![...found.uses].some((id) => id !== editingId) && !plc.variables[name],
     }))
-    const steps = nodes.filter((n) => n.type === 'step' && n.data.label).map((n) => ({ name: `X${n.data.label}`, type: 'step' }))
+    const steps = nodes.filter((n) => n.type === 'step' && n.data.label).map((n) => ({ name: `X${t(n.data.label)}`, type: 'step' }))
     return [...vars, ...steps]
   }, [editingId, symbols, plc.variables, nodes])
 
@@ -409,8 +410,8 @@ export default function GrafcetCanvas() {
   const addSheet = useCallback(() => {
     const list = sheetsOf(plcRef.current)
     let n = list.length + 1
-    while (list.some((s) => s.name === `Hoja ${n}`)) n++
-    const sheet = { id: crypto.randomUUID(), name: `Hoja ${n}` }
+    while (list.some((s) => s.name === t('Hoja {n}', { n }))) n++
+    const sheet = { id: crypto.randomUUID(), name: t('Hoja {n}', { n }) }
     setPlc((p) => ({ ...p, sheets: [...sheetsOf(p), sheet] }))
     selectSheet(sheet.id)
   }, [setPlc, selectSheet])
@@ -418,7 +419,7 @@ export default function GrafcetCanvas() {
     (id) => {
       const inside = getNodes().filter((n) => n.data?.sheet === id)
       const name = sheetsOf(plcRef.current).find((s) => s.id === id)?.name
-      if (inside.length && !window.confirm(`¿Borrar «${name}» y sus ${inside.length} elementos?`)) return
+      if (inside.length && !window.confirm(t('¿Borrar «{nombre}» y sus {n} elementos?', { nombre: name, n: inside.length }))) return
       takeSnapshot()
       const gone = new Set(inside.map((n) => n.id))
       setNodes((nds) => nds.filter((n) => !gone.has(n.id)))
@@ -497,8 +498,8 @@ export default function GrafcetCanvas() {
     (from, to) => {
       to = to.trim()
       if (to === from) return null
-      if (!isValidName(to)) return 'Nombre no válido: letras, cifras y _ (sin empezar por cifra ni espacios).'
-      if (symbols.has(to)) return `Ya existe una variable «${to}».`
+      if (!isValidName(to)) return t('Nombre no válido: letras, cifras y _ (sin empezar por cifra ni espacios).')
+      if (symbols.has(to)) return t('Ya existe una variable «{nombre}».', { nombre: to })
       takeSnapshot()
       const result = renameVariable(getNodes(), plcRef.current, from, to)
       setNodes(result.nodes)
@@ -556,7 +557,7 @@ export default function GrafcetCanvas() {
   const addAction = useCallback(() => {
     if (!selectedStep) return
     takeSnapshot()
-    updateNodeData(selectedStep.id, { actions: [...(selectedStep.data.actions ?? []), normalizeAction('Acción')] })
+    updateNodeData(selectedStep.id, { actions: [...(selectedStep.data.actions ?? []), normalizeAction(t('Acción'))] })
     setEditingId(selectedStep.id)
   }, [selectedStep, takeSnapshot, updateNodeData])
 
@@ -571,7 +572,7 @@ export default function GrafcetCanvas() {
 
   const clear = useCallback(() => {
     if (!nodes.length && !edges.length) return
-    pushRecent({ nodes: getNodes(), edges: getEdges(), plc: plcRef.current, name: projectNameRef.current }, 'Antes de limpiar el lienzo')
+    pushRecent({ nodes: getNodes(), edges: getEdges(), plc: plcRef.current, name: projectNameRef.current }, t('Antes de limpiar el lienzo'))
     takeSnapshot()
     setNodes([])
     setEdges([])
@@ -628,7 +629,7 @@ export default function GrafcetCanvas() {
       try {
         const project = await loadProject(file)
         // Proyectos guardados sin nombre: el del archivo, sin la extensión.
-        replaceProject({ ...project, name: project.name ?? file.name.replace(/\.json$/i, '') }, `Antes de abrir «${file.name}»`)
+        replaceProject({ ...project, name: project.name ?? file.name.replace(/\.json$/i, '') }, t('Antes de abrir «{archivo}»', { archivo: file.name }))
       } catch (err) {
         alert(err.message)
       }
@@ -639,14 +640,14 @@ export default function GrafcetCanvas() {
   const [projectsTab, setProjectsTab] = useState(null) // 'examples' | 'recent' | null
   const openExample = useCallback(
     (example) => {
-      replaceProject({ ...normalizeProject(example.build()), name: example.title }, `Antes de abrir el ejemplo «${example.title}»`)
+      replaceProject({ ...normalizeProject(example.build()), name: example.title }, t('Antes de abrir el ejemplo «{ejemplo}»', { ejemplo: t(example.title) }))
       setProjectsTab(null)
     },
     [replaceProject],
   )
   const restoreRecent = useCallback(
     (entry) => {
-      replaceProject(normalizeProject(entry.project), 'Antes de recuperar un trabajo anterior')
+      replaceProject(normalizeProject(entry.project), t('Antes de recuperar un trabajo anterior'))
       setProjectsTab(null)
     },
     [replaceProject],
@@ -873,30 +874,30 @@ export default function GrafcetCanvas() {
           </Suspense>
         )}
         {incoming && (
-          <div role="alertdialog" aria-label="Proyecto compartido" className="fixed left-1/2 top-16 z-50 flex -translate-x-1/2 items-center gap-3 rounded-lg bg-slate-900 px-4 py-2 text-sm text-white shadow-xl">
+          <div role="alertdialog" aria-label={t('Proyecto compartido')} className="fixed left-1/2 top-16 z-50 flex -translate-x-1/2 items-center gap-3 rounded-lg bg-slate-900 px-4 py-2 text-sm text-white shadow-xl">
             {incoming.error ? (
               <span>{incoming.error}</span>
             ) : (
               <>
                 <span>
-                  Proyecto compartido: <strong>«{incoming.project.name || 'sin nombre'}»</strong>
+                  {t('Proyecto compartido:')}{' '}<strong>«{incoming.project.name || t('sin nombre')}»</strong>
                 </span>
                 <button
                   type="button"
                   onClick={() => {
                     const project = normalizeProject(incoming.project)
-                    if (project) replaceProject({ ...project, name: incoming.project.name ?? '' }, 'Antes de abrir un proyecto compartido')
+                    if (project) replaceProject({ ...project, name: incoming.project.name ?? '' }, t('Antes de abrir un proyecto compartido'))
                     closeIncoming()
                   }}
                   className="rounded-md bg-blue-600 px-2.5 py-1 font-medium hover:bg-blue-700"
                 >
-                  Abrir
+                  {t('Abrir')}
                 </button>
-                <span className="text-xs text-slate-300">(lo de ahora queda en «Trabajos anteriores»)</span>
+                <span className="text-xs text-slate-300">{t('(lo de ahora queda en «Trabajos anteriores»)')}</span>
               </>
             )}
             <button type="button" onClick={closeIncoming} className="rounded-md px-2 py-1 text-slate-300 hover:text-white">
-              {incoming.error ? 'Cerrar' : 'Descartar'}
+              {incoming.error ? t('Cerrar') : t('Descartar')}
             </button>
           </div>
         )}
@@ -905,7 +906,7 @@ export default function GrafcetCanvas() {
             <NewProjectDialog
               onCreate={(project) => {
                 setNewOpen(false)
-                replaceProject(normalizeProject(project), 'Antes de crear un proyecto nuevo')
+                replaceProject(normalizeProject(project), t('Antes de crear un proyecto nuevo'))
               }}
               onClose={() => setNewOpen(false)}
             />
@@ -916,7 +917,7 @@ export default function GrafcetCanvas() {
             <PneumaticDialog
               onCreate={(project) => {
                 setPneumaticOpen(false)
-                replaceProject({ ...normalizeProject(project), name: project.name }, 'Antes de generar una secuencia neumática')
+                replaceProject({ ...normalizeProject(project), name: project.name }, t('Antes de generar una secuencia neumática'))
               }}
               onClose={() => setPneumaticOpen(false)}
             />
@@ -946,13 +947,13 @@ export default function GrafcetCanvas() {
           >
             {editLocked && !simulating && (
               <div className="absolute left-1/2 top-3 z-10 flex -translate-x-1/2 items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-sm text-amber-900 shadow">
-                <Lock size={14} /> Edición bloqueada: solo puedes desplazarte y hacer zoom
+                <Lock size={14} />{' '}{t('Edición bloqueada: solo puedes desplazarte y hacer zoom')}
                 <button
                   type="button"
                   onClick={() => setEditLocked(false)}
                   className="rounded-md border border-amber-300 bg-white px-2 py-0.5 text-xs font-medium hover:bg-amber-100"
                 >
-                  Desbloquear
+                  {t('Desbloquear')}
                 </button>
               </div>
             )}

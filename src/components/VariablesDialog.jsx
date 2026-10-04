@@ -4,6 +4,7 @@ import { SCHEMES, VARIABLE_TYPES, duplicatedAddresses, typeInfo } from '../lib/a
 import { STEP_PREFIXES, resolveStepPrefix, setPreferredStepPrefix, stepVar } from '../lib/stepNames'
 import S7200Config from './S7200Config'
 import { DEFAULT_ANALOG, SIGNALS, analogConfig, isAnalog } from '../lib/analog'
+import { t } from '../lib/i18n'
 
 const cellInput =
   'w-full rounded border border-transparent bg-transparent px-1.5 py-1 text-sm hover:border-slate-300 focus:border-blue-500 focus:bg-white focus:outline-none'
@@ -34,7 +35,7 @@ function VariableName({ name, onRename }) {
         <button
           type="button"
           onClick={() => setDraft(name)}
-          title="Renombrar en todo el diagrama"
+          title={t('Renombrar en todo el diagrama')}
           aria-label={`Renombrar ${name}`}
           className="rounded p-0.5 text-slate-400 opacity-0 hover:bg-slate-100 group-hover:opacity-100 focus:opacity-100"
         >
@@ -46,7 +47,7 @@ function VariableName({ name, onRename }) {
     <span className="block">
       <input
         autoFocus
-        aria-label="Nuevo nombre de la variable"
+        aria-label={t('Nuevo nombre de la variable')}
         className={`w-full rounded border px-1 py-0.5 font-mono text-sm ${error ? 'border-red-400' : 'border-blue-500'}`}
         value={draft}
         onChange={(e) => {
@@ -109,7 +110,7 @@ export default function VariablesDialog({
       className={`${cellInput} font-mono ${isDup(value) ? 'border-red-400 bg-red-50 text-red-700' : ''}`}
       value={value ?? ''}
       placeholder={placeholder}
-      title={isDup(value) ? 'Dirección repetida' : undefined}
+      title={isDup(value) ? t('Dirección repetida') : undefined}
       onChange={(e) => onValue(e.target.value)}
     />
   )
@@ -127,9 +128,9 @@ export default function VariablesDialog({
     >
       <div className="flex items-center justify-between border-b border-slate-200 px-5 py-3">
         <h2 id="vars-title" className="text-base font-semibold">
-          Tabla de variables
+          {t('Tabla de variables')}
         </h2>
-        <button type="button" onClick={onClose} title="Cerrar (Esc)" className="rounded-md p-1 text-slate-500 hover:bg-slate-100">
+        <button type="button" onClick={onClose} title={t('Cerrar (Esc)')} className="rounded-md p-1 text-slate-500 hover:bg-slate-100">
           <X size={18} />
         </button>
       </div>
@@ -139,16 +140,16 @@ export default function VariablesDialog({
           className="rounded-md border border-slate-300 px-2 py-1"
           value={plc.scheme}
           onChange={(e) => onChange((p) => ({ ...p, scheme: e.target.value }))}
-          aria-label="Formato de direcciones"
+          aria-label={t('Formato de direcciones')}
         >
           {SCHEMES.map((s) => (
             <option key={s.id} value={s.id}>
-              {s.label}
+              {t(s.label)}
             </option>
           ))}
         </select>
-        <label className="flex items-center gap-1 text-slate-600" title="Las receptividades se siguen escribiendo con X (X2, 5s/X2), como manda la norma">
-          Etapas:
+        <label className="flex items-center gap-1 text-slate-600" title={t('Las receptividades se siguen escribiendo con X (X2, 5s/X2), como manda la norma')}>
+          {t('Etapas:')}
           <select
             className="rounded-md border border-slate-300 px-2 py-1 text-slate-900"
             value={stepPrefix}
@@ -156,11 +157,11 @@ export default function VariablesDialog({
               setPreferredStepPrefix(e.target.value)
               onChange((p) => ({ ...p, stepPrefix: e.target.value }))
             }}
-            aria-label="Nombre de las variables de etapa"
+            aria-label={t('Nombre de las variables de etapa')}
           >
             {STEP_PREFIXES.map((p) => (
               <option key={p.id} value={p.id}>
-                {p.label}
+                {t(p.label)}
               </option>
             ))}
           </select>
@@ -168,31 +169,31 @@ export default function VariablesDialog({
         <button
           type="button"
           onClick={() => onAutoAssign(false)}
-          title="Asigna dirección a etapas y variables que aún no tienen, sin tocar las existentes"
+          title={t('Asigna dirección a etapas y variables que aún no tienen, sin tocar las existentes')}
           className="flex items-center gap-1 rounded-md bg-blue-600 px-3 py-1 font-medium text-white hover:bg-blue-700"
         >
-          <WandSparkles size={16} /> Rellenar vacías
+          <WandSparkles size={16} />{' '}{t('Rellenar vacías')}
         </button>
         <button
           type="button"
           onClick={() => onAutoAssign(true)}
-          title="Vuelve a asignar todas las direcciones en orden (se puede deshacer)"
+          title={t('Vuelve a asignar todas las direcciones en orden (se puede deshacer)')}
           className="rounded-md border border-slate-300 px-3 py-1 hover:bg-slate-100"
         >
-          Reasignar todo
+          {t('Reasignar todo')}
         </button>
         <button
           type="button"
           onClick={onExportCsv}
-          title="Descarga la tabla en CSV para importarla en el software del PLC"
+          title={t('Descarga la tabla en CSV para importarla en el software del PLC')}
           className="flex items-center gap-1 rounded-md border border-slate-300 px-3 py-1 hover:bg-slate-100"
         >
-          <Download size={16} /> CSV
+          <Download size={16} />{' '}{t('CSV')}
         </button>
         <div className="ml-auto flex flex-col gap-0.5">
           <label className="flex items-center gap-2">
             <input type="checkbox" checked={tableShown} onChange={onToggleTable} />
-            Mostrar la tabla en el lienzo
+            {t('Mostrar la tabla en el lienzo')}
           </label>
           <label className="flex items-center gap-2">
             <input
@@ -200,7 +201,7 @@ export default function VariablesDialog({
               checked={plc.showAddresses}
               onChange={(e) => onChange((p) => ({ ...p, showAddresses: e.target.checked }))}
             />
-            Mostrar direcciones en el diagrama
+            {t('Mostrar direcciones en el diagrama')}
           </label>
         </div>
       </div>
@@ -209,8 +210,8 @@ export default function VariablesDialog({
 
       <div className="flex gap-1 px-5 pt-2" role="tablist">
         {[
-          ['steps', `Etapas (${stepNodes.length})`],
-          ['variables', `Variables (${symbols.size})`],
+          ['steps', t('Etapas ({n})', { n: stepNodes.length })],
+          ['variables', t('Variables ({n})', { n: symbols.size })],
         ].map(([id, label]) => (
           <button
             key={id}
@@ -238,9 +239,9 @@ export default function VariablesDialog({
           <table className="w-full">
             <thead className="sticky top-0 bg-white">
               <tr className="border-b border-slate-200">
-                <th className={`${th} w-24`}>Etapa</th>
-                <th className={`${th} w-36`}>Dirección</th>
-                <th className={th}>Comentario</th>
+                <th className={`${th} w-24`}>{t('Etapa')}</th>
+                <th className={`${th} w-36`}>{t('Dirección')}</th>
+                <th className={th}>{t('Comentario')}</th>
               </tr>
             </thead>
             <tbody>
@@ -248,14 +249,14 @@ export default function VariablesDialog({
                 <tr key={s.id} className="border-b border-slate-100">
                   <td className="px-2 font-mono text-sm">
                     {stepVar(s.data.label, stepPrefix)}
-                    {s.data.initial && <span className="ml-1 text-xs text-slate-400">inicial</span>}
+                    {s.data.initial && <span className="ml-1 text-xs text-slate-400">{t('inicial')}</span>}
                   </td>
                   <td>{addressInput(plc.steps[s.id]?.address, (v) => setStep(s.id, { address: v }, 'address'), 'M0.0')}</td>
                   <td>
                     <input
                       className={cellInput}
                       value={plc.steps[s.id]?.comment ?? ''}
-                      placeholder="p. ej. Reposo"
+                      placeholder={t('p. ej. Reposo')}
                       onChange={(e) => setStep(s.id, { comment: e.target.value }, 'comment')}
                     />
                   </td>
@@ -267,19 +268,19 @@ export default function VariablesDialog({
           <>
             {symbols.size === 0 && (
               <p className="py-6 text-center text-sm text-slate-400">
-                Aún no hay variables: se detectan solas en las receptividades y las acciones.
+                {t('Aún no hay variables: se detectan solas en las receptividades y las acciones.')}
               </p>
             )}
             {symbols.size > 0 && (
               <table className="w-full">
                 <thead className="sticky top-0 bg-white">
                   <tr className="border-b border-slate-200">
-                    <th className={th}>Símbolo</th>
-                    <th className={`${th} w-36`}>Tipo</th>
-                    <th className={`${th} w-32`}>Dirección</th>
-                    <th className={th} title="Preselección (temporizadores y contadores) o señal y rango (analógicas)">Presel. / rango</th>
-                    <th className={th}>Comentario</th>
-                    <th className={`${th} w-12 text-right`}>Usos</th>
+                    <th className={th}>{t('Símbolo')}</th>
+                    <th className={`${th} w-36`}>{t('Tipo')}</th>
+                    <th className={`${th} w-32`}>{t('Dirección')}</th>
+                    <th className={th} title={t('Preselección (temporizadores y contadores) o señal y rango (analógicas)')}>{t('Presel. / rango')}</th>
+                    <th className={th}>{t('Comentario')}</th>
+                    <th className={`${th} w-12 text-right`}>{t('Usos')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -297,9 +298,9 @@ export default function VariablesDialog({
                             value={type}
                             onChange={(e) => setVariable(name, { type: e.target.value }, 'type')}
                           >
-                            {VARIABLE_TYPES.map((t) => (
-                              <option key={t.id} value={t.id}>
-                                {t.label}
+                            {VARIABLE_TYPES.map((x) => (
+                              <option key={x.id} value={x.id}>
+                                {t(x.label)}
                               </option>
                             ))}
                           </select>
@@ -314,35 +315,35 @@ export default function VariablesDialog({
                         <td>
                           {isAnalog(type) ? (
                             // Analógicas: señal, rango físico y unidad (lib/analog.js).
-                            <span className="flex items-center gap-1" title="Señal y rango físico: para la simulación y para pasar los umbrales a valor bruto">
+                            <span className="flex items-center gap-1" title={t('Señal y rango físico: para la simulación y para pasar los umbrales a valor bruto')}>
                               <select
-                                aria-label={`Señal de ${name}`}
+                                aria-label={t('Señal de {variable}', { variable: name })}
                                 className={`${cellInput} w-auto`}
                                 value={analogConfig(entry).signal}
                                 onChange={(e) => setVariable(name, { signal: e.target.value }, 'signal')}
                               >
                                 {SIGNALS.map((sig) => (
                                   <option key={sig.id} value={sig.id}>
-                                    {sig.label}
+                                    {t(sig.label)}
                                   </option>
                                 ))}
                               </select>
                               <input
-                                aria-label={`Mínimo de ${name}`}
+                                aria-label={t('Mínimo de {variable}', { variable: name })}
                                 className={`${cellInput} w-14 font-mono`}
                                 value={entry.min ?? DEFAULT_ANALOG.min}
                                 onChange={(e) => setVariable(name, { min: e.target.value }, 'min')}
                               />
                               –
                               <input
-                                aria-label={`Máximo de ${name}`}
+                                aria-label={t('Máximo de {variable}', { variable: name })}
                                 className={`${cellInput} w-14 font-mono`}
                                 value={entry.max ?? DEFAULT_ANALOG.max}
                                 onChange={(e) => setVariable(name, { max: e.target.value }, 'max')}
                               />
                               <input
                                 aria-label={`Unidad de ${name}`}
-                                placeholder="ud."
+                                placeholder={t('ud.')}
                                 className={`${cellInput} w-12`}
                                 value={entry.unit ?? ''}
                                 onChange={(e) => setVariable(name, { unit: e.target.value }, 'unit')}
@@ -369,10 +370,10 @@ export default function VariablesDialog({
                         <td className="px-2 text-right text-sm text-slate-500">
                           {found.uses.size || (
                             <span className="flex items-center justify-end gap-1 text-xs italic">
-                              sin uso
+                              {t('sin uso')}
                               <button
                                 type="button"
-                                title="Quitar de la tabla"
+                                title={t('Quitar de la tabla')}
                                 onClick={() => removeVariable(name)}
                                 className="rounded p-0.5 text-slate-400 hover:bg-red-50 hover:text-red-600"
                               >
@@ -389,15 +390,15 @@ export default function VariablesDialog({
             )}
             {/* Variables previstas que aún no se usan en el diagrama (se renombran en la tabla del lienzo). */}
             <div className="mt-3 flex flex-wrap items-center gap-1 text-sm">
-              <span className="mr-1 text-xs text-slate-500">Añadir:</span>
-              {VARIABLE_TYPES.map((t) => (
+              <span className="mr-1 text-xs text-slate-500">{t('Añadir:')}</span>
+              {VARIABLE_TYPES.map((x) => (
                 <button
-                  key={t.id}
+                  key={x.id}
                   type="button"
-                  onClick={() => onAddVariable(t.id)}
+                  onClick={() => onAddVariable(x.id)}
                   className="flex items-center gap-1 rounded-full border border-slate-300 px-2.5 py-0.5 text-xs hover:border-blue-400 hover:bg-blue-50"
                 >
-                  <Plus size={12} /> {t.label}
+                  <Plus size={12} /> {t(t.label)}
                 </button>
               ))}
             </div>

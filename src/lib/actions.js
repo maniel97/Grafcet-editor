@@ -1,36 +1,37 @@
 // Acciones asociadas a etapas según IEC 60848.
 // Cada acción es { text, kind, condition }. Los proyectos antiguos guardaban solo el texto
 // (string): normalizeAction los trata como acciones continuas.
+import { N_ } from './i18n'
 
 export const ACTION_KINDS = [
   {
     id: 'continuous',
-    label: 'Continua',
-    help: 'Activa mientras la etapa está activa.',
+    label: N_('Continua'),
+    help: N_('Activa mientras la etapa está activa.'),
   },
   {
     id: 'conditional',
-    label: 'Condicionada',
-    help: 'Activa mientras la etapa está activa Y se cumple la condición. Con una condición de tiempo (p. ej. 3s/X2) es retardada; con su negación, limitada en el tiempo.',
+    label: N_('Condicionada'),
+    help: N_('Activa mientras la etapa está activa Y se cumple la condición. Con una condición de tiempo (p. ej. 3s/X2) es retardada; con su negación, limitada en el tiempo.'),
     needsCondition: true,
-    placeholder: 'p. ej. b, 3s/X2',
+    placeholder: N_('p. ej. b, 3s/X2'),
   },
   {
     id: 'stored-on',
-    label: 'Memorizada en la activación',
-    help: 'Se ejecuta una vez al activarse la etapa (p. ej. A:=1, C:=C+1).',
+    label: N_('Memorizada en la activación'),
+    help: N_('Se ejecuta una vez al activarse la etapa (p. ej. A:=1, C:=C+1).'),
   },
   {
     id: 'stored-off',
-    label: 'Memorizada en la desactivación',
-    help: 'Se ejecuta una vez al desactivarse la etapa (p. ej. A:=0).',
+    label: N_('Memorizada en la desactivación'),
+    help: N_('Se ejecuta una vez al desactivarse la etapa (p. ej. A:=0).'),
   },
   {
     id: 'event',
-    label: 'Al evento',
-    help: 'Se ejecuta una vez cuando ocurre el evento estando la etapa activa (p. ej. ↑b).',
+    label: N_('Al evento'),
+    help: N_('Se ejecuta una vez cuando ocurre el evento estando la etapa activa (p. ej. ↑b).'),
     needsCondition: true,
-    placeholder: 'p. ej. ↑b',
+    placeholder: N_('p. ej. ↑b'),
   },
 ]
 

@@ -39,16 +39,24 @@ const unquote = (lit) => {
   )
 }
 
-// { keys: Set, dynamic: ['archivo:línea'] }
+// Variable local llamada «t» en un archivo que importa t (taparía la función: t('…') fallaría al
+// ejecutarse aunque compile). Parámetros (t) / (t, …), const / let t y for (const t of …).
+const IMPORTS_T = /import \{[^}]*\bt\b(?!\s+as\b)[^}]*\} from '[^']*i18n'/
+const LOCAL_T = /\(\s*t\s*[,)]|\b(?:const|let|var)\s+t\s*=|for\s*\(\s*(?:const|let)\s+t\s+of\b/g
+
+// { keys: Set, dynamic: ['archivo:línea'], shadowed: ['archivo:línea'] }
 export function extract() {
   const keys = new Set()
   const dynamic = []
+  const shadowed = []
   for (const file of files(SRC)) {
     const text = readFileSync(file, 'utf8')
+    const where = (index) => `${relative(ROOT, file)}:${text.slice(0, index).split('\n').length}`
     for (const m of text.matchAll(CALL)) keys.add(unquote(m[1]))
-    for (const m of text.matchAll(DYNAMIC)) dynamic.push(`${relative(ROOT, file)}:${text.slice(0, m.index).split('\n').length}`)
+    for (const m of text.matchAll(DYNAMIC)) dynamic.push(where(m.index))
+    if (IMPORTS_T.test(text)) for (const m of text.matchAll(LOCAL_T)) shadowed.push(where(m.index))
   }
-  return { keys, dynamic }
+  return { keys, dynamic, shadowed }
 }
 
 export const placeholders = (text) => [...String(text).matchAll(/\{(\w+)\}/g)].map((m) => m[1]).sort()
@@ -57,9 +65,9 @@ const read = (file) => JSON.parse(readFileSync(join(LOCALES, file), 'utf8'))
 const write = (file, obj) => writeFileSync(join(LOCALES, file), `${JSON.stringify(sorted(obj), null, 2)}\n`)
 export const languages = () => readdirSync(LOCALES).filter((f) => /^[a-z]{2}(-[A-Z]{2})?\.json$/.test(f) && f !== `${SOURCE}.json`)
 
-// Problemas de los catálogos: { stale, missing: { lang: [...] }, extra, badPlaceholders, dynamic }.
+// Problemas de los catálogos: { stale, missing: { lang: [...] }, extra, badPlaceholders, dynamic, shadowed }.
 export function audit() {
-  const { keys, dynamic } = extract()
+  const { keys, dynamic, shadowed } = extract()
   const source = read(`${SOURCE}.json`)
   const stale = [...keys].filter((k) => !(k in source)).concat(Object.keys(source).filter((k) => !keys.has(k)))
   const missing = {}
@@ -71,7 +79,7 @@ export function audit() {
     extra[file] = Object.keys(dict).filter((k) => !keys.has(k))
     for (const [k, v] of Object.entries(dict)) if (v && placeholders(k).join() !== placeholders(v).join()) badPlaceholders.push(`${file}: «${k}» -> «${v}»`)
   }
-  return { keys, stale, missing, extra, badPlaceholders, dynamic }
+  return { keys, stale, missing, extra, badPlaceholders, dynamic, shadowed }
 }
 
 // Pone al día los catálogos.
@@ -93,6 +101,7 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
     ...a.stale.map((k) => `Catálogo de origen sin actualizar: «${k}»`),
     ...a.badPlaceholders.map((p) => `Marcadores distintos: ${p}`),
     ...a.dynamic.map((d) => `t() con texto variable (usa marcadores {nombre}): ${d}`),
+    ...a.shadowed.map((d) => `Variable local «t» que tapa a t() (renómbrala): ${d}`),
   ]
   for (const p of problems) console.log(p)
   if (process.argv.includes('--check') && problems.length) process.exit(1)

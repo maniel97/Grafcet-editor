@@ -125,6 +125,6 @@ export function describeExample(example) {
 
 // Propuesta para hacerla excluyente: «B · !A» (con paréntesis si hace falta).
 export function exclusiveFix(textA, textB) {
-  const wrap = (t) => (/^[\p{L}_][\p{L}\p{N}_.]*$/u.test(t.trim()) ? t.trim() : `(${t.trim()})`)
+  const wrap = (v) => (/^[\p{L}_][\p{L}\p{N}_.]*$/u.test(v.trim()) ? v.trim() : `(${v.trim()})`)
   return `${wrap(textB)} · !${wrap(textA)}`
 }

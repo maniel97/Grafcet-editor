@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { NodeResizer, useReactFlow } from '@xyflow/react'
 import { useEditor } from '../lib/editorContext'
 import { FRAME_KINDS, FRAME_MIN } from '../lib/frames'
+import { t } from '../lib/i18n'
 
 // Marco con nombre (lib/frames.js): grafcet parcial «G1» o expansión de macroetapa «M1».
 // Solo el nombre (arriba a la izquierda) atrapa el ratón: por él se selecciona y se arrastra
@@ -39,7 +40,7 @@ export default function FrameNode({ id, data, selected }) {
       />
       <div
         className="pointer-events-auto absolute left-0 top-0 -translate-y-full cursor-move px-1 pb-0.5"
-        title={`${kind.label}: arrastra para mover el marco con su contenido; doble clic para renombrar`}
+        title={t('{tipo}: arrastra para mover el marco con su contenido; doble clic para renombrar', { tipo: t(kind.label) })}
         onDoubleClick={(e) => {
           if (readOnly) return
           e.stopPropagation()
@@ -49,7 +50,7 @@ export default function FrameNode({ id, data, selected }) {
         {draft !== null ? (
           <input
             autoFocus
-            aria-label="Nombre del marco"
+            aria-label={t('Nombre del marco')}
             className="nodrag diagram-text w-24 rounded border border-blue-500 bg-white px-1 font-bold outline-none"
             value={draft}
             onChange={(e) => setDraft(e.target.value)}

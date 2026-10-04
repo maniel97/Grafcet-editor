@@ -13,23 +13,24 @@ import { resolveStepPrefix, stepVar } from './stepNames'
 export const EMPTY_PLC = { scheme: 'siemens', showAddresses: false, steps: {}, variables: {} }
 
 export const VARIABLE_TYPES = [
-  { id: 'input', label: 'Entrada', plural: 'Entradas', area: 'I' },
-  { id: 'output', label: 'Salida', plural: 'Salidas', area: 'Q' },
-  { id: 'memory', label: 'Marca', plural: 'Marcas', area: 'M' },
-  { id: 'timer', label: 'Temporizador', plural: 'Temporizadores', area: 'T' },
-  { id: 'counter', label: 'Contador', plural: 'Contadores', area: 'C' },
-  { id: 'analogIn', label: 'Entrada analógica', plural: 'Entradas analógicas', area: 'AI' },
-  { id: 'analogOut', label: 'Salida analógica', plural: 'Salidas analógicas', area: 'AQ' },
+  { id: 'input', label: N_('Entrada'), plural: N_('Entradas'), area: 'I' },
+  { id: 'output', label: N_('Salida'), plural: N_('Salidas'), area: 'Q' },
+  { id: 'memory', label: N_('Marca'), plural: N_('Marcas'), area: 'M' },
+  { id: 'timer', label: N_('Temporizador'), plural: N_('Temporizadores'), area: 'T' },
+  { id: 'counter', label: N_('Contador'), plural: N_('Contadores'), area: 'C' },
+  { id: 'analogIn', label: N_('Entrada analógica'), plural: N_('Entradas analógicas'), area: 'AI' },
+  { id: 'analogOut', label: N_('Salida analógica'), plural: N_('Salidas analógicas'), area: 'AQ' },
 ]
-export const typeInfo = (id) => VARIABLE_TYPES.find((t) => t.id === id) ?? VARIABLE_TYPES[0]
+export const typeInfo = (id) => VARIABLE_TYPES.find((v) => v.id === id) ?? VARIABLE_TYPES[0]
 
 export const SCHEMES = [
-  { id: 'siemens', label: 'Siemens (I0.0, Q0.0, M0.0, T1)' },
-  { id: 'iec', label: 'IEC 61131-3 (%IX0.0, %QX0.0, %MX0.0)' },
-  { id: 's7200', label: 'S7-200 / Micro/WIN (I0.0, Q0.0, V0.0, VW, T37)' },
+  { id: 'siemens', label: N_('Siemens (I0.0, Q0.0, M0.0, T1)') },
+  { id: 'iec', label: N_('IEC 61131-3 (%IX0.0, %QX0.0, %MX0.0)') },
+  { id: 's7200', label: N_('S7-200 / Micro/WIN (I0.0, Q0.0, V0.0, VW, T37)') },
 ]
 
 import { ioMap } from './s7200Catalog'
+import { N_, t } from './i18n'
 
 // S7-200: solo 32 bytes de marcas (M0.0–M31.7), así que las etapas van en memoria V (V0.0…), las
 // marcas internas del ladder detrás (lib/ladder/generate.js) y las palabras en VW100…; los
@@ -245,10 +246,12 @@ export function validatePlc(plc, stepNodes, symbols) {
     const address = plc.steps[s.id]?.address?.trim()
     if (!address) continue
     const parsed = parseAddress(address)
-    if (!parsed) issues.push({ severity: 'warning', message: `Etapa ${s.data.label}: dirección «${address}» con formato no reconocido.`, nodeIds: [s.id] })
+    if (!parsed) issues.push({ severity: 'warning', message: t('Etapa {etapa}: dirección «{direccion}» con formato no reconocido.', { etapa: s.data.label, direccion: address }), nodeIds: [s.id] })
     else if (parsed.area !== 'M' && !(s7200 && parsed.area === 'V'))
-      issues.push({ severity: 'warning', message: `Etapa ${s.data.label}: la variable de etapa debería ser una marca (M${s7200 ? ' o V' : ''}), no ${address}.`, nodeIds: [s.id] })
-    own(address, `etapa ${s.data.label}`, [s.id])
+      issues.push({ severity: 'warning', message: s7200
+          ? t('Etapa {etapa}: la variable de etapa debería ser una marca (M o V), no {direccion}.', { etapa: s.data.label, direccion: address })
+          : t('Etapa {etapa}: la variable de etapa debería ser una marca (M), no {direccion}.', { etapa: s.data.label, direccion: address }), nodeIds: [s.id] })
+    own(address, t('etapa {etapa}', { etapa: s.data.label }), [s.id])
   }
 
   for (const [name, found] of symbols) {
@@ -266,11 +269,11 @@ export function validatePlc(plc, stepNodes, symbols) {
         (s7200 && expected === 'M' && parsed.area === 'V') ||
         (!s7200 && expected === 'AI' && parsed.area === 'I' && parsed.word !== undefined) ||
         (!s7200 && expected === 'AQ' && parsed.area === 'Q' && parsed.word !== undefined))
-    if (!parsed) issues.push({ severity: 'warning', message: `«${name}»: dirección «${address}» con formato no reconocido.`, nodeIds })
+    if (!parsed) issues.push({ severity: 'warning', message: t('«{variable}»: dirección «{direccion}» con formato no reconocido.', { variable: name, direccion: address }), nodeIds })
     else if (exists?.[parsed.area] && (parsed.index !== undefined || ['AI', 'AQ'].includes(parsed.area)) && !exists[parsed.area].has(address.toUpperCase()))
-      issues.push({ severity: 'warning', message: `«${name}»: ${address} no existe en la configuración ${configName}.`, nodeIds })
+      issues.push({ severity: 'warning', message: t('«{variable}»: {direccion} no existe en la configuración {configuracion}.', { variable: name, direccion: address, configuracion: configName }), nodeIds })
     else if (!okArea)
-      issues.push({ severity: 'warning', message: `«${name}» es de tipo ${typeInfo(entry.type ?? found.type).label.toLowerCase()} pero tiene la dirección ${address}.`, nodeIds })
+      issues.push({ severity: 'warning', message: t('«{variable}» es de tipo {tipo} pero tiene la dirección {direccion}.', { variable: name, tipo: t(typeInfo(entry.type ?? found.type).label).toLowerCase(), direccion: address }), nodeIds })
     own(address, `«${name}»`, nodeIds)
   }
 
@@ -281,7 +284,7 @@ export function validatePlc(plc, stepNodes, symbols) {
     if (stepNames.has(name)) {
       issues.push({
         severity: 'error',
-        message: `La variable «${name}» se llama igual que la variable de la etapa ${name.slice(P.length)}: cámbiale el nombre o usa X como prefijo de etapa.`,
+        message: t('La variable «{variable}» se llama igual que la variable de la etapa {etapa}: cámbiale el nombre o usa X como prefijo de etapa.', { variable: name, etapa: name.slice(P.length) }),
         nodeIds: [...found.uses, stepNames.get(name)],
       })
     }
@@ -292,13 +295,13 @@ export function validatePlc(plc, stepNodes, symbols) {
     const count = (type) =>
       [...symbols].filter(([name, found]) => (plc.variables[name]?.type ?? found.type) === type && (!found.numeric || type.startsWith('analog'))).length
     for (const [type, label, list] of [
-      ['input', 'entradas digitales', io.inputs],
-      ['output', 'salidas digitales', io.outputs],
-      ['analogIn', 'entradas analógicas', io.analogIn],
-      ['analogOut', 'salidas analógicas', io.analogOut],
+      ['input', t('entradas digitales'), io.inputs],
+      ['output', t('salidas digitales'), io.outputs],
+      ['analogIn', t('entradas analógicas'), io.analogIn],
+      ['analogOut', t('salidas analógicas'), io.analogOut],
     ]) {
       const used = count(type)
-      if (used > list.length) issues.push({ severity: 'warning', message: `El proyecto usa ${used} ${label} y la configuración ${configName} tiene ${list.length}.`, nodeIds: [] })
+      if (used > list.length) issues.push({ severity: 'warning', message: t('El proyecto usa {n} {tipo} y la configuración {configuracion} tiene {total}.', { n: used, tipo: label, configuracion: configName, total: list.length }), nodeIds: [] })
     }
   }
 
@@ -306,7 +309,7 @@ export function validatePlc(plc, stepNodes, symbols) {
     if (list.length > 1) {
       issues.push({
         severity: 'error',
-        message: `Dirección ${address} repetida: ${list.map((o) => o.label).join(', ')}.`,
+        message: t('Dirección {direccion} repetida: {lista}.', { direccion: address, lista: list.map((o) => o.label).join(', ') }),
         nodeIds: [...new Set(list.flatMap((o) => o.nodeIds))],
       })
     }

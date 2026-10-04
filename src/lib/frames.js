@@ -4,10 +4,11 @@
 //   salida S1.
 // Un elemento pertenece al marco más pequeño que contiene su centro; el marco no es un grupo de
 // React Flow (las posiciones siguen siendo absolutas) y la pertenencia se calcula siempre al vuelo.
+import { N_ } from './i18n'
 
 export const FRAME_KINDS = {
-  grafcet: { label: 'Grafcet parcial', prefix: 'G', help: 'Destino de las órdenes de forzado: F/G2{3}' },
-  macro: { label: 'Expansión de macroetapa', prefix: 'M', help: 'De la etapa de entrada E1 a la de salida S1' },
+  grafcet: { label: N_('Grafcet parcial'), prefix: 'G', help: N_('Destino de las órdenes de forzado: F/G2{3}') },
+  macro: { label: N_('Expansión de macroetapa'), prefix: 'M', help: N_('De la etapa de entrada E1 a la de salida S1') },
 }
 export const FRAME_PADDING = 40
 export const FRAME_MIN = { width: 160, height: 120 }

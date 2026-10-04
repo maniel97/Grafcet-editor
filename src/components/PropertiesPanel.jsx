@@ -2,6 +2,7 @@ import { useRef } from 'react'
 import { Plus, Trash2, X } from 'lucide-react'
 import { ACTION_KINDS, ACTION_PRESETS, actionKind, normalizeAction } from '../lib/actions'
 import AutocompleteInput from './AutocompleteInput'
+import { t, N_ } from '../lib/i18n'
 
 const inputClass =
   'w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500'
@@ -9,11 +10,11 @@ const sectionTitle = 'text-xs font-medium uppercase tracking-wide text-slate-500
 
 // Símbolos de receptividad (IEC 60848) que se insertan en la posición del cursor.
 const CONDITION_SYMBOLS = [
-  { symbol: '↑', title: 'Flanco de subida (↑a)' },
-  { symbol: '↓', title: 'Flanco de bajada (↓a)' },
-  { symbol: ' · ', label: '·', title: 'Y lógica (a · b)' },
-  { symbol: ' + ', label: '+', title: 'O lógica (a + b)' },
-  { symbol: '!', title: 'Negación: se dibuja con raya encima' },
+  { symbol: '↑', title: N_('Flanco de subida (↑a)') },
+  { symbol: '↓', title: N_('Flanco de bajada (↓a)') },
+  { symbol: ' · ', label: '·', title: N_('Y lógica (a · b)') },
+  { symbol: ' + ', label: '+', title: N_('O lógica (a + b)') },
+  { symbol: '!', title: N_('Negación: se dibuja con raya encima') },
 ]
 
 // Etiquetas de un clic para rellenar valores habituales.
@@ -61,13 +62,13 @@ function ActionRow({ action, onChange, onRemove, vocabulary, otherTexts }) {
             className={inputClass}
             value={action.text}
             placeholder="p. ej. Motor ON, A:=1, F/G2{3}"
-            aria-label="Texto de la acción"
+            aria-label={t('Texto de la acción')}
             onChange={(text) => onChange({ text })}
           />
         </div>
         <button
           type="button"
-          title="Eliminar acción"
+          title={t('Eliminar acción')}
           onClick={onRemove}
           className="rounded-md px-2 text-slate-500 hover:bg-red-50 hover:text-red-600"
         >
@@ -77,13 +78,13 @@ function ActionRow({ action, onChange, onRemove, vocabulary, otherTexts }) {
       <select
         className={inputClass}
         value={action.kind}
-        title={kind.help}
+        title={t(kind.help)}
         onChange={(e) => onChange({ kind: e.target.value })}
-        aria-label="Tipo de acción"
+        aria-label={t('Tipo de acción')}
       >
         {ACTION_KINDS.map((k) => (
           <option key={k.id} value={k.id}>
-            {k.label}
+            {t(k.label)}
           </option>
         ))}
       </select>
@@ -93,12 +94,12 @@ function ActionRow({ action, onChange, onRemove, vocabulary, otherTexts }) {
           otherTexts={[...otherTexts, action.text]}
           className={inputClass}
           value={action.condition}
-          placeholder={kind.placeholder}
+          placeholder={t(kind.placeholder)}
           onChange={(condition) => onChange({ condition })}
-          aria-label="Condición de la acción"
+          aria-label={t('Condición de la acción')}
         />
       )}
-      <p className="text-xs text-slate-400">{kind.help}</p>
+      <p className="text-xs text-slate-400">{t(kind.help)}</p>
     </div>
   )
 }
@@ -109,7 +110,7 @@ function StepFields({ data, onChange, onCommitLabel, vocabulary }) {
 
   return (
     <>
-      <Field label="Número / nombre">
+      <Field label={t('Número / nombre')}>
         {/* Al terminar de editar el número se actualizan las referencias a la etapa (X5, 5s/X5). */}
         <input
           className={inputClass}
@@ -128,7 +129,7 @@ function StepFields({ data, onChange, onCommitLabel, vocabulary }) {
             checked={!!data.initial}
             onChange={(e) => onChange({ initial: e.target.checked, ...(e.target.checked ? { macro: false } : {}) })}
           />
-          Etapa inicial
+          {t('Etapa inicial')}
         </label>
         <label className="flex items-center gap-2 text-sm">
           <input
@@ -136,14 +137,14 @@ function StepFields({ data, onChange, onCommitLabel, vocabulary }) {
             checked={!!data.macro}
             onChange={(e) => onChange({ macro: e.target.checked, ...(e.target.checked ? { initial: false } : {}) })}
           />
-          Macroetapa
+          {t('Macroetapa')}
           <span className="text-xs text-slate-400">(se detalla en otro grafcet; p. ej. M1)</span>
         </label>
       </div>
 
       <div className="space-y-2">
-        <span className={sectionTitle}>Acciones</span>
-        {actions.length === 0 && <p className="text-sm text-slate-400">Sin acciones asociadas.</p>}
+        <span className={sectionTitle}>{t('Acciones')}</span>
+        {actions.length === 0 && <p className="text-sm text-slate-400">{t('Sin acciones asociadas.')}</p>}
         {actions.map((action, i) => (
           <ActionRow
             key={i}
@@ -160,10 +161,10 @@ function StepFields({ data, onChange, onCommitLabel, vocabulary }) {
           onClick={() => setActions([...actions, normalizeAction('')])}
           className="flex items-center gap-1 rounded-md px-2 py-1 text-sm text-blue-600 hover:bg-blue-50"
         >
-          <Plus size={16} /> Añadir acción
+          <Plus size={16} />{' '}{t('Añadir acción')}
         </button>
         <Presets
-          title="Añadir acción habitual"
+          title={t('Añadir acción habitual')}
           values={ACTION_PRESETS}
           render={(a) => `${kindMarker[a.kind] ?? ''}${a.text}`}
           onPick={(a) => setActions([...actions, normalizeAction(a)])}
@@ -195,13 +196,13 @@ function TransitionFields({ data, onChange, previousSteps, vocabulary }) {
 
   return (
     <>
-      <Field label="Receptividad / condición">
+      <Field label={t('Receptividad / condición')}>
         <AutocompleteInput
           inputRef={inputRef}
           vocabulary={vocabulary}
           className={inputClass}
           value={condition}
-          placeholder="p. ej. a · b, ↑c, 5s/X2"
+          placeholder={t('p. ej. a · b, ↑c, 5s/X2')}
           onChange={(c) => onChange({ condition: c })}
           autoFocus
         />
@@ -211,7 +212,7 @@ function TransitionFields({ data, onChange, previousSteps, vocabulary }) {
           <button
             key={s.symbol}
             type="button"
-            title={s.title}
+            title={t(s.title)}
             onClick={() => insert(s.symbol)}
             className="h-8 w-8 rounded-md border border-slate-300 font-mono text-sm text-slate-700 hover:border-blue-400 hover:bg-blue-50"
           >
@@ -221,9 +222,9 @@ function TransitionFields({ data, onChange, previousSteps, vocabulary }) {
       </div>
       <p className="text-xs text-slate-400">
         <code className="font-mono">!a</code> o <code className="font-mono">!(a + b)</code> se dibujan con raya encima.{' '}
-        <code className="font-mono">5s/X2</code>: verdadera 5 s después de activarse la etapa 2.
+        <code className="font-mono">5s/X2</code>{t(': verdadera 5 s después de activarse la etapa 2.')}
       </p>
-      <Presets title="Receptividades frecuentes" values={presets} onPick={(v) => onChange({ condition: v })} />
+      <Presets title={t('Receptividades frecuentes')} values={presets} onPick={(v) => onChange({ condition: v })} />
     </>
   )
 }
@@ -236,7 +237,7 @@ export default function PropertiesPanel({ node, onChange, onCommitLabel, onClose
     <aside className="side-panel flex w-72 shrink-0 flex-col border-l border-slate-200 bg-white">
       <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
         <h2 className="text-sm font-semibold">{isStep ? 'Etapa' : 'Transición'}</h2>
-        <button type="button" onClick={onClose} title="Cerrar" className="rounded-md p-1 text-slate-500 hover:bg-slate-100">
+        <button type="button" onClick={onClose} title={t('Cerrar')} className="rounded-md p-1 text-slate-500 hover:bg-slate-100">
           <X size={16} />
         </button>
       </div>

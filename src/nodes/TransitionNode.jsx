@@ -9,8 +9,9 @@ import { transitionOutput } from '../lib/grafcetRules'
 import { addressExpression } from '../lib/symbols'
 import { useEditor } from '../lib/editorContext'
 import { useHighlightClass } from './useHighlighted'
+import { t, N_ } from '../lib/i18n'
 
-const ALTERNATIVE_HINT = 'Para «volver O seguir»: clic derecho en la transición > Añadir alternativa en O'
+const ALTERNATIVE_HINT = N_('Para «volver O seguir»: clic derecho en la transición > Añadir alternativa en O')
 
 // Transición Grafcet: barra horizontal con su receptividad a la derecha.
 export default function TransitionNode({ id, data, selected }) {
@@ -57,10 +58,10 @@ export default function TransitionNode({ id, data, selected }) {
             disabled={output === 'loop'}
             title={
               output === 'loop'
-                ? `Esta transición ya vuelve atrás con un bucle. ${ALTERNATIVE_HINT}`
+                ? `${t('Esta transición ya vuelve atrás con un bucle.')} ${t(ALTERNATIVE_HINT)}`
                 : output === 'step'
-                  ? 'Añadir etapa en paralelo (rama en Y)'
-                  : 'Añadir etapa'
+                  ? t('Añadir etapa en paralelo (rama en Y)')
+                  : t('Añadir etapa')
             }
           />
           <LoopButton
@@ -68,10 +69,10 @@ export default function TransitionNode({ id, data, selected }) {
             disabled={output !== null}
             title={
               output === 'loop'
-                ? 'Esta transición ya tiene un bucle'
+                ? t('Esta transición ya tiene un bucle')
                 : output === 'step'
-                  ? `Esta transición ya continúa hacia abajo. ${ALTERNATIVE_HINT}`
-                  : 'Bucle: volver a una etapa anterior'
+                  ? `${t('Esta transición ya continúa hacia abajo.')} ${t(ALTERNATIVE_HINT)}`
+                  : t('Bucle: volver a una etapa anterior')
             }
           />
         </>

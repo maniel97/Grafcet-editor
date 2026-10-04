@@ -4,13 +4,14 @@ import { useEditor } from '../lib/editorContext'
 import { VARIABLE_TYPES, duplicatedAddresses } from '../lib/addressing'
 import { resolveStepPrefix, stepVar } from '../lib/stepNames'
 import { describeRange, isAnalog } from '../lib/analog'
+import { t, N_ } from '../lib/i18n'
 
 const DRAG_MIME = 'application/x-grafcet-variable'
 
 // Celda que se edita al hacer clic: Intro o salir del campo confirma, Esc cancela.
 // `autoEdit` la abre en edición al aparecer (variable recién añadida). Si `onCommit` devuelve
 // false (p. ej. nombre repetido), el valor no se acepta.
-function EditableCell({ value, placeholder, onCommit, className = '', invalid, autoEdit, title = 'Clic para editar', readOnly }) {
+function EditableCell({ value, placeholder, onCommit, className = '', invalid, autoEdit, title = N_('Clic para editar'), readOnly }) {
   const [draft, setDraft] = useState(autoEdit && !readOnly ? (value ?? '') : null)
   if (readOnly) {
     return (
@@ -45,7 +46,7 @@ function EditableCell({ value, placeholder, onCommit, className = '', invalid, a
   return (
     <button
       type="button"
-      title={title}
+      title={t(title)}
       onClick={() => setDraft(value ?? '')}
       className={`nodrag w-full cursor-text truncate rounded px-1 text-left hover:bg-blue-50 ${
         invalid ? 'bg-red-50 text-red-700' : ''
@@ -60,7 +61,7 @@ function HeaderButton({ icon: Icon, title, onClick, active }) {
   return (
     <button
       type="button"
-      title={title}
+      title={t(title)}
       aria-label={title}
       aria-pressed={active}
       onClick={onClick}
@@ -134,8 +135,8 @@ export default function VariablesTableNode({ id, data, selected }) {
       })
 
   const sections = [
-    { id: 'steps', title: 'Etapas', rows: stepRows },
-    ...VARIABLE_TYPES.map((t) => ({ id: t.id, title: t.plural, rows: variableRows(t.id), droppable: true })),
+    { id: 'steps', title: N_('Etapas'), rows: stepRows },
+    ...VARIABLE_TYPES.map((v) => ({ id: v.id, title: v.plural, rows: variableRows(v.id), droppable: true })),
   ]
   // Durante un arrastre se muestran también las secciones vacías, para poder soltar en ellas.
   const visible = sections.filter((s) => s.rows.length || (dragging && s.droppable))
@@ -156,19 +157,19 @@ export default function VariablesTableNode({ id, data, selected }) {
       onMouseLeave={() => setHighlight(null)}
     >
       <div className="flex items-center gap-1 border-b-2 border-slate-900 bg-slate-100 px-2 py-1">
-        <span className="flex-1 font-semibold">Tabla de variables</span>
+        <span className="flex-1 font-semibold">{t('Tabla de variables')}</span>
         {!readOnly && (
           <>
-            <HeaderButton icon={WandSparkles} title="Rellenar direcciones vacías" onClick={autoFill} />
-            <HeaderButton icon={MessageSquare} title="Mostrar u ocultar comentarios" onClick={() => toggleComments(id)} active={showComments} />
-            <HeaderButton icon={Maximize2} title="Abrir la tabla completa" onClick={openDialog} />
-            <HeaderButton icon={EyeOff} title="Ocultar del lienzo" onClick={hideTable} />
+            <HeaderButton icon={WandSparkles} title={t('Rellenar direcciones vacías')} onClick={autoFill} />
+            <HeaderButton icon={MessageSquare} title={t('Mostrar u ocultar comentarios')} onClick={() => toggleComments(id)} active={showComments} />
+            <HeaderButton icon={Maximize2} title={t('Abrir la tabla completa')} onClick={openDialog} />
+            <HeaderButton icon={EyeOff} title={t('Ocultar del lienzo')} onClick={hideTable} />
           </>
         )}
       </div>
 
       {visible.length === 0 && (
-        <p className="px-3 py-2 text-slate-400">Sin etapas ni variables todavía.</p>
+        <p className="px-3 py-2 text-slate-400">{t('Sin etapas ni variables todavía.')}</p>
       )}
 
       {visible.map((section) => (
@@ -179,7 +180,7 @@ export default function VariablesTableNode({ id, data, selected }) {
             e.preventDefault()
             setDropTarget(section.id)
           }}
-          onDragLeave={() => setDropTarget((t) => (t === section.id ? null : t))}
+          onDragLeave={() => setDropTarget((v) => (v === section.id ? null : v))}
           onDrop={(e) => {
             const name = e.dataTransfer.getData(DRAG_MIME)
             setDropTarget(null)
@@ -196,11 +197,11 @@ export default function VariablesTableNode({ id, data, selected }) {
             className="grid items-baseline gap-x-1 border-b border-slate-300 bg-slate-50 px-1 py-0.5 uppercase tracking-wide text-slate-600"
           >
             <span className="truncate px-1 text-[0.8em] font-semibold">
-              {section.title}
-              {!section.rows.length && <span className="canvas-hint ml-1 font-normal normal-case text-slate-400">— suelta aquí</span>}
+              {t(section.title)}
+              {!section.rows.length && <span className="canvas-hint ml-1 font-normal normal-case text-slate-400">{t('— suelta aquí')}</span>}
             </span>
-            <span className="truncate px-1 text-[0.8em] font-medium text-slate-500">Dirección</span>
-            {showComments && <span className="truncate px-1 text-[0.8em] font-medium text-slate-500">Comentario</span>}
+            <span className="truncate px-1 text-[0.8em] font-medium text-slate-500">{t('Dirección')}</span>
+            {showComments && <span className="truncate px-1 text-[0.8em] font-medium text-slate-500">{t('Comentario')}</span>}
           </div>
           {section.rows.map((row) => (
             <div
@@ -224,7 +225,7 @@ export default function VariablesTableNode({ id, data, selected }) {
                   <GripVertical
                     size={12}
                     className="editor-only shrink-0 cursor-grab text-slate-300 group-hover:text-slate-500"
-                    aria-label="Arrastrar a otra sección para cambiar el tipo"
+                    aria-label={t('Arrastrar a otra sección para cambiar el tipo')}
                   />
                 )}
                 {row.unused ? (
@@ -232,7 +233,7 @@ export default function VariablesTableNode({ id, data, selected }) {
                     readOnly={readOnly}
                     value={row.name}
                     autoEdit={row.name === lastAdded}
-                    title="Sin uso en el diagrama todavía. Clic para renombrar"
+                    title={t('Sin uso en el diagrama todavía. Clic para renombrar')}
                     className="italic text-slate-500"
                     onCommit={(v) => renameVariable(row.name, v)}
                   />
@@ -245,8 +246,8 @@ export default function VariablesTableNode({ id, data, selected }) {
                 {row.unused && !readOnly && (
                   <button
                     type="button"
-                    title="Quitar de la tabla"
-                    aria-label={`Quitar ${row.name} de la tabla`}
+                    title={t('Quitar de la tabla')}
+                    aria-label={t('Quitar {variable} de la tabla', { variable: row.name })}
                     onClick={() => deleteVariable(row.name)}
                     className="nodrag editor-only shrink-0 rounded p-0.5 text-slate-300 opacity-0 hover:bg-red-50 hover:text-red-600 group-hover:opacity-100"
                   >
@@ -262,7 +263,7 @@ export default function VariablesTableNode({ id, data, selected }) {
                 invalid={isDup(row.address)}
                 onCommit={row.setAddress}
               />
-              {showComments && <EditableCell readOnly={readOnly} value={row.comment} placeholder="comentario" onCommit={row.setComment} />}
+              {showComments && <EditableCell readOnly={readOnly} value={row.comment} placeholder={t('comentario')} onCommit={row.setComment} />}
             </div>
           ))}
         </section>

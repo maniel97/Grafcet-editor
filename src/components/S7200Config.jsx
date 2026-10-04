@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import { Plus, Trash2, WandSparkles } from 'lucide-react'
 import { CPUS, DEFAULT_MARGIN, MODULES, countNeeds, cpuById, ioMap, moduleById, suggestConfiguration } from '../lib/s7200Catalog'
+import { t } from '../lib/i18n'
 
 // Configuración S7-200 (tabla de variables, formato «S7-200 / Micro/WIN»): lo que usa el proyecto,
 // la CPU y los módulos sugeridos (con reserva) y el mapa de direcciones de la configuración
@@ -20,12 +21,12 @@ export default function S7200Config({ plc, symbols, onChange }) {
   const free = map && { di: map.inputs.length - needs.di, do: map.outputs.length - needs.do, ai: map.analogIn.length - needs.ai, ao: map.analogOut.length - needs.ao }
 
   return (
-    <section aria-label="Configuración S7-200" className="space-y-2 border-b border-slate-200 bg-slate-50 px-5 py-3 text-sm">
+    <section aria-label={t('Configuración S7-200')} className="space-y-2 border-b border-slate-200 bg-slate-50 px-5 py-3 text-sm">
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-        <strong>Configuración S7-200</strong>
+        <strong>{t('Configuración S7-200')}</strong>
         <span className="text-slate-600">
           El proyecto usa {needs.di} entradas y {needs.do} salidas digitales
-          {needs.ai + needs.ao > 0 && `, ${needs.ai} entradas y ${needs.ao} salidas analógicas`}.
+          {needs.ai + needs.ao > 0 && t(', {ai} entradas y {ao} salidas analógicas', { ai: needs.ai, ao: needs.ao })}.
         </span>
       </div>
       {suggestion ? (
@@ -39,27 +40,27 @@ export default function S7200Config({ plc, symbols, onChange }) {
               onClick={() => set({ cpu: suggestion.cpu, modules: suggestion.modules })}
               className="flex items-center gap-1 rounded-md bg-blue-600 px-2 py-1 text-xs font-medium text-white hover:bg-blue-700"
             >
-              <WandSparkles size={13} /> Usar la sugerida
+              <WandSparkles size={13} />{' '}{t('Usar la sugerida')}
             </button>
           )}
         </div>
       ) : (
-        <p className="text-amber-700">No cabe en ninguna configuración S7-200 (máx. 128 E / 128 S digitales y 32 / 32 analógicas).</p>
+        <p className="text-amber-700">{t('No cabe en ninguna configuración S7-200 (máx. 128 E / 128 S digitales y 32 / 32 analógicas).')}</p>
       )}
 
       <div className="flex flex-wrap items-center gap-2">
         <label className="flex items-center gap-1">
-          CPU
+          {t('CPU')}
           <select
-            aria-label="CPU S7-200"
+            aria-label={t('CPU S7-200')}
             className="rounded-md border border-slate-300 px-1.5 py-1"
             value={config?.cpu ?? ''}
             onChange={(e) => set(e.target.value ? { cpu: e.target.value, modules: (config?.modules ?? []).slice(0, cpuById(e.target.value).maxModules) } : null)}
           >
-            <option value="">— sin elegir —</option>
+            <option value="">{t('— sin elegir —')}</option>
             {CPUS.map((c) => (
               <option key={c.id} value={c.id}>
-                {c.label} ({c.di} E / {c.do} S{c.ai ? `, ${c.ai} EA / ${c.ao} SA` : ''})
+                {t(c.label)} ({c.di} E / {c.do} S{c.ai ? `, ${c.ai} EA / ${c.ao} SA` : ''})
               </option>
             ))}
           </select>
@@ -81,29 +82,29 @@ export default function S7200Config({ plc, symbols, onChange }) {
           <label className="flex items-center gap-1 text-xs text-slate-600">
             <Plus size={13} />
             <select
-              aria-label="Añadir módulo de ampliación"
+              aria-label={t('Añadir módulo de ampliación')}
               className="rounded-md border border-slate-300 px-1 py-0.5"
               value=""
               onChange={(e) => e.target.value && set({ ...config, modules: [...config.modules, e.target.value] })}
             >
-              <option value="">Añadir módulo…</option>
+              <option value="">{t('Añadir módulo…')}</option>
               {MODULES.map((m) => (
                 <option key={m.id} value={m.id}>
-                  {m.label}
+                  {t(m.label)}
                 </option>
               ))}
             </select>
           </label>
         )}
-        {cpu && cpu.maxModules === 0 && <span className="text-xs text-slate-500">(la CPU 221 no admite módulos)</span>}
+        {cpu && cpu.maxModules === 0 && <span className="text-xs text-slate-500">{t('(la CPU 221 no admite módulos)')}</span>}
       </div>
 
       {map && (
         <div className="space-y-1">
-          <ul className="flex flex-wrap gap-x-4 gap-y-0.5 font-mono text-xs text-slate-600" aria-label="Mapa de direcciones">
+          <ul className="flex flex-wrap gap-x-4 gap-y-0.5 font-mono text-xs text-slate-600" aria-label={t('Mapa de direcciones')}>
             {map.parts.map((p, i) => (
               <li key={i}>
-                <span className="font-sans font-medium text-slate-800">{p.label}:</span> {p.ranges.join(' · ')}
+                <span className="font-sans font-medium text-slate-800">{t(p.label)}:</span> {p.ranges.join(' · ')}
               </li>
             ))}
           </ul>

@@ -2,10 +2,11 @@ import { useEffect, useRef, useState } from 'react'
 import { BookOpen, History, RotateCcw, Trash2, X } from 'lucide-react'
 import { EXAMPLES, LEVELS } from '../lib/examples'
 import { listRecent, removeRecent } from '../lib/recent'
+import { t, N_ } from '../lib/i18n'
 
 const TABS = [
-  { id: 'examples', label: 'Ejemplos', icon: BookOpen },
-  { id: 'recent', label: 'Trabajos anteriores', icon: History },
+  { id: 'examples', label: N_('Ejemplos'), icon: BookOpen },
+  { id: 'recent', label: N_('Trabajos anteriores'), icon: History },
 ]
 
 const when = (iso) =>
@@ -32,26 +33,26 @@ export default function ProjectsDialog({ initialTab = 'examples', onOpenExample,
     >
       <div className="flex items-center justify-between border-b border-slate-200 px-5 py-3">
         <h2 id="projects-title" className="text-base font-semibold">
-          Abrir
+          {t('Abrir')}
         </h2>
-        <button type="button" onClick={onClose} title="Cerrar (Esc)" className="rounded-md p-1 text-slate-500 hover:bg-slate-100">
+        <button type="button" onClick={onClose} title={t('Cerrar (Esc)')} className="rounded-md p-1 text-slate-500 hover:bg-slate-100">
           <X size={18} />
         </button>
       </div>
 
       <div className="flex gap-1 border-b border-slate-200 px-5 pt-2" role="tablist">
-        {TABS.map((t) => (
+        {TABS.map((x) => (
           <button
-            key={t.id}
+            key={x.id}
             type="button"
             role="tab"
-            aria-selected={tab === t.id}
-            onClick={() => setTab(t.id)}
+            aria-selected={tab === x.id}
+            onClick={() => setTab(x.id)}
             className={`flex items-center gap-1.5 rounded-t-md border-b-2 px-3 py-1.5 text-sm ${
-              tab === t.id ? 'border-blue-600 font-medium text-blue-700' : 'border-transparent text-slate-500 hover:text-slate-800'
+              tab === x.id ? 'border-blue-600 font-medium text-blue-700' : 'border-transparent text-slate-500 hover:text-slate-800'
             }`}
           >
-            <t.icon size={15} /> {t.label}
+            <x.icon size={15} /> {t(x.label)}
           </button>
         ))}
       </div>
@@ -92,9 +93,9 @@ export default function ProjectsDialog({ initialTab = 'examples', onOpenExample,
           <>
             <p className="mb-3 text-sm text-slate-600">
               Lo que había en el lienzo antes de abrir un archivo o un ejemplo, recuperar otro trabajo o limpiar. Se guarda solo
-              en este navegador (los {recent.length ? 'últimos' : ''} 8 más recientes).
+              {t('en este navegador (los 8 más recientes).')}
             </p>
-            {recent.length === 0 && <p className="py-6 text-center text-sm text-slate-400">Todavía no hay trabajos anteriores.</p>}
+            {recent.length === 0 && <p className="py-6 text-center text-sm text-slate-400">{t('Todavía no hay trabajos anteriores.')}</p>}
             <ul className="divide-y divide-slate-100">
               {recent.map((entry) => (
                 <li key={entry.id} className="flex items-center gap-3 py-2">
@@ -112,12 +113,12 @@ export default function ProjectsDialog({ initialTab = 'examples', onOpenExample,
                     onClick={() => onRestore(entry)}
                     className="flex items-center gap-1 rounded-md border border-slate-300 px-2.5 py-1 text-sm hover:bg-slate-100"
                   >
-                    <RotateCcw size={14} /> Recuperar
+                    <RotateCcw size={14} />{' '}{t('Recuperar')}
                   </button>
                   <button
                     type="button"
-                    title="Olvidar este trabajo"
-                    aria-label="Olvidar este trabajo"
+                    title={t('Olvidar este trabajo')}
+                    aria-label={t('Olvidar este trabajo')}
                     onClick={() => setRecent(removeRecent(entry.id))}
                     className="rounded-md p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600"
                   >

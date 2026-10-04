@@ -8,9 +8,9 @@
 // marcador donde lo pida su idioma, sin cambiarle el nombre. Un texto que se define en un sitio y
 // se traduce en otro (p. ej. las etiquetas de un menú) se marca con N_('…') para que el extractor
 // (npm run i18n) lo encuentre.
-import en from '../locales/en.json'
-import fr from '../locales/fr.json'
-import pt from '../locales/pt.json'
+import en from '../locales/en.json' with { type: 'json' }
+import fr from '../locales/fr.json' with { type: 'json' }
+import pt from '../locales/pt.json' with { type: 'json' }
 
 export const LANGUAGES = [
   { id: 'es', label: 'Español' },
