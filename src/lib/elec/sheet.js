@@ -4,8 +4,9 @@
 // plc.electrical.sheets = [{ id, name }]; cada componente lleva `sheet` (sin él, la primera hoja).
 // plc.electrical.frame: true para dibujar el marco; frameCols: número de columnas.
 import { sizeOf } from './catalog'
+import { t } from '../i18n'
 
-export const FIRST_ELEC_SHEET = { id: 'e1', name: 'Hoja 1' }
+export const FIRST_ELEC_SHEET = { id: 'e1', name: t('Hoja 1') }
 export const COLUMN_WIDTH = 160
 export const FRAME_HEIGHT = 1040
 export const FRAME_TOP = 60 // franja de los números de columna, encima del dibujo (y < 0)

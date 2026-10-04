@@ -12,6 +12,7 @@
 // esquema, -Y1), a mano (pulsador o palanca) y vuelven con su muelle si no tienen bobina 12.
 // Puro: se prueba sin navegador.
 import { cylinderSignals, terminalsOf } from './catalog'
+import { t as tr } from '../i18n'
 
 const key = (c, t) => `${c}:${t}`
 const END = 0.02
@@ -142,8 +143,8 @@ export function pneuStep(schematic, state, { solenoids = new Set(), manual = () 
     let note = null
     if (a === 'P' && b === 'R') dir = 1
     else if (c.acting === 'single' ? a === 'R' : b === 'P' && a === 'R') dir = -1
-    else if (a === 'P' && b === 'P') note = 'Presión en los dos lados'
-    else if (a === 'P' || b === 'P') note = 'Aire atrapado: el otro lado no tiene escape'
+    else if (a === 'P' && b === 'P') note = tr('Presión en los dos lados')
+    else if (a === 'P' || b === 'P') note = tr('Aire atrapado: el otro lado no tiene escape')
     // Al salir entra aire por A y sale por B; al entrar, al revés (el de simple efecto solo tiene A).
     const [inPort, outPort] = dir > 0 ? ['A', 'B'] : ['B', 'A']
     const factor = !dir ? 1 : Math.min(c.acting === 'single' && inPort === 'B' ? 1 : brake(key(c.id, inPort), false), c.acting === 'single' && outPort === 'B' ? 1 : brake(key(c.id, outPort), true))
@@ -151,7 +152,7 @@ export function pneuStep(schematic, state, { solenoids = new Set(), manual = () 
     const next = stuck || !dir ? now : Math.min(1, Math.max(0, now + (dir * factor * dt) / Math.max(0.1, Number(c.time) || 1)))
     pos[c.id] = next
     const moving = next !== now ? dir : 0
-    cylinders[c.id] = { pos: next, moving, note: stuck ? 'Avería: cilindro agarrotado' : moving ? null : note, speed: factor }
+    cylinders[c.id] = { pos: next, moving, note: stuck ? tr('Avería: cilindro agarrotado') : moving ? null : note, speed: factor }
     const [s0, s1] = cylinderSignals(c.tag)
     if (s0) {
       signals[s0] = next <= END ? 1 : 0

@@ -1,4 +1,5 @@
 import { COLUMN_WIDTH, FRAME_HEIGHT, FRAME_TOP, TITLE_BLOCK } from '../../lib/elec/sheet'
+import { t as tr } from '../../lib/i18n'
 import { INK } from './elecColors'
 
 // Marco de una hoja del esquema (IEC 61082-1): columnas numeradas arriba y abajo, y el cajetín
@@ -39,7 +40,7 @@ export default function ElecFrame({ cols, info = {} }) {
         </g>
       ))}
       {/* Cajetín */}
-      {cell(tb.x, tb.y - strip, 240, 'Proyecto', info.project || 'Sin título', true)}
+      {cell(tb.x, tb.y - strip, 240, 'Proyecto', info.project || tr('Sin título'), true)}
       {cell(tb.x + 240, tb.y - strip, 180, 'Centro / empresa', info.company ?? '')}
       {cell(tb.x, tb.y - strip + TITLE_BLOCK.h / 2, 120, 'Autor', info.author ?? '')}
       {cell(tb.x + 120, tb.y - strip + TITLE_BLOCK.h / 2, 90, 'Fecha', info.date ?? '')}

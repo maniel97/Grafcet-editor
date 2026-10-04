@@ -2,6 +2,7 @@
 // los planos de máquina) y puntos de unión (donde salen dos o más cables de un mismo borne, o se
 // toma un embarrado).
 import { isPneumatic, terminalsOf } from './catalog'
+import { N_ } from '../i18n'
 
 const key = (c, t) => `${c}:${t}`
 
@@ -76,16 +77,16 @@ export function nextTerminalNumber(components, strip) {
 
 // Colores y secciones de los cables (IEC 60445 / 60204-1).
 export const WIRE_COLORS = {
-  auto: { label: 'Automático (por su potencial al simular)', stroke: null },
-  brown: { label: 'Marrón (fase)', stroke: '#92400e' },
-  black: { label: 'Negro (fase / potencia)', stroke: '#111827' },
-  grey: { label: 'Gris (fase)', stroke: '#6b7280' },
-  blue: { label: 'Azul claro (neutro)', stroke: '#38bdf8' },
-  darkblue: { label: 'Azul oscuro (mando en continua)', stroke: '#1d4ed8' },
-  red: { label: 'Rojo (mando en alterna)', stroke: '#dc2626' },
-  orange: { label: 'Naranja (tensiones externas)', stroke: '#ea580c' },
-  greenyellow: { label: 'Verde-amarillo (tierra PE)', stroke: '#65a30d' },
-  white: { label: 'Blanco', stroke: '#94a3b8' },
+  auto: { label: N_('Automático (por su potencial al simular)'), stroke: null },
+  brown: { label: N_('Marrón (fase)'), stroke: '#92400e' },
+  black: { label: N_('Negro (fase / potencia)'), stroke: '#111827' },
+  grey: { label: N_('Gris (fase)'), stroke: '#6b7280' },
+  blue: { label: N_('Azul claro (neutro)'), stroke: '#38bdf8' },
+  darkblue: { label: N_('Azul oscuro (mando en continua)'), stroke: '#1d4ed8' },
+  red: { label: N_('Rojo (mando en alterna)'), stroke: '#dc2626' },
+  orange: { label: N_('Naranja (tensiones externas)'), stroke: '#ea580c' },
+  greenyellow: { label: N_('Verde-amarillo (tierra PE)'), stroke: '#65a30d' },
+  white: { label: N_('Blanco'), stroke: '#94a3b8' },
 }
 export const WIRE_SECTIONS = ['0.5', '0.75', '1', '1.5', '2.5', '4', '6']
 export const sectionWidth = (section) => ({ 0.5: 1.1, 0.75: 1.3, 1: 1.5, 1.5: 1.8, 2.5: 2.3, 4: 2.8, 6: 3.2 })[Number(section)] ?? 1.6

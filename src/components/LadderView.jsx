@@ -262,8 +262,7 @@ export default function LadderView({ nodes, edges, plc, grafcetErrors, exportPro
         <div className="space-y-1 border-b border-amber-200 bg-amber-50 px-4 py-2 text-xs text-amber-900">
           {grafcetErrors > 0 && (
             <p className="flex items-center gap-1">
-              <AlertTriangle size={14} /> El grafcet tiene {grafcetErrors} error(es) de conformidad (ver Verificar): el programa
-              puede no comportarse como se espera.
+              <AlertTriangle size={14} /> {t('El grafcet tiene {n} error(es) de conformidad (ver Verificar): el programa puede no comportarse como se espera.', { n: grafcetErrors })}
             </p>
           )}
           {ladder.warnings.map((w, i) => (

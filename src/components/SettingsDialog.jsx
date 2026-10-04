@@ -78,11 +78,9 @@ export default function SettingsDialog({ settings, onChange, onReset, onClose })
               </option>
             ))}
           </select>
-          <p className="text-xs text-slate-500">
-            {settings.lang && settings.lang !== 'es'
-              ? 'Translation in progress: some texts are still in Spanish. / Traduction en cours. / Tradução em curso.'
-              : 'La barra, los menús y las opciones; el resto se irá traduciendo.'}
-          </p>
+          {settings.lang && settings.lang !== 'es' && (
+            <p className="text-xs text-slate-500">{t('Los ejemplos (enunciados, notas y comentarios) siguen en español.')}</p>
+          )}
         </fieldset>
 
         <fieldset className="space-y-2">

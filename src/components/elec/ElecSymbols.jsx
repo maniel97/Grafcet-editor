@@ -5,6 +5,7 @@ import { plcTerminals, sizeOf, terminalsOf } from '../../lib/elec/catalog'
 
 import { INK, POTENTIAL_COLORS } from './elecColors'
 import { PneuSymbol } from './PneuSymbols'
+import { t as tr } from '../../lib/i18n'
 
 const LIVE = '#16a34a'
 const LAMP_COLORS = { green: '#22c55e', red: '#ef4444', amber: '#f59e0b', white: '#f8fafc', blue: '#3b82f6' }
@@ -94,7 +95,7 @@ function SinglePhaseMotor({ c, m }) {
       <path d="M 20 0 L 20 30 L 45 47 M 40 0 L 40 30 L 52 40 M 100 0 L 100 30 L 80 44" />
       {/* Condensador en serie con el auxiliar (Z1) */}
       <path d="M 80 0 L 80 20 M 72 20 L 88 20 M 72 25 L 88 25 M 80 25 L 80 30 L 70 40" />
-      {c.capacitor === 'start' && <text x="60" y="26" textAnchor="end" fontSize="7" fill={INK} stroke="none">arr.</text>}
+      {c.capacitor === 'start' && <text x="60" y="26" textAnchor="end" fontSize="7" fill={INK} stroke="none">{tr('arr.')}</text>}
       <circle cx="60" cy="62" r="24" fill="white" stroke={color} strokeWidth={m?.running ? 3 : 2} />
       <text x="60" y="60" textAnchor="middle" fontSize="14" fontWeight="700" fill={INK} stroke="none">
         M
@@ -128,7 +129,7 @@ function TwoSpeedMotor({ c, m }) {
         3~
       </text>
       <text x="130" y="100" textAnchor="middle" fontSize="8" fill="#334155" stroke="none">
-        {c.type === 'dahlander' ? 'Dahlander' : '2 devanados'}
+        {c.type === 'dahlander' ? tr('Dahlander') : '2 devanados'}
       </text>
       {m?.running && (
         <text x="160" y="72" fontSize="16" fill={LIVE} stroke="none">
@@ -195,7 +196,7 @@ function Plc({ c, s }) {
         {c.tag ? `-${c.tag}` : ''}
       </text>
       <text x={w / 2} y="64" textAnchor="middle" fontSize="13" fontWeight="700" fill={INK}>
-        {c.text || 'Autómata'}
+        {c.text || tr('Autómata')}
       </text>
     </g>
   )
@@ -337,7 +338,7 @@ function Socket() {
       <path d="M 12 24 L 48 24 A 18 18 0 0 1 12 24" fill="white" />
       <path d="M 54 18 L 66 18" />
       <text x="62" y="34" fontSize="8" fill={INK} stroke="none">
-        PE
+        {tr('PE')}
       </text>
     </g>
   )
@@ -564,17 +565,17 @@ export function ElecSymbol({ c, view }) {
         c.type === 'vfd'
           ? view?.vfd?.[c.id]?.dir
             ? `${view.vfd[c.id].hz} Hz ${view.vfd[c.id].dir > 0 ? '→' : '←'}`
-            : 'parado'
+            : tr('parado')
           : c.type === 'softstarter'
             ? view?.soft?.[c.id]?.on
-              ? `rampa ${Math.round(view.soft[c.id].pct * 100)} %`
+              ? tr('rampa {pct} %', { pct: Math.round(view.soft[c.id].pct * 100) })
               : ''
             : c.type === 'safetyrelay' && view?.safety?.[c.id]
-              ? `canal 1 ${view.safety[c.id].ch1 ? '✓' : '✗'} · canal 2 ${view.safety[c.id].ch2 ? '✓' : '✗'}`
+              ? tr('canal 1 {c1} · canal 2 {c2}', { c1: view.safety[c.id].ch1 ? '✓' : '✗', c2: view.safety[c.id].ch2 ? '✓' : '✗' })
               : c.type === 'psu'
                 ? '24 V DC'
                 : ''
-      const label = { psu: 'Fuente', phasemonitor: 'Control de fases', vfd: 'Variador', softstarter: 'Arrancador suave', safetyrelay: 'Relé de seguridad' }[c.type]
+      const label = { psu: tr('Fuente'), phasemonitor: tr('Control de fases'), vfd: tr('Variador'), softstarter: tr('Arrancador suave'), safetyrelay: tr('Relé de seguridad') }[c.type]
       return (
         <g>
           <Box x={2} y={top} w={w - 4} h={bottom - top} label={label} sub={sub} on={view?.loads?.[c.id]} />

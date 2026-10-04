@@ -92,8 +92,7 @@ export default function ProjectsDialog({ initialTab = 'examples', onOpenExample,
         ) : (
           <>
             <p className="mb-3 text-sm text-slate-600">
-              Lo que había en el lienzo antes de abrir un archivo o un ejemplo, recuperar otro trabajo o limpiar. Se guarda solo
-              {t('en este navegador (los 8 más recientes).')}
+              {t('Lo que había en el lienzo antes de abrir un archivo o un ejemplo, recuperar otro trabajo o limpiar. Se guarda solo en este navegador (los 8 más recientes).')}
             </p>
             {recent.length === 0 && <p className="py-6 text-center text-sm text-slate-400">{t('Todavía no hay trabajos anteriores.')}</p>}
             <ul className="divide-y divide-slate-100">

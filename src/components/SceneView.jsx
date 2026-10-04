@@ -30,6 +30,7 @@ import {
 import { copyToClipboard, pasteFromClipboard } from '../lib/sim/sceneClipboard'
 import { exportGroups, importGroups, loadGroups, makeGroup, placeGroup, storeGroups } from '../lib/sim/sceneLibrary'
 import { downloadFile } from '../lib/projectFile'
+import { N_, t as tr } from '../lib/i18n'
 
 const W = 1200
 const H = 800
@@ -45,7 +46,7 @@ const COLORS = {
   amber: '#f59e0b',
   metal: '#94a3b8',
 }
-const COLOR_NAMES = { green: 'Verde', red: 'Rojo', yellow: 'Amarillo', blue: 'Azul', black: 'Negro', white: 'Blanco' }
+const COLOR_NAMES = { green: N_('Verde'), red: N_('Rojo'), yellow: N_('Amarillo'), blue: N_('Azul'), black: N_('Negro'), white: N_('Blanco') }
 const INK = '#0f172a'
 const ON = '#16a34a'
 const OFF = '#cbd5e1'
@@ -61,7 +62,7 @@ function ButtonShape({ e, pressed }) {
       <circle r={pressed ? 12 : 14} fill={fill} stroke={INK} strokeWidth="1.5" opacity={pressed ? 0.75 : 1} />
       {e.contact === 'NC' && (
         <text y="4" textAnchor="middle" fontSize="9" fontWeight="700" fill="white">
-          NC
+          {tr('NC')}
         </text>
       )}
     </g>
@@ -89,7 +90,7 @@ function EmergencyShape({ pressed }) {
       <circle r={pressed ? 15 : 18} fill="#dc2626" stroke={INK} strokeWidth="1.5" />
       {pressed && (
         <text y="4" textAnchor="middle" fontSize="8" fontWeight="700" fill="white">
-          PULSADA
+          {tr('PULSADA')}
         </text>
       )}
     </g>
@@ -356,10 +357,10 @@ function ImageShape({ e }) {
     <g>
       <rect x="0" y="0" width={w} height={h} fill="#f8fafc" stroke="#94a3b8" strokeDasharray="6 4" />
       <text x={w / 2} y={h / 2 - 4} textAnchor="middle" fontSize="13" fill="#64748b">
-        Imagen
+        {tr('Imagen')}
       </text>
       <text x={w / 2} y={h / 2 + 12} textAnchor="middle" fontSize="10" fill="#94a3b8">
-        (elígela en sus propiedades)
+        {tr('(elígela en sus propiedades)')}
       </text>
     </g>
   )
@@ -530,8 +531,8 @@ function boundsOf(e, pos = 0) {
 function labelOf(e) {
   const vars = (SCENE_VARS[e.type] ?? []).map(([key]) => e[key]).filter(Boolean)
   // Detector sin variable: su tipo, corto (los rótulos largos se solapan entre detectores juntos).
-  const fallback = e.type === 'sensor' ? { optical: 'Óptico', inductive: 'Inductivo', capacitive: 'Capacitivo', color: 'Color' }[e.kind ?? 'optical'] : null
-  return e.text || vars[0] || fallback || SCENE_TYPES[e.type].label
+  const fallback = e.type === 'sensor' ? { optical: tr('Óptico'), inductive: tr('Inductivo'), capacitive: tr('Capacitivo'), color: tr('Color') }[e.kind ?? 'optical'] : null
+  return e.text || vars[0] || fallback || tr(SCENE_TYPES[e.type].label)
 }
 
 // --- Propiedades -------------------------------------------------------------------------------
@@ -539,7 +540,7 @@ function labelOf(e) {
 // Tipo de la variable nueva según el campo: lo que la escena escribe es una entrada, lo que lee
 // una salida; las analógicas, entradas analógicas; el visualizador, una marca.
 const NEW_TYPE = { in: 'input', out: 'output', analog: 'analogIn', any: 'memory', trigger: 'input' }
-const TYPE_NAMES = { input: 'entrada', output: 'salida', analogIn: 'entrada analógica', memory: 'marca' }
+const TYPE_NAMES = { input: 'entrada', output: 'salida', analogIn: N_('entrada analógica'), memory: 'marca' }
 
 // Campo de variable: se elige de la tabla o se escribe un nombre nuevo, que se añade a la tabla
 // con el tipo adecuado. Si se parece mucho a uno que ya existe, pregunta antes («¿Querías decir…?»).
@@ -589,7 +590,7 @@ function VariableField({ label, value, options, allNames, dir, onPick, onCreate 
             aria-expanded={open}
             aria-controls={listId}
             aria-autocomplete="list"
-            placeholder="— (elige o escribe)"
+            placeholder={tr('— (elige o escribe)')}
             // Al abrir, resaltada la variable actual.
             onFocus={() => {
               setOpen(true)
@@ -661,7 +662,7 @@ function VariableField({ label, value, options, allNames, dir, onPick, onCreate 
           </button>
         </p>
       ) : (
-        fresh && <p className="mt-0.5 text-[11px] text-blue-700">Nueva: se añadirá a la tabla como {TYPE_NAMES[NEW_TYPE[dir]]}.</p>
+        fresh && <p className="mt-0.5 text-[11px] text-blue-700">{tr('Nueva: se añadirá a la tabla como {tipo}.', { tipo: tr(TYPE_NAMES[NEW_TYPE[dir]]) })}</p>
       )}
     </div>
   )
@@ -672,7 +673,7 @@ function VariableField({ label, value, options, allNames, dir, onPick, onCreate 
 function IOPanel({ io, elements, onSelect }) {
   const label = (id) => {
     const e = elements.find((x) => x.id === id)
-    return e ? `${SCENE_TYPES[e.type].label} ${labelOf(e)}` : id
+    return e ? `${tr(SCENE_TYPES[e.type].label)} ${labelOf(e)}` : id
   }
   // Función, no componente: definido dentro de IOPanel, React lo montaría de nuevo en cada paso de la
   // simulación (y el botón «se movería» bajo el ratón).
@@ -683,19 +684,19 @@ function IOPanel({ io, elements, onSelect }) {
   )
   const warnings = io.unassigned.length + io.unusedOutputs.length + io.notInGrafcet.length
   return (
-    <div className="space-y-3 text-xs" aria-label="Conexiones de la planta">
-      <p className="font-semibold">Entradas y salidas de la planta</p>
+    <div className="space-y-3 text-xs" aria-label={tr('Conexiones de la planta')}>
+      <p className="font-semibold">{tr('Entradas y salidas de la planta')}</p>
       {io.signals.length === 0 ? (
-        <p className="text-slate-500">Ningún elemento tiene variables todavía.</p>
+        <p className="text-slate-500">{tr('Ningún elemento tiene variables todavía.')}</p>
       ) : (
-        <ul className="space-y-1" aria-label="Conectadas">
+        <ul className="space-y-1" aria-label={tr('Conectadas')}>
           {io.signals.map((sig) => (
             <li key={sig.name}>
               <span className="flex items-center gap-1 font-mono">
                 {sig.dir === 'out' ? (
-                  <ArrowRight size={12} className="shrink-0 text-green-600" aria-label="salida del grafcet hacia la planta" />
+                  <ArrowRight size={12} className="shrink-0 text-green-600" aria-label={tr('salida del grafcet hacia la planta')} />
                 ) : (
-                  <ArrowLeft size={12} className="shrink-0 text-blue-600" aria-label="entrada del grafcet desde la planta" />
+                  <ArrowLeft size={12} className="shrink-0 text-blue-600" aria-label={tr('entrada del grafcet desde la planta')} />
                 )}
                 <span className="font-semibold">{sig.name}</span>
                 <span className="text-slate-500">{sig.address || 'sin dirección'}</span>
@@ -713,10 +714,10 @@ function IOPanel({ io, elements, onSelect }) {
         </ul>
       )}
       {warnings + io.manual.length > 0 && (
-        <div className="space-y-2 border-t border-slate-200 pt-2" aria-label="Avisos de conexión">
+        <div className="space-y-2 border-t border-slate-200 pt-2" aria-label={tr('Avisos de conexión')}>
           {io.unassigned.length > 0 && (
             <div>
-              <p className="font-medium text-amber-700">Sin variable (no hacen nada):</p>
+              <p className="font-medium text-amber-700">{tr('Sin variable (no hacen nada):')}</p>
               {io.unassigned.map((id) => (
                 <p key={id} className="pl-2">
                   {elementLink(id)}
@@ -738,7 +739,7 @@ function IOPanel({ io, elements, onSelect }) {
           )}
           {io.manual.length > 0 && (
             <p className="text-slate-600">
-              <span className="font-medium">Entradas que se cambian a mano</span> (en el panel de simulación):{' '}
+              <span className="font-medium">{tr('Entradas que se cambian a mano')}</span> (en el panel de simulación):{' '}
               <span className="font-mono">{io.manual.join(', ')}</span>
             </p>
           )}
@@ -772,14 +773,14 @@ function Properties({ element, variables, onChange, onDelete, onRotate, onCreate
     </label>
   )
   return (
-    <div className="space-y-2 text-xs" aria-label="Propiedades del elemento">
+    <div className="space-y-2 text-xs" aria-label={tr('Propiedades del elemento')}>
       <div className="flex items-center gap-1">
-        <span className="font-semibold">{SCENE_TYPES[element.type].label}</span>
+        <span className="font-semibold">{tr(SCENE_TYPES[element.type].label)}</span>
         <span className="ml-auto" />
-        <button type="button" onClick={onRotate} title="Girar 90° (R)" className="rounded p-1 hover:bg-slate-100">
+        <button type="button" onClick={onRotate} title={tr('Girar 90° (R)')} className="rounded p-1 hover:bg-slate-100">
           <RotateCw size={14} />
         </button>
-        <button type="button" onClick={onDelete} title="Borrar (Supr)" className="rounded p-1 hover:bg-red-500 hover:text-white">
+        <button type="button" onClick={onDelete} title={tr('Borrar (Supr)')} className="rounded p-1 hover:bg-red-500 hover:text-white">
           <Trash2 size={14} />
         </button>
       </div>
@@ -799,18 +800,18 @@ function Properties({ element, variables, onChange, onDelete, onRotate, onCreate
       {DESK_TYPES.includes(element.type) && (
         <div className="flex items-end gap-1">
           <label className="block flex-1">
-            <span className="text-slate-500">Ubicación</span>
+            <span className="text-slate-500">{tr('Ubicación')}</span>
             <select value={element.place === 'desk' ? 'desk' : 'machine'} onChange={(ev) => set({ place: ev.target.value })} className={field}>
-              <option value="desk">En el panel de control</option>
-              <option value="machine">En la máquina</option>
+              <option value="desk">{tr('En el panel de control')}</option>
+              <option value="machine">{tr('En la máquina')}</option>
             </select>
           </label>
           {element.place === 'desk' && (
             <>
-              <button type="button" onClick={() => onMoveInDesk(-1)} title="Mover a la izquierda en el panel" className="rounded border border-slate-300 px-1.5 py-0.5 hover:bg-slate-100">
+              <button type="button" onClick={() => onMoveInDesk(-1)} title={tr('Mover a la izquierda en el panel')} className="rounded border border-slate-300 px-1.5 py-0.5 hover:bg-slate-100">
                 ◀
               </button>
-              <button type="button" onClick={() => onMoveInDesk(1)} title="Mover a la derecha en el panel" className="rounded border border-slate-300 px-1.5 py-0.5 hover:bg-slate-100">
+              <button type="button" onClick={() => onMoveInDesk(1)} title={tr('Mover a la derecha en el panel')} className="rounded border border-slate-300 px-1.5 py-0.5 hover:bg-slate-100">
                 ▶
               </button>
             </>
@@ -819,20 +820,20 @@ function Properties({ element, variables, onChange, onDelete, onRotate, onCreate
       )}
       {['button', 'switch', 'limit', 'sensor'].includes(element.type) && (
         <label className="block">
-          <span className="text-slate-500">Contacto</span>
+          <span className="text-slate-500">{tr('Contacto')}</span>
           <select value={element.contact ?? 'NO'} onChange={(ev) => set({ contact: ev.target.value })} className={field}>
-            <option value="NO">Normalmente abierto (NA)</option>
-            <option value="NC">Normalmente cerrado (NC)</option>
+            <option value="NO">{tr('Normalmente abierto (NA)')}</option>
+            <option value="NC">{tr('Normalmente cerrado (NC)')}</option>
           </select>
         </label>
       )}
       {(element.type === 'button' || element.type === 'lamp') && (
         <label className="block">
-          <span className="text-slate-500">Color</span>
+          <span className="text-slate-500">{tr('Color')}</span>
           <select value={element.color ?? 'green'} onChange={(ev) => set({ color: ev.target.value })} className={field}>
             {Object.entries(COLOR_NAMES).map(([id, name]) => (
               <option key={id} value={id}>
-                {name}
+                {tr(name)}
               </option>
             ))}
           </select>
@@ -841,9 +842,9 @@ function Properties({ element, variables, onChange, onDelete, onRotate, onCreate
       {element.type === 'cylinder' && (
         <>
           <label className="block">
-            <span className="text-slate-500">Montado en el vástago de</span>
+            <span className="text-slate-500">{tr('Montado en el vástago de')}</span>
             <select value={element.mountedOn ?? ''} onChange={(ev) => set({ mountedOn: ev.target.value })} className={field}>
-              <option value="">— (fijo)</option>
+              <option value="">{tr('— (fijo)')}</option>
               {cylinders
                 .filter((c) => c.id !== element.id && c.mountedOn !== element.id)
                 .map((c) => (
@@ -855,22 +856,22 @@ function Properties({ element, variables, onChange, onDelete, onRotate, onCreate
           </label>
           <label className="flex items-center gap-1">
             <input type="checkbox" checked={Number(element.initial) === 1} onChange={(ev) => set({ initial: ev.target.checked ? 1 : 0 })} />
-            Empieza con el vástago fuera
+            {tr('Empieza con el vástago fuera')}
           </label>
           {number('stroke', 'Carrera (px)', 20, 10)}
-          {number('time', 'Tiempo de carrera (s)', 0.1, 0.1)}
+          {number('time', tr('Tiempo de carrera (s)'), 0.1, 0.1)}
         </>
       )}
       {element.type === 'conveyor' && (
         <>
           {number('length', 'Largo (px)', 60, 10)}
-          {number('time', 'Tiempo de recorrido (s)', 0.2, 0.1)}
+          {number('time', tr('Tiempo de recorrido (s)'), 0.2, 0.1)}
         </>
       )}
       {element.type === 'sensor' && (
         <>
           <label className="block">
-            <span className="text-slate-500">Tipo de detector</span>
+            <span className="text-slate-500">{tr('Tipo de detector')}</span>
             <select
               value={element.kind ?? 'optical'}
               onChange={(ev) => set({ kind: ev.target.value, range: SENSOR_KINDS[ev.target.value].range })}
@@ -878,18 +879,18 @@ function Properties({ element, variables, onChange, onDelete, onRotate, onCreate
             >
               {Object.entries(SENSOR_KINDS).map(([id, k]) => (
                 <option key={id} value={id}>
-                  {k.label}
+                  {tr(k.label)}
                 </option>
               ))}
             </select>
           </label>
           {element.kind === 'color' && (
             <label className="block">
-              <span className="text-slate-500">Color que detecta</span>
+              <span className="text-slate-500">{tr('Color que detecta')}</span>
               <select value={element.color ?? 'amber'} onChange={(ev) => set({ color: ev.target.value })} className={field}>
                 {Object.entries(PIECE_COLORS).map(([id, name]) => (
                   <option key={id} value={id}>
-                    {name}
+                    {tr(name)}
                   </option>
                 ))}
               </select>
@@ -898,29 +899,29 @@ function Properties({ element, variables, onChange, onDelete, onRotate, onCreate
           {number('range', 'Alcance (px)', 10, 10)}
         </>
       )}
-      {element.type === 'distance' && number('range', 'Alcance (px) = valor máximo', 20, 10)}
+      {element.type === 'distance' && number('range', tr('Alcance (px) = valor máximo'), 20, 10)}
       {element.type === 'siren' && (
         <label className="flex items-center gap-1">
           <input type="checkbox" checked={Boolean(element.sound)} onChange={(ev) => set({ sound: ev.target.checked })} />
-          Con sonido (al simular)
+          {tr('Con sonido (al simular)')}
         </label>
       )}
       {element.type === 'pipe' && number('length', 'Largo (px)', 20, 10)}
       {element.type === 'barrier' && (
         <>
-          {number('length', 'Largo del brazo (px)', 40, 10)}
-          {number('time', 'Tiempo en abrirse (s)', 0.2, 0.1)}
+          {number('length', tr('Largo del brazo (px)'), 40, 10)}
+          {number('time', tr('Tiempo en abrirse (s)'), 0.2, 0.1)}
         </>
       )}
-      {element.type === 'label' && number('size', 'Tamaño de letra (px)', 8, 1)}
+      {element.type === 'label' && number('size', tr('Tamaño de letra (px)'), 8, 1)}
       {element.type === 'image' && (
         <>
           <label className="block">
-            <span className="text-slate-500">Imagen (se reduce a 1200 px)</span>
+            <span className="text-slate-500">{tr('Imagen (se reduce a 1200 px)')}</span>
             <input
               type="file"
               accept="image/*"
-              aria-label="Elegir imagen"
+              aria-label={tr('Elegir imagen')}
               onChange={async (ev) => {
                 const file = ev.target.files?.[0]
                 ev.target.value = ''
@@ -939,12 +940,12 @@ function Properties({ element, variables, onChange, onDelete, onRotate, onCreate
       {(element.type === 'diverter' || element.type === 'ramp') && (
         <>
           {number('length', 'Largo (px)', 30, 10)}
-          {number('time', 'Tiempo en recorrerla (s)', 0.1, 0.1)}
+          {number('time', tr('Tiempo en recorrerla (s)'), 0.1, 0.1)}
         </>
       )}
       {element.type === 'potentiometer' && (
         <label className="block">
-          <span className="text-slate-500">Posición al empezar (%)</span>
+          <span className="text-slate-500">{tr('Posición al empezar (%)')}</span>
           <input
             type="number"
             min="0"
@@ -960,16 +961,16 @@ function Properties({ element, variables, onChange, onDelete, onRotate, onCreate
         <>
           {number('setpoint', 'Termostato: salta a (°C)', 0, 1)}
           {number('ambient', 'Temperatura ambiente (°C)', -20, 1)}
-          {number('maxTemp', 'Temperatura máxima (°C)', 30, 5)}
-          {number('tau', 'Inercia: constante de tiempo (s)', 1, 1)}
+          {number('maxTemp', tr('Temperatura máxima (°C)'), 30, 5)}
+          {number('tau', tr('Inercia: constante de tiempo (s)'), 1, 1)}
         </>
       )}
       {element.type === 'tank' && (
         <>
-          {number('fillTime', 'Llenado de vacío a lleno (s)', 0.5, 0.5)}
-          {number('drainTime', 'Vaciado de lleno a vacío (s)', 0.5, 0.5)}
+          {number('fillTime', tr('Llenado de vacío a lleno (s)'), 0.5, 0.5)}
+          {number('drainTime', tr('Vaciado de lleno a vacío (s)'), 0.5, 0.5)}
           <label className="block">
-            <span className="text-slate-500">Nivel al empezar (%)</span>
+            <span className="text-slate-500">{tr('Nivel al empezar (%)')}</span>
             <input
               type="number"
               min="0"
@@ -985,28 +986,28 @@ function Properties({ element, variables, onChange, onDelete, onRotate, onCreate
       {element.type === 'feeder' && (
         <>
           <label className="block">
-            <span className="text-slate-500">Piezas</span>
+            <span className="text-slate-500">{tr('Piezas')}</span>
             <select value={element.sizes ?? 'small'} onChange={(ev) => set({ sizes: ev.target.value })} className={field}>
-              <option value="small">Pequeñas</option>
-              <option value="large">Grandes</option>
-              <option value="mixed">Alternas (pequeña, grande…)</option>
+              <option value="small">{tr('Pequeñas')}</option>
+              <option value="large">{tr('Grandes')}</option>
+              <option value="mixed">{tr('Alternas (pequeña, grande…)')}</option>
             </select>
           </label>
           <label className="block">
-            <span className="text-slate-500">Material</span>
+            <span className="text-slate-500">{tr('Material')}</span>
             <select value={element.material ?? 'plastic'} onChange={(ev) => set({ material: ev.target.value })} className={field}>
-              <option value="plastic">Plástico</option>
-              <option value="metal">Metal</option>
-              <option value="mixed">Alterno (plástico, metal…)</option>
+              <option value="plastic">{tr('Plástico')}</option>
+              <option value="metal">{tr('Metal')}</option>
+              <option value="mixed">{tr('Alterno (plástico, metal…)')}</option>
             </select>
           </label>
           {element.material !== 'metal' && (
             <label className="block">
-              <span className="text-slate-500">Color del plástico</span>
+              <span className="text-slate-500">{tr('Color del plástico')}</span>
               <select value={element.color ?? 'amber'} onChange={(ev) => set({ color: ev.target.value })} className={field}>
                 {Object.entries(PIECE_COLORS).map(([id, name]) => (
                   <option key={id} value={id}>
-                    {name}
+                    {tr(name)}
                   </option>
                 ))}
               </select>
@@ -1015,16 +1016,16 @@ function Properties({ element, variables, onChange, onDelete, onRotate, onCreate
           {!element.trigger && (
             <label className="flex items-center gap-1">
               <input type="checkbox" checked={Boolean(element.auto)} onChange={(ev) => set({ auto: ev.target.checked })} />
-              Siempre una pieza esperando
+              {tr('Siempre una pieza esperando')}
             </label>
           )}
-          {!element.trigger && element.auto && number('spacing', 'Hueco hasta la siguiente (px)', 0, 10)}
+          {!element.trigger && element.auto && number('spacing', tr('Hueco hasta la siguiente (px)'), 0, 10)}
         </>
       )}
       {!['limit', 'sensor', 'distance'].includes(element.type) && (
         <label className="block">
-          <span className="text-slate-500">Rótulo</span>
-          <input value={element.text ?? ''} onChange={(ev) => set({ text: ev.target.value })} placeholder="(el nombre de la variable)" className={field} />
+          <span className="text-slate-500">{tr('Rótulo')}</span>
+          <input value={element.text ?? ''} onChange={(ev) => set({ text: ev.target.value })} placeholder={tr('(el nombre de la variable)')} className={field} />
         </label>
       )}
     </div>
@@ -1034,29 +1035,29 @@ function Properties({ element, variables, onChange, onDelete, onRotate, onCreate
 function Faults({ element, fault, onAction }) {
   const options = sceneFaults(element)
   return (
-    <div className="space-y-2 text-xs" aria-label="Averías del elemento">
+    <div className="space-y-2 text-xs" aria-label={tr('Averías del elemento')}>
       <p className="font-semibold">{labelOf(element)}</p>
       {options.length ? (
         <label className="block">
-          <span className="text-slate-500">Avería (solo en esta simulación)</span>
+          <span className="text-slate-500">{tr('Avería (solo en esta simulación)')}</span>
           <select
             value={fault ?? ''}
             onChange={(ev) => onAction(element.id, `fault:${ev.target.value}`)}
-            aria-label={`Avería de ${labelOf(element)}`}
+            aria-label={tr('Avería de {elemento}', { elemento: labelOf(element) })}
             className={`w-full rounded border px-1 py-0.5 ${fault ? 'border-red-400 text-red-700' : 'border-slate-300'}`}
           >
-            <option value="">Ninguna</option>
+            <option value="">{tr('Ninguna')}</option>
             {options.map((f) => (
               <option key={f.id} value={f.id}>
-                {f.label}
+                {tr(f.label)}
               </option>
             ))}
           </select>
         </label>
       ) : (
-        <p className="text-slate-500">Este elemento no tiene averías.</p>
+        <p className="text-slate-500">{tr('Este elemento no tiene averías.')}</p>
       )}
-      <p className="text-[11px] text-slate-500">Mira en «Qué espera el grafcet» cómo reacciona el programa.</p>
+      <p className="text-[11px] text-slate-500">{tr('Mira en «Qué espera el grafcet» cómo reacciona el programa.')}</p>
     </div>
   )
 }
@@ -1091,39 +1092,39 @@ let created = 0
 const newId = () => `e${Date.now().toString(36)}${(created++).toString(36)}`
 // Vista previa de la paleta: el módulo «en acción» y para qué sirve.
 const HINTS = {
-  button: 'Pulsador: da 1 mientras lo mantienes pulsado (o 0 si es NC). Para Marcha, Paro, Rearme…',
-  switch: 'Interruptor: se queda en la posición elegida. Para selectores Manual/Automático, pieza colocada…',
-  emergency: 'Seta de emergencia: contacto NC enclavado; al pulsarla da 0 hasta que se rearma.',
-  lamp: 'Piloto: se enciende con una salida del grafcet.',
-  cylinder: 'Cilindro: sale con A+ y entra con A− (o con muelle). Lleva detectores a0/a1 o pisa finales de carrera; empuja las piezas.',
-  conveyor: 'Cinta: con su motor en marcha lleva las piezas que tiene encima.',
-  limit: 'Final de carrera: se acciona cuando lo pisa el vástago de un cilindro o una pieza.',
-  'sensor:optical': 'Detector óptico (réflex): su haz ve cualquier pieza (y los vástagos) que pase por delante.',
-  'sensor:inductive': 'Detector inductivo: solo detecta metal y a poca distancia. Para separar piezas de metal de las de plástico.',
-  'sensor:capacitive': 'Detector capacitivo: detecta cualquier material (plástico, metal…) a poca distancia.',
-  'sensor:color': 'Detector de color: solo da 1 con piezas del color elegido. Para clasificar por colores.',
-  distance: 'Sensor de distancia (ultrasonidos): valor analógico proporcional a la distancia al primer objeto de su haz.',
+  button: N_('Pulsador: da 1 mientras lo mantienes pulsado (o 0 si es NC). Para Marcha, Paro, Rearme…'),
+  switch: N_('Interruptor: se queda en la posición elegida. Para selectores Manual/Automático, pieza colocada…'),
+  emergency: N_('Seta de emergencia: contacto NC enclavado; al pulsarla da 0 hasta que se rearma.'),
+  lamp: N_('Piloto: se enciende con una salida del grafcet.'),
+  cylinder: N_('Cilindro: sale con A+ y entra con A− (o con muelle). Lleva detectores a0/a1 o pisa finales de carrera; empuja las piezas.'),
+  conveyor: N_('Cinta: con su motor en marcha lleva las piezas que tiene encima.'),
+  limit: N_('Final de carrera: se acciona cuando lo pisa el vástago de un cilindro o una pieza.'),
+  'sensor:optical': N_('Detector óptico (réflex): su haz ve cualquier pieza (y los vástagos) que pase por delante.'),
+  'sensor:inductive': N_('Detector inductivo: solo detecta metal y a poca distancia. Para separar piezas de metal de las de plástico.'),
+  'sensor:capacitive': N_('Detector capacitivo: detecta cualquier material (plástico, metal…) a poca distancia.'),
+  'sensor:color': N_('Detector de color: solo da 1 con piezas del color elegido. Para clasificar por colores.'),
+  distance: N_('Sensor de distancia (ultrasonidos): valor analógico proporcional a la distancia al primer objeto de su haz.'),
   pickplace:
-    'Pick & place: cilindro horizontal X y vertical Z montado en su vástago. Asigna a Z la ventosa (vacío) para coger la pieza que toca y llevarla con los dos vástagos.',
-  diverter: 'Desviador: mientras su salida está activa, empuja las piezas de su zona hacia donde apunta la flecha (para sacarlas de una cinta).',
-  ramp: 'Rampa: las piezas resbalan solas hasta su extremo (a la salida de una cinta, hacia una recogida…).',
-  platform: 'Plataforma: superficie fija (mesa, estante, suelo). Las piezas no la atraviesan y, en la vista de frente, se apoyan en ella.',
-  stop: 'Tope / pared: para las piezas (en una cinta se acumulan detrás). Un cilindro que empuja una pieza contra él se queda a medio recorrido y su final de carrera no llega.',
-  siren: 'Sirena: avisa (con sonido, si se activa en sus propiedades) mientras su salida está activa.',
-  trafficlight: 'Semáforo: tres luces (rojo, ámbar y verde), cada una con su salida.',
-  valve: 'Electroválvula: abierta (azul) mientras su salida está activa. Para dibujar el circuito de un depósito.',
-  barrier: 'Barrera: se abre con su orden y se cierra con la suya o por su peso; finales de carrera de abierta y cerrada. Mientras no está abierta, para las piezas.',
-  pipe: 'Tubería: decoración; se pinta de azul, con el fluido moviéndose, mientras la variable elegida está activa.',
-  label: 'Rótulo: texto libre en la escena (nombre de la estación, zonas…).',
-  image: 'Imagen: una foto o un plano de fondo (se dibuja debajo de todo).',
-  scale: 'Báscula: valor analógico con el peso (kg) de las piezas que tiene encima; el metal pesa el triple.',
-  potentiometer: 'Potenciómetro: entrada analógica manual (consignas, velocidades…). En modo Usar, arrastra a izquierda o derecha.',
-  heater: 'Calentador: la resistencia sube la temperatura (analógica, °C) con inercia; termostato digital opcional.',
-  feeder: 'Alimentador: suelta piezas solo, con una salida del grafcet o al pulsarlo en modo Usar.',
-  sink: 'Recogida: retira y cuenta las piezas que caen dentro.',
-  tank: 'Depósito: se llena y vacía con sus válvulas; sensores de nivel bajo y alto y nivel analógico.',
-  motor: 'Motor: gira mientras su salida está activa (al revés con la salida de giro inverso).',
-  display: 'Visualizador: muestra el valor de una variable (contador, analógica…).',
+    N_('Pick & place: cilindro horizontal X y vertical Z montado en su vástago. Asigna a Z la ventosa (vacío) para coger la pieza que toca y llevarla con los dos vástagos.'),
+  diverter: N_('Desviador: mientras su salida está activa, empuja las piezas de su zona hacia donde apunta la flecha (para sacarlas de una cinta).'),
+  ramp: N_('Rampa: las piezas resbalan solas hasta su extremo (a la salida de una cinta, hacia una recogida…).'),
+  platform: N_('Plataforma: superficie fija (mesa, estante, suelo). Las piezas no la atraviesan y, en la vista de frente, se apoyan en ella.'),
+  stop: N_('Tope / pared: para las piezas (en una cinta se acumulan detrás). Un cilindro que empuja una pieza contra él se queda a medio recorrido y su final de carrera no llega.'),
+  siren: N_('Sirena: avisa (con sonido, si se activa en sus propiedades) mientras su salida está activa.'),
+  trafficlight: N_('Semáforo: tres luces (rojo, ámbar y verde), cada una con su salida.'),
+  valve: N_('Electroválvula: abierta (azul) mientras su salida está activa. Para dibujar el circuito de un depósito.'),
+  barrier: N_('Barrera: se abre con su orden y se cierra con la suya o por su peso; finales de carrera de abierta y cerrada. Mientras no está abierta, para las piezas.'),
+  pipe: N_('Tubería: decoración; se pinta de azul, con el fluido moviéndose, mientras la variable elegida está activa.'),
+  label: N_('Rótulo: texto libre en la escena (nombre de la estación, zonas…).'),
+  image: N_('Imagen: una foto o un plano de fondo (se dibuja debajo de todo).'),
+  scale: N_('Báscula: valor analógico con el peso (kg) de las piezas que tiene encima; el metal pesa el triple.'),
+  potentiometer: N_('Potenciómetro: entrada analógica manual (consignas, velocidades…). En modo Usar, arrastra a izquierda o derecha.'),
+  heater: N_('Calentador: la resistencia sube la temperatura (analógica, °C) con inercia; termostato digital opcional.'),
+  feeder: N_('Alimentador: suelta piezas solo, con una salida del grafcet o al pulsarlo en modo Usar.'),
+  sink: N_('Recogida: retira y cuenta las piezas que caen dentro.'),
+  tank: N_('Depósito: se llena y vacía con sus válvulas; sensores de nivel bajo y alto y nivel analógico.'),
+  motor: N_('Motor: gira mientras su salida está activa (al revés con la salida de giro inverso).'),
+  display: N_('Visualizador: muestra el valor de una variable (contador, analógica…).'),
 }
 const PREVIEW_DELAY = 450
 
@@ -1172,11 +1173,11 @@ function ModulePreview({ item }) {
     valve: <ValveShape open />,
     pipe: <PipeShape e={{ ...e, length: 120 }} flowing t={0} />,
     barrier: <BarrierShape e={e} pos={0.4} />,
-    label: <LabelShape e={{ ...e, text: 'Estación 1' }} />,
+    label: <LabelShape e={{ ...e, text: tr('Estación 1') }} />,
     image: <ImageShape e={{ ...e, width: 160, height: 100 }} />,
   }
   const b = boundsOf(
-    type === 'conveyor' ? { ...e, length: 160 } : type === 'distance' ? { ...e, range: 120 } : type === 'pipe' ? { ...e, length: 120 } : type === 'image' ? { ...e, width: 160, height: 100 } : type === 'label' ? { ...e, text: 'Estación 1' } : e,
+    type === 'conveyor' ? { ...e, length: 160 } : type === 'distance' ? { ...e, range: 120 } : type === 'pipe' ? { ...e, length: 120 } : type === 'image' ? { ...e, width: 160, height: 100 } : type === 'label' ? { ...e, text: tr('Estación 1') } : e,
     type === 'barrier' ? 0.4 : 1,
   )
   const pad = 12
@@ -1193,7 +1194,7 @@ function ModulePreview({ item }) {
 }
 
 // Paleta: un módulo por tipo; los detectores de presencia, uno por tipo de detección.
-const SENSOR_PALETTE = { optical: 'Detector óptico', inductive: 'Detector inductivo', capacitive: 'Detector capacitivo', color: 'Detector de color' }
+const SENSOR_PALETTE = { optical: N_('Detector óptico'), inductive: N_('Detector inductivo'), capacitive: N_('Detector capacitivo'), color: N_('Detector de color') }
 const PALETTE_ITEMS = Object.entries(SCENE_TYPES).flatMap(([type, t]) =>
   type === 'sensor'
     ? Object.entries(SENSOR_KINDS).map(([kind, k]) => ({
@@ -1206,12 +1207,12 @@ const PALETTE_ITEMS = Object.entries(SCENE_TYPES).flatMap(([type, t]) =>
     : type === 'cylinder'
       ? [
           { key: type, type, group: t.group, label: t.label, preset: {} },
-          { key: 'pickplace', type, group: t.group, label: 'Pick & place (2 cilindros)', preset: {} },
+          { key: 'pickplace', type, group: t.group, label: N_('Pick & place (2 cilindros)'), preset: {} },
         ]
       : type === 'platform'
         ? [
             { key: type, type, group: t.group, label: t.label, preset: {} },
-            { key: 'stop', type, group: t.group, label: 'Tope / pared', preset: { length: 40, rot: 90, text: 'Tope' } },
+            { key: 'stop', type, group: t.group, label: N_('Tope / pared'), preset: { length: 40, rot: 90, text: tr('Tope') } },
           ]
           : [{ key: type, type, group: t.group, label: t.label, preset: {} }],
 )
@@ -1375,7 +1376,7 @@ export function SceneStatic({ scene, variables = [] }) {
         <g>
           <rect x={minX + 10} y={deskY - 20} width={width - 20} height="110" rx="4" fill="#cbd5e1" />
           <text x={minX + 18} y={deskY - 6} fontSize="10" fontWeight="600" fill="#334155">
-            Panel de control
+            {tr('Panel de control')}
           </text>
           {desk.map((e, i) => {
             const x = minX + 60 + i * 100
@@ -1428,7 +1429,7 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
   const importRef = useRef(null)
   const changeGroups = (list) => {
     setGroups(list)
-    if (!storeGroups(list)) setGroupMessage('No se han podido guardar los grupos en este navegador.')
+    if (!storeGroups(list)) setGroupMessage(tr('No se han podido guardar los grupos en este navegador.'))
   }
   const saveSelectionAsGroup = () => {
     const name = groupName.trim()
@@ -1436,7 +1437,7 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
     const chosen = elements.filter((e) => selection.includes(e.id))
     changeGroups([...groups.filter((g) => g.name !== name), makeGroup(name, chosen)])
     setGroupName('')
-    setGroupMessage(`Guardado «${name}» en Mis grupos.`)
+    setGroupMessage(tr('Guardado «{nombre}» en Mis grupos.', { nombre: name }))
   }
   const [showIO, setShowIO] = useState(false) // rótulos con las variables y sus direcciones
   const [ioOpen, setIoOpen] = useState(false) // panel de conexiones
@@ -1706,7 +1707,7 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
       x += 30
       y += 30
     }
-    const element = { id: newId(), type, x, y, rot: 0, ...SCENE_TYPES[type].defaults, ...preset, ...(where ? { place: where } : {}) }
+    const element = { id: newId(), type, x, y, rot: 0, ...SCENE_TYPES[type].defaults, ...(SCENE_TYPES[type].defaults.text ? { text: tr(SCENE_TYPES[type].defaults.text) } : {}), ...preset, ...(where ? { place: where } : {}) }
     save([...elements, element])
     setSelected(element.id)
     setMode('edit')
@@ -1852,7 +1853,7 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
 
   return (
     <section
-      aria-label="Escena de la planta"
+      aria-label={tr('Escena de la planta')}
       ref={sectionRef}
       tabIndex={-1}
       onKeyDown={onKeyDown}
@@ -1864,8 +1865,8 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
         <div
           role="separator"
           aria-orientation="vertical"
-          aria-label="Ancho de la planta"
-          title="Arrastra para cambiar el ancho de la planta (doble clic: mitad y mitad)"
+          aria-label={tr('Ancho de la planta')}
+          title={tr('Arrastra para cambiar el ancho de la planta (doble clic: mitad y mitad)')}
           className="absolute inset-y-0 -left-1 z-10 w-2 cursor-col-resize hover:bg-blue-400/40"
           onPointerDown={(ev) => {
             const right = sectionRef.current.getBoundingClientRect().right
@@ -1902,11 +1903,11 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
         />
       )}
       <header className="flex flex-wrap items-center gap-1 border-b border-slate-200 px-2 py-1.5 text-xs">
-        <span className="mr-1 text-sm font-semibold">Planta</span>
-        <div className="flex rounded-md border border-slate-300 p-0.5" role="radiogroup" aria-label="Modo de la escena">
+        <span className="mr-1 text-sm font-semibold">{tr('Planta')}</span>
+        <div className="flex rounded-md border border-slate-300 p-0.5" role="radiogroup" aria-label={tr('Modo de la escena')}>
           {[
-            ['use', 'Usar', Hand, 'Accionar pulsadores, interruptores y alimentadores'],
-            ['edit', 'Editar', MousePointer2, 'Colocar, mover y configurar elementos'],
+            ['use', tr('Usar'), Hand, tr('Accionar pulsadores, interruptores y alimentadores')],
+            ['edit', tr('Editar'), MousePointer2, tr('Colocar, mover y configurar elementos')],
           ].map(([id, label, Icon, title]) => (
             <button
               key={id}
@@ -1928,7 +1929,7 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
           type="button"
           onClick={() => setShowIO((v) => !v)}
           aria-pressed={showIO}
-          title="Rótulos con las variables y sus direcciones"
+          title={tr('Rótulos con las variables y sus direcciones')}
           className={`flex items-center gap-1 rounded border px-2 py-0.5 ${showIO ? 'border-blue-300 bg-blue-50 text-blue-800' : 'border-slate-300 hover:bg-slate-100'}`}
         >
           <Tag size={12} /> E/S
@@ -1937,58 +1938,58 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
           type="button"
           onClick={() => setIoOpen((v) => !v)}
           aria-pressed={ioOpen}
-          title="Qué está conectado y qué falta"
-          aria-label="Conexiones"
+          title={tr('Qué está conectado y qué falta')}
+          aria-label={tr('Conexiones')}
           className={`flex items-center gap-1 rounded border px-2 py-0.5 ${ioOpen ? 'border-blue-300 bg-blue-50 text-blue-800' : 'border-slate-300 hover:bg-slate-100'}`}
         >
           {/* Con la planta estrecha, solo los iconos: la cabecera no salta a dos líneas. */}
-          <Cable size={12} /> <span className="hidden @3xl:inline">Conexiones</span>
+          <Cable size={12} /> <span className="hidden @3xl:inline">{tr('Conexiones')}</span>
           {ioWarnings > 0 && <span className="rounded-full bg-amber-500 px-1.5 text-[10px] font-semibold text-white">{ioWarnings}</span>}
         </button>
         <button
           type="button"
           onClick={() => onChange({ ...(scene ?? {}), gravity: !scene?.gravity })}
           aria-pressed={Boolean(scene?.gravity)}
-          aria-label="Gravedad"
+          aria-label={tr('Gravedad')}
           title={
             scene?.gravity
-              ? 'Vista de frente: las piezas caen y se apoyan en cintas, plataformas y otras piezas. Pulsa para verla desde arriba (sin gravedad)'
-              : 'Vista desde arriba: las piezas no caen. Pulsa para verla de frente, con gravedad'
+              ? tr('Vista de frente: las piezas caen y se apoyan en cintas, plataformas y otras piezas. Pulsa para verla desde arriba (sin gravedad)')
+              : tr('Vista desde arriba: las piezas no caen. Pulsa para verla de frente, con gravedad')
           }
           className={`flex items-center gap-1 rounded border px-2 py-0.5 ${scene?.gravity ? 'border-blue-300 bg-blue-50 text-blue-800' : 'border-slate-300 hover:bg-slate-100'}`}
         >
-          <ArrowDownToLine size={12} /> <span className="hidden @3xl:inline">Gravedad</span>
+          <ArrowDownToLine size={12} /> <span className="hidden @3xl:inline">{tr('Gravedad')}</span>
         </button>
-        <button type="button" onClick={() => onAction(null, 'clear')} title="Quita de la escena todas las piezas (cilindros, cintas y demás elementos se quedan)" className="rounded border border-slate-300 px-2 py-0.5 hover:bg-slate-100">
-          Quitar piezas
+        <button type="button" onClick={() => onAction(null, 'clear')} title={tr('Quita de la escena todas las piezas (cilindros, cintas y demás elementos se quedan)')} className="rounded border border-slate-300 px-2 py-0.5 hover:bg-slate-100">
+          {tr('Quitar piezas')}
         </button>
         <span className="ml-auto" />
-        <button type="button" onClick={() => setZoom((z) => Math.max(ZOOM_MIN, z - 0.1))} title="Alejar" className="rounded p-1 hover:bg-slate-100">
+        <button type="button" onClick={() => setZoom((z) => Math.max(ZOOM_MIN, z - 0.1))} title={tr('Alejar')} className="rounded p-1 hover:bg-slate-100">
           <Minus size={13} />
         </button>
         <span className="w-11 text-center tabular-nums whitespace-nowrap">{Math.round(zoom * 100)} %</span>
-        <button type="button" onClick={() => setZoom((z) => Math.min(ZOOM_MAX, z + 0.1))} title="Acercar" className="rounded p-1 hover:bg-slate-100">
+        <button type="button" onClick={() => setZoom((z) => Math.min(ZOOM_MAX, z + 0.1))} title={tr('Acercar')} className="rounded p-1 hover:bg-slate-100">
           <Plus size={13} />
         </button>
-        <button type="button" onClick={fit} title="Ajustar: ver todos los mandos y el mecanismo" aria-label="Ajustar la vista" className="rounded p-1 hover:bg-slate-100">
+        <button type="button" onClick={fit} title={tr('Ajustar: ver todos los mandos y el mecanismo')} aria-label={tr('Ajustar la vista')} className="rounded p-1 hover:bg-slate-100">
           <Scan size={14} />
         </button>
         <button type="button" onClick={onToggleMaximize} title={maximized ? 'Vista dividida con el grafcet' : 'Pantalla completa'} className="rounded p-1 hover:bg-slate-100">
           {maximized ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
         </button>
-        <button type="button" onClick={onClose} title="Cerrar la planta" className="rounded p-1 hover:bg-slate-100">
+        <button type="button" onClick={onClose} title={tr('Cerrar la planta')} className="rounded p-1 hover:bg-slate-100">
           <X size={14} />
         </button>
       </header>
 
       <div className="flex min-h-0 flex-1">
         {mode === 'edit' && (
-          <nav className="w-32 shrink-0 space-y-2 overflow-y-auto border-r border-slate-200 p-1.5 text-xs" aria-label="Elementos">
+          <nav className="w-32 shrink-0 space-y-2 overflow-y-auto border-r border-slate-200 p-1.5 text-xs" aria-label={tr('Elementos')}>
             {detected.length > 0 && (
               <button
                 type="button"
                 onClick={() => save([...elements, ...detected])}
-                title="A partir de los nombres de las variables: cada salida A+ con A−, a0 y a1 es un cilindro"
+                title={tr('A partir de los nombres de las variables: cada salida A+ con A−, a0 y a1 es un cilindro')}
                 className="flex w-full items-center gap-1 rounded border border-blue-300 bg-blue-50 px-1 py-0.5 text-left text-blue-800 hover:bg-blue-100"
               >
                 <WandSparkles size={12} className="shrink-0" /> Detectar cilindros ({detected.length})
@@ -1996,7 +1997,7 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
             )}
             {Object.entries(PALETTE).map(([group, types]) => (
               <div key={group}>
-                <p className="mb-0.5 text-[10px] font-medium uppercase tracking-wide text-slate-400">{group}</p>
+                <p className="mb-0.5 text-[10px] font-medium uppercase tracking-wide text-slate-400">{tr(group)}</p>
                 {types.map((item) => (
                   <button
                     key={item.key}
@@ -2019,26 +2020,26 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
                       ev.dataTransfer.setData(DRAG_TYPE, item.key)
                       ev.dataTransfer.effectAllowed = 'copy'
                     }}
-                    title="Arrastra a la escena (o pulsa para ponerlo en el centro)"
+                    title={tr('Arrastra a la escena (o pulsa para ponerlo en el centro)')}
                     onMouseLeave={() => {
                       clearTimeout(previewTimer.current)
                       setPreview(null)
                     }}
                     className="block w-full rounded px-1 py-0.5 text-left hover:bg-blue-50"
                   >
-                    + {item.label}
+                    + {tr(item.label)}
                   </button>
                 ))}
               </div>
             ))}
-            <div aria-label="Mis grupos">
+            <div aria-label={tr('Mis grupos')}>
               <p className="mb-0.5 flex items-center gap-1 text-[10px] font-medium uppercase tracking-wide text-slate-400">
-                Mis grupos
+                {tr('Mis grupos')}
                 <span className="ml-auto" />
                 <button
                   type="button"
-                  title="Exportar mis grupos a un archivo"
-                  aria-label="Exportar mis grupos"
+                  title={tr('Exportar mis grupos a un archivo')}
+                  aria-label={tr('Exportar mis grupos')}
                   disabled={!groups.length}
                   onClick={() => downloadFile(exportGroups(groups), 'grupos-planta.json', 'application/json')}
                   className="rounded p-0.5 normal-case hover:bg-slate-100 disabled:opacity-30"
@@ -2047,8 +2048,8 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
                 </button>
                 <button
                   type="button"
-                  title="Importar grupos de un archivo"
-                  aria-label="Importar grupos"
+                  title={tr('Importar grupos de un archivo')}
+                  aria-label={tr('Importar grupos')}
                   onClick={() => importRef.current?.click()}
                   className="rounded p-0.5 normal-case hover:bg-slate-100"
                 >
@@ -2060,7 +2061,7 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
                 type="file"
                 accept=".json,application/json"
                 className="hidden"
-                aria-label="Archivo de grupos"
+                aria-label={tr('Archivo de grupos')}
                 onChange={async (ev) => {
                   const file = ev.target.files?.[0]
                   ev.target.value = ''
@@ -2074,7 +2075,7 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
                   }
                 }}
               />
-              {groups.length === 0 && <p className="text-[11px] text-slate-500">Selecciona varios elementos y pulsa «Guardar como grupo».</p>}
+              {groups.length === 0 && <p className="text-[11px] text-slate-500">{tr('Selecciona varios elementos y pulsa «Guardar como grupo».')}</p>}
               {groups.map((g) => (
                 <div key={g.id} className="group flex items-center">
                   <button
@@ -2085,15 +2086,15 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
                       ev.dataTransfer.effectAllowed = 'copy'
                     }}
                     onClick={() => addGroup(g)}
-                    title={`${g.elements.length} elementos · arrastra a la escena o pulsa para ponerlo en el centro`}
+                    title={tr('{n} elementos · arrastra a la escena o pulsa para ponerlo en el centro', { n: g.elements.length })}
                     className="min-w-0 flex-1 truncate rounded px-1 py-0.5 text-left hover:bg-blue-50"
                   >
                     + {g.name}
                   </button>
                   <button
                     type="button"
-                    aria-label={`Borrar el grupo ${g.name}`}
-                    title="Borrar el grupo"
+                    aria-label={tr('Borrar el grupo {nombre}', { nombre: g.name })}
+                    title={tr('Borrar el grupo')}
                     onClick={() => changeGroups(groups.filter((x) => x.id !== g.id))}
                     className="rounded p-0.5 opacity-0 hover:bg-red-500 hover:text-white group-hover:opacity-100"
                   >
@@ -2158,7 +2159,7 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
             onPointerDown={onBackgroundDown}
             onPointerUp={onBackgroundUp}
             role="img"
-            aria-label="Escena"
+            aria-label={tr('Escena')}
           >
             <defs>
               <pattern id="scene-grid" width="20" height="20" patternUnits="userSpaceOnUse">
@@ -2171,7 +2172,7 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
             {scene?.gravity && <rect x="0" y={SCENE_FLOOR} width={W} height={H - SCENE_FLOOR} fill="#cbd5e1" data-floor="" />}
             {machine.length === 0 && (
               <text x={W / 2} y={H / 2} textAnchor="middle" fontSize="16" fill="#94a3b8">
-                Pulsa «Editar» y añade elementos: pulsadores, cilindros, cintas, detectores…
+                {tr('Pulsa «Editar» y añade elementos: pulsadores, cilindros, cintas, detectores…')}
               </text>
             )}
             {/* Las cintas y recogidas, debajo de todo (las piezas van encima). */}
@@ -2180,7 +2181,7 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
                 key={e.id}
                 data-element={e.type}
                 data-pos={e.type === 'cylinder' ? (state.pos[e.id] ?? 0).toFixed(2) : undefined}
-                aria-label={`${SCENE_TYPES[e.type].label} ${labelOf(e)}`}
+                aria-label={`${tr(SCENE_TYPES[e.type].label)} ${labelOf(e)}`}
                 style={{ cursor: mode === 'edit' ? 'move' : operable(e) ? 'pointer' : 'default' }}
                 onPointerDown={(ev) => onPointerDown(ev, e)}
                 onPointerUp={(ev) => onPointerUp(ev, e)}
@@ -2240,7 +2241,7 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
         {(deskItems.length > 0 || mode === 'edit') && (
           <div
             role="region"
-            aria-label="Panel de control"
+            aria-label={tr('Panel de control')}
             className="paper flex shrink-0 items-start gap-2 overflow-x-auto border-t-4 border-slate-400 bg-slate-300 px-3 py-2"
             onDragOver={(ev) => {
               if (!ev.dataTransfer.types.includes(DRAG_TYPE)) return
@@ -2255,7 +2256,7 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
             }}
           >
             {deskItems.length === 0 && (
-              <p className="py-3 text-xs text-slate-600">Panel de control: arrastra aquí pulsadores, pilotos, potenciómetros…</p>
+              <p className="py-3 text-xs text-slate-600">{tr('Panel de control: arrastra aquí pulsadores, pilotos, potenciómetros…')}</p>
             )}
             {deskItems.map((e) => {
               const b = boundsOf({ ...e, x: 0, y: 0 })
@@ -2264,7 +2265,7 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
                   key={e.id}
                   data-element={e.type}
                   data-desk=""
-                  aria-label={`${SCENE_TYPES[e.type].label} ${labelOf(e)}`}
+                  aria-label={`${tr(SCENE_TYPES[e.type].label)} ${labelOf(e)}`}
                   className={`flex w-20 shrink-0 select-none flex-col items-center rounded bg-slate-200 p-1 shadow-sm ${
                     selection.includes(e.id) ? 'ring-2 ring-blue-500' : ''
                   }`}
@@ -2291,20 +2292,20 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
         )}
         </div>
         {mode === 'edit' && selection.length > 1 && (
-          <aside className="w-48 shrink-0 space-y-2 overflow-y-auto border-l border-slate-200 p-2 text-xs" aria-label="Selección">
+          <aside className="w-48 shrink-0 space-y-2 overflow-y-auto border-l border-slate-200 p-2 text-xs" aria-label={tr('Selección')}>
             <p className="font-semibold">{selection.length} elementos seleccionados</p>
             <div className="flex flex-wrap gap-1">
               <button type="button" onClick={rotateSelected} className="flex items-center gap-1 rounded border border-slate-300 px-2 py-0.5 hover:bg-slate-100">
-                <RotateCw size={12} /> Girar
+                <RotateCw size={12} />{' '}{tr('Girar')}
               </button>
               <button type="button" onClick={duplicate} className="flex items-center gap-1 rounded border border-slate-300 px-2 py-0.5 hover:bg-slate-100">
-                <Copy size={12} /> Duplicar
+                <Copy size={12} />{' '}{tr('Duplicar')}
               </button>
               <button type="button" onClick={removeSelected} className="flex items-center gap-1 rounded border border-slate-300 px-2 py-0.5 hover:bg-red-500 hover:text-white">
-                <Trash2 size={12} /> Borrar
+                <Trash2 size={12} />{' '}{tr('Borrar')}
               </button>
             </div>
-            <p className="text-[11px] text-slate-500">Arrastra uno de ellos para mover todo el grupo. Ctrl+clic añade o quita.</p>
+            <p className="text-[11px] text-slate-500">{tr('Arrastra uno de ellos para mover todo el grupo. Ctrl+clic añade o quita.')}</p>
             <form
               className="space-y-1 border-t border-slate-200 pt-2"
               onSubmit={(ev) => {
@@ -2313,11 +2314,11 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
               }}
             >
               <label className="block">
-                <span className="text-slate-500">Guardar como grupo (Mis grupos)</span>
+                <span className="text-slate-500">{tr('Guardar como grupo (Mis grupos)')}</span>
                 <input
                   value={groupName}
                   onChange={(ev) => setGroupName(ev.target.value)}
-                  placeholder="Nombre, p. ej. Estación de taladrado"
+                  placeholder={tr('Nombre, p. ej. Estación de taladrado')}
                   className="w-full rounded border border-slate-300 px-1 py-0.5"
                 />
               </label>
@@ -2326,7 +2327,7 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
                 disabled={!groupName.trim()}
                 className="flex items-center gap-1 rounded border border-slate-300 px-2 py-0.5 hover:bg-slate-100 disabled:opacity-40"
               >
-                <BookmarkPlus size={12} /> Guardar como grupo
+                <BookmarkPlus size={12} />{' '}{tr('Guardar como grupo')}
               </button>
             </form>
           </aside>
@@ -2365,21 +2366,23 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
       {preview && mode === 'edit' && (
         <div
           role="tooltip"
-          aria-label={`Vista previa: ${PALETTE_BY_KEY[preview.key].label}`}
+          aria-label={tr('Vista previa: {elemento}', { elemento: tr(PALETTE_BY_KEY[preview.key].label) })}
           className="side-panel pointer-events-none fixed z-50 w-56 rounded-md border border-slate-200 bg-white p-2 text-xs text-slate-700 shadow-lg"
           style={{ left: Math.min(preview.x + 16, window.innerWidth - 240), top: Math.min(preview.y + 12, window.innerHeight - 220) }}
         >
-          <p className="mb-1 font-semibold">{PALETTE_BY_KEY[preview.key].label}</p>
+          <p className="mb-1 font-semibold">{tr(PALETTE_BY_KEY[preview.key].label)}</p>
           <div className="paper rounded border border-slate-100 bg-white p-1">
             <ModulePreview item={PALETTE_BY_KEY[preview.key]} />
           </div>
-          <p className="mt-1 text-slate-600">{HINTS[preview.key]}</p>
+          <p className="mt-1 text-slate-600">{tr(HINTS[preview.key])}</p>
         </div>
       )}
       {mode === 'edit' && (
         <p className="border-t border-slate-200 px-2 py-1 text-[11px] text-slate-500">
-          Arrastra módulos a la escena o al panel · rueda: zoom · arrastrar el fondo (o con la rueda pulsada): desplazar · Ctrl+clic o Mayús+arrastrar: varios · R gira · Supr borra · Ctrl+C/V/D copia, pega, duplica · deshacer y rehacer: los de siempre · asigna las variables en el panel de la derecha. Piezas de {PIECE_SIZES.small[0]} y{' '}
-          {PIECE_SIZES.large[0]} px.
+          {tr(
+            'Arrastra módulos a la escena o al panel · rueda: zoom · arrastrar el fondo (o con la rueda pulsada): desplazar · Ctrl+clic o Mayús+arrastrar: varios · R gira · Supr borra · Ctrl+C/V/D copia, pega, duplica · deshacer y rehacer: los de siempre · asigna las variables en el panel de la derecha. Piezas de {pequena} y {grande} px.',
+            { pequena: PIECE_SIZES.small[0], grande: PIECE_SIZES.large[0] },
+          )}
         </p>
       )}
     </section>

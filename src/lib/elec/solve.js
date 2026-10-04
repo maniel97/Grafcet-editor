@@ -15,6 +15,7 @@
 // Puro: se prueba sin navegador.
 import { POTENTIALS, isMotor, isSecondary, terminalsOf } from './catalog'
 import { pneuStep } from './pneumatic'
+import { t as tr } from '../i18n'
 
 const key = (c, t) => `${c}:${t}`
 const PAIRS = [
@@ -57,7 +58,7 @@ export function randomFault(schematic, rand = Math.random) {
 // { value, unit: 'V~' | 'V DC' | null, text }.
 export function voltageBetween(a, b) {
   const phase = (p) => POTENTIALS[p]?.kind === 'phase'
-  if (!a || !b) return { value: 0, unit: null, text: '0 V (sin tensión o circuito abierto)' }
+  if (!a || !b) return { value: 0, unit: null, text: tr('0 V (sin tensión o circuito abierto)') }
   if (a === b) return { value: 0, unit: null, text: '0 V (mismo potencial)' }
   const pair = new Set([a, b])
   if (pair.has('L+') && pair.has('M')) return { value: 24, unit: 'V DC', text: '24 V DC' }
@@ -65,7 +66,7 @@ export function voltageBetween(a, b) {
   if ((phase(a) && b === 'N') || (phase(b) && a === 'N') || (phase(a) && b === 'PE') || (phase(b) && a === 'PE')) return { value: 230, unit: 'V~', text: '230 V~' }
   if (phase(a) && phase(b) && ['L1', 'L2', 'L3'].includes(a) && ['L1', 'L2', 'L3'].includes(b)) return { value: 400, unit: 'V~', text: '400 V~' }
   if ((a === 'N' && b === 'PE') || (a === 'PE' && b === 'N') || (a === 'M' && b === 'PE') || (a === 'PE' && b === 'M')) return { value: 0, unit: null, text: '0 V' }
-  return { value: null, unit: null, text: 'Sin referencia común (circuitos distintos)' }
+  return { value: null, unit: null, text: tr('Sin referencia común (circuitos distintos)') }
 }
 
 export function elecInit() {
@@ -431,17 +432,17 @@ export function elecStep(schematic, state, { physical = {}, analog = {}, plcOut 
     }
     if (!best) break
     tripped[best.c.id] = true
-    const name = best.c.tag ? `-${best.c.tag}` : 'la protección'
+    const name = best.c.tag ? `-${best.c.tag}` : tr('la protección')
     short =
       best.c.type === 'rcd'
-        ? `Derivación a tierra: ha saltado ${name} (diferencial)`
+        ? tr('Derivación a tierra: ha saltado {aparato} (diferencial)', { aparato: name })
         : best.c.type === 'fuse'
-          ? `Cortocircuito: se ha fundido ${name}`
-          : `Cortocircuito: ha saltado ${name}`
+          ? tr('Cortocircuito: se ha fundido {aparato}', { aparato: name })
+          : tr('Cortocircuito: ha saltado {aparato}', { aparato: name })
     r = solve()
   }
   const dead = r.net.shorted.length > 0
-  if (dead) short = 'Cortocircuito sin protección: pon un magnetotérmico o un fusible (o corrige el cableado)'
+  if (dead) short = tr('Cortocircuito sin protección: pon un magnetotérmico o un fusible (o corrige el cableado)')
 
   const pot = (c, t) => (dead ? null : r.net.potentialOf(key(c, t)))
   const root = (c, t) => r.net.find(key(c, t))
@@ -635,7 +636,7 @@ function motorState(c, potOf, rootOf, spinning = 0) {
   const { distinct, dir } = phaseOrder(u, v, w)
   const count = [u, v, w].filter((p) => p in ORDER).length
   if (!sixWire) {
-    return { running: distinct, dir, mode: null, warning: count && !distinct ? 'Le falta una fase' : null }
+    return { running: distinct, dir, mode: null, warning: count && !distinct ? tr('Le falta una fase') : null }
   }
   const star = rootOf('U2') === rootOf('V2') && rootOf('V2') === rootOf('W2') && !potOf('U2')
   const delta = [
@@ -643,8 +644,8 @@ function motorState(c, potOf, rootOf, spinning = 0) {
     [v, potOf('V2')],
     [w, potOf('W2')],
   ].every(([a, b]) => a in ORDER && b in ORDER && a !== b)
-  const mode = distinct && star ? 'estrella' : distinct && delta ? 'triángulo' : null
-  return { running: Boolean(mode), dir: mode ? dir : 0, mode, warning: count && !mode ? 'Sin conexión válida (ni estrella ni triángulo)' : null }
+  const mode = distinct && star ? 'estrella' : distinct && delta ? tr('triángulo') : null
+  return { running: Boolean(mode), dir: mode ? dir : 0, mode, warning: count && !mode ? tr('Sin conexión válida (ni estrella ni triángulo)') : null }
 }
 
 // Monofásico: gira con tensión en el principal (U1-U2) y en el auxiliar (Z1-Z2, con su
@@ -658,8 +659,8 @@ function singlePhase(c, potOf, spinning) {
     const dir = z1 === u1 || z2 === u2 ? 1 : z1 === u2 || z2 === u1 ? -1 : 1
     return { running: true, dir, mode: null, warning: null }
   }
-  if (main && c.capacitor === 'start' && spinning) return { running: true, dir: spinning, mode: 'sin el auxiliar (ya arrancado)', warning: null }
-  return { running: false, dir: 0, mode: null, warning: main ? 'Zumba sin arrancar: falta el devanado auxiliar' : aux ? 'Sin tensión en el devanado principal' : null }
+  if (main && c.capacitor === 'start' && spinning) return { running: true, dir: spinning, mode: tr('sin el auxiliar (ya arrancado)'), warning: null }
+  return { running: false, dir: 0, mode: null, warning: main ? tr('Zumba sin arrancar: falta el devanado auxiliar') : aux ? tr('Sin tensión en el devanado principal') : null }
 }
 
 // Dos velocidades: Dahlander (lenta en triángulo por 1U-1V-1W; rápida en doble estrella por
@@ -675,13 +676,13 @@ function twoSpeed(c, potOf, rootOf) {
   if (fed(low) && fed(high)) {
     // En el Dahlander, la rápida necesita los 1 puenteados (sin tensión propia): con tensión en los
     // dos lados es un error; en el de dos devanados, también.
-    return { ...off, mode: null, warning: 'Las dos velocidades a la vez: conexión no válida' }
+    return { ...off, mode: null, warning: tr('Las dos velocidades a la vez: conexión no válida') }
   }
-  if (slow.distinct) return { running: true, dir: slow.dir, speed: 0.5, mode: c.type === 'dahlander' ? 'velocidad lenta (triángulo)' : 'velocidad lenta', warning: null }
+  if (slow.distinct) return { running: true, dir: slow.dir, speed: 0.5, mode: c.type === 'dahlander' ? tr('velocidad lenta (triángulo)') : 'velocidad lenta', warning: null }
   if (fast.distinct) {
     if (c.type === 'dahlander' && !(rootOf('1U') === rootOf('1V') && rootOf('1V') === rootOf('1W')))
-      return { ...off, mode: null, warning: 'Rápida sin puentear 1U-1V-1W (doble estrella)' }
-    return { running: true, dir: fast.dir, speed: 1, mode: c.type === 'dahlander' ? 'velocidad rápida (doble estrella)' : 'velocidad rápida', warning: null }
+      return { ...off, mode: null, warning: tr('Rápida sin puentear 1U-1V-1W (doble estrella)') }
+    return { running: true, dir: fast.dir, speed: 1, mode: c.type === 'dahlander' ? tr('velocidad rápida (doble estrella)') : tr('velocidad rápida'), warning: null }
   }
-  return { ...off, mode: null, warning: fed(low) || fed(high) ? 'Le falta una fase' : null }
+  return { ...off, mode: null, warning: fed(low) || fed(high) ? tr('Le falta una fase') : null }
 }

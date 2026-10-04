@@ -44,7 +44,7 @@ export default function CpuControls({ config = {}, status, onChange, onApplySymb
             </label>
             <label className="flex items-center gap-1.5">
               <input type="radio" name="cpu-source" checked={config.source === 'file'} onChange={() => set({ source: 'file' })} disabled={!config.text} />
-              Un programa de Micro/WIN {config.name ? <span className="font-mono">({config.name})</span> : ''}
+              {t('Un programa de Micro/WIN')} {config.name ? <span className="font-mono">({config.name})</span> : ''}
             </label>
           </fieldset>
           <div className="flex flex-wrap gap-1">

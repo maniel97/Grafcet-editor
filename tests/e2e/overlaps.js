@@ -1,9 +1,9 @@
 // Comprobación de textos que se pisan en el esquema eléctrico, medida en el navegador: cada línea
 // de cada rótulo (y los números de borne) contra los trazos de los demás aparatos, sus rótulos y
 // los cables. Devuelve una lista de descripciones (vacía si no se pisa nada).
-export async function schematicOverlaps(page, { where = false } = {}) {
-  const found = await page.evaluate(() => {
-    const section = document.querySelector('section[aria-label="Esquema eléctrico"]')
+export async function schematicOverlaps(page, { where = false, label = 'Esquema eléctrico' } = {}) {
+  const found = await page.evaluate((label) => {
+    const section = document.querySelector(`section[aria-label="${label}"]`)
     const box = (r, d = 0.5) => ({ l: r.left + d, t: r.top + d, r: r.right - d, b: r.bottom - d })
     const hit = (a, b) => a.l < b.r && b.l < a.r && a.t < b.b && b.t < a.b
     const nodes = [...section.querySelectorAll('.react-flow__node')].filter((n) => !n.classList.contains('react-flow__node-elecframe'))
@@ -88,7 +88,7 @@ export async function schematicOverlaps(page, { where = false } = {}) {
       }
     })
     return out
-  })
+  }, label)
   const seen = new Set()
   const unique = found.filter((f) => !seen.has(f.msg) && seen.add(f.msg))
   return where ? unique : unique.map((f) => f.msg)

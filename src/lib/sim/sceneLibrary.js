@@ -4,6 +4,7 @@
 // Grupo: { id, name, elements: [...] } con las posiciones relativas a su esquina superior
 // izquierda y los ids propios del grupo (para las referencias internas: un cilindro montado en
 // otro del mismo grupo).
+import { N_ } from '../i18n'
 
 const KEY = 'grafcet-editor:scene-groups'
 const FORMAT = 'grafcet-editor-scene-groups'
@@ -68,9 +69,9 @@ export function importGroups(text, current) {
   try {
     data = JSON.parse(text)
   } catch {
-    throw new Error('El archivo no es un JSON válido.')
+    throw new Error(N_('El archivo no es un JSON válido.'))
   }
-  if (data?.format !== FORMAT || !Array.isArray(data.groups)) throw new Error('El archivo no contiene grupos de la planta.')
+  if (data?.format !== FORMAT || !Array.isArray(data.groups)) throw new Error(N_('El archivo no contiene grupos de la planta.'))
   const taken = new Set(current.map((g) => g.id))
   const added = data.groups.filter(valid).map((g, i) => (taken.has(g.id) || !g.id ? { ...g, id: `g${Date.now().toString(36)}${i}` } : g))
   return [...current, ...added]

@@ -100,8 +100,7 @@ export default function GemmaDialog({ gemma, onChange, grafcets, onGenerate, onC
           </label>
           {missingTarget && (
             <p className="rounded bg-amber-50 p-2 text-xs text-amber-900">
-              No hay ningún grafcet parcial «{gemma.production}»: encierra tu grafcet de producción en un marco con ese nombre
-              (clic derecho sobre la selección) para que los forzados funcionen.
+              {t('No hay ningún grafcet parcial «{nombre}»: encierra tu grafcet de producción en un marco con ese nombre (clic derecho sobre la selección) para que los forzados funcionen.', { nombre: gemma.production })}
             </p>
           )}
 

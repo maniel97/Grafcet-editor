@@ -8,6 +8,7 @@
 // Cada aparato queda enlazado con su señal de la planta (pulsarlo en la planta acciona su
 // contacto; la bobina mueve la planta). Entradas en sumidero (1M a M), salidas por relé (1L a L+).
 import { GRID, nextTag, plcTerminals, sizeOf, terminalAddress } from './catalog'
+import { t as tr } from '../i18n'
 
 const PLC_X = 100
 // Sitio de un aparato en su fila: su ancho, su rótulo (92 px) y el accionamiento del siguiente.
@@ -87,7 +88,7 @@ export function generatePlcWiring(variables, scene, existing = { components: [],
   let n = 0
   const plcId = `plc-${Date.now().toString(36)}`
   const id = (p) => `${p}-${plcId}-${n++}`
-  const plc = { id: plcId, ...plcBase, x: PLC_X, y: plcY, tag: nextTag(all, 'A'), text: 'Autómata' }
+  const plc = { id: plcId, ...plcBase, x: PLC_X, y: plcY, tag: nextTag(all, 'A'), text: tr('Autómata') }
   all.push(plc)
   const components = [plc]
   const wires = []

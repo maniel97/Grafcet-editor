@@ -9,6 +9,7 @@ import { contactNumbers, isPneumatic, showTag, sizeOf, terminalsOf } from '../..
 import { COLUMN_WIDTH, FRAME_HEIGHT, FRAME_TOP, crossReferenceMap, elecSheetsOf, frameColumns, sheetOfComponent } from '../../lib/elec/sheet'
 import { WIRE_COLORS, junctions, sectionWidth, wireNumbers } from '../../lib/elec/wiring'
 import { routePath, wireRoute } from '../../lib/elec/route'
+import { t as tr } from '../../lib/i18n'
 
 const BOXED = new Set(['psu', 'phasemonitor', 'vfd', 'softstarter', 'safetyrelay'])
 const MARGIN = 20
@@ -134,7 +135,7 @@ export default function ElecStatic({ schematic, sheetId, info = {} }) {
       })}
       {!comps.length && (
         <text x={box.x + box.w / 2} y={box.y + box.h / 2} textAnchor="middle" fontSize="14" fill="#94a3b8">
-          Hoja vacía
+          {tr('Hoja vacía')}
         </text>
       )}
     </svg>

@@ -25,7 +25,7 @@ export default function S7200Config({ plc, symbols, onChange }) {
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
         <strong>{t('Configuración S7-200')}</strong>
         <span className="text-slate-600">
-          El proyecto usa {needs.di} entradas y {needs.do} salidas digitales
+          {t('El proyecto usa {di} entradas y {do} salidas digitales', { di: needs.di, do: needs.do })}
           {needs.ai + needs.ao > 0 && t(', {ai} entradas y {ao} salidas analógicas', { ai: needs.ai, ao: needs.ao })}.
         </span>
       </div>

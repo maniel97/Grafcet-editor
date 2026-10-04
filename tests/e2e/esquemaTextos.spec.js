@@ -32,6 +32,31 @@ test('esquema eléctrico: ningún montaje tiene textos que se pisen (editor y pl
   }
 })
 
+// Traducidos, los rótulos cambian de largo: en los demás idiomas tampoco se pisan.
+for (const lang of ['en', 'fr', 'pt']) test(`esquema eléctrico en ${lang}: ningún montaje tiene textos que se pisen`, async ({ page }) => {
+  test.setTimeout(240000)
+  const dict = JSON.parse(readFileSync(new URL(`../../src/locales/${lang}.json`, import.meta.url), 'utf8'))
+  const T = (text) => dict[text] || text
+  await page.setViewportSize({ width: 1600, height: 1000 })
+  await openEditor(page)
+  await page.getByTitle('Opciones: tema, letra y tamaño').click()
+  await page.getByLabel('Idioma').selectOption(lang)
+  await page.keyboard.press('Escape')
+  await page.getByRole('button', { name: T('Esquema eléctrico') }).click()
+  const view = page.getByRole('region', { name: T('Esquema eléctrico') })
+  await view.getByRole('button', { name: T('Pantalla completa') }).click()
+  for (const t of ELEC_TEMPLATES) {
+    await view.getByLabel(T('Insertar montaje')).selectOption(t.id)
+    await expect(view.locator('.react-flow__node').first()).toBeVisible()
+    await page.waitForTimeout(300)
+    expect(await schematicOverlaps(page, { label: T('Esquema eléctrico') }), `${lang}: ${t.id}`).toEqual([])
+    await view.locator('.react-flow__pane').click({ position: { x: 5, y: 5 } })
+    await page.keyboard.press('Control+a')
+    await page.keyboard.press('Delete')
+    await expect(view.locator('.react-flow__node')).toHaveCount(0)
+  }
+})
+
 test('esquema eléctrico: el esquema de cada ejemplo, sin textos que se pisen', async ({ page }) => {
   test.setTimeout(240000)
   await page.setViewportSize({ width: 1600, height: 1000 })

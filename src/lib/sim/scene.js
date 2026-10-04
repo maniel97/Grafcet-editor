@@ -14,51 +14,52 @@
 // Estado: { pos: { [cilindro]: 0..1 }, pressed: { [mando]: bool }, level: { [depósito]: 0..1 },
 //           angle: { [motor]: grados }, faults: { [elemento]: avería }, pieces: [{ id, x, y, w, h,
 //           color, vy }], counts: { [recogida]: n }, nextPiece, fed: { [alimentador]: valor anterior } }
+import { N_, t as tr } from '../i18n'
 
 export const SCENE_TYPES = {
-  button: { label: 'Pulsador', group: 'Mandos', defaults: { variable: '', contact: 'NO', color: 'green', text: '' } },
-  switch: { label: 'Interruptor', group: 'Mandos', defaults: { variable: '', contact: 'NO', text: '' } },
-  emergency: { label: 'Seta de emergencia', group: 'Mandos', defaults: { variable: '', text: 'Emergencia' } },
-  lamp: { label: 'Piloto', group: 'Señalización', defaults: { variable: '', color: 'green', text: '' } },
+  button: { label: N_('Pulsador'), group: N_('Mandos'), defaults: { variable: '', contact: 'NO', color: 'green', text: '' } },
+  switch: { label: N_('Interruptor'), group: N_('Mandos'), defaults: { variable: '', contact: 'NO', text: '' } },
+  emergency: { label: N_('Seta de emergencia'), group: N_('Mandos'), defaults: { variable: '', text: N_('Emergencia') } },
+  lamp: { label: N_('Piloto'), group: N_('Señalización'), defaults: { variable: '', color: 'green', text: '' } },
   cylinder: {
-    label: 'Cilindro',
-    group: 'Actuadores',
+    label: N_('Cilindro'),
+    group: N_('Actuadores'),
     defaults: { extend: '', retract: '', retracted: '', extended: '', position: '', vacuum: '', holding: '', mountedOn: '', stroke: 100, time: 1, text: '' },
   },
-  conveyor: { label: 'Cinta', group: 'Actuadores', defaults: { motor: '', reverse: '', length: 240, time: 4, text: '' } },
-  limit: { label: 'Final de carrera', group: 'Detectores', defaults: { variable: '', contact: 'NO' } },
-  sensor: { label: 'Detector de presencia', group: 'Detectores', defaults: { variable: '', contact: 'NO', range: 60, kind: 'optical', color: 'amber' } },
-  distance: { label: 'Sensor de distancia', group: 'Detectores', defaults: { variable: '', range: 200, text: '' } },
-  scale: { label: 'Báscula', group: 'Detectores', defaults: { variable: '', text: '' } },
-  potentiometer: { label: 'Potenciómetro', group: 'Mandos', defaults: { variable: '', initial: 0.5, text: '' } },
+  conveyor: { label: N_('Cinta'), group: N_('Actuadores'), defaults: { motor: '', reverse: '', length: 240, time: 4, text: '' } },
+  limit: { label: N_('Final de carrera'), group: N_('Detectores'), defaults: { variable: '', contact: 'NO' } },
+  sensor: { label: N_('Detector de presencia'), group: N_('Detectores'), defaults: { variable: '', contact: 'NO', range: 60, kind: 'optical', color: 'amber' } },
+  distance: { label: N_('Sensor de distancia'), group: N_('Detectores'), defaults: { variable: '', range: 200, text: '' } },
+  scale: { label: N_('Báscula'), group: N_('Detectores'), defaults: { variable: '', text: '' } },
+  potentiometer: { label: N_('Potenciómetro'), group: N_('Mandos'), defaults: { variable: '', initial: 0.5, text: '' } },
   heater: {
-    label: 'Calentador',
-    group: 'Proceso',
+    label: N_('Calentador'),
+    group: N_('Proceso'),
     defaults: { heat: '', temperature: '', thermostat: '', setpoint: 60, ambient: 20, maxTemp: 150, tau: 20, text: '' },
   },
   feeder: {
-    label: 'Alimentador de piezas',
-    group: 'Proceso',
+    label: N_('Alimentador de piezas'),
+    group: N_('Proceso'),
     defaults: { trigger: '', auto: true, spacing: 0, sizes: 'small', material: 'plastic', color: 'amber' },
   },
-  sink: { label: 'Recogida', group: 'Proceso', defaults: { text: '' } },
+  sink: { label: N_('Recogida'), group: N_('Proceso'), defaults: { text: '' } },
   tank: {
-    label: 'Depósito',
-    group: 'Proceso',
+    label: N_('Depósito'),
+    group: N_('Proceso'),
     defaults: { fill: '', fillFine: '', drain: '', low: '', high: '', empty: '', level: '', fillTime: 10, drainTime: 10, initial: 0, text: '' },
   },
-  motor: { label: 'Motor', group: 'Actuadores', defaults: { variable: '', reverse: '', pulses: '', text: '' } },
-  display: { label: 'Visualizador', group: 'Señalización', defaults: { variable: '', text: '' } },
-  diverter: { label: 'Desviador', group: 'Actuadores', defaults: { gate: '', length: 80, time: 0.5, text: '' } },
-  ramp: { label: 'Rampa', group: 'Proceso', defaults: { length: 120, time: 1, text: '' } },
-  platform: { label: 'Plataforma', group: 'Proceso', defaults: { length: 160, text: '' } },
-  siren: { label: 'Sirena', group: 'Señalización', defaults: { variable: '', sound: false, text: '' } },
-  trafficlight: { label: 'Semáforo', group: 'Señalización', defaults: { red: '', amber: '', green: '', text: '' } },
-  valve: { label: 'Electroválvula', group: 'Actuadores', defaults: { variable: '', text: '' } },
-  barrier: { label: 'Barrera', group: 'Actuadores', defaults: { open: '', close: '', opened: '', closed: '', length: 140, time: 2, text: '' } },
-  pipe: { label: 'Tubería', group: 'Decoración', defaults: { variable: '', length: 160, text: '' } },
-  label: { label: 'Rótulo', group: 'Decoración', defaults: { text: 'Rótulo', size: 16 } },
-  image: { label: 'Imagen', group: 'Decoración', defaults: { src: '', width: 300, height: 200, text: '' } },
+  motor: { label: N_('Motor'), group: N_('Actuadores'), defaults: { variable: '', reverse: '', pulses: '', text: '' } },
+  display: { label: N_('Visualizador'), group: N_('Señalización'), defaults: { variable: '', text: '' } },
+  diverter: { label: N_('Desviador'), group: N_('Actuadores'), defaults: { gate: '', length: 80, time: 0.5, text: '' } },
+  ramp: { label: N_('Rampa'), group: N_('Proceso'), defaults: { length: 120, time: 1, text: '' } },
+  platform: { label: N_('Plataforma'), group: N_('Proceso'), defaults: { length: 160, text: '' } },
+  siren: { label: N_('Sirena'), group: N_('Señalización'), defaults: { variable: '', sound: false, text: '' } },
+  trafficlight: { label: N_('Semáforo'), group: N_('Señalización'), defaults: { red: '', amber: '', green: '', text: '' } },
+  valve: { label: N_('Electroválvula'), group: N_('Actuadores'), defaults: { variable: '', text: '' } },
+  barrier: { label: N_('Barrera'), group: N_('Actuadores'), defaults: { open: '', close: '', opened: '', closed: '', length: 140, time: 2, text: '' } },
+  pipe: { label: N_('Tubería'), group: N_('Decoración'), defaults: { variable: '', length: 160, text: '' } },
+  label: { label: N_('Rótulo'), group: N_('Decoración'), defaults: { text: N_('Rótulo'), size: 16 } },
+  image: { label: N_('Imagen'), group: N_('Decoración'), defaults: { src: '', width: 300, height: 200, text: '' } },
 }
 
 // Variables de cada tipo: [clave, etiqueta, 'in' (la escena la escribe) | 'out' (la lee)].
@@ -69,43 +70,43 @@ export const SCENE_VARS = {
   lamp: [['variable', 'Salida', 'out']],
   cylinder: [
     ['extend', 'Sale (A+)', 'out'],
-    ['retract', 'Entra (A−; vacío = muelle)', 'out'],
+    ['retract', N_('Entra (A−; vacío = muelle)'), 'out'],
     ['retracted', 'Detector dentro (a0)', 'in'],
     ['extended', 'Detector fuera (a1)', 'in'],
-    ['position', 'Posición (analógica, opcional)', 'analog'],
-    ['vacuum', 'Ventosa: vacío (opcional)', 'out'],
+    ['position', N_('Posición (analógica, opcional)'), 'analog'],
+    ['vacuum', N_('Ventosa: vacío (opcional)'), 'out'],
     ['holding', 'Ventosa: pieza cogida (opcional)', 'in'],
   ],
   conveyor: [
     ['motor', 'Motor', 'out'],
-    ['reverse', 'Marcha atrás (opcional)', 'out'],
+    ['reverse', N_('Marcha atrás (opcional)'), 'out'],
   ],
   limit: [['variable', 'Entrada', 'in']],
   sensor: [['variable', 'Entrada', 'in']],
-  distance: [['variable', 'Distancia (analógica)', 'analog']],
-  scale: [['variable', 'Peso en kg (analógica)', 'analog']],
-  potentiometer: [['variable', 'Entrada analógica', 'analog']],
+  distance: [['variable', N_('Distancia (analógica)'), 'analog']],
+  scale: [['variable', N_('Peso en kg (analógica)'), 'analog']],
+  potentiometer: [['variable', N_('Entrada analógica'), 'analog']],
   heater: [
     ['heat', 'Resistencia', 'out'],
-    ['temperature', 'Temperatura en °C (analógica)', 'analog'],
+    ['temperature', N_('Temperatura en °C (analógica)'), 'analog'],
     ['thermostat', 'Termostato (opcional)', 'in'],
   ],
   // La orden de soltar pieza: una salida del grafcet o un pulsador de la planta (flanco de subida).
   feeder: [['trigger', 'Soltar pieza: salida o pulsador (opcional)', 'trigger']],
   sink: [],
   tank: [
-    ['fill', 'Válvula de llenado', 'out'],
-    ['fillFine', 'Llenado fino (opcional, 5 veces más lento)', 'out'],
-    ['drain', 'Válvula de vaciado', 'out'],
+    ['fill', N_('Válvula de llenado'), 'out'],
+    ['fillFine', N_('Llenado fino (opcional, 5 veces más lento)'), 'out'],
+    ['drain', N_('Válvula de vaciado'), 'out'],
     ['low', 'Sensor nivel bajo', 'in'],
     ['high', 'Sensor nivel alto', 'in'],
-    ['empty', 'Sensor de vacío (opcional)', 'in'],
-    ['level', 'Nivel (analógica)', 'analog'],
+    ['empty', N_('Sensor de vacío (opcional)'), 'in'],
+    ['level', N_('Nivel (analógica)'), 'analog'],
   ],
   motor: [
     ['variable', 'Marcha', 'out'],
     ['reverse', 'Giro inverso (opcional)', 'out'],
-    ['pulses', 'Encoder: 1 impulso por vuelta (opcional)', 'in'],
+    ['pulses', N_('Encoder: 1 impulso por vuelta (opcional)'), 'in'],
   ],
   display: [['variable', 'Valor', 'any']],
   diverter: [['gate', 'Desviar (salida)', 'out']],
@@ -114,13 +115,13 @@ export const SCENE_VARS = {
   siren: [['variable', 'Salida', 'out']],
   trafficlight: [
     ['red', 'Rojo (salida)', 'out'],
-    ['amber', 'Ámbar (salida)', 'out'],
+    ['amber', N_('Ámbar (salida)'), 'out'],
     ['green', 'Verde (salida)', 'out'],
   ],
   valve: [['variable', 'Abrir (salida)', 'out']],
   barrier: [
     ['open', 'Abrir (salida)', 'out'],
-    ['close', 'Cerrar (salida; vacío = por su peso)', 'out'],
+    ['close', N_('Cerrar (salida; vacío = por su peso)'), 'out'],
     ['opened', 'Final abierta (entrada)', 'in'],
     ['closed', 'Final cerrada (entrada)', 'in'],
   ],
@@ -138,12 +139,12 @@ export const PIECE_SIZES = { small: [28, 28], large: [44, 44] }
 // Tipos de detector de presencia: qué ven (piezas y vástagos de los cilindros).
 //   óptico y capacitivo: cualquier pieza; inductivo: solo metal; de color: piezas de su color.
 export const SENSOR_KINDS = {
-  optical: { label: 'Óptico (réflex)', range: 60 },
-  inductive: { label: 'Inductivo (metal)', range: 20 },
-  capacitive: { label: 'Capacitivo', range: 20 },
-  color: { label: 'De color', range: 30 },
+  optical: { label: N_('Óptico (réflex)'), range: 60 },
+  inductive: { label: N_('Inductivo (metal)'), range: 20 },
+  capacitive: { label: N_('Capacitivo'), range: 20 },
+  color: { label: N_('De color'), range: 30 },
 }
-export const PIECE_COLORS = { amber: 'Ámbar', red: 'Rojo', blue: 'Azul', green: 'Verde', black: 'Negro' }
+export const PIECE_COLORS = { amber: N_('Ámbar'), red: N_('Rojo'), blue: N_('Azul'), green: N_('Verde'), black: N_('Negro') }
 // Masa de una pieza (kg), para la báscula: el metal pesa el triple.
 export const pieceMass = (p) => (p.w >= PIECE_SIZES.large[0] ? 2 : 1) * (p.material === 'metal' ? 3 : 1)
 
@@ -633,34 +634,34 @@ export function sceneFaults(e) {
   switch (e.type) {
     case 'cylinder':
       return [
-        { id: 'stuck', label: 'Atascado' },
-        ...(e.retracted ? [{ id: 'sensor:retracted', label: `Detector ${e.retracted} roto` }] : []),
-        ...(e.extended ? [{ id: 'sensor:extended', label: `Detector ${e.extended} roto` }] : []),
-        ...(e.vacuum ? [{ id: 'vacuum', label: 'Ventosa sin vacío (no coge)' }] : []),
+        { id: 'stuck', label: N_('Atascado') },
+        ...(e.retracted ? [{ id: 'sensor:retracted', label: tr('Detector {senal} roto', { senal: e.retracted }) }] : []),
+        ...(e.extended ? [{ id: 'sensor:extended', label: tr('Detector {senal} roto', { senal: e.extended }) }] : []),
+        ...(e.vacuum ? [{ id: 'vacuum', label: N_('Ventosa sin vacío (no coge)') }] : []),
       ]
     case 'conveyor':
     case 'motor':
     case 'diverter':
-      return [{ id: 'stuck', label: 'Atascado' }]
+      return [{ id: 'stuck', label: N_('Atascado') }]
     case 'barrier':
       return [
-        { id: 'stuck', label: 'Atascada' },
-        ...(e.opened ? [{ id: 'sensor:opened', label: `Final ${e.opened} roto` }] : []),
-        ...(e.closed ? [{ id: 'sensor:closed', label: `Final ${e.closed} roto` }] : []),
+        { id: 'stuck', label: N_('Atascada') },
+        ...(e.opened ? [{ id: 'sensor:opened', label: tr('Final {senal} roto', { senal: e.opened }) }] : []),
+        ...(e.closed ? [{ id: 'sensor:closed', label: tr('Final {senal} roto', { senal: e.closed }) }] : []),
       ]
     case 'limit':
     case 'sensor':
     case 'distance':
     case 'scale':
-      return [{ id: 'broken', label: 'Roto (no detecta)' }]
+      return [{ id: 'broken', label: N_('Roto (no detecta)') }]
     case 'heater':
-      return [{ id: 'stuck', label: 'Resistencia fundida' }, ...(e.temperature ? [{ id: 'sensor:temperature', label: 'Sonda de temperatura rota' }] : [])]
+      return [{ id: 'stuck', label: N_('Resistencia fundida') }, ...(e.temperature ? [{ id: 'sensor:temperature', label: N_('Sonda de temperatura rota') }] : [])]
     case 'tank':
       return [
-        { id: 'stuck', label: 'Válvulas atascadas' },
-        ...(e.low ? [{ id: 'sensor:low', label: `Sensor ${e.low} roto` }] : []),
-        ...(e.high ? [{ id: 'sensor:high', label: `Sensor ${e.high} roto` }] : []),
-        ...(e.empty ? [{ id: 'sensor:empty', label: `Sensor ${e.empty} roto` }] : []),
+        { id: 'stuck', label: N_('Válvulas atascadas') },
+        ...(e.low ? [{ id: 'sensor:low', label: tr('Sensor {senal} roto', { senal: e.low }) }] : []),
+        ...(e.high ? [{ id: 'sensor:high', label: tr('Sensor {senal} roto', { senal: e.high }) }] : []),
+        ...(e.empty ? [{ id: 'sensor:empty', label: tr('Sensor {senal} roto', { senal: e.empty }) }] : []),
       ]
     default:
       return []

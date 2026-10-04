@@ -25,6 +25,8 @@ export function wrap(source, importPath) {
     if (/&&|\|\||\(\)|\breturn\b|\bconst\b|\.map\b/.test(text)) return all
     // Código entre dos etiquetas (p. ej. un ternario: «</code> ) : x ? ( <strong»).
     if (/^\s*[)\]]|\?\s*\(|\s:\s*\(/.test(text)) return all
+    // Elementos JSX como valores de un objeto o una lista: «/>,\n  clave: <…».
+    if (/^\s*,/.test(text) || /[\w'"]:\s*$/.test(text)) return all
     const collapsed = text
       .split('\n')
       .map((line) => line.trim())

@@ -2,29 +2,30 @@ import { Handle, Position } from '@xyflow/react'
 import { ElecSymbol } from './ElecSymbols'
 import { INK, POTENTIAL_COLORS } from './elecColors'
 import { ELEC_TYPES, POTENTIALS, isMotor, isPneumatic, showTag, sizeOf, terminalsOf } from '../../lib/elec/catalog'
+import { N_, t as tr } from '../../lib/i18n'
 
 // Lo que se acciona con el ratón al simular (modo Usar).
 const MOMENTARY = new Set(['pushbutton', 'litbutton'])
 const TOGGLES = new Set(['switch', 'emergency', 'breaker', 'motorprotector', 'thermal', 'fuse', 'rcd', 'selector3', 'changeover', 'crossover', 'mainswitch', 'doorswitch', 'lightcurtain', 'potentiometer'])
 const HINTS = {
-  pushbutton: 'Mantén pulsado para accionarlo',
-  switch: 'Clic: conmutar',
-  emergency: 'Clic: pulsar o desenclavar la seta',
-  breaker: 'Clic: abrir o cerrar (rearmar si ha saltado)',
-  motorprotector: 'Clic: abrir o cerrar (rearmar si ha saltado)',
-  thermal: 'Clic: provocar una sobrecarga o rearmarlo',
-  fuse: 'Clic: abrir o cerrar el portafusibles (reponer si se ha fundido)',
-  rcd: 'Clic: abrir o cerrar (rearmar si ha saltado) · T: botón de prueba',
-  selector3: 'Clic: siguiente posición (0 → 1 → 2)',
-  changeover: 'Clic: conmutar',
-  crossover: 'Clic: conmutar',
-  mainswitch: 'Clic: abrir o cerrar el interruptor general',
-  doorswitch: 'Clic: abrir o cerrar la puerta del resguardo',
-  lightcurtain: 'Clic: cortar el haz (o dejarlo libre)',
-  potentiometer: 'Clic: +25 % (de 100 % vuelve a 0)',
-  litbutton: 'Mantén pulsado para accionarlo',
-  frl: 'Clic: abrir o cortar el aire',
-  throttle: 'Clic: abrir más el regulador (+25 %)',
+  pushbutton: N_('Mantén pulsado para accionarlo'),
+  switch: N_('Clic: conmutar'),
+  emergency: N_('Clic: pulsar o desenclavar la seta'),
+  breaker: N_('Clic: abrir o cerrar (rearmar si ha saltado)'),
+  motorprotector: N_('Clic: abrir o cerrar (rearmar si ha saltado)'),
+  thermal: N_('Clic: provocar una sobrecarga o rearmarlo'),
+  fuse: N_('Clic: abrir o cerrar el portafusibles (reponer si se ha fundido)'),
+  rcd: N_('Clic: abrir o cerrar (rearmar si ha saltado) · T: botón de prueba'),
+  selector3: N_('Clic: siguiente posición (0 → 1 → 2)'),
+  changeover: N_('Clic: conmutar'),
+  crossover: N_('Clic: conmutar'),
+  mainswitch: N_('Clic: abrir o cerrar el interruptor general'),
+  doorswitch: N_('Clic: abrir o cerrar la puerta del resguardo'),
+  lightcurtain: N_('Clic: cortar el haz (o dejarlo libre)'),
+  potentiometer: N_('Clic: +25 % (de 100 % vuelve a 0)'),
+  litbutton: N_('Mantén pulsado para accionarlo'),
+  frl: N_('Clic: abrir o cortar el aire'),
+  throttle: N_('Clic: abrir más el regulador (+25 %)'),
 }
 
 // Componente del esquema eléctrico en el lienzo (React Flow): símbolo, bornes (handles) y rótulos.
@@ -38,9 +39,9 @@ export default function ElecNode({ data }) {
   // Con el polímetro o las averías, el clic es para la herramienta, no para accionar.
   const momentary = use && !tool && (MOMENTARY.has(c.type) || (c.type === 'pvalve' && c.manual === 'button'))
   const toggle = use && !tool && (TOGGLES.has(c.type) || (c.type === 'pvalve' && c.manual === 'lever') || c.type === 'frl' || c.type === 'throttle')
-  const hint = c.type === 'pvalve' ? { button: 'Mantén pulsado para accionar la válvula', lever: 'Clic: mover la palanca' }[c.manual] : HINTS[c.type]
+  const hint = c.type === 'pvalve' ? { button: tr('Mantén pulsado para accionar la válvula'), lever: tr('Clic: mover la palanca') }[c.manual] : tr(HINTS[c.type])
   const fault = view?.faults?.[c.id]
-  const label = ELEC_TYPES[c.type]?.label ?? c.type
+  const label = tr(ELEC_TYPES[c.type]?.label) ?? c.type
   const tag = c.type === 'contact' || c.type === 'maincontacts' ? c.ref : c.tag
   const rail = c.type === 'rail'
   // Estado al simular (para leerlo y para las pruebas): cargas y motores, encendidos; contactos,
@@ -123,34 +124,34 @@ export default function ElecNode({ data }) {
           {where && <div className="font-mono text-[9px] text-slate-500">{where}</div>}
           {c.signal && <div className="font-mono text-[9px] text-blue-700">↔ {c.signal}</div>}
           {view?.motors?.[c.id]?.mode && <div className="text-green-700">{view.motors[c.id].mode}</div>}
-          {view?.motors?.[c.id]?.warning && <div className="text-amber-700">{view.motors[c.id].warning}</div>}
+          {view?.motors?.[c.id]?.warning && <div className="text-amber-700">{tr(view.motors[c.id].warning)}</div>}
           {view?.tripped?.[c.id] && <div className="font-semibold text-red-700">{c.type === 'fuse' ? 'Fundido' : 'Disparado'}</div>}
           {fault && <div className="font-semibold text-red-700">{fault === 'welded' ? 'Avería: soldado' : ['coil', 'valve', 'lamp', 'buzzer', 'brake'].includes(c.type) || isMotor(c.type) ? 'Avería: cortado' : c.type === 'terminal' ? 'Avería: borna floja' : 'Avería: quemado'}</div>}
           {c.type === 'counter' && <div className="text-slate-600">{`Preselección ${c.preset ?? 1}`}</div>}
           {c.type === 'coil' && c.kind === 'flash' && <div className="text-slate-600">{`Intermitente ${c.preset ?? 1} s`}</div>}
-          {c.type === 'coil' && c.kind === 'impulse' && <div className="text-slate-600">Telerruptor</div>}
+          {c.type === 'coil' && c.kind === 'impulse' && <div className="text-slate-600">{tr('Telerruptor')}</div>}
           {c.type === 'coil' && c.interlock && <div className="text-slate-600">{`Enclavamiento mecánico con -${c.interlock}`}</div>}
-          {c.type === 'emergency' && Number(c.channels) === 2 && <div className="text-slate-600">Doble canal</div>}
+          {c.type === 'emergency' && Number(c.channels) === 2 && <div className="text-slate-600">{tr('Doble canal')}</div>}
           {c.type === 'transmitter' && <div className="text-slate-600">{c.output === '0-10V' ? '0-10 V (3 hilos)' : '4-20 mA (2 hilos)'}</div>}
           {c.type === 'vfd' && <div className="text-slate-600">{`2ª velocidad ${c.speed2 ?? 25} Hz`}</div>}
           {c.type === 'softstarter' && <div className="text-slate-600">{`Rampa ${c.ramp ?? 3} s`}</div>}
-          {c.type === 'safetyrelay' && view?.safety?.[c.id]?.discrepancy && <div className="font-semibold text-amber-700">Discrepancia entre canales</div>}
+          {c.type === 'safetyrelay' && view?.safety?.[c.id]?.discrepancy && <div className="font-semibold text-amber-700">{tr('Discrepancia entre canales')}</div>}
           {c.type === 'brake' && view && <div className={view.loads?.[c.id] ? 'text-green-700' : 'text-red-700'}>{view.loads?.[c.id] ? 'Suelto' : 'Frenado'}</div>}
           {c.type === 'pcylinder' && <div className="text-slate-600">{c.acting === 'single' ? 'Simple efecto' : 'Doble efecto'}</div>}
           {cyl?.note && <div className="text-amber-700">{cyl.note}</div>}
           {c.type === 'pvalve' && <div className="text-slate-600">{`${c.ways ?? '5/2'} ${c.ways === '5/3' ? `centro ${{ closed: 'cerrado', exhaust: 'a escape', pressure: 'a presión' }[c.center] ?? 'cerrado'}` : c.sol12 ? 'biestable' : c.ways === '3/2' && c.normally === 'NO' ? 'NA' : 'monoestable'}`}</div>}
           {c.type === 'throttle' && <div className="text-slate-600">{`Abierto ${Math.round((view?.knob?.[c.id] ?? Number(c.setting ?? 0.5)) * 100)} %`}</div>}
-          {c.type === 'airsource' && air?.leaks && <div className="font-semibold text-amber-700">Fuga: el aire sale por un escape</div>}
+          {c.type === 'airsource' && air?.leaks && <div className="font-semibold text-amber-700">{tr('Fuga: el aire sale por un escape')}</div>}
           {c.type === 'motor1' && <div className="text-slate-600">{c.capacitor === 'start' ? 'Condensador de arranque' : 'Condensador permanente'}</div>}
           {view?.motors?.[c.id]?.running && view.motors[c.id].speed < 1 && <div className="text-green-700">{`${Math.round(view.motors[c.id].speed * 100)} % de velocidad`}</div>}
         </div>
       )}
-      {rail && <span className="sr-only">{POTENTIALS[c.potential]?.label}</span>}
+      {rail && <span className="sr-only">{tr(POTENTIALS[c.potential]?.label)}</span>}
       {/* Diferencial: botón de prueba (T), al simular. */}
       {use && c.type === 'rcd' && (
         <button
           type="button"
-          title="Botón de prueba del diferencial"
+          title={tr('Botón de prueba del diferencial')}
           aria-label={`Probar ${showTag(c.tag)}`}
           onClick={(e) => {
             e.stopPropagation()

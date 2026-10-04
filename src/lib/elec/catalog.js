@@ -9,6 +9,7 @@
 //   wires: [{ id, from: { c, t }, to: { c, t } }],   // c: componente, t: borne
 // }
 // Todo en una cuadrícula de 20 px; los aparatos se dibujan en vertical (la corriente baja).
+import { N_ } from '../i18n'
 
 export const GRID = 20
 
@@ -59,7 +60,7 @@ export const VALVE_SIDE = 40
 export const VALVE_SQUARE = 80
 export const valveSquares = (c) => (c.ways === '5/3' ? 3 : 2)
 export const restSquare = () => 1
-export const isPneumatic = (type) => ELEC_TYPES[type]?.group === 'Neumática'
+export const isPneumatic = (type) => ELEC_TYPES[type]?.group === N_('Neumática')
 // Señales de los detectores de un cilindro (A: a0 dentro, a1 fuera).
 export const cylinderSignals = (tag) => (tag ? [`${tag.toLowerCase()}0`, `${tag.toLowerCase()}1`] : [])
 
@@ -88,8 +89,8 @@ export function plcTerminals(c) {
 // Tipos: label, grupo de la paleta, prefijo del identificador, tamaño, bornes y propiedades.
 export const ELEC_TYPES = {
   rail: {
-    label: 'Embarrado',
-    group: 'Alimentación',
+    label: N_('Embarrado'),
+    group: N_('Alimentación'),
     prefix: '',
     defaults: { potential: 'L', length: 400 },
     size: (c) => ({ w: Number(c.length) || 400, h: 20 }),
@@ -102,23 +103,23 @@ export const ELEC_TYPES = {
         side: railSide(c),
       })),
   },
-  pushbutton: { label: 'Pulsador', group: 'Mando', prefix: 'S', defaults: { contact: 'NO', signal: '', text: '' }, size: () => ({ w: 40, h: 80 }), terminals: (c) => (c.contact === 'NC' ? two('11', '12') : two('13', '14')) },
-  switch: { label: 'Interruptor / selector', group: 'Mando', prefix: 'S', defaults: { contact: 'NO', signal: '', text: '' }, size: () => ({ w: 40, h: 80 }), terminals: (c) => (c.contact === 'NC' ? two('11', '12') : two('13', '14')) },
+  pushbutton: { label: N_('Pulsador'), group: N_('Mando'), prefix: 'S', defaults: { contact: 'NO', signal: '', text: '' }, size: () => ({ w: 40, h: 80 }), terminals: (c) => (c.contact === 'NC' ? two('11', '12') : two('13', '14')) },
+  switch: { label: N_('Interruptor / selector'), group: N_('Mando'), prefix: 'S', defaults: { contact: 'NO', signal: '', text: '' }, size: () => ({ w: 40, h: 80 }), terminals: (c) => (c.contact === 'NC' ? two('11', '12') : two('13', '14')) },
   // Seta de emergencia (channels: 2, doble canal 11-12 y 21-22 para un relé de seguridad).
   emergency: {
-    label: 'Seta de emergencia',
-    group: 'Mando',
+    label: N_('Seta de emergencia'),
+    group: N_('Mando'),
     prefix: 'S',
-    defaults: { channels: 1, signal: '', text: 'Emergencia' },
+    defaults: { channels: 1, signal: '', text: N_('Emergencia') },
     size: (c) => ({ w: Number(c.channels) === 2 ? 80 : 40, h: 80 }),
     terminals: (c) => (Number(c.channels) === 2 ? [...two('11', '12'), { id: '21', x: 60, y: 0, side: 'top' }, { id: '22', x: 60, y: 80, side: 'bottom' }] : two('11', '12')),
   },
   // kind: limit (final de carrera), float (flotador), pressure (presostato), thermostat (termostato).
-  limit: { label: 'Final de carrera / detector', group: 'Mando', prefix: 'B', defaults: { kind: 'limit', contact: 'NO', signal: '', text: '' }, size: () => ({ w: 40, h: 80 }), terminals: (c) => (c.contact === 'NC' ? two('11', '12') : two('13', '14')) },
+  limit: { label: N_('Final de carrera / detector'), group: N_('Mando'), prefix: 'B', defaults: { kind: 'limit', contact: 'NO', signal: '', text: '' }, size: () => ({ w: 40, h: 80 }), terminals: (c) => (c.contact === 'NC' ? two('11', '12') : two('13', '14')) },
   // Conmutador de 3 posiciones (0-1-2): en 1 cierra 13-14; en 2, 23-24.
   selector3: {
-    label: 'Conmutador 0-1-2',
-    group: 'Mando',
+    label: N_('Conmutador 0-1-2'),
+    group: N_('Mando'),
     prefix: 'S',
     defaults: { text: '' },
     size: () => ({ w: 80, h: 80 }),
@@ -131,8 +132,8 @@ export const ELEC_TYPES = {
   },
   // Detector de proximidad de 3 hilos: BN (+), BU (−) y BK (salida, PNP a + o NPN a −).
   sensor3: {
-    label: 'Detector de 3 hilos (PNP/NPN)',
-    group: 'Mando',
+    label: N_('Detector de 3 hilos (PNP/NPN)'),
+    group: N_('Mando'),
     prefix: 'B',
     defaults: { output: 'PNP', kind: 'inductive', signal: '', text: '' },
     size: () => ({ w: 80, h: 80 }),
@@ -143,8 +144,8 @@ export const ELEC_TYPES = {
     ],
   },
   counter: {
-    label: 'Contador',
-    group: 'Mando',
+    label: N_('Contador'),
+    group: N_('Mando'),
     prefix: 'KC',
     defaults: { preset: 3, text: '' },
     size: () => ({ w: 80, h: 80 }),
@@ -152,8 +153,8 @@ export const ELEC_TYPES = {
   },
   // Pulsador luminoso: contacto 13-14 y piloto X1-X2 en el mismo aparato.
   litbutton: {
-    label: 'Pulsador luminoso',
-    group: 'Mando',
+    label: N_('Pulsador luminoso'),
+    group: N_('Mando'),
     prefix: 'S',
     defaults: { color: 'green', signal: '', light: '', text: '' },
     size: () => ({ w: 80, h: 80 }),
@@ -161,8 +162,8 @@ export const ELEC_TYPES = {
   },
   // Columna de señalización: rojo, ámbar, verde y zumbador con un común X0.
   beacon: {
-    label: 'Columna de señalización',
-    group: 'Mando',
+    label: N_('Columna de señalización'),
+    group: N_('Mando'),
     prefix: 'P',
     defaults: { red: '', amber: '', green: '', buzzer: '', text: '' },
     size: () => ({ w: 120, h: 120 }),
@@ -176,8 +177,8 @@ export const ELEC_TYPES = {
   },
   // Transmisores analógicos: 4-20 mA a 2 hilos (+ / −) o 0-10 V a 3 hilos (+, 0V, OUT).
   transmitter: {
-    label: 'Transmisor analógico',
-    group: 'Mando',
+    label: N_('Transmisor analógico'),
+    group: N_('Mando'),
     prefix: 'B',
     defaults: { output: '4-20mA', signal: '', text: '' },
     size: () => ({ w: 80, h: 80 }),
@@ -194,12 +195,12 @@ export const ELEC_TYPES = {
           ],
   },
   // Potenciómetro de consigna: su cursor W da de 0 a 10 V (con su referencia propia).
-  potentiometer: { label: 'Potenciómetro de consigna', group: 'Mando', prefix: 'R', defaults: { initial: 0.5, text: '' }, size: () => ({ w: 80, h: 80 }), terminals: () => [{ id: 'W', x: 40, y: 80, side: 'bottom' }] },
+  potentiometer: { label: N_('Potenciómetro de consigna'), group: N_('Mando'), prefix: 'R', defaults: { initial: 0.5, text: '' }, size: () => ({ w: 80, h: 80 }), terminals: () => [{ id: 'W', x: 40, y: 80, side: 'bottom' }] },
   // Relé de seguridad: A1-A2 alimentación; canales S11-S12 y S21-S22; rearme S33-S34; salidas de
   // seguridad 13-14 y 23-24 (NA) y auxiliar 41-42 (NC).
   safetyrelay: {
-    label: 'Relé de seguridad',
-    group: 'Seguridad',
+    label: N_('Relé de seguridad'),
+    group: N_('Seguridad'),
     prefix: 'KS',
     defaults: { text: '' },
     size: () => ({ w: 200, h: 120 }),
@@ -209,11 +210,11 @@ export const ELEC_TYPES = {
     ],
   },
   // Interruptor de puerta de seguridad (dos contactos NC, abiertos con la puerta abierta).
-  doorswitch: { label: 'Interruptor de puerta', group: 'Seguridad', prefix: 'B', defaults: { signal: '', text: 'Resguardo' }, size: () => ({ w: 80, h: 80 }), terminals: () => [...two('11', '12'), { id: '21', x: 60, y: 0, side: 'top' }, { id: '22', x: 60, y: 80, side: 'bottom' }] },
+  doorswitch: { label: N_('Interruptor de puerta'), group: N_('Seguridad'), prefix: 'B', defaults: { signal: '', text: N_('Resguardo') }, size: () => ({ w: 80, h: 80 }), terminals: () => [...two('11', '12'), { id: '21', x: 60, y: 0, side: 'top' }, { id: '22', x: 60, y: 80, side: 'bottom' }] },
   // Cortina fotoeléctrica: alimentación +24 / 0V; salidas OSSD1 y OSSD2 (a + mientras está libre).
   lightcurtain: {
-    label: 'Cortina fotoeléctrica',
-    group: 'Seguridad',
+    label: N_('Cortina fotoeléctrica'),
+    group: N_('Seguridad'),
     prefix: 'B',
     defaults: { signal: '', text: '' },
     size: () => ({ w: 100, h: 100 }),
@@ -224,28 +225,28 @@ export const ELEC_TYPES = {
       { id: 'OSSD2', x: 60, y: 100, side: 'bottom' },
     ],
   },
-  buzzer: { label: 'Timbre / zumbador', group: 'Mando', prefix: 'H', defaults: { kind: 'bell', signal: '', text: '' }, size: () => ({ w: 40, h: 80 }), terminals: () => two('X1', 'X2') },
-  contact: { label: 'Contacto auxiliar', group: 'Mando', prefix: '', defaults: { ref: 'KM1', contact: 'NO' }, size: () => ({ w: 40, h: 80 }), terminals: () => two('a', 'b') },
+  buzzer: { label: N_('Timbre / zumbador'), group: N_('Mando'), prefix: 'H', defaults: { kind: 'bell', signal: '', text: '' }, size: () => ({ w: 40, h: 80 }), terminals: () => two('X1', 'X2') },
+  contact: { label: N_('Contacto auxiliar'), group: N_('Mando'), prefix: '', defaults: { ref: 'KM1', contact: 'NO' }, size: () => ({ w: 40, h: 80 }), terminals: () => two('a', 'b') },
   coil: {
-    label: 'Bobina (contactor, relé, temporizador)',
-    group: 'Mando',
+    label: N_('Bobina (contactor, relé, temporizador)'),
+    group: N_('Mando'),
     prefix: 'KM',
     defaults: { kind: 'contactor', preset: 3, signal: '', text: '' },
     size: () => ({ w: 40, h: 80 }),
     terminals: () => two('A1', 'A2'),
   },
-  valve: { label: 'Electroválvula', group: 'Mando', prefix: 'Y', defaults: { signal: '', text: '' }, size: () => ({ w: 40, h: 80 }), terminals: () => two('A1', 'A2') },
-  lamp: { label: 'Piloto', group: 'Mando', prefix: 'H', defaults: { color: 'green', signal: '', text: '' }, size: () => ({ w: 40, h: 80 }), terminals: () => two('X1', 'X2') },
+  valve: { label: N_('Electroválvula'), group: N_('Mando'), prefix: 'Y', defaults: { signal: '', text: '' }, size: () => ({ w: 40, h: 80 }), terminals: () => two('A1', 'A2') },
+  lamp: { label: N_('Piloto'), group: N_('Mando'), prefix: 'H', defaults: { color: 'green', signal: '', text: '' }, size: () => ({ w: 40, h: 80 }), terminals: () => two('X1', 'X2') },
   // Fusible (con seccionador portafusibles: se abre a mano y, fundido, se repone).
-  fuse: { label: 'Fusible / seccionador', group: 'Potencia', prefix: 'F', defaults: { poles: 1, text: '' }, size: (c) => ({ w: Number(c.poles) === 3 ? 120 : 40, h: 80 }), terminals: (c) => (Number(c.poles) === 3 ? threePoles() : two('1', '2')) },
+  fuse: { label: N_('Fusible / seccionador'), group: N_('Potencia'), prefix: 'F', defaults: { poles: 1, text: '' }, size: (c) => ({ w: Number(c.poles) === 3 ? 120 : 40, h: 80 }), terminals: (c) => (Number(c.poles) === 3 ? threePoles() : two('1', '2')) },
   // Diferencial (fase y neutro): salta con una derivación a tierra o con su botón de prueba.
-  rcd: { label: 'Diferencial', group: 'Potencia', prefix: 'Q', defaults: { text: '' }, size: () => ({ w: 80, h: 80 }), terminals: () => twoPoles() },
+  rcd: { label: N_('Diferencial'), group: N_('Potencia'), prefix: 'Q', defaults: { text: '' }, size: () => ({ w: 80, h: 80 }), terminals: () => twoPoles() },
   // Interruptor general / seccionador de corte en carga (se maniobra a mano; con candado).
-  mainswitch: { label: 'Interruptor general', group: 'Alimentación', prefix: 'Q', defaults: { text: 'Interruptor general' }, size: () => ({ w: 120, h: 80 }), terminals: () => threePoles() },
+  mainswitch: { label: N_('Interruptor general'), group: N_('Alimentación'), prefix: 'Q', defaults: { text: N_('Interruptor general') }, size: () => ({ w: 120, h: 80 }), terminals: () => threePoles() },
   // Fuente de alimentación 230 V~ -> 24 V DC: con tensión en L-N, da L+ y M.
   psu: {
-    label: 'Fuente de alimentación 24 V DC',
-    group: 'Alimentación',
+    label: N_('Fuente de alimentación 24 V DC'),
+    group: N_('Alimentación'),
     prefix: 'G',
     defaults: { text: '230 V~ / 24 V DC' },
     size: () => ({ w: 80, h: 100 }),
@@ -258,8 +259,8 @@ export const ELEC_TYPES = {
   },
   // Relé de control de fases: su contacto (por su identificador) cierra con las tres fases en orden.
   phasemonitor: {
-    label: 'Relé de control de fases',
-    group: 'Alimentación',
+    label: N_('Relé de control de fases'),
+    group: N_('Alimentación'),
     prefix: 'KF',
     defaults: { text: '' },
     size: () => ({ w: 120, h: 80 }),
@@ -268,8 +269,8 @@ export const ELEC_TYPES = {
   // Transformador de mando: el secundario es un circuito aparte (S1-S2) mientras el primario
   // (P1-P2) tiene tensión.
   transformer: {
-    label: 'Transformador de mando',
-    group: 'Alimentación',
+    label: N_('Transformador de mando'),
+    group: N_('Alimentación'),
     prefix: 'T',
     defaults: { text: '230/24 V' },
     size: () => ({ w: 80, h: 100 }),
@@ -280,16 +281,16 @@ export const ELEC_TYPES = {
       { id: 'S2', x: 60, y: 100, side: 'bottom' },
     ],
   },
-  breaker: { label: 'Magnetotérmico', group: 'Potencia', prefix: 'Q', defaults: { poles: 3, text: '' }, size: (c) => ({ w: Number(c.poles) === 1 ? 40 : 120, h: 80 }), terminals: (c) => (Number(c.poles) === 1 ? two('1', '2') : threePoles()) },
-  motorprotector: { label: 'Guardamotor', group: 'Potencia', prefix: 'Q', defaults: { text: '' }, size: () => ({ w: 120, h: 80 }), terminals: () => threePoles() },
-  thermal: { label: 'Relé térmico', group: 'Potencia', prefix: 'F', defaults: { text: '' }, size: () => ({ w: 120, h: 80 }), terminals: () => threePoles() },
-  maincontacts: { label: 'Contactos principales', group: 'Potencia', prefix: '', defaults: { ref: 'KM1' }, size: () => ({ w: 120, h: 80 }), terminals: () => threePoles() },
+  breaker: { label: N_('Magnetotérmico'), group: N_('Potencia'), prefix: 'Q', defaults: { poles: 3, text: '' }, size: (c) => ({ w: Number(c.poles) === 1 ? 40 : 120, h: 80 }), terminals: (c) => (Number(c.poles) === 1 ? two('1', '2') : threePoles()) },
+  motorprotector: { label: N_('Guardamotor'), group: N_('Potencia'), prefix: 'Q', defaults: { text: '' }, size: () => ({ w: 120, h: 80 }), terminals: () => threePoles() },
+  thermal: { label: N_('Relé térmico'), group: N_('Potencia'), prefix: 'F', defaults: { text: '' }, size: () => ({ w: 120, h: 80 }), terminals: () => threePoles() },
+  maincontacts: { label: N_('Contactos principales'), group: N_('Potencia'), prefix: '', defaults: { ref: 'KM1' }, size: () => ({ w: 120, h: 80 }), terminals: () => threePoles() },
   // Variador de frecuencia: L1-L3 entrada, U-V-W al motor; mando con su propio 24 V (+24 / GND):
   // DI1 marcha adelante, DI2 marcha atrás, DI3 segunda velocidad, AI1 consigna 0-10 V; relé de
   // marcha R1-R2 (cerrado con el motor en marcha).
   vfd: {
-    label: 'Variador de frecuencia',
-    group: 'Potencia',
+    label: N_('Variador de frecuencia'),
+    group: N_('Potencia'),
     prefix: 'T',
     defaults: { speed2: 25, text: '' },
     size: () => ({ w: 240, h: 120 }),
@@ -304,8 +305,8 @@ export const ELEC_TYPES = {
   // Arrancador suave: L1-L3 a T1-T3 con rampa de arranque (A1-A2 mando); contacto de fin de rampa
   // por su identificador.
   softstarter: {
-    label: 'Arrancador suave',
-    group: 'Potencia',
+    label: N_('Arrancador suave'),
+    group: N_('Potencia'),
     prefix: 'T',
     defaults: { ramp: 3, text: '' },
     size: () => ({ w: 200, h: 100 }),
@@ -317,18 +318,18 @@ export const ELEC_TYPES = {
     ],
   },
   // Freno del motor (electrofreno): suelta con tensión; sin ella, frena.
-  brake: { label: 'Freno del motor', group: 'Potencia', prefix: 'MB', defaults: { signal: '', text: 'Freno' }, size: () => ({ w: 40, h: 80 }), terminals: () => two('A1', 'A2') },
+  brake: { label: N_('Freno del motor'), group: N_('Potencia'), prefix: 'MB', defaults: { signal: '', text: N_('Freno') }, size: () => ({ w: 40, h: 80 }), terminals: () => two('A1', 'A2') },
   motor3: {
-    label: 'Motor trifásico',
-    group: 'Potencia',
+    label: N_('Motor trifásico'),
+    group: N_('Potencia'),
     prefix: 'M',
     defaults: { signal: '', reverse: '', text: '' },
     size: () => ({ w: 120, h: 100 }),
     terminals: () => ['U', 'V', 'W'].map((id, i) => ({ id, x: 20 + 40 * i, y: 0, side: 'top' })),
   },
   motor6: {
-    label: 'Motor estrella-triángulo',
-    group: 'Potencia',
+    label: N_('Motor estrella-triángulo'),
+    group: N_('Potencia'),
     prefix: 'M',
     defaults: { signal: '', reverse: '', text: '' },
     size: () => ({ w: 120, h: 120 }),
@@ -340,8 +341,8 @@ export const ELEC_TYPES = {
   // Motor monofásico: devanado principal U1-U2 y auxiliar Z1-Z2 con su condensador (permanente, o de
   // arranque: desconectado el auxiliar, sigue girando). El sentido, por cómo se conecta el auxiliar.
   motor1: {
-    label: 'Motor monofásico con condensador',
-    group: 'Potencia',
+    label: N_('Motor monofásico con condensador'),
+    group: N_('Potencia'),
     prefix: 'M',
     defaults: { capacitor: 'permanent', signal: '', reverse: '', text: '' },
     size: () => ({ w: 120, h: 100 }),
@@ -355,8 +356,8 @@ export const ELEC_TYPES = {
   // Motor Dahlander (un devanado, dos velocidades 1:2): lenta en triángulo por 1U-1V-1W (2U-2V-2W
   // libres); rápida en doble estrella por 2U-2V-2W con 1U-1V-1W puenteados.
   dahlander: {
-    label: 'Motor Dahlander (2 velocidades)',
-    group: 'Potencia',
+    label: N_('Motor Dahlander (2 velocidades)'),
+    group: N_('Potencia'),
     prefix: 'M',
     defaults: { signal: '', reverse: '', text: '' },
     size: () => ({ w: 260, h: 100 }),
@@ -364,8 +365,8 @@ export const ELEC_TYPES = {
   },
   // Motor de dos devanados separados: lenta por 1U-1V-1W, rápida por 2U-2V-2W (nunca los dos).
   motor2w: {
-    label: 'Motor de dos devanados',
-    group: 'Potencia',
+    label: N_('Motor de dos devanados'),
+    group: N_('Potencia'),
     prefix: 'M',
     defaults: { signal: '', reverse: '', text: '' },
     size: () => ({ w: 260, h: 100 }),
@@ -373,8 +374,8 @@ export const ELEC_TYPES = {
   },
   // Borna de una regleta (-X1:1, -X1:2…): une su borne de arriba con el de abajo. kind: 'pe' (tierra).
   terminal: {
-    label: 'Borna',
-    group: 'Bornas',
+    label: N_('Borna'),
+    group: N_('Bornas'),
     prefix: 'X',
     defaults: { n: 1, kind: 'normal' },
     size: () => ({ w: 40, h: 40 }),
@@ -385,8 +386,8 @@ export const ELEC_TYPES = {
   },
   // Instalaciones de interior.
   changeover: {
-    label: 'Conmutador (vivienda)',
-    group: 'Vivienda',
+    label: N_('Conmutador (vivienda)'),
+    group: N_('Vivienda'),
     prefix: 'S',
     defaults: { text: '' },
     size: () => ({ w: 80, h: 80 }),
@@ -397,8 +398,8 @@ export const ELEC_TYPES = {
     ],
   },
   crossover: {
-    label: 'Cruzamiento (vivienda)',
-    group: 'Vivienda',
+    label: N_('Cruzamiento (vivienda)'),
+    group: N_('Vivienda'),
     prefix: 'S',
     defaults: { text: '' },
     size: () => ({ w: 80, h: 80 }),
@@ -410,8 +411,8 @@ export const ELEC_TYPES = {
     ],
   },
   socket: {
-    label: 'Base de enchufe',
-    group: 'Vivienda',
+    label: N_('Base de enchufe'),
+    group: N_('Vivienda'),
     prefix: 'X',
     defaults: { text: '' },
     size: () => ({ w: 80, h: 60 }),
@@ -424,11 +425,11 @@ export const ELEC_TYPES = {
   // Neumática (ISO 1219-1; conexiones ISO 5599: 1 presión, 2 y 4 utilización, 3 y 5 escape). Sus
   // conexiones (pneu) se unen con tubos, no con cables; identificación ISO 1219-2 (0P1, 0Z1, 1V1) y
   // cilindros con letra (A, B…: detectores a0 / a1) como en las secuencias A+ B+ A− B−.
-  airsource: { label: 'Fuente de aire comprimido', group: 'Neumática', prefix: '0P', defaults: { text: '' }, size: () => ({ w: 40, h: 40 }), terminals: () => [pneu('1', 20, 0, 'top')] },
-  frl: { label: 'Unidad de mantenimiento', group: 'Neumática', prefix: '0Z', defaults: { text: '' }, size: () => ({ w: 40, h: 80 }), terminals: () => [pneu('2', 20, 0, 'top'), pneu('1', 20, 80, 'bottom')] },
+  airsource: { label: N_('Fuente de aire comprimido'), group: N_('Neumática'), prefix: '0P', defaults: { text: '' }, size: () => ({ w: 40, h: 40 }), terminals: () => [pneu('1', 20, 0, 'top')] },
+  frl: { label: N_('Unidad de mantenimiento'), group: N_('Neumática'), prefix: '0Z', defaults: { text: '' }, size: () => ({ w: 40, h: 80 }), terminals: () => [pneu('2', 20, 0, 'top'), pneu('1', 20, 80, 'bottom')] },
   pvalve: {
-    label: 'Válvula distribuidora',
-    group: 'Neumática',
+    label: N_('Válvula distribuidora'),
+    group: N_('Neumática'),
     prefix: '1V',
     defaults: { ways: '5/2', sol14: '', sol12: '', manual: 'none', normally: 'NC', center: 'closed', text: '' },
     size: (c) => ({ w: VALVE_SIDE * 2 + VALVE_SQUARE * valveSquares(c), h: 80 }),
@@ -440,18 +441,18 @@ export const ELEC_TYPES = {
     },
   },
   pcylinder: {
-    label: 'Cilindro neumático',
-    group: 'Neumática',
+    label: N_('Cilindro neumático'),
+    group: N_('Neumática'),
     prefix: '',
     letterTag: true,
     defaults: { acting: 'double', time: 1, initial: 0, text: '' },
     size: () => ({ w: 160, h: 60 }),
     terminals: (c) => (c.acting === 'single' ? [pneu('A', 20, 60, 'bottom')] : [pneu('A', 20, 60, 'bottom'), pneu('B', 140, 60, 'bottom')]),
   },
-  throttle: { label: 'Regulador de caudal', group: 'Neumática', prefix: '1V', defaults: { setting: 0.5, text: '' }, size: () => ({ w: 40, h: 80 }), terminals: () => [pneu('2', 20, 0, 'top'), pneu('1', 20, 80, 'bottom')] },
+  throttle: { label: N_('Regulador de caudal'), group: N_('Neumática'), prefix: '1V', defaults: { setting: 0.5, text: '' }, size: () => ({ w: 40, h: 80 }), terminals: () => [pneu('2', 20, 0, 'top'), pneu('1', 20, 80, 'bottom')] },
   plc: {
-    label: 'Autómata (E/S)',
-    group: 'Autómata',
+    label: N_('Autómata (E/S)'),
+    group: N_('Autómata'),
     prefix: 'A',
     defaults: { inputs: 14, outputs: 10, text: '' },
     size: (c) => {
