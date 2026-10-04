@@ -1,0 +1,37 @@
+# The virtual plant
+
+The **virtual plant** is an animated model of the machine: push buttons, cylinders, conveyors, sensors, tanks… It moves with the grafcet's **outputs** and switches the **inputs** by itself: it is like testing the program on the real machine, without breaking anything.
+
+## Opening it
+
+When simulating, it opens next to the grafcet if the project has a plant; in the simulation panel, **“Virtual plant”** closes and reopens it. Drag the divider to share the width (double-click: half and half).
+
+## Use and Edit
+
+- **Use**: it is operated like the machine: push buttons, switches, part feeders. The inputs given by the plant appear in the panel marked “plant”.
+- **Edit**: elements are placed and configured. Drag them from the palette, rotate them with **R**, delete them with **Del**. In their properties you choose each one's variable (if it does not exist, it is added to the table).
+
+“Connections” shows what is connected and what is missing: grafcet inputs nobody gives, outputs that move nothing.
+
+## More realism
+
+- **Gravity**: front view; parts fall, rest on platforms and on cylinder rods.
+- **Relief**: a drawing with volume, for presentation only.
+- **Faults** (in Use): a sensor that gives no signal, a cylinder that jams… to practise diagnosis.
+- **Control panel**: push buttons and pilot lights can go on a separate desk.
+- **My groups**: save a station to reuse it in other projects.
+
+> **Watch out:** if something does not move, look first at “Connections” and then at the “What the grafcet is waiting for” section of the simulation panel.
+
+```ejemplo taladradora
+A drilling machine with its plant.
+```
+
+```ejemplo cargador-gravedad
+With gravity: parts fall from the feeder.
+```
+
+To try it step by step:
+
+```tutorial planta
+```

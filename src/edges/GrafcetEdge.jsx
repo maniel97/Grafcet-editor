@@ -1,6 +1,7 @@
 import { useCallback } from 'react'
 import { BaseEdge, EdgeLabelRenderer, useStore } from '@xyflow/react'
 import { buildPath, computeRoute, sameRoute } from '../lib/grafcetRouting'
+import { refFrom, refTo } from '../lib/sheets'
 
 const DEFAULT_STROKE = '#0f172a'
 const SELECTED_STROKE = '#3b82f6'
@@ -8,9 +9,6 @@ const REF_STUB = 28 // tramo de cada extremo de un enlace cortado con referencia
 const ARROW = 6
 const REF_ROUTE = { kind: 'ref', bendAtSource: false, laneX: 0 }
 
-// Cómo se nombra un extremo en una referencia: «la etapa 5» o la receptividad de la transición.
-const describe = (node) =>
-  !node ? '?' : node.type === 'step' ? `la etapa ${node.data.label}` : `«${String(node.data.condition ?? '').trim() || 'transición'}»`
 
 // Enlace Grafcet: elige solo su trazado (normal, bucle con flecha o salto lateral). Con
 // data.reference se dibuja cortado (IEC 60848, referencia de enlace): una flecha bajo el origen
@@ -24,7 +22,7 @@ export default function GrafcetEdge({ id, source, target, sourceX, sourceY, targ
   const route = useStore(selector, sameRoute)
   const labels = useStore(
     useCallback(
-      (state) => (reference ? `${describe(state.nodeLookup.get(target))}|${describe(state.nodeLookup.get(source))}` : ''),
+      (state) => (reference ? `${refTo(state.nodeLookup.get(target))}|${refFrom(state.nodeLookup.get(source))}` : ''),
       [reference, source, target],
     ),
   )
@@ -42,10 +40,10 @@ export default function GrafcetEdge({ id, source, target, sourceX, sourceY, targ
         <path d={arrow} fill={stroke} stroke="none" />
         <EdgeLabelRenderer>
           <div data-ref-label className={labelClass} style={{ transform: `translate(${sourceX + 10}px, ${end - 12}px)` }}>
-            a {to}
+            {to}
           </div>
           <div data-ref-label className={labelClass} style={{ transform: `translate(${targetX + 10}px, ${targetY - REF_STUB - 6}px)` }}>
-            de {from}
+            {from}
           </div>
         </EdgeLabelRenderer>
       </>

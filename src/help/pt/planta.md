@@ -1,0 +1,37 @@
+# A planta virtual
+
+A **planta virtual** é uma maqueta animada da máquina: botões, cilindros, tapetes, detetores, depósitos… Move-se com as **saídas** do grafcet e ativa sozinha as **entradas**: é como testar o programa na máquina real, sem estragar nada.
+
+## Abri-la
+
+Ao simular abre-se junto ao grafcet, se o projeto tiver planta; no painel de simulação, **«Planta virtual»** fecha-a e volta a abri-la. Arraste a separação para repartir a largura (duplo clique: metade e metade).
+
+## Usar e Editar
+
+- **Usar**: aciona-se como a máquina: botões, interruptores, alimentadores de peças. As entradas que a planta dá aparecem no painel com a marca «planta».
+- **Editar**: colocam-se e configuram-se elementos. Arraste-os da paleta, rode-os com **R**, apague-os com **Supr**. Nas suas propriedades escolhe-se a variável de cada um (se não existir, acrescenta-se à tabela).
+
+«Ligações» mostra o que está ligado e o que falta: entradas do grafcet que ninguém dá, saídas que não movem nada.
+
+## Mais realismo
+
+- **Gravidade**: vista de frente; as peças caem, apoiam-se em plataformas e na haste dos cilindros.
+- **Relevo**: desenho com volume, só de apresentação.
+- **Avarias** (em Usar): um detetor que não dá sinal, um cilindro que encrava… para praticar o diagnóstico.
+- **Painel de comando**: os botões e sinalizadores podem ir numa consola à parte.
+- **Os meus grupos**: guarde uma estação para a reutilizar noutros projetos.
+
+> **Atenção:** se algo não se mexer, veja primeiro «Ligações» e depois a secção «O que o grafcet espera» do painel de simulação.
+
+```ejemplo taladradora
+Um engenho de furar com a sua planta.
+```
+
+```ejemplo cargador-gravedad
+Com gravidade: as peças caem do carregador.
+```
+
+Para a experimentar passo a passo:
+
+```tutorial planta
+```

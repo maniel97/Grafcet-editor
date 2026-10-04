@@ -68,3 +68,7 @@ traducir uno, copia `src/help/es/<id>.md` a la carpeta del idioma (`src/help/en/
 entero, título incluido. Lo que no esté traducido se muestra en español. No traduzcas lo que va
 entre acentos graves (`5s/X2`), los destinos de los enlaces `[texto](destino)` ni la primera
 línea de los bloques ```` ```ejemplo … ```` y ```` ```tutorial … ````.
+
+La prueba `tests/unit/help.test.js` exige que cada idioma tenga todos los artículos con la misma
+estructura que el español (apartados, listas, tablas, enlaces, ejemplos, tutoriales y código): si
+cambias un artículo en español, cambia también sus traducciones.

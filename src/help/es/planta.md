@@ -4,7 +4,7 @@ La **planta virtual** es una maqueta animada de la máquina: pulsadores, cilindr
 
 ## Abrirla
 
-Durante la simulación, en el panel de la derecha, **«Planta virtual»**. Se abre junto al grafcet; arrastra la separación para repartir el ancho (doble clic: mitad y mitad).
+Al simular se abre junto al grafcet, si el proyecto tiene planta; en el panel de simulación, **«Planta virtual»** la cierra y la vuelve a abrir. Arrastra la separación para repartir el ancho (doble clic: mitad y mitad).
 
 ## Usar y Editar
 

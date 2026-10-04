@@ -71,3 +71,25 @@ describe('ayuda contextual', () => {
     for (const id of topics) expect(ARTICLES, id).toContain(id)
   })
 })
+
+describe('traducciones de los artículos', () => {
+  // Lo que no se traduce: destinos de enlaces, ejemplos, tutoriales, código y estructura.
+  const skeleton = (source) => {
+    const blocks = parseBlocks(source)
+    return {
+      links: [...source.matchAll(/\]\(([^)]+)\)/g)].map((m) => m[1]),
+      fences: blocks.filter((b) => b.type === 'fence').map((b) => `${b.lang} ${b.arg}`),
+      code: [...source.replace(/^```[\s\S]*?^```$/gm, '').matchAll(/`([^`\n]+)`/g)].map((m) => m[1]),
+      shape: blocks.map((b) => (b.type === 'heading' ? `h${b.level}` : b.type === 'list' || b.type === 'olist' ? `${b.type}${b.items.length}` : b.type === 'table' ? `table${b.rows.length}` : b.type)),
+    }
+  }
+  for (const lang of ['en', 'fr', 'pt']) {
+    test(`${lang}: todos los artículos, con la misma estructura que el español`, () => {
+      for (const id of ARTICLES) {
+        const own = articleSource(id, lang)
+        expect(own, `${lang}/${id}.md`).not.toBe(articleSource(id, 'es'))
+        expect(skeleton(own), `${lang}/${id}.md`).toEqual(skeleton(articleSource(id, 'es')))
+      }
+    })
+  }
+})

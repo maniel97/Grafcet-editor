@@ -206,3 +206,19 @@ test('ayuda contextual: Verificar y propiedades llevan a su artículo', async ({
   await expect(help.getByRole('heading', { name: 'Acciones', level: 2 })).toBeVisible()
   expectNoErrors(errors)
 })
+
+// Los artículos se ven en el idioma elegido (con su índice y su buscador).
+test('wiki en inglés', async ({ page }) => {
+  const errors = await openEditor(page)
+  await page.getByTitle('Opciones: tema, letra y tamaño').click()
+  await page.getByLabel('Idioma').selectOption('en')
+  await page.keyboard.press('Escape')
+  await page.getByTitle('Shortcuts and notation (?)').click()
+  const help = page.getByRole('dialog', { name: 'Help' })
+  await help.getByRole('navigation').getByRole('button', { name: 'Choosing and doing at once (OR and AND)' }).click()
+  await expect(help.getByRole('heading', { name: 'OR divergence: choosing a path' })).toBeVisible()
+  await expect(help.locator('[data-help-card="tutorial:divergencia-o"]')).toContainText('Choosing a path')
+  await help.getByLabel('Search the help').fill('enclosing step')
+  await expect(help.getByRole('region', { name: 'Search results' }).getByRole('button', { name: /^Enclosure/ })).toBeVisible()
+  expectNoErrors(errors)
+})

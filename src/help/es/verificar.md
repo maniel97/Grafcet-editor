@@ -1,6 +1,6 @@
 # Verificar
 
-El botón **Verificar** revisa el grafcet continuamente. Su número indica cuántos **errores** (rojo) o **avisos** (ámbar) hay; con **✓**, todo en orden. Pulsa un mensaje para ir al elemento.
+El botón **Verificar** revisa el grafcet continuamente. Su número indica cuántos **errores** (rojo) o **avisos** (ámbar) hay; con **✓**, todo en orden. Pulsa un mensaje para ir al elemento; «Más en la ayuda» abre el artículo que explica la regla.
 
 ## Qué comprueba
 

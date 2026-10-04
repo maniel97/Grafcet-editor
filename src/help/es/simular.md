@@ -12,13 +12,13 @@
 ## Cómo se maneja
 
 - Activa una entrada con un clic, o con las teclas **1–9** (en el orden del panel).
-- **Pausa** y **Paso** franquean de una en una, para ver bien qué pasa.
+- Con **Pausa**, el botón **Paso** (⏭) franquea de una en una, para ver bien qué pasa (también la evolución fugaz).
 - La velocidad del tiempo se puede cambiar: útil con esperas largas.
 - Si algo no avanza, pasa el ratón por la transición: dice qué condición falta.
 
 ## Planta virtual y esquema
 
-En los ejemplos que la tienen, la **planta** (cilindros, cintas, detectores…) se mueve con tus salidas y activa sola las entradas: es como probar en la máquina. El **esquema eléctrico** muestra el autómata cableado y también se simula.
+En los ejemplos que la tienen, la **planta** (cilindros, cintas, detectores…) se mueve con tus salidas y activa sola las entradas: es como probar en la máquina. El **esquema eléctrico** muestra el autómata cableado y también se simula. Ver [La planta virtual](planta) y [El esquema eléctrico](esquema-electrico).
 
 ## Escenarios
 

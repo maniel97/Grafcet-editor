@@ -3,6 +3,8 @@
 // ven el proyecto entero (es un solo programa). Los enlaces entre hojas se dibujan como referencias
 // («a la etapa 5 (Hoja 2)»).
 
+import { t } from './i18n'
+
 export const FIRST_SHEET = { id: 'h1', name: 'Hoja 1' }
 
 export const sheetsOf = (plc) => (plc.sheets?.length ? plc.sheets : [FIRST_SHEET])
@@ -27,7 +29,11 @@ export function visibleEdges(edges, nodes, current) {
   })
 }
 
-const describe = (n) => (!n ? '?' : n.type === 'step' ? `la etapa ${n.data.label}` : `«${String(n.data.condition ?? '').trim() || 'transición'}»`)
+// Rótulos de una referencia de enlace (en la misma hoja, edges/GrafcetEdge.jsx, o entre hojas):
+// «a la etapa 5» / «de «Fc»», en el idioma elegido.
+const receptivity = (n) => String(n.data.condition ?? '').trim() || t('transición')
+export const refTo = (n) => (!n ? '?' : n.type === 'step' ? t('a la etapa {etapa}', { etapa: n.data.label }) : t('a «{receptividad}»', { receptividad: receptivity(n) }))
+export const refFrom = (n) => (!n ? '?' : n.type === 'step' ? t('de la etapa {etapa}', { etapa: n.data.label }) : t('de «{receptividad}»', { receptividad: receptivity(n) }))
 
 // Referencias de los enlaces entre hojas que tocan a la hoja activa:
 // [{ nodeId, side: 'out' | 'in', text }] («a la etapa 5 (Hoja 2)» / «de «Fc» (Hoja 1)»).
@@ -42,8 +48,8 @@ export function crossSheetRefs(nodes, edges, plc, current) {
     const sa = sheetOf(a, current)
     const sb = sheetOf(b, current)
     if (sa === sb) continue
-    if (sa === current) refs.push({ nodeId: a.id, side: 'out', text: `a ${describe(b)} (${name.get(sb) ?? sb})` })
-    if (sb === current) refs.push({ nodeId: b.id, side: 'in', text: `de ${describe(a)} (${name.get(sa) ?? sa})` })
+    if (sa === current) refs.push({ nodeId: a.id, side: 'out', text: `${refTo(b)} (${name.get(sb) ?? sb})` })
+    if (sb === current) refs.push({ nodeId: b.id, side: 'in', text: `${refFrom(a)} (${name.get(sa) ?? sa})` })
   }
   return refs
 }
