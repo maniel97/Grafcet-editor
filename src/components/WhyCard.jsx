@@ -1,13 +1,14 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Check, X } from 'lucide-react'
+import { N_, t } from '../lib/i18n'
 
 const STATUS_STYLE = {
-  ready: { label: 'Se franquea', className: 'bg-green-100 text-green-800' },
-  waiting: { label: 'Esperando', className: 'bg-amber-100 text-amber-800' },
-  'not-validated': { label: 'No validada', className: 'bg-slate-100 text-slate-700' },
-  forced: { label: 'Forzada', className: 'bg-violet-100 text-violet-800' },
-  error: { label: 'Con error', className: 'bg-red-100 text-red-800' },
+  ready: { label: N_('Se franquea'), className: 'bg-green-100 text-green-800' },
+  waiting: { label: N_('Esperando'), className: 'bg-amber-100 text-amber-800' },
+  'not-validated': { label: N_('No validada'), className: 'bg-slate-100 text-slate-700' },
+  forced: { label: N_('Forzada'), className: 'bg-violet-100 text-violet-800' },
+  error: { label: N_('Con error'), className: 'bg-red-100 text-red-800' },
 }
 
 function Term({ term, depth = 0 }) {
@@ -15,9 +16,9 @@ function Term({ term, depth = 0 }) {
   return (
     <>
       <li className="flex items-start gap-1" style={{ paddingLeft: depth * 12 }}>
-        <Icon size={13} className={`mt-0.5 shrink-0 ${term.ok ? 'text-green-600' : 'text-red-600'}`} aria-label={term.ok ? 'se cumple' : 'no se cumple'} />
+        <Icon size={13} className={`mt-0.5 shrink-0 ${term.ok ? 'text-green-600' : 'text-red-600'}`} aria-label={term.ok ? t('se cumple') : t('no se cumple')} />
         <span>
-          <span className="font-mono">{term.op === 'and' ? `${term.text}  (Y: todas)` : term.op === 'or' ? `${term.text}  (O: alguna)` : term.text}</span>
+          <span className="font-mono">{term.op === 'and' ? `${term.text}  ${t('(Y: todas)')}` : term.op === 'or' ? `${term.text}  ${t('(O: alguna)')}` : term.text}</span>
           {term.detail && <span className="text-slate-500">: {term.detail}</span>}
         </span>
       </li>
@@ -52,17 +53,17 @@ export default function WhyCard({ anchorRef, explain }) {
     <div
       ref={cardRef}
       role="tooltip"
-      aria-label="Por qué"
+      aria-label={t('Por qué')}
       className="side-panel pointer-events-none fixed z-50 w-max max-w-sm rounded-md border border-slate-200 bg-white p-2 text-xs text-slate-800 shadow-lg"
       style={position ?? { left: -9999, top: 0 }}
     >
       <p className="mb-1 flex items-start gap-2">
-        <span className={`shrink-0 rounded px-1.5 py-0.5 font-medium ${style.className}`}>{style.label}</span>
+        <span className={`shrink-0 rounded px-1.5 py-0.5 font-medium ${style.className}`}>{t(style.label)}</span>
         <span>{explanation.summary}</span>
       </p>
       <ul className="space-y-0.5">
         {explanation.steps.map((s) => (
-          <Term key={s.id} term={{ text: s.variable, ok: s.active, detail: s.active ? 'etapa anterior activa' : 'etapa anterior no activa' }} />
+          <Term key={s.id} term={{ text: s.variable, ok: s.active, detail: s.active ? t('etapa anterior activa') : t('etapa anterior no activa') }} />
         ))}
         {explanation.receptivity && <Term term={explanation.receptivity} />}
       </ul>

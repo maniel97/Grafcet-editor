@@ -17,7 +17,7 @@ export default function SheetTabs({ sheets, current, counts, onSelect, onAdd, on
           <input
             key={s.id}
             autoFocus
-            aria-label="Nombre de la hoja"
+            aria-label={t('Nombre de la hoja')}
             className="w-24 rounded border border-blue-500 px-1 py-0.5 outline-none"
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
@@ -50,7 +50,7 @@ export default function SheetTabs({ sheets, current, counts, onSelect, onAdd, on
             {sheets.length > 1 && !readOnly && (
               <button
                 type="button"
-                aria-label={t(`Borrar ${s.name}`)}
+                aria-label={t('Borrar {nombre}', { nombre: s.name })}
                 title={t('Borrar la hoja y su contenido')}
                 onClick={() => onDelete(s.id)}
                 className="mr-0.5 rounded p-0.5 opacity-0 hover:bg-red-500 hover:text-white group-hover:opacity-100"

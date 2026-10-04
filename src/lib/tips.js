@@ -2,6 +2,7 @@
 // típicos al aprender). No son errores ni avisos: severity 'tip', con `why` explicando la regla.
 // Devuelve [{ severity: 'tip', message, why, nodeIds }].
 import { buildPlcModel } from './plcModel'
+import { t as tr } from './i18n'
 import { compile } from './sim/engine'
 import { evaluate, truthy } from './sim/expression'
 
@@ -76,8 +77,8 @@ export function studentTips(nodes, edges, plc) {
     const outputs = [...(booleanVarsLoose(t.ast) ?? [])].filter((n) => types.get(n) === 'output')
     for (const o of outputs) {
       add(
-        `La receptividad ${text} usa ${o}, que es una salida.`,
-        'Una receptividad describe lo que se espera del proceso: normalmente entradas (sensores, pulsadores) o el estado de otras etapas (X3). Una salida la pone el propio grafcet, así que esperar por ella suele ser un descuido: usa el sensor que confirma que la orden se ha cumplido. Si es una marca interna, cámbiale el tipo a «Marca» en Variables.',
+        tr('La receptividad {receptividad} usa {salida}, que es una salida.', { receptividad: text, salida: o }),
+        tr('Una receptividad describe lo que se espera del proceso: normalmente entradas (sensores, pulsadores) o el estado de otras etapas (X3). Una salida la pone el propio grafcet, así que esperar por ella suele ser un descuido: usa el sensor que confirma que la orden se ha cumplido. Si es una marca interna, cámbiale el tipo a «Marca» en Variables.'),
         [t.id],
       )
     }
@@ -87,8 +88,14 @@ export function studentTips(nodes, edges, plc) {
       const from = t.from.map((id) => String(stepById.get(id)?.label))
       if (!from.includes(String(timer.step))) {
         add(
-          `La temporización ${timer.seconds}s/X${timer.step} está en una transición que no sale de X${timer.step} (sale de ${t.from.map(name).join(', ') || '—'}).`,
-          `t/Xn cuenta el tiempo desde que se activó la etapa n y vuelve a 0 cuando se desactiva. Lo habitual es temporizar la etapa anterior a la transición (${from.length ? `${timer.seconds}s/X${from[0]}` : 't/X de la etapa anterior'}); si de verdad quieres medir otra etapa, está bien así.`,
+          tr('La temporización {temporizacion} está en una transición que no sale de X{etapa} (sale de {origen}).', {
+            temporizacion: `${timer.seconds}s/X${timer.step}`,
+            etapa: timer.step,
+            origen: t.from.map(name).join(', ') || '—',
+          }),
+          tr('t/Xn cuenta el tiempo desde que se activó la etapa n y vuelve a 0 cuando se desactiva. Lo habitual es temporizar la etapa anterior a la transición ({propuesta}); si de verdad quieres medir otra etapa, está bien así.', {
+            propuesta: from.length ? `${timer.seconds}s/X${from[0]}` : tr('t/X de la etapa anterior'),
+          }),
           [t.id],
         )
       }
@@ -97,13 +104,17 @@ export function studentTips(nodes, edges, plc) {
     // 3. Receptividad constante.
     if (t.ast.op === 'num') {
       if (!truthy(t.ast.value)) {
-        add(`La receptividad ${text} es siempre falsa: la transición no se franquea nunca.`, 'Una receptividad 0 bloquea la secuencia. Escribe la condición que debe cumplirse para avanzar.', [t.id])
+        add(
+          tr('La receptividad {receptividad} es siempre falsa: la transición no se franquea nunca.', { receptividad: text }),
+          tr('Una receptividad 0 bloquea la secuencia. Escribe la condición que debe cumplirse para avanzar.'),
+          [t.id],
+        )
       } else {
         const acting = t.from.map((id) => stepById.get(id)).filter((s) => s && continuous(s).length)
         if (acting.length) {
           add(
-            `Receptividad «1» después de ${acting.map((s) => s.variable).join(', ')}, que tiene acciones continuas: no llegarán a ejecutarse.`,
-            'Con una receptividad siempre verdadera la etapa se desactiva en el mismo instante en que se activa (evolución fugaz). Según IEC 60848, en una situación inestable las acciones continuas no se ejecutan; solo las memorizadas (al activar / al desactivar). Usa una acción memorizada o espera a una condición real.',
+            tr('Receptividad «1» después de {etapas}, que tiene acciones continuas: no llegarán a ejecutarse.', { etapas: acting.map((s) => s.variable).join(', ') }),
+            tr('Con una receptividad siempre verdadera la etapa se desactiva en el mismo instante en que se activa (evolución fugaz). Según IEC 60848, en una situación inestable las acciones continuas no se ejecutan; solo las memorizadas (al activar / al desactivar). Usa una acción memorizada o espera a una condición real.'),
             [t.id, ...acting.map((s) => s.id)],
           )
         }
@@ -120,10 +131,15 @@ export function studentTips(nodes, edges, plc) {
       if (hasEdge(out.ast) || out.ast.op === 'num') continue
       const before = incoming.find((inc) => inc.ast.op !== 'num' && implies(withoutEdges(inc.ast), out.ast))
       if (!before) continue
-      const actions = continuous(s).length ? ' y sus acciones continuas no se ejecutan' : ''
+      const vars = { etapa: s.variable, entrada: before.condition, salida: out.condition }
       add(
-        `${s.variable} se atraviesa sin detenerse: si «${before.condition}» es verdadera, «${out.condition}» también lo es${actions}.`,
-        `Al franquear «${before.condition}» se activa ${s.variable}, y como «${out.condition}» ya se cumple se franquea también en ese mismo instante (evolución fugaz, IEC 60848). Pasa a menudo al usar el mismo pulsador para avanzar dos veces: usa un flanco (↑${firstVar(out.ast) ?? 'a'}) en la segunda transición o una condición distinta.`,
+        continuous(s).length
+          ? tr('{etapa} se atraviesa sin detenerse: si «{entrada}» es verdadera, «{salida}» también lo es y sus acciones continuas no se ejecutan.', vars)
+          : tr('{etapa} se atraviesa sin detenerse: si «{entrada}» es verdadera, «{salida}» también lo es.', vars),
+        tr('Al franquear «{entrada}» se activa {etapa}, y como «{salida}» ya se cumple se franquea también en ese mismo instante (evolución fugaz, IEC 60848). Pasa a menudo al usar el mismo pulsador para avanzar dos veces: usa un flanco ({flanco}) en la segunda transición o una condición distinta.', {
+          ...vars,
+          flanco: `↑${firstVar(out.ast) ?? 'a'}`,
+        }),
         [s.id, before.id, out.id],
       )
     }
@@ -145,8 +161,12 @@ export function studentTips(nodes, edges, plc) {
     const stored = storedIn.get(output)
     if (!stored) continue
     add(
-      `${output} se manda con acción continua (${steps.map((s) => s.variable).join(', ')}) y memorizada (${stored.map((s) => s.variable).join(', ')}).`,
-      'Una acción continua asigna la salida en cada instante (1 mientras la etapa está activa, 0 si no); una memorizada la deja en un valor hasta que otra la cambie. Mezclar las dos en la misma salida hace que la continua tape a la memorizada. Elige un solo tipo para cada salida.',
+      tr('{salida} se manda con acción continua ({continuas}) y memorizada ({memorizadas}).', {
+        salida: output,
+        continuas: steps.map((s) => s.variable).join(', '),
+        memorizadas: stored.map((s) => s.variable).join(', '),
+      }),
+      tr('Una acción continua asigna la salida en cada instante (1 mientras la etapa está activa, 0 si no); una memorizada la deja en un valor hasta que otra la cambie. Mezclar las dos en la misma salida hace que la continua tape a la memorizada. Elige un solo tipo para cada salida.'),
       [...new Set([...steps, ...stored].map((s) => s.id))],
     )
   }

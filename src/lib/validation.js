@@ -7,9 +7,12 @@ import { frameOf, macroName, membersOf } from './frames'
 import { parseForcing } from './forcing'
 import { normalizeAction } from './actions'
 import { checkExclusive, describeExample, exclusiveFix } from './exclusivity'
+import { t } from './i18n'
 
-const stepName = (n) => `Etapa ${n.data.label?.trim() || '(sin número)'}`
-const transitionName = (n) => `Transición «${n.data.condition?.trim() || 'sin receptividad'}»`
+// (Mensajes traducibles: lib/i18n.js, con sus partes variables como marcadores {nombre}.)
+const stepLabel = (n) => n.data.label?.trim() || t('(sin número)')
+const stepName = (n) => t('Etapa {etapa}', { etapa: stepLabel(n) })
+const transitionName = (n) => t('Transición «{receptividad}»', { receptividad: n.data.condition?.trim() || t('sin receptividad') })
 const nameOf = (n) => (n.type === 'step' ? stepName(n) : transitionName(n))
 
 export function validateGrafcet(nodes, edges) {
@@ -39,11 +42,11 @@ export function validateGrafcet(nodes, edges) {
   const grafcetOf = (n) => (frameOf(n, frames, 'grafcet') ? frameName(frameOf(n, frames, 'grafcet')) : null)
   const byFrameName = new Map()
   for (const f of frames) {
-    if (!frameName(f)) add('error', 'Marco sin nombre: un grafcet parcial se llama G1, G2...; una expansión, como su macroetapa (M1).', [f.id])
+    if (!frameName(f)) add('error', t('Marco sin nombre: un grafcet parcial se llama G1, G2...; una expansión, como su macroetapa (M1).'), [f.id])
     else byFrameName.set(frameName(f), [...(byFrameName.get(frameName(f)) ?? []), f])
   }
   for (const [name, list] of byFrameName) {
-    if (list.length > 1) add('error', `El nombre ${name} está repetido en ${list.length} marcos.`, list.map((f) => f.id))
+    if (list.length > 1) add('error', t('El nombre {nombre} está repetido en {n} marcos.', { nombre: name, n: list.length }), list.map((f) => f.id))
   }
   // Expansiones: entrada E.. y salida S.. (o la etapa sin entrada / sin salida dentro del marco).
   const expansions = new Map() // id de la macroetapa -> { entry, exit, members }
@@ -51,7 +54,7 @@ export function validateGrafcet(nodes, edges) {
   for (const f of frames.filter((x) => x.data.kind === 'macro')) {
     const macro = steps.find((s) => s.data.macro && macroName(s.data.label) === frameName(f))
     if (!macro) {
-      add('warning', `La expansión ${frameName(f)} no corresponde a ninguna macroetapa: crea la macroetapa ${frameName(f)} o renombra el marco.`, [f.id])
+      add('warning', t('La expansión {marco} no corresponde a ninguna macroetapa: crea la macroetapa {marco} o renombra el marco.', { marco: frameName(f) }), [f.id])
       continue
     }
     const members = membersOf(f, steps)
@@ -59,15 +62,15 @@ export function validateGrafcet(nodes, edges) {
       members.find((s) => re.test(String(s.data.label))) ?? members.find((s) => (dir === 'in' ? incoming(s.id) : outgoing(s.id)).length === 0)
     const entry = find(/^E/i, 'in')
     const exit = find(/^S/i, 'out')
-    if (!entry) add('error', `La expansión ${frameName(f)} no tiene etapa de entrada (E${frameName(f).slice(1)}).`, [f.id])
-    if (!exit) add('error', `La expansión ${frameName(f)} no tiene etapa de salida (S${frameName(f).slice(1)}).`, [f.id])
+    if (!entry) add('error', t('La expansión {marco} no tiene etapa de entrada ({etapa}).', { marco: frameName(f), etapa: `E${frameName(f).slice(1)}` }), [f.id])
+    if (!exit) add('error', t('La expansión {marco} no tiene etapa de salida ({etapa}).', { marco: frameName(f), etapa: `S${frameName(f).slice(1)}` }), [f.id])
     if (entry) expansionRole.set(entry.id, 'entry')
     if (exit) expansionRole.set(exit.id, 'exit')
     expansions.set(macro.id, { entry, exit, members })
   }
   for (const s of steps) {
     if (s.data.macro && !expansions.has(s.id)) {
-      add('warning', `Macroetapa ${macroName(s.data.label)} sin expansión: dibuja un marco «${macroName(s.data.label)}» con sus etapas (de E a S). Mientras tanto se simula como una etapa normal.`, [s.id])
+      add('warning', t('Macroetapa {macro} sin expansión: dibuja un marco «{macro}» con sus etapas (de E a S). Mientras tanto se simula como una etapa normal.', { macro: macroName(s.data.label) }), [s.id])
     }
   }
   // Forzados: grafcet destino existente, distinto del propio y con esas etapas.
@@ -83,16 +86,23 @@ export function validateGrafcet(nodes, edges) {
       if (!f) continue
       const isGrafcet = frames.some((x) => x.data.kind === 'grafcet' && frameName(x) === f.grafcet)
       if (!isGrafcet) {
-        add('error', `${stepName(s)}: el forzado F/${f.grafcet}{…} se refiere a un grafcet parcial que no existe (encierra sus etapas en un marco «${f.grafcet}»).`, [s.id])
+        add('error', t('{etapa}: el forzado F/{grafcet}{…} se refiere a un grafcet parcial que no existe (encierra sus etapas en un marco «{grafcet}»).', { etapa: stepName(s), grafcet: f.grafcet }), [s.id])
         continue
       }
       if (grafcetOf(s) === f.grafcet) {
-        add('error', `${stepName(s)}: un grafcet no puede forzarse a sí mismo (F/${f.grafcet}).`, [s.id])
+        add('error', t('{etapa}: un grafcet no puede forzarse a sí mismo (F/{grafcet}).', { etapa: stepName(s), grafcet: f.grafcet }), [s.id])
         continue
       }
       const members = grafcetSteps.get(f.grafcet) ?? []
       const missing = f.steps.filter((l) => !members.some((m) => String(m.data.label) === String(l)))
-      if (missing.length) add('error', `${stepName(s)}: ${missing.map((l) => `la etapa ${l}`).join(', ')} no ${missing.length > 1 ? 'son' : 'es'} del grafcet ${f.grafcet}.`, [s.id])
+      if (missing.length)
+        add(
+          'error',
+          missing.length > 1
+            ? t('{etapa}: las etapas {lista} no son del grafcet {grafcet}.', { etapa: stepName(s), lista: missing.join(', '), grafcet: f.grafcet })
+            : t('{etapa}: la etapa {lista} no es del grafcet {grafcet}.', { etapa: stepName(s), lista: missing[0], grafcet: f.grafcet }),
+          [s.id],
+        )
       const targets = f.mode === 'init' ? members.filter((m) => m.data.initial) : members.filter((m) => f.steps.includes(String(m.data.label)))
       forcedOn.set(s.id, [...(forcedOn.get(s.id) ?? []), ...targets.map((m) => m.id)])
     }
@@ -101,69 +111,71 @@ export function validateGrafcet(nodes, edges) {
 
   // Situación inicial: sin etapa inicial el grafcet no puede arrancar.
   if (steps.length && !steps.some((s) => s.data.initial)) {
-    add('error', 'No hay ninguna etapa inicial: el grafcet no puede arrancar. Marca al menos una (doble cuadrado).')
+    add('error', t('No hay ninguna etapa inicial: el grafcet no puede arrancar. Marca al menos una (doble cuadrado).'))
   }
 
   // Identificación de etapas: número obligatorio y único.
   const byLabel = new Map()
   for (const s of steps) {
     const label = s.data.label?.trim()
-    if (!label) add('error', 'Etapa sin número: toda etapa debe estar identificada.', [s.id])
+    if (!label) add('error', t('Etapa sin número: toda etapa debe estar identificada.'), [s.id])
     else byLabel.set(label, [...(byLabel.get(label) ?? []), s.id])
   }
   for (const [label, ids] of byLabel) {
-    if (ids.length > 1) add('error', `El número de etapa ${label} está repetido ${ids.length} veces.`, ids)
+    if (ids.length > 1) add('error', t('El número de etapa {etapa} está repetido {n} veces.', { etapa: label, n: ids.length }), ids)
   }
 
   for (const s of steps) {
-    if (s.data.macro && s.data.initial) add('error', `${stepName(s)}: una macroetapa no puede ser inicial.`, [s.id])
+    if (s.data.macro && s.data.initial) add('error', t('{etapa}: una macroetapa no puede ser inicial.', { etapa: stepName(s) }), [s.id])
   }
 
   // Alternancia etapa / transición.
   for (const e of edges) {
     const s = byId.get(e.source)
-    const t = byId.get(e.target)
-    if (s && t && s.type === t.type) {
+    const tn = byId.get(e.target)
+    if (s && tn && s.type === tn.type) {
       add(
         'error',
-        `Enlace directo entre dos ${s.type === 'step' ? 'etapas' : 'transiciones'}: deben alternarse siempre.`,
-        [s.id, t.id],
+        s.type === 'step' ? t('Enlace directo entre dos etapas: deben alternarse siempre.') : t('Enlace directo entre dos transiciones: deben alternarse siempre.'),
+        [s.id, tn.id],
       )
     }
   }
 
   for (const s of steps) {
     if (!s.data.initial && incoming(s.id).length === 0 && expansionRole.get(s.id) !== 'entry' && !forcedTargets.has(s.id)) {
-      add('warning', `${stepName(s)} no tiene enlace de entrada: nunca se activará.`, [s.id])
+      add('warning', t('{etapa} no tiene enlace de entrada: nunca se activará.', { etapa: stepName(s) }), [s.id])
     }
     if (outgoing(s.id).length === 0 && expansionRole.get(s.id) !== 'exit') {
-      add('warning', `${stepName(s)} no tiene transición de salida: una vez activa no se desactiva nunca.`, [s.id])
+      add('warning', t('{etapa} no tiene transición de salida: una vez activa no se desactiva nunca.', { etapa: stepName(s) }), [s.id])
     }
   }
 
-  for (const t of transitions) {
-    if (!t.data.condition?.trim()) {
-      add('error', 'Transición sin receptividad: toda transición la necesita (usa 1 si siempre se cumple).', [t.id])
+  for (const tn of transitions) {
+    if (!tn.data.condition?.trim()) {
+      add('error', t('Transición sin receptividad: toda transición la necesita (usa 1 si siempre se cumple).'), [tn.id])
     }
-    if (incoming(t.id).length === 0) {
-      add('error', `${transitionName(t)} no tiene etapa anterior: nunca podrá franquearse.`, [t.id])
+    if (incoming(tn.id).length === 0) {
+      add('error', t('{transicion} no tiene etapa anterior: nunca podrá franquearse.', { transicion: transitionName(tn) }), [tn.id])
     }
-    const out = outgoing(t.id)
+    const out = outgoing(tn.id)
     if (out.length === 0) {
-      add('error', `${transitionName(t)} no tiene etapa posterior: al franquearla no se activaría nada.`, [t.id])
+      add('error', t('{transicion} no tiene etapa posterior: al franquearla no se activaría nada.', { transicion: transitionName(tn) }), [tn.id])
     }
-    const loops = out.filter((e) => y(e.target) < y(t.id))
+    const loops = out.filter((e) => y(e.target) < y(tn.id))
     if (loops.length && out.length > loops.length) {
       add(
         'error',
-        `${transitionName(t)} vuelve atrás y continúa a la vez: activaría ambas etapas simultáneamente. Para «volver O seguir» usa dos transiciones alternativas (divergencia en O).`,
-        [t.id],
+        t('{transicion} vuelve atrás y continúa a la vez: activaría ambas etapas simultáneamente. Para «volver O seguir» usa dos transiciones alternativas (divergencia en O).', {
+          transicion: transitionName(tn),
+        }),
+        [tn.id],
       )
     } else if (loops.length > 1 && !loops.every((e) => outgoing(e.target).some((next) => incoming(next.target).length > 1))) {
       // Varios bucles a la vez solo tienen sentido si esas etapas se esperan después en una
       // convergencia en Y (p. ej. devolver un recurso compartido junto con el reposo de su
       // secuencia, IEC 60848); si no, suele ser un «volver aquí O allí» mal dibujado.
-      add('error', `${transitionName(t)} tiene varios bucles: activaría todas esas etapas a la vez.`, [t.id])
+      add('error', t('{transicion} tiene varios bucles: activaría todas esas etapas a la vez.', { transicion: transitionName(tn) }), [tn.id])
     }
   }
 
@@ -182,13 +194,17 @@ export function validateGrafcet(nodes, edges) {
         if (result.exclusive === false) {
           add(
             'warning',
-            `Divergencia en O desde la ${stepName(s).toLowerCase()}: «${ca}» y «${cb}» pueden cumplirse a la vez (p. ej. con ${describeExample(
-              result.example,
-            )}) y se activarían las dos ramas. Hazlas excluyentes, p. ej. «${exclusiveFix(ca, cb)}».`,
+            t('Divergencia en O desde la etapa {etapa}: «{a}» y «{b}» pueden cumplirse a la vez (p. ej. con {ejemplo}) y se activarían las dos ramas. Hazlas excluyentes, p. ej. «{arreglo}».', {
+              etapa: stepLabel(s),
+              a: ca,
+              b: cb,
+              ejemplo: describeExample(result.example),
+              arreglo: exclusiveFix(ca, cb),
+            }),
             [s.id, a.id, b.id],
           )
         } else if (result.exclusive === null && result.reason === 'size') {
-          add('warning', `Divergencia en O desde la ${stepName(s).toLowerCase()}: no se ha podido comprobar si «${ca}» y «${cb}» son excluyentes (demasiadas variables).`, [s.id, a.id, b.id])
+          add('warning', t('Divergencia en O desde la etapa {etapa}: no se ha podido comprobar si «{a}» y «{b}» son excluyentes (demasiadas variables).', { etapa: stepLabel(s), a: ca, b: cb }), [s.id, a.id, b.id])
         }
       }
     }
@@ -210,7 +226,7 @@ export function validateGrafcet(nodes, edges) {
   if (reached.size) {
     for (const s of steps) {
       if (!reached.has(s.id) && (incoming(s.id).length > 0 || expansionRole.get(s.id) === 'entry')) {
-        add('warning', `${stepName(s)} no es alcanzable desde ninguna etapa inicial.`, [s.id])
+        add('warning', t('{etapa} no es alcanzable desde ninguna etapa inicial.', { etapa: stepName(s) }), [s.id])
       }
     }
   }

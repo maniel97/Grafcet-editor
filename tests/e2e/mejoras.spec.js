@@ -688,6 +688,25 @@ test('idioma: inglés en la barra y los menús, recordado al recargar, y vuelta 
   expectNoErrors(errors)
 })
 
+test('idioma: la ayuda y Verificar (mensajes con partes variables) también se traducen', async ({ page }) => {
+  const errors = await openEditor(page)
+  await page.getByTitle('Opciones: tema, letra y tamaño').click()
+  await page.getByLabel('Idioma').selectOption('en')
+  await page.keyboard.press('Escape')
+  await page.getByTitle('Shortcuts and notation (?)').click()
+  const help = page.getByRole('dialog', { name: 'Help' })
+  await expect(help.getByRole('heading', { name: 'Shortcuts' })).toBeVisible()
+  await expect(help.getByText('OR divergence', { exact: true })).toBeVisible()
+  await expect(help.getByText('Duplicate the selection')).toBeVisible()
+  await page.keyboard.press('Escape')
+  // Un paso sin transición de salida: el aviso lleva el número de la etapa en su sitio.
+  await page.getByRole('button', { name: 'Step', exact: true }).click()
+  await page.getByTitle('Verify IEC 60848 compliance').click()
+  const panel = page.locator('aside').filter({ hasText: 'IEC 60848 verification' })
+  await expect(panel.getByText(/^Step \d+ has no outgoing transition: once active it is never deactivated\.$/).first()).toBeVisible()
+  expectNoErrors(errors)
+})
+
 test('modo oscuro: las opciones de los desplegables se leen (fondo oscuro y texto claro)', async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('grafcet-editor:settings', JSON.stringify({ theme: 'dark' })))
   const errors = await openEditor(page)

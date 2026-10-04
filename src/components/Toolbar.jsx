@@ -2,7 +2,7 @@ import InitialStepIcon from './InitialStepIcon'
 import ExportMenu from './ExportMenu'
 import ToolbarDropdown from './ToolbarDropdown'
 import Logo from './Logo'
-import { t } from '../lib/i18n'
+import { t, N_ } from '../lib/i18n'
 import {
   Square,
   Minus,
@@ -118,44 +118,44 @@ export default function Toolbar({
       <input
         value={projectName}
         onChange={(e) => onRenameProject(e.target.value)}
-        placeholder="Sin título"
-        aria-label="Nombre del proyecto"
-        title="Nombre del proyecto (se usa al guardar y exportar)"
+        placeholder={t('Sin título')}
+        aria-label={t('Nombre del proyecto')}
+        title={t('Nombre del proyecto (se usa al guardar y exportar)')}
         className="mr-2 w-20 shrink-0 rounded-md border border-transparent px-2 py-1 text-sm text-slate-700 placeholder:italic placeholder:text-slate-400 hover:border-slate-300 focus:border-blue-500 focus:outline-none 2xl:w-44"
       />
 
-      <ToolButton icon={Undo2} label="Deshacer" title="Deshacer (Ctrl+Z)" onClick={onUndo} disabled={(locked && !historyUnlocked) || !canUndo} iconOnly />
-      <ToolButton icon={Redo2} label="Rehacer" title="Rehacer (Ctrl+Shift+Z)" onClick={onRedo} disabled={(locked && !historyUnlocked) || !canRedo} iconOnly />
+      <ToolButton icon={Undo2} label={N_('Deshacer')} title={N_('Deshacer (Ctrl+Z)')} onClick={onUndo} disabled={(locked && !historyUnlocked) || !canUndo} iconOnly />
+      <ToolButton icon={Redo2} label={N_('Rehacer')} title={N_('Rehacer (Ctrl+Shift+Z)')} onClick={onRedo} disabled={(locked && !historyUnlocked) || !canRedo} iconOnly />
 
       <Separator />
 
-      <ToolButton icon={InitialStepIcon} label="Etapa inicial" disabled={locked} onClick={() => onAdd('step', { initial: true })} />
-      <ToolButton icon={Square} label="Etapa" disabled={locked} onClick={() => onAdd('step')} />
-      <ToolButton icon={Minus} label="Transición" disabled={locked} onClick={() => onAdd('transition')} />
+      <ToolButton icon={InitialStepIcon} label={N_('Etapa inicial')} disabled={locked} onClick={() => onAdd('step', { initial: true })} />
+      <ToolButton icon={Square} label={N_('Etapa')} disabled={locked} onClick={() => onAdd('step')} />
+      <ToolButton icon={Minus} label={N_('Transición')} disabled={locked} onClick={() => onAdd('transition')} />
       <ToolButton
         icon={RectangleHorizontal}
-        label="Acción"
+        label={N_('Acción')}
         onClick={onAddAction}
         disabled={locked || !canAddAction}
         title={canAddAction ? 'Añadir acción a la etapa seleccionada' : 'Selecciona una etapa para añadirle una acción'}
       />
-      <ToolButton icon={StickyNote} label="Nota" title="Añadir una nota de texto" disabled={locked} onClick={() => onAdd('note')} />
+      <ToolButton icon={StickyNote} label={N_('Nota')} title={N_('Añadir una nota de texto')} disabled={locked} onClick={() => onAdd('note')} />
 
       <Separator />
 
-      <ToolButton icon={Save} label="Guardar" title="Guardar proyecto .json (Ctrl+S)" onClick={onSave} />
+      <ToolButton icon={Save} label={N_('Guardar')} title={N_('Guardar proyecto .json (Ctrl+S)')} onClick={onSave} />
       <ToolbarDropdown
         icon={FolderOpen}
-        label="Abrir"
-        title="Abrir un proyecto, un ejemplo o un trabajo anterior"
-        menuLabel="Abrir"
+        label={N_('Abrir')}
+        title={N_('Abrir un proyecto, un ejemplo o un trabajo anterior')}
+        menuLabel={N_('Abrir')}
         labelClass={labelClass(false)}
         disabled={locked}
         items={[
           { id: 'new', label: 'Nuevo…', hint: 'Proyecto en blanco: título, autómata y tabla de variables', icon: FilePlus, onSelect: onNew },
-          { id: 'file', label: 'Abrir archivo…', hint: 'Proyecto .json guardado (Ctrl+O)', icon: FileJson, onSelect: onOpen },
-          { id: 'examples', label: 'Ejemplos…', hint: 'Grafcets típicos listos para usar', icon: BookOpen, onSelect: onOpenExamples },
-          { id: 'recent', label: 'Trabajos anteriores…', hint: 'Recuperar lo que había antes de abrir o limpiar', icon: History, onSelect: onOpenRecent },
+          { id: 'file', label: N_('Abrir archivo…'), hint: 'Proyecto .json guardado (Ctrl+O)', icon: FileJson, onSelect: onOpen },
+          { id: 'examples', label: N_('Ejemplos…'), hint: 'Grafcets típicos listos para usar', icon: BookOpen, onSelect: onOpenExamples },
+          { id: 'recent', label: N_('Trabajos anteriores…'), hint: 'Recuperar lo que había antes de abrir o limpiar', icon: History, onSelect: onOpenRecent },
           { id: 'pneumatic', label: 'Secuencia neumática…', hint: 'Crear el grafcet y la planta de una secuencia como A+ B+ B− A−', icon: Wind, onSelect: onOpenPneumatic },
         ]}
       />
@@ -168,13 +168,13 @@ export default function Toolbar({
 
       <ToolButton
         icon={Table2}
-        label="Variables"
-        title="Tabla de variables: direcciones de PLC de etapas, entradas y salidas"
+        label={N_('Variables')}
+        title={N_('Tabla de variables: direcciones de PLC de etapas, entradas y salidas')}
         onClick={onOpenVariables}
       />
       <ToolButton
         icon={simulating ? CircleStop : Play}
-        label={simulating ? 'Detener' : 'Simular'}
+        label={simulating ? N_('Detener') : N_('Simular')}
         title={simulating ? 'Detener la simulación y volver a editar' : 'Simular el grafcet (IEC 60848)'}
         onClick={onToggleSimulation}
         active={simulating}
@@ -182,36 +182,36 @@ export default function Toolbar({
       />
       <ToolButton
         icon={Cpu}
-        label="Ladder"
-        title="Paso a ladder (LD), texto estructurado y AWL"
+        label={N_('Ladder')}
+        title={N_('Paso a ladder (LD), texto estructurado y AWL')}
         onClick={onOpenLadder}
         primary
       />
       <ToolButton
         icon={Zap}
-        label="Esquema eléctrico"
-        title="Esquema eléctrico: mando, potencia y conexiones del autómata (simulable)"
+        label={N_('Esquema eléctrico')}
+        title={N_('Esquema eléctrico: mando, potencia y conexiones del autómata (simulable)')}
         onClick={onToggleElectrical}
         active={electricalOpen}
         iconOnly
       />
-      <ToolButton icon={Workflow} label="GEMMA" title="Asistente GEMMA: modos de marcha y parada (grafcet de conducción)" disabled={locked} onClick={onOpenGemma} />
+      <ToolButton icon={Workflow} label={N_('GEMMA')} title={N_('Asistente GEMMA: modos de marcha y parada (grafcet de conducción)')} disabled={locked} onClick={onOpenGemma} />
       <ToolButton
         icon={ShieldCheck}
         disabled={locked}
-        label="Verificar"
-        title="Verificar conformidad con IEC 60848"
+        label={N_('Verificar')}
+        title={N_('Verificar conformidad con IEC 60848')}
         onClick={onToggleVerify}
         active={verifyOpen}
         primary
         badge={<VerifyBadge {...issueCounts} />}
       />
-      <ToolButton icon={Search} label="Buscar" title="Buscar en el diagrama: etapas, receptividades, acciones y notas (Ctrl+F)" onClick={onSearch} iconOnly />
+      <ToolButton icon={Search} label={N_('Buscar')} title={N_('Buscar en el diagrama: etapas, receptividades, acciones y notas (Ctrl+F)')} onClick={onSearch} iconOnly />
 
       <div className="ml-auto" />
-      <ToolButton icon={Trash2} label="Limpiar" title="Vaciar el lienzo (se puede deshacer)" onClick={onClear} disabled={locked} />
-      <ToolButton icon={Settings} label="Opciones" title="Opciones: tema, letra y tamaño" onClick={onOpenSettings} />
-      <ToolButton icon={CircleHelp} label="Ayuda" title="Atajos y notación (?)" onClick={onHelp} />
+      <ToolButton icon={Trash2} label={N_('Limpiar')} title={N_('Vaciar el lienzo (se puede deshacer)')} onClick={onClear} disabled={locked} />
+      <ToolButton icon={Settings} label={N_('Opciones')} title={N_('Opciones: tema, letra y tamaño')} onClick={onOpenSettings} />
+      <ToolButton icon={CircleHelp} label={N_('Ayuda')} title={N_('Atajos y notación (?)')} onClick={onHelp} />
     </header>
   )
 }

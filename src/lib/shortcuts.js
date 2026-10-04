@@ -1,3 +1,4 @@
+import { N_ } from './i18n'
 import { useEffect, useRef } from 'react'
 import { ARROWS } from './keyboardNav'
 
@@ -62,23 +63,23 @@ export function useEditorShortcuts(handlers) {
 
 // Lista para la ayuda (HelpDialog).
 export const SHORTCUTS = [
-  ['Ctrl+Z', 'Deshacer'],
-  ['Ctrl+Shift+Z · Ctrl+Y', 'Rehacer'],
-  ['Ctrl+C · Ctrl+X · Ctrl+V', 'Copiar · cortar · pegar (renumera las etapas)'],
-  ['Ctrl+D', 'Duplicar la selección'],
-  ['Ctrl+A', 'Seleccionar todo'],
-  ['Supr · Retroceso', 'Eliminar la selección'],
-  ['Ctrl+S · Ctrl+O', 'Guardar · abrir proyecto (.json)'],
-  ['Ctrl+F', 'Buscar en el diagrama (Intro: siguiente)'],
-  ['Mayús + arrastrar', 'Seleccionar varios con un recuadro'],
-  ['Doble clic · Intro', 'Editar etapa o transición (Intro: la seleccionada)'],
-  ['Alt + flechas', 'Ir a la etapa o transición siguiente, anterior o de la rama vecina'],
-  ['Flechas · Mayús + flechas', 'Mover la selección 10 px · 50 px'],
-  ['Clic derecho', 'Menú contextual (ramificaciones, convergencias…)'],
-  ['Esc', 'Cancelar / deseleccionar'],
-  ['Pulsación larga (táctil)', 'Menú contextual (como el clic derecho)'],
-  ['Doble toque (táctil)', 'Editar etapa, transición o nota'],
-  ['Controles (abajo izq.)', 'Acercar · alejar · encuadrar todo · candado para bloquear la edición'],
-  ['1 … 9 (simulando)', 'Cambiar las entradas 1 a 9'],
-  ['? · F1', 'Esta ayuda'],
+  [N_('Ctrl+Z'), N_('Deshacer')],
+  [N_('Ctrl+Shift+Z · Ctrl+Y'), N_('Rehacer')],
+  [N_('Ctrl+C · Ctrl+X · Ctrl+V'), N_('Copiar · cortar · pegar (renumera las etapas)')],
+  [N_('Ctrl+D'), N_('Duplicar la selección')],
+  [N_('Ctrl+A'), N_('Seleccionar todo')],
+  [N_('Supr · Retroceso'), N_('Eliminar la selección')],
+  [N_('Ctrl+S · Ctrl+O'), N_('Guardar · abrir proyecto (.json)')],
+  [N_('Ctrl+F'), N_('Buscar en el diagrama (Intro: siguiente)')],
+  [N_('Mayús + arrastrar'), N_('Seleccionar varios con un recuadro')],
+  [N_('Doble clic · Intro'), N_('Editar etapa o transición (Intro: la seleccionada)')],
+  [N_('Alt + flechas'), N_('Ir a la etapa o transición siguiente, anterior o de la rama vecina')],
+  [N_('Flechas · Mayús + flechas'), N_('Mover la selección 10 px · 50 px')],
+  [N_('Clic derecho'), N_('Menú contextual (ramificaciones, convergencias…)')],
+  [N_('Esc'), N_('Cancelar / deseleccionar')],
+  [N_('Pulsación larga (táctil)'), N_('Menú contextual (como el clic derecho)')],
+  [N_('Doble toque (táctil)'), N_('Editar etapa, transición o nota')],
+  [N_('Controles (abajo izq.)'), N_('Acercar · alejar · encuadrar todo · candado para bloquear la edición')],
+  [N_('1 … 9 (simulando)'), N_('Cambiar las entradas 1 a 9')],
+  [N_('? · F1'), N_('Esta ayuda')],
 ]

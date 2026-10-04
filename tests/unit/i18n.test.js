@@ -1,13 +1,11 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { LANGUAGES, setLanguage, t } from '../../src/lib/i18n'
-import en from '../../src/lib/locales/en'
-import fr from '../../src/lib/locales/fr'
-import pt from '../../src/lib/locales/pt'
+import { LANGUAGES, N_, setLanguage, t } from '../../src/lib/i18n'
+import { audit } from '../../scripts/i18n.mjs'
 
 describe('idiomas', () => {
   afterEach(() => setLanguage('es'))
   it('español por defecto: el texto tal cual', () => expect(t('Exportar')).toBe('Exportar'))
-  it('traduce y, si falta, deja el español', () => {
+  it('traduce y, si falta (o está vacío), deja el español', () => {
     setLanguage('en')
     expect(t('Exportar')).toBe('Export')
     expect(t('Texto sin traducir')).toBe('Texto sin traducir')
@@ -16,20 +14,33 @@ describe('idiomas', () => {
     setLanguage('pt')
     expect(t('Deshacer')).toBe('Desfazer')
   })
-  it('textos con parte variable', () => {
+  it('partes variables con nombre (también en español)', () => {
+    expect(t('Mover a {hoja}', { hoja: 'Hoja 2' })).toBe('Mover a Hoja 2')
     setLanguage('en')
-    expect(t('Mover a Hoja 2')).toBe('Move to Hoja 2')
+    expect(t('Mover a {hoja}', { hoja: 'Hoja 2' })).toBe('Move to Hoja 2')
     setLanguage('fr')
-    expect(t('Borrar GEMMA')).toBe('Supprimer GEMMA')
+    expect(t('Borrar {nombre}', { nombre: 'GEMMA' })).toBe('Supprimer GEMMA')
+  })
+  it('N_ marca sin traducir', () => {
+    setLanguage('en')
+    expect(N_('Exportar')).toBe('Exportar')
   })
   it('idioma desconocido: español', () => {
     setLanguage('xx')
     expect(t('Exportar')).toBe('Exportar')
-  })
-  it('los diccionarios cubren lo mismo (lo que tiene el inglés lo tienen el francés y el portugués)', () => {
     expect(LANGUAGES.map((l) => l.id)).toEqual(['es', 'en', 'fr', 'pt'])
-    const missing = (dict) => Object.keys(en).filter((k) => !(k in dict) && !/…$/.test(k) && !['Converger en Y', 'Bloquear la edición', 'Desbloquear la edición', 'Restablecer'].includes(k))
-    expect(missing(fr)).toEqual([])
-    expect(missing(pt)).toEqual([])
   })
+})
+
+describe('catálogos (src/locales, npm run i18n)', () => {
+  const a = audit()
+  it('el catálogo de origen (es.json) está al día con el código', () => expect(a.stale).toEqual([]))
+  it('cada idioma tiene exactamente los textos del código (vacío: sin traducir)', () => {
+    for (const lang of Object.keys(a.missing)) {
+      expect(a.missing[lang], lang).toEqual([])
+      expect(a.extra[lang], lang).toEqual([])
+    }
+  })
+  it('las traducciones conservan los marcadores {nombre}', () => expect(a.badPlaceholders).toEqual([]))
+  it('ningún t() con texto variable (se usan marcadores)', () => expect(a.dynamic).toEqual([]))
 })

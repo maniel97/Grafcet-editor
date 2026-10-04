@@ -10,7 +10,7 @@ import '@fontsource/lexend/400.css'
 import '@fontsource/lexend/600.css'
 import '@fontsource/opendyslexic/400.css'
 import '@fontsource/opendyslexic/700.css'
-import { setLanguage } from './i18n'
+import { setLanguage, N_ } from './i18n'
 
 export const FONTS = [
   { id: 'inter', label: 'Inter (predeterminada)', stack: "'Inter', system-ui, sans-serif" },
@@ -31,9 +31,9 @@ export const UI_SCALES = [90, 100, 115, 130, 150] // % del tamaño base de la in
 export const DIAGRAM_FONT = { min: 12, max: 24, step: 1 } // px
 
 export const THEMES = [
-  { id: 'auto', label: 'Automático' },
-  { id: 'light', label: 'Claro' },
-  { id: 'dark', label: 'Oscuro' },
+  { id: 'auto', label: N_('Automático') },
+  { id: 'light', label: N_('Claro') },
+  { id: 'dark', label: N_('Oscuro') },
 ]
 
 export const DEFAULT_SETTINGS = { fontId: 'inter', uiScale: 100, diagramFontSize: 14, theme: 'auto', lang: 'es' }

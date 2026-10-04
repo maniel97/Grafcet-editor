@@ -1,6 +1,6 @@
 import { Panel, useReactFlow } from '@xyflow/react'
 import { Lock, LockOpen, Scan, ZoomIn, ZoomOut } from 'lucide-react'
-import { t } from '../lib/i18n'
+import { t, N_ } from '../lib/i18n'
 
 function ControlButton({ icon: Icon, label, onClick, active, disabled }) {
   return (
@@ -27,17 +27,17 @@ export default function CanvasControls({ onFitView, locked, onToggleLock, lockDi
   return (
     <Panel position="bottom-left" className="editor-only">
       <div className="flex flex-col overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm">
-        <ControlButton icon={ZoomIn} label="Acercar" onClick={() => zoomIn({ duration: 200 })} />
-        <ControlButton icon={ZoomOut} label="Alejar" onClick={() => zoomOut({ duration: 200 })} />
-        <ControlButton icon={Scan} label="Encuadrar todo el diagrama" onClick={() => onFitView()} />
+        <ControlButton icon={ZoomIn} label={N_('Acercar')} onClick={() => zoomIn({ duration: 200 })} />
+        <ControlButton icon={ZoomOut} label={N_('Alejar')} onClick={() => zoomOut({ duration: 200 })} />
+        <ControlButton icon={Scan} label={N_('Encuadrar todo el diagrama')} onClick={() => onFitView()} />
         <ControlButton
           icon={locked ? Lock : LockOpen}
           label={
             lockDisabled
-              ? 'La edición ya está bloqueada mientras se simula'
+              ? N_('La edición ya está bloqueada mientras se simula')
               : locked
-                ? 'Desbloquear la edición'
-                : 'Bloquear la edición (solo mirar: desplazar y hacer zoom)'
+                ? N_('Desbloquear la edición')
+                : N_('Bloquear la edición (solo mirar: desplazar y hacer zoom)')
           }
           onClick={onToggleLock}
           active={locked}

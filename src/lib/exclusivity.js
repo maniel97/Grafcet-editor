@@ -1,3 +1,4 @@
+import { t } from './i18n'
 // Exclusión mutua de receptividades (IEC 60848): en una divergencia en O, si dos receptividades
 // pueden ser verdaderas a la vez se franquearían las dos transiciones y se activarían las dos
 // ramas. Se comprueba de forma exacta probando todas las combinaciones de valores con el mismo
@@ -117,9 +118,9 @@ export function checkExclusive(textA, textB) {
 // Ejemplo legible: «Marcha = 1 y Limpieza = 1» (con los flancos, «Marcha pasa de 0 a 1»).
 export function describeExample(example) {
   const parts = Object.entries(example.now).map(([name, v]) =>
-    name in example.before && example.before[name] !== v ? `${name} pasa de ${example.before[name]} a ${v}` : `${name} = ${v}`,
+    name in example.before && example.before[name] !== v ? t('{variable} pasa de {antes} a {ahora}', { variable: name, antes: example.before[name], ahora: v }) : `${name} = ${v}`,
   )
-  return parts.length > 1 ? `${parts.slice(0, -1).join(', ')} y ${parts.at(-1)}` : (parts[0] ?? 'cualquier valor')
+  return parts.length > 1 ? t('{lista} y {ultimo}', { lista: parts.slice(0, -1).join(', '), ultimo: parts.at(-1) }) : (parts[0] ?? t('cualquier valor'))
 }
 
 // Propuesta para hacerla excluyente: «B · !A» (con paréntesis si hace falta).

@@ -5,6 +5,7 @@
 // en pausa todavía no se han aplicado) y con el ciclo anterior para los flancos.
 import { makeContext } from './engine'
 import { evaluate, truthy } from './expression'
+import { t as tr } from '../i18n'
 
 const num = (v) => String(Math.round(Number(v) * 100) / 100).replace('.', ',')
 
@@ -52,40 +53,43 @@ function explainTerm(ast, ctx, info) {
     case 'not': {
       const inner = explainTerm(ast.arg, ctx, info)
       // Negación de algo simple: una sola línea («!Paro: vale 1»).
-      if (!inner.children) return { text, ok, detail: inner.detail ?? (inner.ok ? 'es verdadera' : 'es falsa') }
+      if (!inner.children) return { text, ok, detail: inner.detail ?? (inner.ok ? tr('es verdadera') : tr('es falsa')) }
       return { text, ok, op: 'not', children: [inner] }
     }
     case 'num':
-      return { text, ok, detail: ok ? 'siempre verdadera' : 'siempre falsa: nunca se franquea' }
+      return { text, ok, detail: ok ? tr('siempre verdadera') : tr('siempre falsa: nunca se franquea') }
     case 'var': {
       const type = info.types.get(ast.name)
-      const owner = type === 'output' || type === 'memory' ? ' (la pone el propio grafcet)' : ''
-      return { text, ok, detail: `vale ${num(ctx.value(ast.name))}${owner}` }
+      const own = type === 'output' || type === 'memory'
+      const value = num(ctx.value(ast.name))
+      return { text, ok, detail: own ? tr('vale {valor} (la pone el propio grafcet)', { valor: value }) : tr('vale {valor}', { valor: value }) }
     }
     case 'step':
-      return { text, ok, detail: ok ? 'etapa activa' : 'etapa no activa' }
+      return { text, ok, detail: ok ? tr('etapa activa') : tr('etapa no activa') }
     case 'timer': {
-      if (!ctx.step(ast.step)) return { text, ok, detail: `X${ast.step} no está activa: la temporización no cuenta` }
+      if (!ctx.step(ast.step)) return { text, ok, detail: tr('X{etapa} no está activa: la temporización no cuenta', { etapa: ast.step }) }
       const left = Math.max(0, ast.seconds - ctx.elapsed(ast.step))
-      return { text, ok, detail: ok ? 'tiempo cumplido' : `quedan ${num(left)} s` }
+      return { text, ok, detail: ok ? tr('tiempo cumplido') : tr('quedan {segundos} s', { segundos: num(left) }) }
     }
     case 'rise':
     case 'fall': {
       const arg = wrap(ast.arg)
       const rise = ast.op === 'rise'
-      if (ok) return { text, ok, detail: `${arg} acaba de pasar de ${rise ? '0 a 1' : '1 a 0'}` }
-      if (!ctx.prev) return { text, ok, detail: 'un flanco necesita un cambio: todavía no ha habido ninguno' }
+      if (ok) return { text, ok, detail: tr('{variable} acaba de pasar de {antes} a {ahora}', { variable: arg, antes: rise ? 0 : 1, ahora: rise ? 1 : 0 }) }
+      if (!ctx.prev) return { text, ok, detail: tr('un flanco necesita un cambio: todavía no ha habido ninguno') }
       const target = rise ? 1 : 0
       const now = truthy(evaluate(ast.arg, ctx)) ? 1 : 0
       const detail =
         now === target
-          ? `${arg} ya vale ${target}: hace falta que cambie (${rise ? 'desactívala y vuelve a activarla' : 'actívala y vuelve a desactivarla'})`
-          : `${arg} vale ${now}: hace falta que pase a ${target}`
+          ? rise
+            ? tr('{variable} ya vale {valor}: hace falta que cambie (desactívala y vuelve a activarla)', { variable: arg, valor: target })
+            : tr('{variable} ya vale {valor}: hace falta que cambie (actívala y vuelve a desactivarla)', { variable: arg, valor: target })
+          : tr('{variable} vale {valor}: hace falta que pase a {objetivo}', { variable: arg, valor: now, objetivo: target })
       return { text, ok, detail }
     }
     case 'cmp': {
       const shown = [ast.left, ast.right].filter((a) => a.op === 'var').map((a) => `${a.name} = ${num(ctx.value(a.name))}`)
-      return { text, ok, detail: shown.length ? shown.join(', ') : ok ? 'verdadera' : 'falsa' }
+      return { text, ok, detail: shown.length ? shown.join(', ') : ok ? tr('verdadera') : tr('falsa') }
     }
     default:
       return { text, ok }
@@ -128,26 +132,26 @@ export function explainTransition(compiled, sim, transitionId) {
   let summary
   if (!t.ast) {
     status = 'error'
-    summary = compiled.errors.find((e) => e.nodeId === t.id)?.message ?? 'La receptividad no es válida (se toma como falsa).'
+    summary = compiled.errors.find((e) => e.nodeId === t.id)?.message ?? tr('La receptividad no es válida (se toma como falsa).')
   } else if (forcing) {
     status = 'forced'
-    summary = `El grafcet ${forcing.grafcet} está forzado (${forcing.text}) por ${variable(forcing.stepId)}: no evoluciona solo.`
+    summary = tr('El grafcet {grafcet} está forzado ({forzado}) por {etapa}: no evoluciona solo.', { grafcet: forcing.grafcet, forzado: forcing.text, etapa: variable(forcing.stepId) })
   } else if (!steps.length) {
     status = 'not-validated'
-    summary = 'No tiene ninguna etapa anterior enlazada: nunca se valida.'
+    summary = tr('No tiene ninguna etapa anterior enlazada: nunca se valida.')
   } else if (missing.length) {
     status = 'not-validated'
     summary =
       steps.length > 1
-        ? `No está validada: falta ${missing.map((s) => s.variable).join(', ')} (convergencia en Y: tienen que estar activas todas).`
-        : `No está validada: ${missing[0].variable} no está activa.`
+        ? tr('No está validada: falta {etapas} (convergencia en Y: tienen que estar activas todas).', { etapas: missing.map((s) => s.variable).join(', ') })
+        : tr('No está validada: {etapa} no está activa.', { etapa: missing[0].variable })
   } else if (receptivity.ok) {
     status = 'ready'
-    summary = 'Validada y con la receptividad verdadera: se franquea en el próximo ciclo.'
+    summary = tr('Validada y con la receptividad verdadera: se franquea en el próximo ciclo.')
   } else {
     status = 'waiting'
     const f = firstFailure(receptivity)
-    summary = `Validada, espera a ${f.text}${f.detail ? ` (${f.detail})` : ''}.`
+    summary = f.detail ? tr('Validada, espera a {condicion} ({detalle}).', { condicion: f.text, detalle: f.detail }) : tr('Validada, espera a {condicion}.', { condicion: f.text })
   }
   return { id: t.id, condition: t.condition, status, steps, receptivity, summary }
 }

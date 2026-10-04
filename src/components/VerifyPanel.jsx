@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { AlertTriangle, CircleCheck, CircleX, Lightbulb, X } from 'lucide-react'
+import { t } from '../lib/i18n'
 
 function IssueItem({ issue, onFocus }) {
   const [open, setOpen] = useState(false)
@@ -19,7 +20,7 @@ function IssueItem({ issue, onFocus }) {
       {issue.why && (
         <div className="pl-8 pr-2">
           <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open} className="text-xs text-blue-600 hover:underline">
-            {open ? 'Ocultar' : '¿Por qué?'}
+            {open ? t('Ocultar') : t('¿Por qué?')}
           </button>
           {open && <p className="mt-1 rounded bg-blue-50 p-2 text-xs text-slate-700">{issue.why}</p>}
         </div>
@@ -38,8 +39,8 @@ export default function VerifyPanel({ issues, onFocus, onClose }) {
   return (
     <aside className="side-panel flex w-80 shrink-0 flex-col border-l border-slate-200 bg-white">
       <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
-        <h2 className="text-sm font-semibold">Verificación IEC 60848</h2>
-        <button type="button" onClick={onClose} title="Cerrar" className="rounded-md p-1 text-slate-500 hover:bg-slate-100">
+        <h2 className="text-sm font-semibold">{t('Verificación IEC 60848')}</h2>
+        <button type="button" onClick={onClose} title={t('Cerrar')} className="rounded-md p-1 text-slate-500 hover:bg-slate-100">
           <X size={16} />
         </button>
       </div>
@@ -48,25 +49,24 @@ export default function VerifyPanel({ issues, onFocus, onClose }) {
         {errors.length + warnings.length === 0 ? (
           <div className="flex items-start gap-2 rounded-md bg-green-50 p-3 text-sm text-green-800">
             <CircleCheck size={18} className="mt-0.5 shrink-0" />
-            <span>El grafcet es conforme: no se han encontrado problemas.</span>
+            <span>{t('El grafcet es conforme: no se han encontrado problemas.')}</span>
           </div>
         ) : (
           <p className="text-sm text-slate-600">
-            {errors.length} {errors.length === 1 ? 'error' : 'errores'} · {warnings.length}{' '}
-            {warnings.length === 1 ? 'aviso' : 'avisos'}. Pulsa uno para ir a él.
+            {t('Errores: {errores} · avisos: {avisos}. Pulsa uno para ir a él.', { errores: errors.length, avisos: warnings.length })}
           </p>
         )}
 
-        <ul className="space-y-1" aria-label="Problemas">
+        <ul className="space-y-1" aria-label={t('Problemas')}>
           {[...errors, ...warnings].map((issue, i) => (
             <IssueItem key={i} issue={issue} onFocus={onFocus} />
           ))}
         </ul>
 
         {tips.length > 0 && (
-          <section aria-label="Consejos">
+          <section aria-label={t('Consejos')}>
             <h3 className="mb-1 flex items-center gap-1 text-xs font-medium uppercase tracking-wide text-slate-500">
-              <Lightbulb size={13} /> Consejos ({tips.length})
+              <Lightbulb size={13} /> {t('Consejos ({n})', { n: tips.length })}
             </h3>
             <ul className="space-y-1">
               {tips.map((issue, i) => (
@@ -77,8 +77,9 @@ export default function VerifyPanel({ issues, onFocus, onClose }) {
         )}
 
         <p className="border-t border-slate-100 pt-3 text-xs text-slate-400">
-          Errores: el grafcet no es conforme o no puede evolucionar. Avisos: es válido pero probablemente no es lo que
-          se quiere (p. ej. una etapa final sin salida). Consejos: errores típicos al aprender, con su explicación.
+          {t(
+            'Errores: el grafcet no es conforme o no puede evolucionar. Avisos: es válido pero probablemente no es lo que se quiere (p. ej. una etapa final sin salida). Consejos: errores típicos al aprender, con su explicación.',
+          )}
         </p>
       </div>
     </aside>

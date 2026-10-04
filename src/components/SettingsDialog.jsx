@@ -27,7 +27,7 @@ export default function SettingsDialog({ settings, onChange, onReset, onClose })
         <h2 id="settings-title" className="text-base font-semibold">
           Opciones
         </h2>
-        <button type="button" onClick={onClose} title="Cerrar (Esc)" className="rounded-md p-1 text-slate-500 hover:bg-slate-100">
+        <button type="button" onClick={onClose} title={t('Cerrar (Esc)')} className="rounded-md p-1 text-slate-500 hover:bg-slate-100">
           <X size={18} />
         </button>
       </div>
@@ -138,7 +138,7 @@ export default function SettingsDialog({ settings, onChange, onReset, onClose })
               step={DIAGRAM_FONT.step}
               value={settings.diagramFontSize}
               onChange={(e) => onChange({ diagramFontSize: Number(e.target.value) })}
-              aria-label="Tamaño del texto del diagrama"
+              aria-label={t('Tamaño del texto del diagrama')}
               className="flex-1 accent-blue-600"
             />
             <span className="w-12 text-right text-sm tabular-nums">{settings.diagramFontSize}px</span>
@@ -158,7 +158,7 @@ export default function SettingsDialog({ settings, onChange, onReset, onClose })
           onClick={onReset}
           className="flex items-center gap-1 rounded-md px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-100"
         >
-          <RotateCcw size={16} /> Restablecer
+          <RotateCcw size={16} /> {t('Restablecer')}
         </button>
         <button
           type="button"
