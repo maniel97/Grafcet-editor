@@ -353,6 +353,12 @@ body {
 :root[data-theme="dark"] .text-blue-900:not(.react-flow *):not(.paper):not(.paper *) {
   color: oklch(88.2% 0.059 254.128);
 }
+:root[data-theme="dark"] .text-blue-950:not(.react-flow *):not(.paper):not(.paper *) {
+  color: oklch(93.2% 0.032 255.585);
+}
+:root[data-theme="dark"] .text-amber-950:not(.react-flow *):not(.paper):not(.paper *) {
+  color: oklch(96.2% 0.059 95.617);
+}
 :root[data-theme="dark"] .text-green-900:not(.react-flow *):not(.paper):not(.paper *) {
   color: oklch(87.1% 0.15 154.449);
 }

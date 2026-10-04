@@ -189,7 +189,7 @@ export default function HelpDialog({ onClose, onTour, onExample, onTutorial, ini
               if (!ids.length) return null
               return (
                 <div key={section.title} className="mt-3">
-                  <p className="px-2 pb-1 text-[11px] font-semibold uppercase tracking-wide text-slate-400">{t(section.title)}</p>
+                  <p className="px-2 pb-1 text-[11px] font-semibold uppercase tracking-wide text-slate-600">{t(section.title)}</p>
                   {ids.map((id) => (
                     <button
                       key={id}

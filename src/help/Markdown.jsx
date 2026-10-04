@@ -91,8 +91,8 @@ function Card({ icon: Icon, title, text, action, onClick, testId }) {
     <div className="my-3 flex items-center gap-3 rounded-lg border border-blue-200 bg-blue-50 p-3" data-help-card={testId}>
       <Icon size={22} className="shrink-0 text-blue-700" />
       <div className="min-w-0 flex-1">
-        <p className="font-medium text-blue-950">{title}</p>
-        {text && <p className="text-[0.92em] text-blue-900/80">{text}</p>}
+        <p className="font-medium text-blue-900">{title}</p>
+        {text && <p className="text-[0.92em] text-blue-800">{text}</p>}
       </div>
       <button type="button" onClick={onClick} className="shrink-0 rounded-md bg-blue-600 px-3 py-1.5 font-medium text-white hover:bg-blue-700">
         {action}
@@ -153,7 +153,7 @@ export default function Markdown({ source, ctx = {} }) {
           )
         if (b.type === 'note')
           return (
-            <div key={i} className="flex gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-amber-950">
+            <div key={i} className="flex gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-amber-900">
               <Info size={16} className="mt-0.5 shrink-0 text-amber-600" />
               <p>
                 <Inline text={b.text} ctx={ctx} />
