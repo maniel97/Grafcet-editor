@@ -8,7 +8,7 @@ import { N_, t } from '../lib/i18n'
 // hint? }:
 // - target: ancla o anclas [data-tour] (o selectores CSS); sin target, la burbuja va en el centro.
 // - free: no bloquea lo de fuera (para pasos que usan paneles o menús).
-// - waitFor(): el paso espera a que el usuario haga algo (se comprueba en la página); mientras,
+// - waitFor(memoria): el paso espera a que el usuario haga algo (se comprueba en la página); mientras,
 //   «Siguiente» está desactivado y se muestra `hint`. Al cumplirse, se marca como hecho.
 // Lo señalado se puede usar (el hueco no tapa); lo demás no, para no perderse. Esc cierra.
 const PAD = 6
@@ -47,10 +47,11 @@ export default function Tour({ tour, onClose }) {
   // Sitio de lo señalado y estado del paso, en cada momento (paneles que se abren, scroll…).
   useEffect(() => {
     setDone(!step.waitFor)
+    const memory = {} // estado propio de esta vez en el paso (lib/tutorials.js, sequence)
     const tick = () => {
       const next = areaOf(step.target)
       setArea((prev) => (same(prev, next) ? prev : next))
-      if (step.waitFor?.()) setDone(true)
+      if (step.waitFor?.(memory)) setDone(true)
     }
     tick()
     const timer = setInterval(tick, 200)

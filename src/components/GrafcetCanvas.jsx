@@ -664,8 +664,10 @@ export default function GrafcetCanvas() {
       setSimulating(false)
       const { EXAMPLES } = await import('../lib/examples')
       const example = EXAMPLES.find((ex) => ex.id === tutorial.start)
+      // Del ejemplo, sin su nota: la explicación la da el tutorial y deja sitio para lo que se añade.
+      const fromExample = example && normalizeProject(example.build())
       const project = example
-        ? { ...normalizeProject(example.build()), name: example.title }
+        ? { ...fromExample, nodes: fromExample.nodes.filter((n) => n.type !== 'note'), name: example.title }
         : { nodes: [{ id: 's0', type: 'step', position: { x: 200, y: 40 }, data: { label: '0', actions: [], initial: true } }], edges: [], plc: plcRef.current, name: t(tutorial.title) }
       replaceProject(project, t('Antes del tutorial «{tutorial}»', { tutorial: t(tutorial.title) }))
       setHelpOpen(false)

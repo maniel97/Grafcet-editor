@@ -31,3 +31,8 @@ Divergencia en O: cada pieza va a su sitio.
 ```ejemplo mezcladora
 Divergencia en Y: dos depósitos a la vez.
 ```
+
+Para practicar la O y la exclusividad paso a paso:
+
+```tutorial divergencia-o
+```

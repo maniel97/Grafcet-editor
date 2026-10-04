@@ -1954,6 +1954,7 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
   return (
     <section
       aria-label={tr('Escena de la planta')}
+      data-tour="planta"
       ref={sectionRef}
       tabIndex={-1}
       onKeyDown={onKeyDown}

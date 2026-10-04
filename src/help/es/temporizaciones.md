@@ -27,3 +27,8 @@ El ladder usa un temporizador por cada condición temporal distinta (TON en S7-2
 ```ejemplo semaforo
 Un semáforo: solo tiempos.
 ```
+
+Para practicarlo paso a paso:
+
+```tutorial temporizacion
+```

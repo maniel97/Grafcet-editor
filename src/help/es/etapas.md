@@ -13,7 +13,7 @@ Una **etapa** es una situación estable del sistema: «esperando», «bajando la
 
 Cada etapa tiene una variable, **X** seguida de su número: `X2` vale 1 mientras la etapa 2 está activa. Sirve en receptividades (`X2 · b`), para sincronizar grafcets y en las [temporizaciones](temporizaciones) (`5s/X2`).
 
-> **Ojo:** los números de etapa no tienen por qué ser seguidos, pero sí únicos dentro del grafcet. Verificar avisa si hay dos iguales.
+> **Ojo:** los números de etapa no tienen por qué ser seguidos, pero sí únicos en todo el proyecto (todas las hojas). Verificar marca un error si hay dos iguales.
 
 ## Buenas costumbres
 

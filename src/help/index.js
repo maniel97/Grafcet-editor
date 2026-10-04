@@ -9,7 +9,8 @@ const FILES = import.meta.glob('./*/*.md', { query: '?raw', import: 'default', e
 export const SECTIONS = [
   { title: N_('Primeros pasos'), articles: ['que-es-grafcet', 'primer-grafcet'] },
   { title: N_('El grafcet (IEC 60848)'), articles: ['etapas', 'transiciones', 'acciones', 'temporizaciones', 'divergencias', 'bucles'] },
-  { title: N_('Comprobar y simular'), articles: ['verificar', 'simular'] },
+  { title: N_('Estructurar'), articles: ['macroetapas', 'grafcets-parciales', 'encapsulacion', 'gemma', 'hojas'] },
+  { title: N_('Comprobar y simular'), articles: ['verificar', 'simular', 'planta', 'esquema-electrico'] },
   { title: N_('Al autómata'), articles: ['variables', 'ladder'] },
 ]
 
