@@ -26,6 +26,7 @@ Pendant la simulation, la section **« Diagramme espace-phase »** du panneau de
 
 - **Gravité** : vue de face ; les pièces tombent, reposent sur des plateformes et sur la tige des vérins.
 - **Relief** : dessin en volume, seulement pour la présentation.
+- **Isométrique** (dans la vue de dessus) : l’installation posée au sol, en perspective, et chaque élément avec sa hauteur : les convoyeurs comme des tables, les pièces comme des cubes dessus, les détecteurs sur un poteau. Seul le dessin change : on simule et on modifie de la même façon (glisser, poser, tourner).
 - **Pannes** (en Utiliser) : un détecteur qui ne donne pas de signal, un vérin qui se bloque… pour s’exercer au diagnostic.
 - **Pupitre de commande** : boutons et voyants peuvent aller sur un pupitre à part.
 - **Mes groupes** : enregistrez un poste pour le réutiliser dans d’autres projets.

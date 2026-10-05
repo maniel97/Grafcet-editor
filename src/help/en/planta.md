@@ -26,6 +26,7 @@ While you simulate, the **“Displacement-step diagram”** section of the panel
 
 - **Gravity**: front view; parts fall, rest on platforms and on cylinder rods.
 - **Relief**: a drawing with volume, for presentation only.
+- **Isometric** (in the top view): the plant resting on the floor, in perspective, and each element with its height: conveyors as tables, parts as cubes on top, sensors on a post. Only the drawing changes: you simulate and edit the same way (drag, place, rotate).
 - **Faults** (in Use): a sensor that gives no signal, a cylinder that jams… to practise diagnosis.
 - **Control panel**: push buttons and pilot lights can go on a separate desk.
 - **My groups**: save a station to reuse it in other projects.

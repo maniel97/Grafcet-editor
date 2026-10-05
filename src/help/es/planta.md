@@ -26,6 +26,7 @@ Mientras simulas, la sección **«Diagrama espacio-fase»** del panel dibuja lo 
 
 - **Gravedad**: vista de frente; las piezas caen, se apoyan en plataformas y en el vástago de los cilindros.
 - **Relieve**: dibujo con volumen, solo de presentación.
+- **Isométrica** (en la vista desde arriba): la planta apoyada en el suelo, en perspectiva, y cada elemento con su altura: las cintas como mesas, las piezas como cubos encima, los detectores en un poste. Solo cambia el dibujo: se simula y se edita igual (arrastrar, poner, girar).
 - **Averías** (en Usar): un detector que no da señal, un cilindro que se atasca… para practicar el diagnóstico.
 - **Panel de control**: los pulsadores y pilotos pueden ir en un pupitre aparte.
 - **Mis grupos**: guarda una estación para reutilizarla en otros proyectos.

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import { closest } from '../lib/autocomplete'
-import { ArrowLeft, ArrowRight, BookmarkPlus, Box, Cable, ChevronDown, Copy, Download, Hand, Maximize2, Upload, Tag, Minimize2, Minus, MousePointer2, Plus, RotateCw, Scan, Trash2, WandSparkles, X, ArrowDownToLine } from 'lucide-react'
+import { ArrowLeft, ArrowRight, BookmarkPlus, Box, Boxes, Cable, ChevronDown, Copy, Download, Hand, Maximize2, Upload, Tag, Minimize2, Minus, MousePointer2, Plus, RotateCw, Scan, Trash2, WandSparkles, X, ArrowDownToLine } from 'lucide-react'
 import {
   PIECE_SIZES,
   SCENE_TYPES,
@@ -29,6 +29,7 @@ import {
 } from '../lib/sim/scene'
 import { copyToClipboard, pasteFromClipboard } from '../lib/sim/sceneClipboard'
 import { faces, pieceBox, reliefBoxes, reliefOrder } from '../lib/sim/relief'
+import { ISO_MATRIX, isoBoxes, isoKey, isoPrism, isoProject, isoScreenBox, lift, pieceLift } from '../lib/sim/iso'
 import { exportGroups, importGroups, loadGroups, makeGroup, placeGroup, storeGroups } from '../lib/sim/sceneLibrary'
 import { downloadFile } from '../lib/projectFile'
 import { N_, t as tr } from '../lib/i18n'
@@ -384,6 +385,8 @@ const RELIEF_TONES = {
   tank: ['#f8fafc', '#cbd5e1'],
 }
 const pts = (list) => list.map(([x, y]) => `${x},${y}`).join(' ')
+// La isométrica solo en la vista desde arriba (la de frente ya es un alzado).
+const isIso = (scene) => scene?.view === 'iso' && !scene?.gravity
 function BoxFaces({ box, color, of }) {
   const { top, side } = faces(box)
   const [light, dark] = color ? [color, color] : (RELIEF_TONES[box.tone] ?? RELIEF_TONES.steel)
@@ -416,6 +419,35 @@ function PieceShape({ p, relief = false }) {
       {relief && <BoxFaces box={pieceBox(p)} color={COLORS[p.color] ?? COLORS.amber} />}
       <rect x={p.x} y={p.y} width={p.w} height={p.h} rx="3" fill={COLORS[p.color] ?? COLORS.amber} stroke={metal ? '#334155' : INK} />
       {metal && <line x1={p.x + 4} y1={p.y + p.h - 5} x2={p.x + p.w - 5} y2={p.y + 4} stroke="white" strokeWidth="2" opacity="0.6" />}
+    </g>
+  )
+}
+// Vista isométrica (lib/sim/iso.js): la cara de arriba de cada volumen y las dos de delante (sur y
+// este, más oscura), debajo del dibujo del elemento, que va encima a su altura.
+function IsoFaces({ boxes, color }) {
+  return boxes.map((box, i) => {
+    const { top, south, east } = isoPrism(box)
+    const [light, dark] = color ? [color, color] : (RELIEF_TONES[box.tone] ?? RELIEF_TONES.steel)
+    return (
+      <g key={i} data-iso-box={box.tone ?? ''}>
+        <polygon points={pts(south)} fill={dark} stroke={INK} strokeWidth="0.8" strokeLinejoin="round" />
+        <polygon points={pts(east)} fill={dark} stroke={INK} strokeWidth="0.8" strokeLinejoin="round" />
+        <polygon points={pts(east)} fill="black" opacity={color ? 0.3 : 0.18} />
+        {color && <polygon points={pts(south)} fill="black" opacity="0.12" />}
+        <polygon points={pts(top)} fill={light} stroke={INK} strokeWidth="0.8" strokeLinejoin="round" />
+      </g>
+    )
+  })
+}
+function IsoPiece({ p, z }) {
+  const color = COLORS[p.color] ?? COLORS.amber
+  const o = lift(z + Math.min(p.w, p.h, 30))
+  return (
+    <g pointerEvents="none" data-piece={p.id} data-material={p.material ?? 'plastic'}>
+      <IsoFaces boxes={[{ r: { x: p.x, y: p.y, w: p.w, h: p.h }, base: z, h: Math.min(p.w, p.h, 30) }]} color={color} />
+      {p.material === 'metal' && (
+        <line x1={p.x + 4 + o.x} y1={p.y + p.h - 5 + o.y} x2={p.x + p.w - 5 + o.x} y2={p.y + 4 + o.y} stroke="white" strokeWidth="2" opacity="0.6" />
+      )}
     </g>
   )
 }
@@ -615,6 +647,54 @@ function layoutLabels(items, gravity) {
     const spot = spots.find((c) => !hits(c.r, e.id)) ?? spots.reduce((best, c) => (covered(c.r) < covered(best.r) ? c : best))
     placed.push(spot.r)
     out.set(e.id, spot)
+  }
+  return out
+}
+// Rótulos de la isométrica: en el suelo, delante de su elemento (bajo el centro de su borde de
+// delante); si ahí pisan a otro rótulo o el volumen de otro elemento (obstacles: [{ id, r }]), se
+// prueba encima, a la derecha, a la izquierda y cada vez más abajo, y se queda el primer sitio libre
+// (si no hay, el que menos pisa). screen(e): su contorno en la pantalla. Nunca fuera del lienzo.
+function isoLabels(elements, textOf, linesOf, obstacles, screen) {
+  const placedRects = []
+  const out = new Map()
+  const items = elements
+    .map((e) => {
+      // Los cilindros, bajo el cuerpo (no bajo toda su carrera).
+      const b = e.type === 'cylinder' ? worldRect(e, 0, -12, 80, 24) : boundsOf(e, 1)
+      return { e, b, p: isoProject({ x: b.x + b.w / 2, y: b.y + b.h }) }
+    })
+    .sort((a, b) => a.p.y - b.p.y)
+  for (const { e, b, p } of items) {
+    const text = String(textOf(e) ?? '')
+    if (!text.trim()) continue
+    const w = Math.max(8, text.length * CHAR_W)
+    const h = 12 + linesOf(e) * 12
+    const sb = screen(e)
+    const long = ISO_LONG.includes(e.type)
+    // Las alargadas (una cinta), en cualquier punto de sus dos bordes de delante.
+    const along = [0.5, 0.3, 0.7, 0.15, 0.85].flatMap((t) => [isoProject({ x: b.x + t * b.w, y: b.y + b.h }), isoProject({ x: b.x + b.w, y: b.y + t * b.h })])
+    const spots = [
+      { x: p.x, y: p.y + 16 },
+      ...(long
+        ? along.flatMap((q) => [{ x: q.x, y: q.y + 16 }, { x: q.x, y: q.y + 30 }])
+        : [-6, -20, -34].flatMap((d) => [
+            { x: sb.x + sb.w / 2, y: sb.y + d - linesOf(e) * 12 },
+            { x: sb.x + sb.w - 6 * d / 6 + 8 + w / 2, y: sb.y + sb.h / 2 + 4 },
+            { x: sb.x + 6 * d / 6 - 8 - w / 2, y: sb.y + sb.h / 2 + 4 },
+          ])),
+      ...Array.from({ length: 10 }, (_, i) => ({ x: p.x, y: p.y + 29 + 13 * i })),
+    ].map((c) => ({ x: Math.max(4 + w / 2, c.x), y: c.y }))
+    // Con un margen de 6 px para que dos rótulos no queden pegados.
+    const rect = (c) => ({ x: c.x - w / 2 - 6, y: c.y - 11, w: w + 12, h: h + 2 })
+    const others = (c) => [...placedRects, ...obstacles.filter((o) => o.id !== e.id).map((o) => o.r)].filter((q) => overlapsRect(rect(c), q))
+    const area = (c) =>
+      others(c).reduce((sum, q) => {
+        const r = rect(c)
+        return sum + (Math.min(r.x + r.w, q.x + q.w) - Math.max(r.x, q.x)) * (Math.min(r.y + r.h, q.y + q.h) - Math.max(r.y, q.y))
+      }, 0)
+    const at = spots.find((c) => !others(c).length) ?? spots.reduce((best, c) => (area(c) < area(best) ? c : best))
+    placedRects.push(rect(at))
+    out.set(e.id, { ...at, anchor: 'middle' })
   }
   return out
 }
@@ -1345,6 +1425,8 @@ const UNDER = ['image', 'pipe', 'conveyor', 'sink', 'ramp', 'diverter', 'platfor
 
 // Panel de control: los mandos y la señalización pueden ir en un panel fijo, aparte del
 // mecanismo (como el cuadro eléctrico real). e.place: 'desk' | 'machine' (por defecto, máquina).
+// En la isométrica, los rótulos esquivan los volúmenes salvo los alargados (van en el suelo delante).
+const ISO_LONG = ['conveyor', 'platform', 'ramp', 'pipe', 'image']
 const DESK_TYPES = ['button', 'switch', 'emergency', 'potentiometer', 'lamp', 'display']
 const isDesk = (e) => DESK_TYPES.includes(e.type) && e.place === 'desk'
 
@@ -1551,6 +1633,7 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
   const history = useRef({ past: [], future: [] })
   const [historySize, setHistorySize] = useState({ past: 0, future: 0 }) // para los botones
   const svgRef = useRef(null)
+  const floorRef = useRef(null) // el suelo de la escena (con la matriz de la isométrica)
   const scrollRef = useRef(null)
   const sectionRef = useRef(null)
   const [width, setWidth] = useState(loadWidth)
@@ -1567,7 +1650,8 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
     const el = scrollRef.current
     const list = (scene?.elements ?? []).filter((e) => !isDesk(e))
     if (!el || !list.length) return
-    const boxes = list.map((e) => boundsOf(e, 1))
+    // En la isométrica, el contorno en la pantalla (con hueco a los lados para los rótulos).
+    const boxes = list.map((e) => (isIso(scene) ? ((b) => ({ x: b.x - 50, y: b.y, w: b.w + 100, h: b.h + 20 }))(isoScreenBox(boundsOf(e, 1), 0, 60)) : boundsOf(e, 1)))
     // Hueco para los rótulos, debajo de cada elemento.
     const minX = Math.max(0, Math.min(...boxes.map((b) => b.x)) - FIT_MARGIN)
     const minY = Math.max(0, Math.min(...boxes.map((b) => b.y)) - FIT_MARGIN)
@@ -1582,6 +1666,14 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
     }
     setZoom(zoomed)
   }, [scene])
+  // Al pasar a la isométrica (o volver al plano), todo cambia de sitio: se reencuadra.
+  const isoOn = isIso(scene)
+  const isoBefore = useRef(isoOn)
+  useEffect(() => {
+    if (isoBefore.current === isoOn) return
+    isoBefore.current = isoOn
+    fit()
+  }, [isoOn, fit])
   useLayoutEffect(() => {
     const el = scrollRef.current
     if (!el || !pendingScroll.current) return
@@ -1928,7 +2020,7 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
     const point = svgRef.current.createSVGPoint()
     point.x = ev.clientX
     point.y = ev.clientY
-    const p = point.matrixTransform(svgRef.current.getScreenCTM().inverse())
+    const p = point.matrixTransform((floorRef.current ?? svgRef.current).getScreenCTM().inverse())
     return { x: p.x, y: p.y }
   }
 
@@ -2140,15 +2232,65 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
   // Los cilindros montados en el vástago de otro, donde están ahora.
   const machine = shown.filter((e) => !isDesk(e)).map((e) => (e.type === 'cylinder' ? placed(scene ?? { elements: [] }, state, e) : e))
   const labelled = (e) => !(e.type === 'label' || ((e.type === 'image' || e.type === 'pipe') && !e.text))
-  const labelSpots = layoutLabels(
-    machine.map((e) => ({ e, b: withRelief(boundsOf(e, 1), scene?.relief), text: labelled(e) ? labelOf(e) : '', lines: showIO ? ioLines(e).length : 0 })),
+  const iso = isIso(scene)
+  const isoOf = (e) => isoBoxes(scene ?? { elements: [] }, state, e)
+  const planSpots = layoutLabels(
+    machine.map((e) => ({ e, b: withRelief(boundsOf(e, 1), scene?.relief && !iso), text: labelled(e) ? labelOf(e) : '', lines: showIO ? ioLines(e).length : 0 })),
     scene?.gravity,
   )
+  // En la isométrica, los rótulos del plano llevados a la pantalla y separados si aún se pisan.
+  const obstacles = iso
+    ? machine.filter((e) => !ISO_LONG.includes(e.type)).flatMap((e) => isoOf(e).boxes.map((b) => ({ id: e.id, r: isoScreenBox(b.r, b.base, b.base + b.h) })))
+    : []
+  const labelSpots = iso
+    ? isoLabels(machine.filter((e) => planSpots.has(e.id)), labelOf, showIO ? (e) => ioLines(e).length : () => 0, obstacles, (e) => isoScreenBox(boundsOf(e, 1), 0, isoOf(e).top))
+    : planSpots
   const deskItems = elements.filter(isDesk)
   const draw = (e) => drawElement(e, { scene, state, values, time, signals })
   // Los mandos y pilotos no se giran (su rótulo se lee siempre).
   const turns = (e) => !['button', 'switch', 'emergency', 'lamp', 'sink', 'feeder', 'tank', 'motor', 'display', 'scale', 'potentiometer', 'heater', 'siren', 'trafficlight', 'label', 'image'].includes(e.type)
   const operable = (e) => ['button', 'switch', 'emergency', 'feeder', 'potentiometer'].includes(e.type)
+  const underRank = (e) => (e.type === 'image' ? -2 : UNDER.includes(e.type) ? -1 : 0)
+  // Elementos y piezas en orden de dibujo: lo de debajo primero (las piezas van encima). En la
+  // isométrica, además, del fondo hacia delante, con las piezas entre los demás elementos.
+  const sceneItems = iso
+    ? [
+        ...machine.filter((e) => underRank(e) < 0).sort((a, b) => underRank(a) - underRank(b) || isoKey(boundsOf(a, 1)) - isoKey(boundsOf(b, 1))).map((e) => ({ e })),
+        ...[
+          ...machine.filter((e) => underRank(e) === 0).map((e) => ({ e, key: isoKey(boundsOf(e, 1)) })),
+          ...state.pieces.map((p) => ({ piece: p, z: pieceLift(scene, state, p, machine), key: isoKey({ x: p.x, y: p.y, w: p.w, h: p.h }) })),
+        ].sort((a, b) => a.key - b.key),
+      ]
+    : [...[...machine].sort((a, b) => underRank(a) - underRank(b)).map((e) => ({ e })), ...state.pieces.map((p) => ({ piece: p }))]
+  const renderElement = (e) => {
+    const volume = iso ? isoOf(e) : null
+    const up = lift(volume?.top ?? 0)
+    return (
+          <g
+            key={e.id}
+            data-element={e.type}
+            data-id={e.id}
+            data-pos={e.type === 'cylinder' ? (state.pos[e.id] ?? 0).toFixed(2) : undefined}
+            aria-label={`${tr(SCENE_TYPES[e.type].label)} ${labelOf(e)}`}
+            {...knobProps(e)}
+            style={{ cursor: mode === 'edit' ? 'move' : operable(e) ? 'pointer' : 'default' }}
+            onPointerDown={(ev) => onPointerDown(ev, e)}
+            onPointerUp={(ev) => onPointerUp(ev, e)}
+            onPointerCancel={(ev) => onPointerUp(ev, e)}
+          >
+            {iso && <IsoFaces boxes={volume.boxes} />}
+            {iso && volume.post && <line x1={e.x} y1={e.y} x2={e.x + up.x} y2={e.y + up.y} stroke="#64748b" strokeWidth="3" />}
+            <g transform={iso && volume.top ? `translate(${up.x} ${up.y})` : undefined}>
+              {/* Zona de clic: todo el contorno (también los huecos del dibujo). */}
+              {(() => {
+                const b = boundsOf(e, state.pos[e.id] ?? 0)
+                return <rect x={b.x} y={b.y} width={b.w} height={b.h} fill="transparent" />
+              })()}
+              <g data-shape="" transform={`translate(${e.x} ${e.y})${turns(e) ? ` rotate(${e.rot ?? 0})` : ''}`}>{draw(e)}</g>
+            </g>
+          </g>
+    )
+  }
 
   return (
     <section
@@ -2264,7 +2406,7 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
         </button>
         <button
           type="button"
-          onClick={() => onChange({ ...(scene ?? {}), relief: !scene?.relief })}
+          onClick={() => onChange({ ...(scene ?? {}), relief: !scene?.relief, view: undefined })}
           aria-pressed={Boolean(scene?.relief)}
           aria-label={tr('Relieve')}
           title={tr('Vista en relieve: cada elemento con su volumen (solo cambia el dibujo)')}
@@ -2272,6 +2414,18 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
         >
           <Box size={12} /> <span className="hidden @4xl:inline">{tr('Relieve')}</span>
         </button>
+        {!scene?.gravity && (
+          <button
+            type="button"
+            onClick={() => onChange({ ...(scene ?? {}), view: isIso(scene) ? undefined : 'iso', relief: false })}
+            aria-pressed={isIso(scene)}
+            aria-label={tr('Isométrica')}
+            title={tr('Vista isométrica: la planta apoyada en el suelo y cada elemento con su altura (solo cambia el dibujo; se edita igual)')}
+            className={`flex items-center gap-1 rounded border px-2 py-0.5 ${isIso(scene) ? 'border-blue-300 bg-blue-50 text-blue-800' : 'border-slate-300 hover:bg-slate-100'}`}
+          >
+            <Boxes size={12} /> <span className="hidden @4xl:inline">{tr('Isométrica')}</span>
+          </button>
+        )}
         <button type="button" onClick={() => onAction(null, 'clear')} title={tr('Quita de la escena todas las piezas (cilindros, cintas y demás elementos se quedan)')} className="rounded border border-slate-300 px-2 py-0.5 hover:bg-slate-100">
           {tr('Quitar piezas')}
         </button>
@@ -2506,6 +2660,8 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
               </pattern>
             </defs>
             <rect width={W} height={H} fill="white" />
+            <g ref={floorRef} transform={iso ? ISO_MATRIX : undefined}>
+            {iso && <rect width={W} height={H} fill="#f1f5f9" stroke="#cbd5e1" data-iso-floor="" />}
             {mode === 'edit' && <rect width={W} height={H} fill="url(#scene-grid)" />}
             {/* Vista de frente: el suelo, donde acaba lo que cae. */}
             {scene?.gravity && <rect x="0" y={SCENE_FLOOR} width={W} height={H - SCENE_FLOOR} fill="#cbd5e1" data-floor="" />}
@@ -2514,32 +2670,9 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
                 {tr('Pulsa «Editar» y añade elementos: pulsadores, cilindros, cintas, detectores…')}
               </text>
             )}
-            {scene?.relief && <ReliefLayer scene={scene} state={state} elements={machine} />}
-            {/* Las cintas y recogidas, debajo de todo (las piezas van encima). */}
-            {[...machine].sort((a, b) => (a.type === 'image' ? -2 : UNDER.includes(a.type) ? -1 : 0) - (b.type === 'image' ? -2 : UNDER.includes(b.type) ? -1 : 0)).map((e) => (
-              <g
-                key={e.id}
-                data-element={e.type}
-                data-id={e.id}
-                data-pos={e.type === 'cylinder' ? (state.pos[e.id] ?? 0).toFixed(2) : undefined}
-                aria-label={`${tr(SCENE_TYPES[e.type].label)} ${labelOf(e)}`}
-                {...knobProps(e)}
-                style={{ cursor: mode === 'edit' ? 'move' : operable(e) ? 'pointer' : 'default' }}
-                onPointerDown={(ev) => onPointerDown(ev, e)}
-                onPointerUp={(ev) => onPointerUp(ev, e)}
-                onPointerCancel={(ev) => onPointerUp(ev, e)}
-              >
-                {/* Zona de clic: todo el contorno (también los huecos del dibujo). */}
-                {(() => {
-                  const b = boundsOf(e, state.pos[e.id] ?? 0)
-                  return <rect x={b.x} y={b.y} width={b.w} height={b.h} fill="transparent" />
-                })()}
-                <g data-shape="" transform={`translate(${e.x} ${e.y})${turns(e) ? ` rotate(${e.rot ?? 0})` : ''}`}>{draw(e)}</g>
-              </g>
-            ))}
-            {state.pieces.map((p) => (
-              <PieceShape key={p.id} p={p} relief={Boolean(scene?.relief)} />
-            ))}
+            {scene?.relief && !iso && <ReliefLayer scene={scene} state={state} elements={machine} />}
+            {sceneItems.map((item) => (item.piece ? iso ? <IsoPiece key={item.piece.id} p={item.piece} z={item.z} /> : <PieceShape key={item.piece.id} p={item.piece} relief={Boolean(scene?.relief)} /> : renderElement(item.e)))}
+          </g>
             {/* Rótulos (sin girar) */}
             {machine.map((e) => {
               // Sin rótulo debajo: los de texto, y las imágenes y tuberías sin nombre propio.
@@ -2547,7 +2680,17 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
               const at = labelSpots.get(e.id)
               if (!at) return null // sin texto (p. ej. una plataforma sin nombre)
               return (
-                <text key={`l-${e.id}`} data-label-of={e.id} x={at.x} y={at.y} textAnchor={at.anchor} fontSize="11" fill="#334155" pointerEvents="none">
+                <text
+                  key={`l-${e.id}`}
+                  data-label-of={e.id}
+                  x={at.x}
+                  y={at.y}
+                  textAnchor={at.anchor}
+                  fontSize="11"
+                  fill="#334155"
+                  pointerEvents="none"
+                  {...(iso ? { stroke: 'white', strokeWidth: 3, paintOrder: 'stroke', strokeLinejoin: 'round' } : {})}
+                >
                   {labelOf(e)}
                   {showIO &&
                     ioLines(e).map((line) => (
@@ -2558,6 +2701,7 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
                 </text>
               )
             })}
+            <g transform={iso ? ISO_MATRIX : undefined}>
             {machine
               .filter((e) => selection.includes(e.id))
               .map((e) => {
@@ -2703,6 +2847,7 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
                 pointerEvents="none"
               />
             )}
+            </g>
           </svg>
         </div>
         {(deskItems.length > 0 || mode === 'edit') && (

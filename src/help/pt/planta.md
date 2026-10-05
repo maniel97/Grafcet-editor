@@ -26,6 +26,7 @@ Enquanto simula, a secção **«Diagrama espaço-fase»** do painel desenha o qu
 
 - **Gravidade**: vista de frente; as peças caem, apoiam-se em plataformas e na haste dos cilindros.
 - **Relevo**: desenho com volume, só de apresentação.
+- **Isométrica** (na vista de cima): a instalação assente no chão, em perspetiva, e cada elemento com a sua altura: os tapetes como mesas, as peças como cubos em cima, os detetores num poste. Só muda o desenho: simula-se e edita-se da mesma forma (arrastar, pôr, rodar).
 - **Avarias** (em Usar): um detetor que não dá sinal, um cilindro que encrava… para praticar o diagnóstico.
 - **Painel de comando**: os botões e sinalizadores podem ir numa consola à parte.
 - **Os meus grupos**: guarde uma estação para a reutilizar noutros projetos.
