@@ -424,9 +424,11 @@ function PieceShape({ p, relief = false }) {
 }
 // Vista isométrica (lib/sim/iso.js): la cara de arriba de cada volumen y las dos de delante (sur y
 // este, más oscura), debajo del dibujo del elemento, que va encima a su altura.
-function IsoFaces({ boxes, color }) {
+// level (0 a 1): un depósito, con el líquido en sus caras hasta esa altura.
+function IsoFaces({ boxes, color, level }) {
   return boxes.map((box, i) => {
     const { top, south, east } = isoPrism(box)
+    const liquid = level > 0 ? isoPrism({ ...box, h: box.h * Math.min(1, level) }) : null
     const [light, dark] = color ? [color, color] : (RELIEF_TONES[box.tone] ?? RELIEF_TONES.steel)
     return (
       <g key={i} data-iso-box={box.tone ?? ''}>
@@ -434,6 +436,12 @@ function IsoFaces({ boxes, color }) {
         <polygon points={pts(east)} fill={dark} stroke={INK} strokeWidth="0.8" strokeLinejoin="round" />
         <polygon points={pts(east)} fill="black" opacity={color ? 0.3 : 0.18} />
         {color && <polygon points={pts(south)} fill="black" opacity="0.12" />}
+        {liquid && (
+          <g data-iso-liquid={Math.round(level * 100)}>
+            <polygon points={pts(liquid.south)} fill="#3b82f6" opacity="0.55" />
+            <polygon points={pts(liquid.east)} fill="#1d4ed8" opacity="0.55" />
+          </g>
+        )}
         <polygon points={pts(top)} fill={light} stroke={INK} strokeWidth="0.8" strokeLinejoin="round" />
       </g>
     )
@@ -470,14 +478,19 @@ function SinkShape({ count }) {
   )
 }
 
-function TankShape({ e, level, values }) {
+// iso: en la isométrica el líquido va en las caras de los lados (IsoFaces), no en la tapa.
+function TankShape({ e, level, values, iso = false }) {
   const { w, h } = TANK
   const fill = isOn(values, e.fill)
   const drain = isOn(values, e.drain)
   return (
     <g>
       <rect x="0" y="0" width={w} height={h} rx="4" fill="#f8fafc" stroke={INK} strokeWidth="1.5" />
-      <rect x="1" y={1 + (h - 2) * (1 - level)} width={w - 2} height={(h - 2) * level} fill="#3b82f6" opacity="0.55" />
+      {iso ? (
+        level > 0 && <rect x="1" y="1" width={w - 2} height={h - 2} fill="#3b82f6" opacity={0.12 + 0.3 * level} />
+      ) : (
+        <rect x="1" y={1 + (h - 2) * (1 - level)} width={w - 2} height={(h - 2) * level} fill="#3b82f6" opacity="0.55" />
+      )}
       {/* Válvulas: entrada arriba, salida abajo */}
       <path d={`M ${w / 2 - 8} -16 L ${w / 2 + 8} -4 L ${w / 2 + 8} -16 L ${w / 2 - 8} -4 Z`} fill={fill ? ON : OFF} stroke={INK} />
       <line x1={w / 2} y1="-24" x2={w / 2} y2="-16" stroke={INK} strokeWidth="2" />
@@ -1432,7 +1445,7 @@ const isDesk = (e) => DESK_TYPES.includes(e.type) && e.place === 'desk'
 
 
 // Dibujo de un elemento en un estado dado (lo usan la escena interactiva y la estática).
-function drawElement(e, { scene, state, values, time, signals }) {
+function drawElement(e, { scene, state, values, time, signals, iso = false }) {
   const pos = state.pos[e.id] ?? 0
   switch (e.type) {
     case 'button':
@@ -1456,7 +1469,7 @@ function drawElement(e, { scene, state, values, time, signals }) {
     case 'sink':
       return <SinkShape count={state.counts[e.id] ?? 0} />
     case 'tank':
-      return <TankShape e={e} level={state.level?.[e.id] ?? (Number(e.initial) || 0)} values={values} />
+      return <TankShape e={e} level={state.level?.[e.id] ?? (Number(e.initial) || 0)} values={values} iso={iso} />
     case 'motor':
       return <MotorShape angle={state.angle?.[e.id] ?? 0} running={isOn(values, e.variable)} />
     case 'display':
@@ -1666,6 +1679,35 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
     }
     setZoom(zoomed)
   }, [scene])
+  // Textos de los dibujos en la isométrica (contadores, niveles, displays): sin la inclinación del
+  // suelo. A cada uno se le aplica la inversa de la matriz que tiene encima alrededor de su punto de
+  // anclaje, con su escala: se lee recto, en su sitio y a su tamaño. Al volver al plano, se quita.
+  useLayoutEffect(() => {
+    const svg = svgRef.current
+    if (!svg) return
+    for (const el of svg.querySelectorAll('text[data-iso-flat]')) {
+      if (el.closest('[data-iso-top]')) continue
+      el.removeAttribute('transform')
+      el.removeAttribute('data-iso-flat')
+    }
+    for (const el of svg.querySelectorAll('[data-iso-top] text')) {
+      // Solo es presentación: si el navegador no lo permite, el texto se queda como estaba.
+      try {
+        const ctm = el.parentNode.getCTM?.()
+        if (!ctm) continue
+        const parent = DOMMatrix.fromMatrix(ctm)
+        const ax = el.x.baseVal.length ? el.x.baseVal[0].value : 0
+        const ay = el.y.baseVal.length ? el.y.baseVal[0].value : 0
+        const at = new DOMPoint(ax, ay).matrixTransform(parent)
+        const scale = (Math.hypot(parent.a, parent.b) + Math.hypot(parent.c, parent.d)) / 2
+        const flat = parent.inverse().multiply(new DOMMatrix().translate(at.x, at.y).scale(scale).translate(-ax, -ay))
+        el.setAttribute('transform', `matrix(${flat.a} ${flat.b} ${flat.c} ${flat.d} ${flat.e} ${flat.f})`)
+        el.setAttribute('data-iso-flat', '')
+      } catch {
+        // sin enderezar
+      }
+    }
+  })
   // Al pasar a la isométrica (o volver al plano), todo cambia de sitio: se reencuadra.
   const isoOn = isIso(scene)
   const isoBefore = useRef(isoOn)
@@ -2246,7 +2288,7 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
     ? isoLabels(machine.filter((e) => planSpots.has(e.id)), labelOf, showIO ? (e) => ioLines(e).length : () => 0, obstacles, (e) => isoScreenBox(boundsOf(e, 1), 0, isoOf(e).top))
     : planSpots
   const deskItems = elements.filter(isDesk)
-  const draw = (e) => drawElement(e, { scene, state, values, time, signals })
+  const draw = (e) => drawElement(e, { scene, state, values, time, signals, iso })
   // Los mandos y pilotos no se giran (su rótulo se lee siempre).
   const turns = (e) => !['button', 'switch', 'emergency', 'lamp', 'sink', 'feeder', 'tank', 'motor', 'display', 'scale', 'potentiometer', 'heater', 'siren', 'trafficlight', 'label', 'image'].includes(e.type)
   const operable = (e) => ['button', 'switch', 'emergency', 'feeder', 'potentiometer'].includes(e.type)
@@ -2278,9 +2320,9 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
             onPointerUp={(ev) => onPointerUp(ev, e)}
             onPointerCancel={(ev) => onPointerUp(ev, e)}
           >
-            {iso && <IsoFaces boxes={volume.boxes} />}
+            {iso && <IsoFaces boxes={volume.boxes} level={e.type === 'tank' ? (state.level?.[e.id] ?? (Number(e.initial) || 0)) : undefined} />}
             {iso && volume.post && <line x1={e.x} y1={e.y} x2={e.x + up.x} y2={e.y + up.y} stroke="#64748b" strokeWidth="3" />}
-            <g transform={iso && volume.top ? `translate(${up.x} ${up.y})` : undefined}>
+            <g transform={iso && volume.top ? `translate(${up.x} ${up.y})` : undefined} data-iso-top={iso ? '' : undefined}>
               {/* Zona de clic: todo el contorno (también los huecos del dibujo). */}
               {(() => {
                 const b = boundsOf(e, state.pos[e.id] ?? 0)

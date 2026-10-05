@@ -102,6 +102,12 @@ test('planta isométrica: con volumen y se edita igual (arrastrar sigue al rató
   await expect(view.getByRole('button', { name: 'Isométrica' })).toHaveAttribute('aria-pressed', 'true')
   await expect(view.locator('[data-iso-floor]')).toHaveCount(1)
   await expect(view.locator('g[data-element="conveyor"] [data-iso-box]').first()).toBeVisible()
+  // Los textos de los dibujos (el contador de las recogidas) se leen rectos: sin giro ni inclinación.
+  const tilt = await view.locator('g[data-element="sink"] text').first().evaluate((t) => {
+    const m = t.getScreenCTM()
+    return Math.max(Math.abs(m.b), Math.abs(m.c)) / Math.abs(m.a)
+  })
+  expect(tilt).toBeLessThan(0.01)
   await view.getByRole('radio', { name: /Editar/ }).click()
   const sink = view.locator('g[data-element="sink"]').first()
   const shape = sink.locator('[data-shape]')
