@@ -7,6 +7,7 @@ El botón **Esquema eléctrico** abre el esquema de la instalación: mando, pote
 - **Insertar montaje**: montajes clásicos listos para simular y modificar (marcha-paro con autorretención, inversión de giro, estrella-triángulo, variador, electroneumática con electroválvulas 5/2…).
 - **Conexiones del autómata**: crea el autómata con un aparato en cada entrada y salida de la tabla de variables, ya cableado.
 - **Conectar con el autómata y la planta**: el esquema, el grafcet y la planta funcionan juntos. El pulsador del esquema da la entrada del autómata, la salida activa el contactor y el contactor mueve la cinta de la planta.
+- **Poner aparatos (tampón)**: pulsa un aparato de la paleta y después pulsa en el esquema: se pone uno en cada clic, con su vista previa bajo el ratón. Esc, «Terminar» o el botón derecho lo sueltan. Doble clic en la paleta: uno en el primer hueco libre. Con el dedo, igual: toca la paleta y luego el esquema.
 - **Varias hojas** con marco, columnas numeradas y referencias cruzadas; números de cable y bornas.
 - **Exportar el esquema** (PDF vectorial, PNG o SVG), también dentro del dossier de la práctica.
 

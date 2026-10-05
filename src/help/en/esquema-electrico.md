@@ -7,6 +7,7 @@ The **Wiring diagram** button opens the installation diagram: control, power and
 - **Insert circuit**: classic circuits ready to simulate and modify (start-stop with self-holding, reversing, star-delta, frequency drive, electro-pneumatics with 5/2 solenoid valves…).
 - **PLC connections**: creates the PLC with a device on each input and output of the variables table, already wired.
 - **Connect with the PLC and the plant**: the diagram, the grafcet and the plant work together. The diagram's push button gives the PLC input, the output energises the contactor and the contactor moves the plant's conveyor.
+- **Placing devices (stamp)**: click a device in the palette and then click on the diagram: one is placed per click, with its preview under the mouse. Esc, “Finish” or the right button release it. Double-click in the palette: one in the first free spot. With a finger, the same: tap the palette and then the diagram.
 - **Several sheets** with a frame, numbered columns and cross references; wire numbers and terminals.
 - **Export the diagram** (vector PDF, PNG or SVG), also inside the exercise report.
 

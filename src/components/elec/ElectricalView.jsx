@@ -28,6 +28,7 @@ const HISTORY_LIMIT = 100
 const DRAG_TYPE = 'application/x-grafcet-elec'
 const snap = (v) => Math.round(v / GRID) * GRID
 const PREVIEW_DELAY = 450
+const GHOST_ID = '__tampon'
 // Ancho del panel (arrastrando el separador), recordado entre sesiones.
 const WIDTH_KEY = 'grafcet-editor:elec-width'
 const MIN_WIDTH = 360
@@ -334,6 +335,13 @@ function Inner({ schematic, onChange, elecState, onAction, variables = [], build
   const [width, setWidth] = useState(loadWidth)
   const resizing = useRef(null)
   const [preview, setPreview] = useState(null) // { item, x, y }
+  // Tampón (como en la planta): un clic en la paleta lo carga, cada clic en el esquema pone uno
+  // (con su vista previa fantasma bajo el ratón) y Esc, «Terminar» o el botón derecho lo sueltan.
+  const [stamp, setStamp] = useState(null) // { item, at: { x, y } | null, count }
+  // Fuera del modo edición (usar, simular), el tampón se suelta.
+  useEffect(() => {
+    if (mode !== 'edit') setStamp(null)
+  }, [mode])
   const previewTimer = useRef(null)
   useEffect(() => () => clearTimeout(previewTimer.current), [])
   const { zoom } = useViewport()
@@ -385,6 +393,12 @@ function Inner({ schematic, onChange, elecState, onAction, variables = [], build
     onChange(prev)
   }
 
+  // Sitio del tampón: el aparato centrado bajo el puntero y ajustado a la cuadrícula.
+  const stampSpot = (item, p) => {
+    const t = ELEC_TYPES[item.type]
+    const { w, h } = sizeOf({ type: item.type, ...t.defaults, ...item.preset })
+    return { x: snap(p.x - w / 2), y: snap(p.y - h / 2) }
+  }
   const add = (item, at = null) => {
     const t = ELEC_TYPES[item.type]
     const center = at ?? screenToFlowPosition({ x: (wrapperRef.current?.getBoundingClientRect().left ?? 0) + 200, y: (wrapperRef.current?.getBoundingClientRect().top ?? 0) + 120 })
@@ -568,7 +582,28 @@ function Inner({ schematic, onChange, elecState, onAction, variables = [], build
         : [],
     [sch.frame, cols, titleInfo, sheets, sheetId],
   )
-  const allNodes = useMemo(() => [...frameNode, ...nodes], [frameNode, nodes])
+  // Vista previa del tampón: el aparato tal como quedará, transparente y sin responder al ratón.
+  const ghostNode = useMemo(() => {
+    if (!stamp?.at || mode !== 'edit') return []
+    const t = ELEC_TYPES[stamp.item.type]
+    const c = { id: GHOST_ID, type: stamp.item.type, x: stamp.at.x, y: stamp.at.y, tag: t.prefix ? `${t.prefix}?` : '', ...t.defaults, ...stamp.item.preset }
+    return [
+      {
+        id: GHOST_ID,
+        type: 'elec',
+        position: stamp.at,
+        data: { c, view: null, mode: 'edit', junctions: {}, probes: [], onAction: () => {}, onProbe: () => {}, onFaultMenu: () => {} },
+        draggable: false,
+        selectable: false,
+        connectable: false,
+        focusable: false,
+        className: 'elec-ghost',
+        zIndex: 5,
+        measured: (({ w, h }) => ({ width: w, height: h }))(sizeOf(c)),
+      },
+    ]
+  }, [stamp, mode])
+  const allNodes = useMemo(() => [...frameNode, ...nodes, ...ghostNode], [frameNode, nodes, ghostNode])
   const pneumaticIds = useMemo(() => new Set(components.filter((c) => isPneumatic(c.type)).map((c) => c.id)), [components])
   const edges = useMemo(
     () =>
@@ -697,6 +732,12 @@ function Inner({ schematic, onChange, elecState, onAction, variables = [], build
       onKeyDown={(e) => {
         if (mode !== 'edit') return
         if (e.target.closest?.('input, select, textarea')) return
+        if (e.key === 'Escape' && stamp) {
+          e.preventDefault()
+          e.stopPropagation()
+          setStamp(null)
+          return
+        }
         if (e.key === 'Delete' || e.key === 'Backspace') {
           e.preventDefault()
           e.stopPropagation()
@@ -704,7 +745,7 @@ function Inner({ schematic, onChange, elecState, onAction, variables = [], build
         }
       }}
       // relative y absolute no pueden ir juntas (en el CSS generado ganaría relative).
-      className={`side-panel @container flex min-w-0 flex-col border-l border-slate-200 bg-white outline-none ${
+      className={`elec-touch side-panel @container flex min-w-0 flex-col border-l border-slate-200 bg-white outline-none ${
         maximized ? `absolute inset-y-0 left-0 z-20 ${simulating ? 'right-80' : 'right-0'}` : 'relative'
       }`}
       style={maximized ? undefined : { width: width ?? '50%', flexShrink: 1, minWidth: MIN_WIDTH }}
@@ -970,11 +1011,19 @@ function Inner({ schematic, onChange, elecState, onAction, variables = [], build
                       e.dataTransfer.setData(DRAG_TYPE, item.key)
                       e.dataTransfer.effectAllowed = 'copy'
                     }}
+                    // Clic: tampón (se pone en el esquema, uno por clic). Doble clic: uno en el primer
+                    // hueco libre, como antes.
                     onClick={() => {
                       clearTimeout(previewTimer.current)
                       setPreview(null)
+                      setStamp((s) => (s?.item.key === item.key ? s : { item, at: null, count: 0 }))
+                    }}
+                    onDoubleClick={() => {
+                      setStamp(null)
                       add(item)
                     }}
+                    aria-pressed={stamp?.item.key === item.key}
+                    data-palette={item.key}
                     onMouseEnter={(ev) => {
                       const at = { x: ev.clientX, y: ev.clientY }
                       clearTimeout(previewTimer.current)
@@ -985,8 +1034,8 @@ function Inner({ schematic, onChange, elecState, onAction, variables = [], build
                       clearTimeout(previewTimer.current)
                       setPreview(null)
                     }}
-                    title={tr('Arrastra al esquema (o pulsa para ponerlo en el centro)')}
-                    className="block w-full truncate rounded px-1 py-0.5 text-left hover:bg-slate-100"
+                    title={tr('Pulsa y después pulsa en el esquema para ponerlo (uno por clic); doble clic: en el primer hueco libre; también se puede arrastrar')}
+                    className={`block w-full truncate rounded px-1 py-0.5 text-left ${stamp?.item.key === item.key ? 'bg-blue-100 font-medium text-blue-900' : 'hover:bg-slate-100'}`}
                   >
                     + {tr(item.label, item.vars)}
                   </button>
@@ -997,8 +1046,34 @@ function Inner({ schematic, onChange, elecState, onAction, variables = [], build
         )}
         <div
           ref={wrapperRef}
-          className="paper relative min-h-0 min-w-0 flex-1"
+          className={`paper relative min-h-0 min-w-0 flex-1 ${stamp ? 'cursor-crosshair' : ''}`}
+          onPointerMove={(e) => {
+            if (!stamp || e.pointerType === 'touch') return
+            const p = stampSpot(stamp.item, screenToFlowPosition({ x: e.clientX, y: e.clientY }))
+            setStamp((s) => (s && (s.at?.x !== p.x || s.at?.y !== p.y) ? { ...s, at: p } : s))
+          }}
+          onPointerLeave={() => setStamp((s) => (s?.at ? { ...s, at: null } : s))}
+          onContextMenu={(e) => {
+            if (!stamp) return
+            e.preventDefault()
+            setStamp(null)
+          }}
         >
+          {stamp && (
+            <div
+              role="status"
+              data-stamp-status
+              className="pointer-events-auto absolute left-1/2 top-2 z-10 flex -translate-x-1/2 items-center gap-2 rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs text-blue-900 shadow"
+            >
+              <span>
+                {tr('Tampón: {aparato}. Pulsa en el esquema para ponerlo', { aparato: tr(stamp.item.label, stamp.item.vars) })}
+                {stamp.count > 0 && ` · ${stamp.count === 1 ? tr('1 puesto') : tr('{n} puestos', { n: stamp.count })}`}
+              </span>
+              <button type="button" onClick={() => setStamp(null)} className="rounded-full border border-blue-300 bg-white px-2 py-0.5 font-medium hover:bg-blue-100">
+                {tr('Terminar')}
+              </button>
+            </div>
+          )}
           <ReactFlow
             onDragOver={(e) => {
               if (!e.dataTransfer.types.includes(DRAG_TYPE)) return
@@ -1040,7 +1115,13 @@ function Inner({ schematic, onChange, elecState, onAction, variables = [], build
             // Desplazar arrastrando el fondo (como en el lienzo) o con la rueda pulsada.
             panOnDrag={[0, 1]}
             proOptions={{ hideAttribution: true }}
-            onPaneClick={() => {
+            onPaneClick={(e) => {
+              // Con el tampón cargado, cada clic (o toque) en el fondo pone uno donde se pulsa.
+              if (stamp && mode === 'edit') {
+                add(stamp.item, stampSpot(stamp.item, screenToFlowPosition({ x: e.clientX, y: e.clientY })))
+                setStamp((s) => (s ? { ...s, count: s.count + 1 } : s))
+                return
+              }
               setSelected([])
               setSelectedWires([])
             }}

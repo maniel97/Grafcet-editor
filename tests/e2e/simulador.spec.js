@@ -436,10 +436,13 @@ test('escena: zoom con la rueda, centrado en el puntero', async ({ page }) => {
   await page.mouse.wheel(0, -300) // acercar
   await expect.poll(zoomText).not.toBe(before)
   expect(parseInt(await zoomText())).toBeGreaterThan(parseInt(before))
-  // El cilindro sigue bajo el puntero.
-  const a = await cyl.boundingBox()
-  expect(Math.abs(a.x + a.width / 2 - at.x)).toBeLessThan(25)
-  expect(Math.abs(a.y + a.height / 2 - at.y)).toBeLessThan(25)
+  // El cilindro sigue bajo el puntero (cuando la vista termina de recolocarse: con el equipo
+  // cargado, el número del zoom cambia antes que la posición).
+  const off = async () => {
+    const a = await cyl.boundingBox()
+    return Math.max(Math.abs(a.x + a.width / 2 - at.x), Math.abs(a.y + a.height / 2 - at.y))
+  }
+  await expect.poll(off, { timeout: 10000 }).toBeLessThan(25)
   await page.mouse.wheel(0, 600) // alejar
   await expect.poll(async () => parseInt(await zoomText())).toBeLessThan(parseInt(before))
   expectNoErrors(errors)

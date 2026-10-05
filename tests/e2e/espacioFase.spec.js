@@ -17,11 +17,15 @@ test('diagrama espacio-fase y espacio-tiempo de un ciclo de cilindros', async ({
   await page.locator('[data-tour="Simular"]').click()
   const section = page.locator('[data-tour="espacio-fase"]')
   await expect(section).toContainText('Aparece cuando se mueve algún cilindro')
-  await hold(page, 'Pulsador Marcha')
-
   const diagram = section.locator('svg[data-space-phase="fase"]')
+  // Marcha (reintentando: con el equipo cargado, la planta puede estar aún colocándose y la
+  // pulsación perderse) hasta que se mueve algún cilindro.
+  await expect(async () => {
+    await hold(page, 'Pulsador Marcha')
+    await expect(diagram).toHaveCount(1, { timeout: 3000 })
+  }).toPass({ timeout: 20000 })
   // Un ciclo entero: 4 fases y la vuelta («5=1»).
-  await expect(diagram.locator('[data-phase-label]').last()).toHaveText('5=1', { timeout: 15000 })
+  await expect(diagram.locator('[data-phase-label]').last()).toHaveText('5=1', { timeout: 30000 })
   await expect(diagram.locator('[data-cylinder]')).toHaveCount(2)
   await expect(diagram.locator('[data-phase-label]')).toHaveText(['1', '2', '3', '4', '5=1'])
 

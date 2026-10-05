@@ -405,4 +405,30 @@ body {
   .scene-touch nav button {
     padding-block: 8px;
   }
+  /* Esquema eléctrico: lo mismo, y los bornes con una zona de toque mayor (invisible): el borne
+     sigue viéndose pequeño, pero se acierta con el dedo. */
+  .elec-touch button,
+  .elec-touch select {
+    min-height: 40px;
+    min-width: 40px;
+  }
+  .elec-touch nav button {
+    padding-block: 8px;
+  }
+  .elec-touch .react-flow__handle.elec-handle::after {
+    content: '';
+    position: absolute;
+    inset: -14px;
+    border-radius: 9999px;
+  }
+}
+
+/* Vista previa del tampón del esquema eléctrico: el aparato tal como quedará, transparente. */
+.react-flow__node.elec-ghost {
+  opacity: 0.45;
+}
+/* (React Flow da pointer-events a sus nodos y a sus partes: el clic tiene que llegar al fondo.) */
+.react-flow__node.elec-ghost,
+.react-flow__node.elec-ghost * {
+  pointer-events: none !important;
 }

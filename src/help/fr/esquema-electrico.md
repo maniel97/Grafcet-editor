@@ -7,6 +7,7 @@ Le bouton **Schéma électrique** ouvre le schéma de l’installation : command
 - **Insérer un montage** : des montages classiques prêts à simuler et à modifier (marche-arrêt avec auto-maintien, inversion de sens de marche, étoile-triangle, variateur, électropneumatique avec distributeurs 5/2…).
 - **Raccordements de l’automate** : crée l’automate avec un appareil sur chaque entrée et sortie de la table des variables, déjà câblé.
 - **Raccorder à l’automate et à la partie opérative** : le schéma, le grafcet et la partie opérative fonctionnent ensemble. Le bouton-poussoir du schéma donne l’entrée de l’automate, la sortie alimente le contacteur et le contacteur fait tourner le convoyeur.
+- **Poser des appareils (tampon)** : cliquez sur un appareil de la palette puis sur le schéma : un appareil par clic, avec son aperçu sous la souris. Échap, « Terminer » ou le bouton droit le relâchent. Double-clic dans la palette : un appareil dans le premier espace libre. Au doigt, pareil : touchez la palette puis le schéma.
 - **Plusieurs feuilles** avec cartouche, colonnes numérotées et renvois ; numéros de fils et borniers.
 - **Exporter le schéma** (PDF vectoriel, PNG ou SVG), aussi dans le dossier du TP.
 

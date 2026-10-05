@@ -7,6 +7,7 @@ O botão **Esquema elétrico** abre o esquema da instalação: comando, potênci
 - **Inserir montagem**: montagens clássicas prontas a simular e modificar (marcha-paragem com autorretenção, inversão de marcha, estrela-triângulo, variador, eletropneumática com eletroválvulas 5/2…).
 - **Ligações do autómato**: cria o autómato com um aparelho em cada entrada e saída da tabela de variáveis, já cablado.
 - **Ligar ao autómato e à planta**: o esquema, o grafcet e a planta funcionam juntos. O botão do esquema dá a entrada do autómato, a saída ativa o contactor e o contactor move o tapete da planta.
+- **Colocar aparelhos (carimbo)**: clique num aparelho da paleta e depois clique no esquema: coloca-se um em cada clique, com a sua pré-visualização sob o rato. Esc, «Terminar» ou o botão direito largam-no. Duplo clique na paleta: um no primeiro espaço livre. Com o dedo, igual: toque na paleta e depois no esquema.
 - **Várias folhas** com moldura, colunas numeradas e referências cruzadas; números de condutor e bornes.
 - **Exportar o esquema** (PDF vetorial, PNG ou SVG), também dentro do dossier do trabalho prático.
 

@@ -110,3 +110,49 @@ test('tampón: una pieza, una fila arrastrando y deshacer', async ({ page }) => 
   await expect(view.locator('[data-stamp-layer]')).toHaveCount(0)
   expectNoErrors(errors)
 })
+
+// Esquema eléctrico: tampón con vista previa (ratón) y con el dedo; doble clic, en un hueco libre.
+test('esquema eléctrico: tampón con vista previa, con ratón y con el dedo', async ({ page, context }) => {
+  await page.setViewportSize({ width: 1500, height: 950 })
+  const errors = await openEditor(page)
+  await page.getByRole('button', { name: 'Esquema eléctrico' }).click()
+  const view = page.getByRole('region', { name: 'Esquema eléctrico' })
+  await view.getByRole('button', { name: 'Pantalla completa' }).click()
+  const palette = view.getByRole('navigation', { name: 'Aparatos' })
+  const nodes = view.locator('.react-flow__node-elec:not(.elec-ghost)')
+  const before = await nodes.count()
+  const pane = view.locator('.react-flow__pane')
+  const box = await pane.boundingBox()
+
+  // Clic en la paleta: el tampón queda cargado.
+  await palette.getByRole('button', { name: '+ Piloto' }).click()
+  await expect(view.locator('[data-stamp-status]')).toContainText('Piloto')
+  // La vista previa sigue al ratón.
+  await page.mouse.move(box.x + 300, box.y + 250)
+  await expect(view.locator('.elec-ghost')).toHaveCount(1)
+  // Cada clic pone uno, donde se pulsa.
+  for (const [dx, dy] of [[300, 250], [520, 250], [740, 250]]) await page.mouse.click(box.x + dx, box.y + dy)
+  await expect(nodes).toHaveCount(before + 3)
+  await expect(view.locator('[data-stamp-status]')).toContainText('3 puestos')
+
+  // Con el dedo: un toque en el esquema pone otro.
+  const cdp = await context.newCDPSession(page)
+  const tap = async (x, y) => {
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y, id: 0 }] })
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
+  }
+  await tap(box.x + 300, box.y + 420)
+  await expect(nodes).toHaveCount(before + 4)
+
+  // Esc lo suelta: un clic en el fondo ya no pone nada.
+  await page.keyboard.press('Escape')
+  await expect(view.locator('[data-stamp-status]')).toHaveCount(0)
+  await page.mouse.click(box.x + 600, box.y + 420)
+  await expect(nodes).toHaveCount(before + 4)
+
+  // Doble clic en la paleta: uno en el primer hueco libre, sin tampón.
+  await palette.getByRole('button', { name: '+ Piloto' }).dblclick()
+  await expect(nodes).toHaveCount(before + 5)
+  await expect(view.locator('[data-stamp-status]')).toHaveCount(0)
+  expectNoErrors(errors)
+})
