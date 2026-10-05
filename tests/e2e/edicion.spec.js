@@ -163,6 +163,5 @@ test('tabla de variables: añadir una variable prevista desde el desplegable', a
   await expect(add).toHaveValue('')
   // El foco se queda en el diálogo (no salta a la tabla del lienzo a renombrar).
   await expect(page.locator('.react-flow input:focus')).toHaveCount(0)
-  await page.screenshot({ path: process.env.SHOT ?? 'test-results/vars.png' })
   expectNoErrors(errors)
 })
