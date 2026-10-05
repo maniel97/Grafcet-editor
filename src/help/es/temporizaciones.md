@@ -58,7 +58,7 @@ Las dos en la misma etapa: el aviso suena 2 s al empezar a descargar y el vibrad
 ## Cómo se ve al simular
 
 - En el panel de la derecha, **Temporizaciones**: una barra por cada una, con el tiempo que lleva y el total (`1.2 / 5 s`). En verde cuando ya se ha cumplido; «etapa inactiva» si aún no ha empezado.
-- **Qué espera el grafcet** dice cuánto falta: «falta 5s/X2: quedan 3,8 s».
+- **Qué espera el grafcet** dice cuánto falta, por ejemplo para 5s/X2: quedan 3,8 s.
 - Para no esperar: **+1 s** adelanta el tiempo un segundo, y el selector de **velocidad** (×2, ×5…) lo acelera todo.
 
 ## Reglas que conviene saber
