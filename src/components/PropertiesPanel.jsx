@@ -257,7 +257,7 @@ export default function PropertiesPanel({ node, onChange, onCommitLabel, onClose
   const isStep = node.type === 'step'
 
   return (
-    <aside className="side-panel flex w-72 shrink-0 flex-col border-l border-slate-200 bg-white">
+    <aside data-tour="propiedades" className="side-panel flex w-72 shrink-0 flex-col border-l border-slate-200 bg-white">
       <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
         <h2 className="text-sm font-semibold">{isStep ? t('Etapa') : t('Transición')}</h2>
         {/* Ayuda del tema: acciones (lo que se edita en una etapa) o receptividades. */}

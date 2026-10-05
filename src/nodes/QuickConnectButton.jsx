@@ -18,7 +18,8 @@ const zoomSelector = (s) => s.transform[2]
 // Con `disabled` se muestra en gris y no hace nada; se usa aria-disabled en vez del atributo
 // disabled para que el tooltip explicativo siga apareciendo al pasar el ratón.
 // `preview` (ver GhostPreview) se muestra en el lienzo mientras el ratón está encima.
-function FloatingButton({ position, title, onClick, centerX, disabled = false, preview, icon: Icon = Plus }) {
+// tour: ancla para la visita guiada y los tutoriales (data-tour), la misma en todos los idiomas.
+function FloatingButton({ position, title, onClick, centerX, disabled = false, preview, icon: Icon = Plus, tour }) {
   const zoom = useStore(zoomSelector)
   const { setPreview, readOnly } = useEditor()
   const showingPreview = useRef(false)
@@ -43,6 +44,7 @@ function FloatingButton({ position, title, onClick, centerX, disabled = false, p
         type="button"
         title={title}
         aria-label={title}
+        data-tour={tour}
         aria-disabled={disabled}
         onMouseEnter={() => {
           if (!preview || disabled) return
@@ -81,20 +83,33 @@ export default function QuickConnectButton({ nodeId, title, centerX, disabled })
       centerX={centerX}
       disabled={disabled}
       preview={{ kind: 'next', nodeId }}
+      tour="mas-siguiente"
       onClick={() => quickConnect(nodeId)}
     />
   )
 }
 
-// "+" a la derecha de la etapa: le añade una acción al final de las existentes.
+// "+" a la derecha de la etapa: le añade una acción al final de las existentes y abre el panel de la
+// etapa con su texto («Acción») seleccionado, para escribir encima directamente.
 export function AddActionButton({ nodeId }) {
   const { addAction } = useStructureActions()
+  const { editNode } = useEditor()
   return (
     <FloatingButton
       position={Position.Right}
       title={t('Añadir acción')}
       preview={{ kind: 'action', nodeId }}
-      onClick={() => addAction(nodeId)}
+      tour="mas-accion"
+      onClick={() => {
+        addAction(nodeId)
+        editNode?.(nodeId)
+        setTimeout(() => {
+          const inputs = document.querySelectorAll(`[data-tour="propiedades"] [aria-label="${t('Texto de la acción')}"]`)
+          const last = inputs[inputs.length - 1]
+          last?.focus()
+          last?.select()
+        }, 80)
+      }}
     />
   )
 }
@@ -107,6 +122,7 @@ export function LoopButton({ nodeId, title, disabled }) {
     <FloatingButton
       position={Position.Left}
       icon={CornerLeftUp}
+      tour="bucle"
       title={title}
       disabled={disabled}
       onClick={() => startLoop(nodeId)}

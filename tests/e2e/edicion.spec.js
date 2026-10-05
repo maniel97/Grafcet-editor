@@ -131,3 +131,18 @@ test('renombrar una variable en uso desde la tabla del lienzo', async ({ page })
   await expect(page.locator('.react-flow__node-transition').filter({ hasText: 'Sensor_pieza' })).toHaveCount(1)
   expectNoErrors(errors)
 })
+
+// El + de la derecha de una etapa añade una acción y deja escribirla al momento (panel abierto y
+// el texto provisional «Acción» seleccionado).
+test('el + de acción abre el panel listo para escribir', async ({ page }) => {
+  const errors = await openEditor(page)
+  await page.getByRole('button', { name: 'Etapa inicial', exact: true }).click()
+  await page.locator('.react-flow__node-step').first().click()
+  await page.locator('[data-tour="mas-accion"]').click()
+  const input = page.locator('[data-tour="propiedades"]').getByLabel('Texto de la acción').last()
+  await expect(input).toBeFocused()
+  await page.keyboard.type('Motor')
+  await expect(input).toHaveValue('Motor')
+  await expect(page.locator('.react-flow__node-step').first()).toContainText('Motor')
+  expectNoErrors(errors)
+})

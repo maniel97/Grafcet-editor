@@ -2,25 +2,56 @@
 // (start: 'vacio' o el id de un ejemplo) y va pidiendo cosas al alumno; cada paso comprueba en la
 // página que se ha hecho (waitFor) y, con auto, pasa solo al siguiente. free: deja usar toda la
 // pantalla (paneles, menús) en ese paso. Cada tutorial lo hace entero un robot (tests/e2e/ayuda.spec.js).
+//
+// Escritos para quien no sabe nada: cada paso dice qué es, para qué sirve y exactamente qué pulsar
+// (y la otra forma de hacerlo). El foco (target) sigue a lo que toca hacer en cada momento: la
+// etapa, su botón +, el panel que se abre al editar…
 import { N_ } from './i18n'
 
 const all = (selector) => [...document.querySelectorAll(selector)]
+const one = (selector) => document.querySelector(selector)
 const transitions = () => all('.react-flow__node-transition')
 const steps = () => all('.react-flow__node-step')
 const transitionWith = (text) => () => transitions().some((n) => n.textContent.includes(text))
 // Transiciones cuya receptividad dibujada (la negación es una raya, sin «!») cumple la expresión.
 const transitionsMatching = (re) => transitions().filter((n) => re.test(n.textContent.replace(/\s+/g, ' ').trim()))
 const transitionMatching = (re) => () => transitionsMatching(re).length > 0
+const labelOf = (n) => n.querySelector('.diagram-step-label')?.textContent.trim()
 const stepActive = (label) => () => steps().some((n) => n.querySelector('.diagram-step-label[data-active]')?.textContent.trim() === label)
-const simulating = () => Boolean(document.querySelector('[data-tour="simulacion"]'))
-const plantOpen = () => Boolean(document.querySelector('[data-tour="planta"]'))
+const simulating = () => Boolean(one('[data-tour="simulacion"]'))
+const plantOpen = () => Boolean(one('[data-tour="planta"]'))
 // Pasa por las etapas en este orden (esperas que el alumno no controla: la máquina hace el ciclo).
 const sequence = (...labels) => (memory) => {
   memory.seen ??= 0
   if (memory.seen < labels.length && stepActive(labels[memory.seen])()) memory.seen++
   return memory.seen === labels.length
 }
-const verified = () => (document.querySelector('[data-tour="Verificar"]')?.textContent ?? '').includes('✓')
+const verified = () => (one('[data-tour="Verificar"]')?.textContent ?? '').includes('✓')
+
+// Para el foco: lo primero que exista de la lista (funciones que devuelven elementos o nada).
+const firstOf =
+  (...options) =>
+  () => {
+    for (const option of options) {
+      const el = option()
+      if (el) return el
+    }
+    return 'lienzo'
+  }
+const panel = () => one('[data-tour="propiedades"]')
+const plusBelow = () => one('[data-tour="mas-siguiente"]')
+const plusAction = () => one('[data-tour="mas-accion"]')
+const loopButton = () => one('[data-tour="bucle"]')
+const stepNode = (label) => () => steps().find((n) => labelOf(n) === label)
+const transitionNode = (re) => () => transitionsMatching(re)[0]
+// Transición recién creada: sin texto o con el nombre provisional (T1, T2…).
+const emptyTransition = () => transitions().find((n) => /^(T\d+)?$/.test(n.textContent.replace(/\s+/g, '')))
+// ¿Hay un enlace de este nodo a este otro? (React Flow etiqueta cada enlace con sus extremos).
+const linked = (from, to) => Boolean(from && to) && all('.react-flow__edge').some((e) => e.getAttribute('aria-label') === `Edge from ${from.dataset.id} to ${to.dataset.id}`)
+
+// «Elegir un camino»: la etapa de Motor_lento y la transición !Paro que sale de ella.
+const slowStep = () => steps().find((n) => n.textContent.includes('Motor_lento'))
+const newParo = () => transitionsMatching(/^Paro$/).find((n) => linked(slowStep(), n))
 
 export const TUTORIALS = [
   {
@@ -31,67 +62,75 @@ export const TUTORIALS = [
     auto: true,
     steps: [
       {
-        target: '.react-flow__node-step',
+        target: stepNode('0'),
         title: N_('La etapa inicial'),
-        text: N_('Empezamos con la etapa 0: el doble cuadrado indica que es inicial, la que está activa al arrancar. Vamos a hacer un marcha-paro: con Marcha se enciende un motor y con Paro se apaga.'),
+        text: N_('Esto es una etapa: una situación en la que puede estar la máquina (parada, en marcha…). La 0 tiene el cuadrado doble porque es la inicial: la que está activa al encender.\nVamos a hacer un marcha-paro: con el pulsador Marcha se enciende un motor y con Paro se apaga.'),
       },
       {
-        target: 'lienzo',
+        target: () => [stepNode('0')(), plusBelow()].filter(Boolean),
         free: true,
         title: N_('Añade una transición'),
-        text: N_('Selecciona la etapa 0 con un clic y pulsa el + que aparece debajo: se añade una transición ya enlazada.'),
+        text: N_('Para pasar de una etapa a otra hace falta una transición: una raya horizontal con su condición.\n1. Haz clic una vez sobre la etapa 0: queda seleccionada (borde azul).\n2. Aparecen unos botones redondos con +. Pulsa el de debajo («Añadir transición»).\nOtra forma: el botón «Transición» de la barra de arriba, y después unirla arrastrando desde el punto de abajo de la etapa.'),
         waitFor: () => transitions().length >= 1,
-        hint: N_('Añade una transición debajo de la etapa 0.'),
+        hint: N_('Selecciona la etapa 0 y pulsa su + de abajo.'),
       },
       {
-        target: 'lienzo',
+        target: firstOf(panel, emptyTransition),
         free: true,
-        title: N_('Su receptividad'),
-        text: N_('La receptividad es la condición para pasar a la etapa siguiente. Haz doble clic en la transición y escribe Marcha en el campo de la receptividad.'),
+        title: N_('Su condición'),
+        text: N_('Cada transición tiene una receptividad: la condición que se tiene que cumplir para pasar a la etapa siguiente.\n1. Haz doble clic sobre la raya de la transición (o selecciónala con un clic y pulsa Intro).\n2. A la derecha se abre su panel. En «Receptividad / condición» pone T1 (un nombre provisional): bórralo y escribe Marcha.\nSe guarda sola: no hay que pulsar nada más.'),
         waitFor: transitionWith('Marcha'),
         hint: N_('Escribe Marcha en la receptividad.'),
       },
       {
-        target: 'lienzo',
+        target: () => [transitionNode(/^Marcha$/)(), plusBelow()].filter(Boolean),
         free: true,
         title: N_('La etapa 1'),
-        text: N_('Selecciona la transición y pulsa su +: añade la etapa 1 debajo.'),
+        text: N_('Ahora, la situación a la que se llega al pulsar Marcha: la etapa 1.\n1. Haz clic una vez sobre la transición Marcha para seleccionarla.\n2. Pulsa el + de debajo («Añadir etapa»): aparece la etapa 1, ya unida.'),
         waitFor: () => steps().length >= 2,
-        hint: N_('Añade la etapa 1.'),
+        hint: N_('Selecciona la transición y pulsa su + de abajo.'),
       },
       {
-        target: 'lienzo',
+        target: firstOf(panel, () => [stepNode('1')(), plusAction()].filter(Boolean)),
         free: true,
         title: N_('Una acción'),
-        text: N_('Lo que hace la etapa mientras está activa es su acción. Haz doble clic en la etapa 1, pulsa «Añadir acción» y escribe Motor.'),
+        text: N_('Lo que hace la máquina mientras está en una etapa es su acción: aquí, encender el motor.\n1. Haz clic una vez sobre la etapa 1.\n2. Pulsa el + de su derecha («Añadir acción»): se añade una acción llamada «Acción» y se abre el panel de la etapa.\n3. Escribe Motor (el texto «Acción» ya está seleccionado: lo que escribas lo sustituye).\nOtra forma: doble clic en la etapa y, en su panel, «Añadir acción».'),
         waitFor: () => steps().some((n) => n.textContent.includes('Motor')),
         hint: N_('Añade la acción Motor a la etapa 1.'),
       },
       {
-        target: 'lienzo',
+        target: firstOf(panel, plusBelow, emptyTransition, stepNode('1')),
         free: true,
-        title: N_('Cierra el ciclo'),
-        text: N_('Añade una transición debajo de la etapa 1 con la receptividad Paro. Después, con ella seleccionada, pulsa el botón de bucle de su izquierda (o clic derecho > «Bucle a etapa») y pulsa la etapa 0: el grafcet vuelve a empezar.'),
-        waitFor: () => transitionWith('Paro')() && verified(),
-        hint: N_('Transición Paro con un bucle a la etapa 0 (Verificar en verde).'),
+        title: N_('La transición de paro'),
+        text: N_('Para apagar hace falta otra transición, debajo de la etapa 1.\n1. Haz clic sobre la etapa 1 y pulsa su + de abajo.\n2. Haz doble clic en la transición nueva y, en su panel, cambia el nombre provisional (T2) por Paro.'),
+        waitFor: transitionWith('Paro'),
+        hint: N_('Transición Paro debajo de la etapa 1.'),
+      },
+      {
+        target: () => [loopButton() ?? transitionNode(/^Paro$/)(), stepNode('0')()].filter(Boolean),
+        free: true,
+        title: N_('Volver al principio'),
+        text: N_('Al apagar, la máquina vuelve a la situación inicial: hay que unir la transición Paro con la etapa 0. Es un bucle.\n1. Haz clic una vez sobre la transición Paro.\n2. Pulsa el botón de su izquierda, el de la flecha hacia arriba («Bucle»).\n3. Haz clic sobre la etapa 0. La unión sube por la izquierda con una flecha.\nOtra forma: clic derecho en la transición > «Bucle a etapa».'),
+        waitFor: verified,
+        hint: N_('Bucle de la transición Paro a la etapa 0 (Verificar en verde).'),
       },
       {
         target: 'Verificar',
         title: N_('Conforme'),
-        text: N_('Verificar está en verde (✓): el grafcet cumple la norma. Si algo falta, el botón muestra cuántos errores o avisos hay y cada uno explica qué hacer.'),
+        text: N_('El botón Verificar revisa el grafcet con las reglas de la norma IEC 60848. Está en verde (✓): todo correcto.\nSi algo falla, muestra cuántos errores o avisos hay; al pulsarlo, cada uno explica qué pasa y cómo arreglarlo.'),
       },
       {
-        target: ['Simular', 'simulacion'],
+        target: firstOf(() => one('[data-tour="entradas"]'), () => one('[data-tour="Simular"]')),
         free: true,
         title: N_('Pruébalo'),
-        text: N_('Pulsa Simular y activa la entrada Marcha (en el panel de la derecha, o la tecla 1): la etapa 1 se activa y el motor se enciende.'),
+        text: N_('Simular es probar el grafcet como si estuviera en el autómata.\n1. Pulsa Simular (en la barra de arriba).\n2. En el panel de la derecha, en Entradas, activa Marcha con su interruptor (o la tecla 1).\nLa etapa 1 se pone verde con un punto: está activa. Y el motor (la acción) se enciende.'),
         waitFor: stepActive('1'),
         hint: N_('Simula y activa Marcha.'),
       },
       {
         target: 'simulacion',
         title: N_('¡Hecho!'),
-        text: N_('Ya tienes tu primer grafcet. Desactiva Marcha y activa Paro: vuelve a la etapa 0. Sigue con la wiki (Ayuda) o abre un ejemplo de nivel 1.'),
+        text: N_('Ya tienes tu primer grafcet. Prueba ahora: desactiva Marcha y activa Paro, y vuelve a la etapa 0.\nPara seguir editando, pulsa Detener. En Ayuda tienes más tutoriales y la explicación de cada parte.'),
       },
     ],
   },
@@ -108,23 +147,23 @@ export const TUTORIALS = [
         text: N_('Es el marcha-paro: con Marcha se pasa a la etapa 1 (motor en marcha) y con Paro se vuelve a la 0. Vamos a cambiar el paro por una espera: el motor funcionará 5 s y se parará solo.'),
       },
       {
-        target: 'lienzo',
+        target: firstOf(panel, transitionNode(/^Paro$/)),
         free: true,
         title: N_('La temporización'),
-        text: N_('Haz doble clic en la transición de debajo de la etapa 1 y cambia su receptividad por 5s/X1: «han pasado 5 s desde que se activó la etapa 1».'),
+        text: N_('El tiempo se escribe en la receptividad: 5s/X1 quiere decir «han pasado 5 s desde que se activó la etapa 1».\n1. Haz doble clic sobre la transición de debajo de la etapa 1 (la de Paro).\n2. En su panel, borra lo que hay y escribe 5s/X1.'),
         waitFor: transitionMatching(/5s\/X1/),
         hint: N_('Escribe 5s/X1 en la receptividad.'),
       },
       {
-        target: ['Simular', 'simulacion'],
+        target: firstOf(() => one('[data-tour="planta"]'), () => one('[data-tour="Simular"]')),
         free: true,
         title: N_('Pruébalo'),
-        text: N_('Pulsa Simular: se abre la planta junto al grafcet. Pulsa el botón Marcha de su panel de control: se activa la etapa 1.'),
+        text: N_('1. Pulsa Simular (en la barra de arriba): se abre la planta (la maqueta de la máquina) junto al grafcet.\n2. Pulsa el botón verde Marcha del panel de control de la planta.\nSe activa la etapa 1 y el motor gira.'),
         waitFor: stepActive('1'),
         hint: N_('Simula y pulsa Marcha en la planta.'),
       },
       {
-        target: 'simulacion',
+        target: 'lienzo',
         free: true,
         title: N_('Espera'),
         text: N_('Ahora espera sin tocar nada: la transición se pone verde a los 5 s y el grafcet vuelve solo a la etapa 0, con el motor parado.'),
@@ -151,34 +190,42 @@ export const TUTORIALS = [
         text: N_('Es el marcha-paro. Vamos a añadir otra forma de salir de la etapa 0: con Lento se irá a otra etapa, que mueve el motor despacio. Desde la etapa 0 habrá que elegir un camino: es una divergencia en O.'),
       },
       {
-        target: 'lienzo',
+        target: firstOf(() => one('[role="menu"]'), transitionNode(/^Marcha$/)),
         free: true,
         title: N_('La alternativa'),
-        text: N_('Clic derecho en la transición Marcha > «Añadir alternativa en O»: aparece otra transición que también sale de la etapa 0.'),
+        text: N_('1. Haz clic derecho sobre la transición Marcha: se abre su menú.\n2. Elige «Añadir alternativa en O».\nAparece otra transición, al lado, que también sale de la etapa 0.'),
         waitFor: () => transitions().length >= 3,
         hint: N_('Añade una alternativa en O a la transición Marcha.'),
       },
       {
-        target: 'lienzo',
+        target: firstOf(panel, emptyTransition),
         free: true,
         title: N_('Su receptividad'),
-        text: N_('Doble clic en la transición nueva y escribe Lento.'),
+        text: N_('1. Haz doble clic sobre la transición nueva (la que tiene un nombre provisional, T…).\n2. En su panel, cambia el nombre provisional (T…) por Lento.'),
         waitFor: transitionMatching(/^Lento$/),
         hint: N_('Escribe Lento en la transición nueva.'),
       },
       {
-        target: 'lienzo',
+        target: firstOf(panel, plusBelow, plusAction, emptyTransition, transitionNode(/^Lento$/)),
         free: true,
         title: N_('Su camino'),
-        text: N_('Con la transición Lento seleccionada, pulsa su + para añadir una etapa y dale la acción Motor_lento. Debajo, una transición con la receptividad !Paro y, con el botón de bucle de su izquierda, vuelve a la etapa 0 (si no la ves, «Encuadrar todo el diagrama», abajo a la izquierda).'),
+        text: N_('Ahora, lo que pasa al elegir Lento:\n1. Selecciona la transición Lento y pulsa su + de abajo: aparece una etapa.\n2. Selecciona esa etapa y pulsa su + de la derecha: escribe la acción Motor_lento.\n3. Selecciona la etapa otra vez y pulsa su + de abajo; en la transición nueva escribe !Paro (! es «no»: Paro sin pulsar).'),
         waitFor: () => steps().some((n) => n.textContent.includes('Motor_lento')) && transitionsMatching(/^Paro$/).length >= 2,
-        hint: N_('Etapa con Motor_lento y transición !Paro con bucle a la 0.'),
+        hint: N_('Etapa con Motor_lento y, debajo, transición !Paro.'),
       },
       {
-        target: 'Verificar',
+        target: () => [loopButton() ?? newParo(), stepNode('0')()].filter(Boolean),
+        free: true,
+        title: N_('Cierra el camino'),
+        text: N_('1. Haz clic sobre la transición !Paro nueva.\n2. Pulsa el botón de su izquierda, el de la flecha hacia arriba («Bucle»).\n3. Haz clic sobre la etapa 0 (si no la ves, «Encuadrar todo el diagrama», abajo a la izquierda).'),
+        waitFor: () => linked(newParo(), stepNode('0')()),
+        hint: N_('Bucle de la transición !Paro nueva a la etapa 0.'),
+      },
+      {
+        target: firstOf(panel, () => one('[data-tour="Verificar"]')),
         free: true,
         title: N_('¿Y si pulso las dos?'),
-        text: N_('Verificar avisa: Marcha y Lento pueden cumplirse a la vez, y entonces se activarían los dos caminos. En una divergencia en O las receptividades deben ser excluyentes. Cambia Lento por Lento · !Marcha («Lento y no Marcha»).'),
+        text: N_('Verificar avisa: Marcha y Lento pueden cumplirse a la vez, y entonces se activarían los dos caminos. En una divergencia en O las receptividades deben ser excluyentes.\nDoble clic en la transición Lento y cámbiala por Lento · !Marcha («Lento y no Marcha»; el punto · es «y»).'),
         waitFor: () => transitionMatching(/^Lento · Marcha$/)() && verified(),
         hint: N_('Receptividad Lento · !Marcha (Verificar en verde).'),
       },
@@ -217,7 +264,7 @@ export const TUTORIALS = [
         target: 'planta',
         free: true,
         title: N_('Manos a la obra'),
-        text: N_('En la planta, coloca la pieza (interruptor «Pieza colocada») y pulsa Marcha. La broca baja: mira cómo la etapa activa sigue a la máquina.'),
+        text: N_('1. En el panel de control de la planta, pulsa el interruptor «Pieza colocada» (se queda puesto).\n2. Pulsa el botón Marcha.\nLa broca baja: mira cómo la etapa activa del grafcet sigue a la máquina.'),
         waitFor: stepActive('1'),
         hint: N_('Pieza colocada y Marcha, en la planta.'),
       },

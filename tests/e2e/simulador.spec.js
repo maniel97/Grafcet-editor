@@ -1175,3 +1175,31 @@ test('esquema eléctrico: polímetro y averías (contacto quemado; avería ocult
   await expect(view.getByText(/Avería: /)).toHaveCount(0)
   expectNoErrors(errors)
 })
+
+// Potenciómetro del panel de control: ajuste fino con la rueda (1 %, con Mayús 0,1 %) y con las
+// flechas del teclado; la rueda sobre él no hace zoom en la planta.
+test('potenciómetro: ajuste fino con la rueda y el teclado', async ({ page }) => {
+  const errors = await openEditor(page)
+  await openExample(page, /Horno con consigna/)
+  await page.getByRole('button', { name: /Simular/ }).click()
+  const view = page.getByRole('region', { name: 'Escena de la planta' })
+  const knob = view.getByRole('region', { name: 'Panel de control' }).getByRole('slider', { name: /Consigna/ })
+  await expect(knob).toHaveAttribute('aria-valuenow', '50')
+  await knob.hover()
+  await page.waitForTimeout(300) // la planta se ajusta sola al abrirse
+  const zoom = await view.getByText(/^\d+ %$/).first().textContent()
+  await page.mouse.wheel(0, -100) // hacia arriba: +1 %
+  await page.mouse.wheel(0, -100)
+  await expect(knob).toHaveAttribute('aria-valuenow', '52')
+  await page.keyboard.down('Shift')
+  for (let i = 0; i < 10; i++) await page.mouse.wheel(0, 100) // −0,1 % cada una
+  await page.keyboard.up('Shift')
+  await expect(knob).toHaveAttribute('aria-valuenow', '51')
+  await expect(view.getByText(/^\d+ %$/).first()).toHaveText(zoom) // sin zoom
+  await knob.focus()
+  await page.keyboard.press('ArrowDown')
+  await expect(knob).toHaveAttribute('aria-valuenow', '50')
+  await page.keyboard.press('End')
+  await expect(knob).toHaveAttribute('aria-valuenow', '100')
+  expectNoErrors(errors)
+})

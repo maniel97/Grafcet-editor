@@ -22,7 +22,7 @@ const HINTS = {
   mainswitch: N_('Clic: abrir o cerrar el interruptor general'),
   doorswitch: N_('Clic: abrir o cerrar la puerta del resguardo'),
   lightcurtain: N_('Clic: cortar el haz (o dejarlo libre)'),
-  potentiometer: N_('Clic: +25 % (de 100 % vuelve a 0)'),
+  potentiometer: N_('Clic: +25 % (de 100 % vuelve a 0). Rueda del ratón: ajuste fino (con Mayús, más fino)'),
   litbutton: N_('Mantén pulsado para accionarlo'),
   frl: N_('Clic: abrir o cortar el aire'),
   throttle: N_('Clic: abrir más el regulador (+25 %)'),
@@ -59,9 +59,20 @@ export default function ElecNode({ data }) {
   const boxed = ['psu', 'phasemonitor', 'vfd', 'softstarter', 'safetyrelay'].includes(c.type)
   const termLabel = (t, i) => (c.type === 'contact' ? numbers?.[i] : rail || c.type === 'plc' || c.type === 'terminal' || boxed || c.type === 'pcylinder' || c.type === 'airsource' ? null : t.id)
 
+  // Potenciómetro (modo Usar): la rueda lo gira 1 % (con Mayús, 0,1 %; con Ctrl, 10 %) en vez de
+  // hacer zoom (nowheel: React Flow no la usa para el zoom).
+  const knob = use && c.type === 'potentiometer'
+  const turnKnob = (e) => {
+    const now = view?.knob?.[c.id] ?? Number(c.initial ?? 0.5)
+    const step = e.shiftKey ? 0.001 : e.ctrlKey ? 0.1 : 0.01
+    const delta = e.deltaY || e.deltaX
+    if (delta) onAction(c.id, `set:${Math.round(Math.min(1, Math.max(0, now + (delta < 0 ? step : -step))) * 1000) / 1000}`)
+  }
+
   return (
     <div
-      className={`relative ${momentary || toggle ? 'cursor-pointer' : ''}`}
+      className={`relative ${momentary || toggle ? 'cursor-pointer' : ''} ${knob ? 'nowheel' : ''}`}
+      onWheel={knob ? (e) => turnKnob(e) : undefined}
       style={{ width: w, height: h }}
       data-elec={c.type}
       data-tag={tag || undefined}

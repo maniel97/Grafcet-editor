@@ -8,7 +8,7 @@ En simulation, elle s’ouvre à côté du grafcet si le projet en a une ; dans 
 
 ## Utiliser et Éditer
 
-- **Utiliser** : on l’actionne comme la machine : boutons-poussoirs, interrupteurs, distributeurs de pièces. Les entrées données par la partie opérative apparaissent dans le panneau avec la marque correspondante.
+- **Utiliser** : on l’actionne comme la machine : boutons-poussoirs, interrupteurs, distributeurs de pièces. Les entrées données par la partie opérative apparaissent dans le panneau avec la marque correspondante. Les potentiomètres se règlent avec la molette (avec Maj, plus finement), avec les flèches du clavier ou, sur écran tactile, en faisant glisser le doigt lentement.
 - **Éditer** : on place et on configure les éléments. Faites-les glisser depuis la palette, tournez-les avec **R**, supprimez-les avec **Suppr**. Dans leurs propriétés on choisit la variable de chacun (si elle n’existe pas, elle est ajoutée à la table).
 
 « Raccordements » montre ce qui est raccordé et ce qui manque : entrées du grafcet que personne ne donne, sorties qui ne font rien bouger.

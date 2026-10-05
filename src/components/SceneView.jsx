@@ -1617,6 +1617,54 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
     return () => cancelAnimationFrame(id)
   }, [maximized, fitTick])
   const state = worldState ?? { pos: {}, pressed: {}, pieces: [], counts: {} }
+  // Potenciómetros: valor actual y ajuste relativo (rueda, flechas del teclado, arrastre táctil).
+  const knobOf = (id) => state.knob?.[id] ?? Number(elements.find((x) => x.id === id)?.initial ?? 0.5)
+  const nudgeKnob = (id, delta) => onAction(id, `set:${Math.round(Math.min(1, Math.max(0, knobOf(id) + delta)) * 1000) / 1000}`)
+  const nudgeRef = useRef(nudgeKnob)
+  nudgeRef.current = nudgeKnob
+  const modeRef = useRef(mode)
+  modeRef.current = mode
+  // Rueda sobre un potenciómetro (modo Usar): lo gira en vez de hacer zoom. 1 % por paso; con
+  // Mayús, 0,1 % (ajuste fino); con Ctrl, 10 %. Escucha en captura para adelantarse al zoom.
+  useEffect(() => {
+    const el = sectionRef.current
+    if (!el) return
+    const onWheel = (ev) => {
+      if (modeRef.current !== 'use') return
+      const knob = ev.target.closest?.('[data-element="potentiometer"][data-id]')
+      if (!knob) return
+      ev.preventDefault()
+      ev.stopPropagation()
+      const step = ev.shiftKey ? 0.001 : ev.ctrlKey ? 0.1 : 0.01
+      const delta = ev.deltaY || ev.deltaX
+      if (delta) nudgeRef.current(knob.dataset.id, delta < 0 ? step : -step)
+    }
+    el.addEventListener('wheel', onWheel, { passive: false, capture: true })
+    return () => el.removeEventListener('wheel', onWheel, { capture: true })
+  }, [])
+  // Flechas: ±1 % (con Mayús, ±0,1 %); Re Pág / Av Pág: ±10 %; Inicio / Fin: 0 y 100 %.
+  const onKnobKey = (ev, e) => {
+    if (mode !== 'use') return
+    const step = ev.shiftKey ? 0.001 : 0.01
+    const deltas = { ArrowUp: step, ArrowRight: step, ArrowDown: -step, ArrowLeft: -step, PageUp: 0.1, PageDown: -0.1, Home: -1, End: 1 }
+    if (!(ev.key in deltas)) return
+    ev.preventDefault()
+    ev.stopPropagation()
+    nudgeKnob(e.id, deltas[ev.key])
+  }
+  // Accesible: un control deslizante (con su valor en %).
+  const knobProps = (e) =>
+    e.type === 'potentiometer' && mode === 'use'
+      ? {
+          tabIndex: 0,
+          role: 'slider',
+          'aria-valuemin': 0,
+          'aria-valuemax': 100,
+          'aria-valuenow': Math.round(knobOf(e.id) * 100),
+          title: tr('Rueda del ratón o flechas: ajuste fino (con Mayús, más fino)'),
+          onKeyDown: (ev) => onKnobKey(ev, e),
+        }
+      : {}
   const signals = sceneSignals(scene ?? { elements: [] }, state)
   // Sirenas con sonido: dos tonos mientras alguna está activa (Web Audio; sin él, en silencio).
   const sounding = elements.some((e) => e.type === 'siren' && e.sound && isOn(values, e.variable))
@@ -1831,10 +1879,16 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
 
   // Panel: los mismos mandos que en la escena, en celdas fijas (el potenciómetro, por la
   // posición del ratón en su celda).
-  const [deskKnob, setDeskKnob] = useState(null)
+  // Con el ratón, el valor es la posición en la celda; con el dedo (difícil de colocar con
+  // precisión), el arrastre es relativo y lento: no salta al tocar y cuatro anchos de celda
+  // recorren todo el rango.
+  const [deskKnob, setDeskKnob] = useState(null) // { id, touch, x0, v0 }
   const turnDeskKnob = (ev, e) => {
     const r = ev.currentTarget.getBoundingClientRect()
-    onAction(e.id, `set:${Math.min(1, Math.max(0, (ev.clientX - r.left) / r.width))}`)
+    if (deskKnob?.touch) {
+      const value = deskKnob.v0 + (ev.clientX - deskKnob.x0) / (r.width * 4)
+      onAction(e.id, `set:${Math.round(Math.min(1, Math.max(0, value)) * 1000) / 1000}`)
+    } else onAction(e.id, `set:${Math.min(1, Math.max(0, (ev.clientX - r.left) / r.width))}`)
   }
   const onDeskDown = (ev, e) => {
     ev.stopPropagation()
@@ -1842,8 +1896,12 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
     if (mode === 'use') {
       ev.currentTarget.setPointerCapture?.(ev.pointerId)
       if (e.type === 'potentiometer') {
-        setDeskKnob(e.id)
-        turnDeskKnob(ev, e)
+        ev.currentTarget.focus({ preventScroll: true }) // para seguir con las flechas
+        if (ev.pointerType === 'touch') setDeskKnob({ id: e.id, touch: true, x0: ev.clientX, v0: knobOf(e.id) })
+        else {
+          setDeskKnob({ id: e.id })
+          turnDeskKnob(ev, e)
+        }
       } else if (operable(e)) operate(e, 'down')
       else setSelected(e.id)
       return
@@ -2295,6 +2353,7 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
                 data-id={e.id}
                 data-pos={e.type === 'cylinder' ? (state.pos[e.id] ?? 0).toFixed(2) : undefined}
                 aria-label={`${tr(SCENE_TYPES[e.type].label)} ${labelOf(e)}`}
+                {...knobProps(e)}
                 style={{ cursor: mode === 'edit' ? 'move' : operable(e) ? 'pointer' : 'default' }}
                 onPointerDown={(ev) => onPointerDown(ev, e)}
                 onPointerUp={(ev) => onPointerUp(ev, e)}
@@ -2378,14 +2437,16 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
                 <div
                   key={e.id}
                   data-element={e.type}
+                  data-id={e.id}
                   data-desk=""
+                  {...knobProps(e)}
                   aria-label={`${tr(SCENE_TYPES[e.type].label)} ${labelOf(e)}`}
                   className={`flex w-20 shrink-0 select-none flex-col items-center rounded bg-slate-200 p-1 shadow-sm ${
                     selection.includes(e.id) ? 'ring-2 ring-blue-500' : ''
                   }`}
                   style={{ cursor: mode === 'use' && operable(e) ? 'pointer' : 'default' }}
                   onPointerDown={(ev) => onDeskDown(ev, e)}
-                  onPointerMove={(ev) => deskKnob === e.id && turnDeskKnob(ev, e)}
+                  onPointerMove={(ev) => deskKnob?.id === e.id && turnDeskKnob(ev, e)}
                   onPointerUp={() => onDeskUp(e)}
                   onPointerCancel={() => onDeskUp(e)}
                 >

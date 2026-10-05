@@ -355,6 +355,7 @@ export default function GrafcetCanvas() {
       takeSnapshot,
       renameEverywhere,
       startLoop: setLoopSourceId,
+      editNode: setEditingId,
       setPreview,
       issuesByNode: markedIssues,
       plcView,

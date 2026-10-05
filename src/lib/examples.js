@@ -1934,7 +1934,25 @@ function withPower(project, { template, maxX, coils, interlocks = [], motor }) {
   const top = Math.min(...components.map((c) => c.y))
   const power = powerPart(template, maxX, right + 160, top, `${project.plc.name ?? 'ej'}-pot`)
   const parts = power.components.map((c) => (['motor3', 'motor6', 'dahlander', 'motor2w', 'motor1'].includes(c.type) ? { ...c, ...motor } : c))
-  return { ...project, plc: { ...project.plc, electrical: { enabled: true, components: [...components, ...parts], wires: [...wiring.wires, ...power.wires] } } }
+  // El contacto 95-96 de cada relé térmico, en serie con la alimentación de las salidas del
+  // autómata (L+ → 95-96 → 1L, donde iba el puente): al dispararse, los contactores caen. Sin él,
+  // el térmico de la potencia no cortaba nada (sus polos principales siempre conducen).
+  const plc = components.find((c) => c.type === 'plc')
+  const thermals = parts.filter((c) => c.type === 'thermal')
+  let wires = [...wiring.wires, ...power.wires]
+  if (plc && thermals.length) {
+    const bridge = wires.find((w) => w.from.c === plc.id && w.from.t === 'L+' && w.to.c === plc.id && w.to.t === '1L')
+    wires = wires.filter((w) => w !== bridge)
+    let from = { c: plc.id, t: 'L+' }
+    thermals.forEach((th, i) => {
+      const contact = { id: `${th.id}-95`, type: 'contact', ref: th.tag, contact: 'NC', x: plc.x - 100 - 60 * i, y: plc.y + 20, text: '' }
+      components.push(contact)
+      wires.push({ id: `w-${contact.id}-a`, from, to: { c: contact.id, t: 'a' }, bend: 10 })
+      from = { c: contact.id, t: 'b' }
+    })
+    wires.push({ id: `w-${plc.id}-1L`, from, to: { c: plc.id, t: '1L' }, bend: 10 })
+  }
+  return { ...project, plc: { ...project.plc, electrical: { enabled: true, components: [...components, ...parts], wires } } }
 }
 
 // Cinta con variador: el autómata manda la marcha (su salida de Avance a DI1) y la velocidad (su

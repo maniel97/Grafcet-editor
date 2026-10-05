@@ -8,7 +8,7 @@ When simulating, it opens next to the grafcet if the project has a plant; in the
 
 ## Use and Edit
 
-- **Use**: it is operated like the machine: push buttons, switches, part feeders. The inputs given by the plant appear in the panel marked “plant”.
+- **Use**: it is operated like the machine: push buttons, switches, part feeders. The inputs given by the plant appear in the panel marked “plant”. Potentiometers are adjusted with the mouse wheel (with Shift, finer), with the arrow keys or, on a touch screen, by dragging your finger slowly.
 - **Edit**: elements are placed and configured. Drag them from the palette, rotate them with **R**, delete them with **Del**. In their properties you choose each one's variable (if it does not exist, it is added to the table).
 
 “Connections” shows what is connected and what is missing: grafcet inputs nobody gives, outputs that move nothing.

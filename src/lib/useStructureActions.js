@@ -4,6 +4,7 @@ import { findFreePosition, nextStepLabel, nextTransitionLabel, yBelow } from './
 import { useEditor } from './editorContext'
 import { defaultEdgeOptions } from './initialDiagram'
 import { normalizeAction } from './actions'
+import { t } from './i18n'
 import { alignColumn, spaceSequence } from './align'
 import { measureBoxes, spreadFactor, spreadNodes } from './spread'
 import { nextFrameName } from './frames'
@@ -193,7 +194,7 @@ export function useStructureActions() {
       const step = getNode(stepId)
       if (!step) return
       takeSnapshot()
-      updateNodeData(stepId, { actions: [...(step.data.actions ?? []), normalizeAction('Acción')] })
+      updateNodeData(stepId, { actions: [...(step.data.actions ?? []), normalizeAction(t('Acción'))] })
     },
     [getNode, takeSnapshot, updateNodeData],
   )

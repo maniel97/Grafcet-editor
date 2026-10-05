@@ -8,7 +8,7 @@ Ao simular abre-se junto ao grafcet, se o projeto tiver planta; no painel de sim
 
 ## Usar e Editar
 
-- **Usar**: aciona-se como a máquina: botões, interruptores, alimentadores de peças. As entradas que a planta dá aparecem no painel com a marca «planta».
+- **Usar**: aciona-se como a máquina: botões, interruptores, alimentadores de peças. As entradas que a planta dá aparecem no painel com a marca «planta». Os potenciómetros ajustam-se com a roda do rato (com Shift, mais fino), com as setas do teclado ou, em ecrã tátil, arrastando o dedo devagar.
 - **Editar**: colocam-se e configuram-se elementos. Arraste-os da paleta, rode-os com **R**, apague-os com **Supr**. Nas suas propriedades escolhe-se a variável de cada um (se não existir, acrescenta-se à tabela).
 
 «Ligações» mostra o que está ligado e o que falta: entradas do grafcet que ninguém dá, saídas que não movem nada.

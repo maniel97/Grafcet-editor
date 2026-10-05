@@ -368,3 +368,27 @@ body {
 :root[data-theme="dark"] .text-violet-800:not(.react-flow *):not(.paper):not(.paper *) {
   color: oklch(89.4% 0.057 293.283);
 }
+
+/* Visita guiada y tutoriales (components/Tour.jsx): el aro que señala late suavemente; al hacer
+   bien un paso, el aviso verde aparece con un pequeño salto y la barra cuenta el tiempo hasta el
+   paso siguiente. Sin animaciones si el sistema pide reducir el movimiento. */
+@keyframes tour-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgb(96 165 250 / 0.55); }
+  50% { box-shadow: 0 0 0 10px rgb(96 165 250 / 0); }
+}
+@keyframes tour-pop {
+  0% { transform: scale(0.6); opacity: 0; }
+  60% { transform: scale(1.25); opacity: 1; }
+  100% { transform: scale(1); }
+}
+@keyframes tour-countdown {
+  from { width: 100%; }
+  to { width: 0%; }
+}
+.tour-ring { animation: tour-pulse 1.8s ease-in-out infinite; }
+.tour-done { animation: tour-pop 0.35s ease-out; }
+.tour-check { animation: tour-pop 0.45s ease-out; }
+.tour-countdown { animation-name: tour-countdown; animation-timing-function: linear; animation-fill-mode: forwards; }
+@media (prefers-reduced-motion: reduce) {
+  .tour-ring, .tour-done, .tour-check { animation: none; }
+}
