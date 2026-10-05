@@ -30,7 +30,8 @@ export function setLanguage(id) {
 // Marca un texto como traducible sin traducirlo aún (se traduce después con t(variable)).
 export const N_ = (text) => text
 
-const fill = (text, vars) => (vars ? text.replace(/\{(\w+)\}/g, (all, name) => (name in vars ? String(vars[name]) : all)) : text)
+// Marcadores con cualquier letra (también tildes y ñ: {año}).
+const fill = (text, vars) => (vars ? text.replace(/\{([\p{L}\p{N}_]+)\}/gu, (all, name) => (name in vars ? String(vars[name]) : all)) : text)
 
 export function t(text, vars) {
   if (typeof text !== 'string') return text

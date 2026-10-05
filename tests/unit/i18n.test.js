@@ -45,3 +45,8 @@ describe('catálogos (src/locales, npm run i18n)', () => {
   it('ningún t() con texto variable (se usan marcadores)', () => expect(a.dynamic).toEqual([]))
   it('ninguna variable local «t» tapa a la función t() (fallaría al ejecutarse)', () => expect(a.shadowed).toEqual([]))
 })
+
+describe('marcadores', () => {
+  // Antes solo se sustituían los de letras sin tilde: «© {año}» se veía tal cual.
+  it('admiten tildes y ñ', () => expect(t('© {año} {autor}.', { año: 2026, autor: 'Ana' })).toBe('© 2026 Ana.'))
+})

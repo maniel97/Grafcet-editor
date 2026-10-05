@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { BookOpen, ChevronRight, Compass, Home, Keyboard, Search, Shapes, X } from 'lucide-react'
+import { BookOpen, ChevronRight, Compass, Home, Info, Keyboard, Search, Shapes, X } from 'lucide-react'
+import { AUTHOR, LICENSE_NAME, LICENSE_URL, REPO_URL, SITE_URL, YEAR } from '../lib/about'
 import { SHORTCUTS } from '../lib/shortcuts'
 import { N_, t } from '../lib/i18n'
 import Markdown from '../help/Markdown'
@@ -94,7 +95,68 @@ const PAGES = [
   { id: 'inicio', title: N_('Inicio'), icon: Home },
   { id: 'atajos', title: N_('Atajos de teclado'), icon: Keyboard },
   { id: 'notacion', title: N_('Notación IEC 60848'), icon: Shapes },
+  { id: 'acerca', title: N_('Acerca de'), icon: Info },
 ]
+
+// Acerca de: autoría, licencia (software libre), cómo se ha hecho (con IA, supervisado),
+// privacidad y marcas citadas.
+const link = 'text-blue-700 underline hover:text-blue-900'
+function About() {
+  const build = import.meta.env.BUILD_ID ? new Date(parseInt(import.meta.env.BUILD_ID, 36)).toISOString().slice(0, 10) : ''
+  return (
+    <section className="max-w-2xl space-y-4" data-about="">
+      <div>
+        <h3 className="text-lg font-semibold">Grafcet Editor</h3>
+        <p className="text-slate-600">
+          {t('Editor y simulador de grafcet (IEC 60848) para la enseñanza de automatismos.')}
+          {build && ` ${t('Versión del {fecha}.', { fecha: build })}`}
+        </p>
+        <p className="mt-1">
+          <a href={SITE_URL} className={link} target="_blank" rel="noreferrer">
+            {SITE_URL.replace('https://', '')}
+          </a>
+          {REPO_URL && (
+            <>
+              {' · '}
+              <a href={REPO_URL} className={link} target="_blank" rel="noreferrer">
+                {t('Código fuente')}
+              </a>
+            </>
+          )}
+        </p>
+      </div>
+      <div>
+        <h4 className="font-semibold">{t('Software libre')}</h4>
+        <p className="text-slate-600">
+          {t('© {año} {autor}. Licencia {licencia}: puedes usarlo, copiarlo, estudiarlo y modificarlo gratis; las versiones modificadas que se publiquen deben seguir siendo libres.', { año: YEAR, autor: AUTHOR, licencia: LICENSE_NAME })}{' '}
+          <a href={LICENSE_URL} className={link} target="_blank" rel="noreferrer">
+            {t('Texto de la licencia')}
+          </a>
+        </p>
+      </div>
+      <div>
+        <h4 className="font-semibold">{t('Cómo se ha hecho')}</h4>
+        <p className="text-slate-600">
+          {t('Desarrollado con asistencia de inteligencia artificial (Claude, de Anthropic) mediante «vibe coding»: la IA escribe el código bajo la dirección, la revisión y las pruebas de {autor}. Más de mil pruebas automáticas comprueban su funcionamiento.', { autor: AUTHOR })}
+        </p>
+      </div>
+      <div>
+        <h4 className="font-semibold">{t('Privacidad')}</h4>
+        <p className="text-slate-600">{t('Todo funciona en tu navegador: tus proyectos no se envían a ningún servidor. Se guardan en este equipo o en los archivos que descargues; un enlace para compartir lleva el proyecto dentro del propio enlace.')}</p>
+      </div>
+      <div>
+        <h4 className="font-semibold">{t('Sin garantía')}</h4>
+        <p className="text-slate-600">{t('Es una herramienta educativa: no está certificada para programar máquinas reales. Revisa siempre el programa antes de cargarlo en un autómata.')}</p>
+      </div>
+      <div>
+        <h4 className="font-semibold">{t('Marcas y normas')}</h4>
+        <p className="text-slate-600">
+          {t('Siemens, SIMATIC, STEP 7-Micro/WIN y TIA Portal son marcas de Siemens AG; este proyecto no tiene relación con Siemens. Las normas IEC 60848, IEC 60617, IEC 61131-3 e ISO 1219 se citan como referencia; los símbolos están dibujados para este proyecto.')}
+        </p>
+      </div>
+    </section>
+  )
+}
 
 // Sin tildes ni mayúsculas, para buscar.
 const plain = (text) =>
@@ -105,7 +167,7 @@ const plain = (text) =>
 
 // Centro de ayuda: inicio (visita guiada y preguntas frecuentes), atajos, notación y, después, la
 // wiki. Buscador en todo lo escrito (en el idioma elegido).
-// page: 'inicio' | 'atajos' | 'notacion' | 'a:<id de artículo>'.
+// page: 'inicio' | 'atajos' | 'notacion' | 'acerca' | 'a:<id de artículo>'.
 export default function HelpDialog({ onClose, onTour, onExample, onTutorial, initialPage = 'inicio' }) {
   const dialogRef = useRef(null)
   const [page, setPage] = useState(initialPage)
@@ -301,6 +363,8 @@ export default function HelpDialog({ onClose, onTour, onExample, onTutorial, ini
                   ))}
                 </dl>
               </section>
+            ) : page === 'acerca' ? (
+              <About />
             ) : (
               <section>
                 <h3 className="mb-3 text-lg font-semibold">{t('Notación IEC 60848')}</h3>

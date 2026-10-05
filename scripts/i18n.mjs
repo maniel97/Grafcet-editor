@@ -59,7 +59,7 @@ export function extract() {
   return { keys, dynamic, shadowed }
 }
 
-export const placeholders = (text) => [...String(text).matchAll(/\{(\w+)\}/g)].map((m) => m[1]).sort()
+export const placeholders = (text) => [...String(text).matchAll(/\{([\p{L}\p{N}_]+)\}/gu)].map((m) => m[1]).sort()
 export const sorted = (obj) => Object.fromEntries(Object.entries(obj).sort(([a], [b]) => a.localeCompare(b, 'es')))
 const read = (file) => JSON.parse(readFileSync(join(LOCALES, file), 'utf8'))
 const write = (file, obj) => writeFileSync(join(LOCALES, file), `${JSON.stringify(sorted(obj), null, 2)}\n`)
