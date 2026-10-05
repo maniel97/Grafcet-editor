@@ -15,8 +15,6 @@ export const TITLE_BLOCK = { w: 420, h: 72 }
 export const elecSheetsOf = (sch) => (sch?.sheets?.length ? sch.sheets : [FIRST_ELEC_SHEET])
 export const sheetOfComponent = (sch, c) => c.sheet ?? elecSheetsOf(sch)[0].id
 export const frameColumns = (sch) => Math.max(4, Math.min(20, Number(sch?.frameCols) || 10))
-export const frameSize = (sch) => ({ w: frameColumns(sch) * COLUMN_WIDTH, h: FRAME_HEIGHT })
-
 // Hoja (1, 2…) y columna (1, 2…) de un componente: por el centro de su dibujo.
 export function locate(sch, c) {
   const sheets = elecSheetsOf(sch)

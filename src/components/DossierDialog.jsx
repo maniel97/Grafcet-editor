@@ -81,7 +81,7 @@ export default function DossierDialog({ nodes, edges, plc, issues, projectName, 
         : null,
     }
     return buildDossier(content, options, measure)
-  }, [ready, projectName, today, options, plc.titleBlock, grafcet, figures, data, measure])
+  }, [ready, projectName, today, options, plc.titleBlock, plc.exercise, grafcet, figures, data, measure])
 
   const save = async () => {
     if (!dossier) return

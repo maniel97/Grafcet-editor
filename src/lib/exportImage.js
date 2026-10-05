@@ -79,12 +79,6 @@ export function download(href, filename) {
   a.click()
 }
 
-// PNG o SVG, 100% en el cliente.
-export async function exportDiagram(format, viewport) {
-  const image = await renderDiagram(format, viewport, 2)
-  if (image) download(image.dataUrl, fileName(format))
-}
-
 // Para el PDF: la imagen (vista previa y PDF de imagen) y la escena vectorial, capturadas a la vez.
 export async function capturePdf(viewport) {
   const image = await renderDiagram('png', viewport, 3)

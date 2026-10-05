@@ -64,7 +64,6 @@ export const valveSquares = (c) => (c.ways === '5/3' || c.ways === '4/3' ? 3 : 2
 export const restSquare = () => 1
 // Neumática e hidráulica se unen con tubos (no cables) y se identifican sin guion (1V1, 0P1).
 export const isPneumatic = (type) => ELEC_TYPES[type]?.group === N_('Neumática') || ELEC_TYPES[type]?.group === N_('Hidráulica')
-export const isHydraulic = (type) => ELEC_TYPES[type]?.group === N_('Hidráulica')
 // Señales de los detectores de un cilindro (A: a0 dentro, a1 fuera).
 export const cylinderSignals = (tag) => (tag ? [`${tag.toLowerCase()}0`, `${tag.toLowerCase()}1`] : [])
 
@@ -495,7 +494,6 @@ export const ELEC_TYPES = {
   },
 }
 
-export const elecType = (type) => ELEC_TYPES[type]
 export const terminalsOf = (c) => ELEC_TYPES[c.type]?.terminals(c) ?? []
 export const sizeOf = (c) => ELEC_TYPES[c.type]?.size(c) ?? { w: 40, h: 40 }
 
