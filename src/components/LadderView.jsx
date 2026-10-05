@@ -107,7 +107,7 @@ export default function LadderView({ nodes, edges, plc, grafcetErrors, exportPro
   const s7200Table = useMemo(() => {
     if (!s7200) return ''
     const stepNodes = nodes.filter((n) => n.type === 'step')
-    return s7200Symbols(ladder, plc, stepNodes, projectVariables(nodes, plc.variables), s7200.addressOf)
+    return s7200Symbols(ladder, plc, stepNodes, projectVariables(nodes, plc.variables), s7200.addressOf, s7200.extraSymbols)
   }, [s7200, ladder, plc, nodes])
   const [tableCopied, setTableCopied] = useState(false)
   const copyTable = async () => {

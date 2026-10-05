@@ -58,12 +58,30 @@ export function symbolName(name) {
   return s.slice(0, 23)
 }
 
+// ¿Existe esta dirección en un S7-200 (hasta la CPU 226)? I/Q 0.0–15.7, M 0.0–31.7, V hasta
+// VB10239, AIW/AQW 0–62 (pares), IW/QW 0–14, MW 0–30, T/C 0–255, SM. Las de otros esquemas (IW64
+// o MW102 de S7-300, %IX0.0 de IEC) no: Micro/WIN da «ERROR 37: rango de direccionamiento».
+export function validS7200(address) {
+  const text = String(address ?? '').trim().toUpperCase()
+  if (text.startsWith('%')) return false
+  const a = parseAddress(text)
+  if (!a) return false
+  if (a.index !== undefined) return { I: 128, Q: 128, M: 256, V: 10240 * 8, SM: 550 * 8 }[a.area] > a.index
+  if (a.word !== undefined) return a.word % 2 === 0 && { AI: 62, AQ: 62, I: 14, Q: 14, M: 30, V: 10238 }[a.area] >= a.word
+  return a.number <= 255
+}
+
 // Direcciones de todo lo que usa el programa. Lo que no tiene dirección en la tabla de variables
-// se asigna al exportar (sin guardarlo) con el reparto de S7-200, y se apunta en `assigned`.
+// se asigna al exportar (sin guardarlo) con el reparto de S7-200, y se apunta en `assigned`. Lo
+// que tiene una dirección que no existe en un S7-200 (otro esquema de direcciones) se cambia por
+// una válida, y se apunta en `remapped` (para el aviso y para la CPU simulada).
 function makeAddresses(ladder, plc) {
   const { resolver } = ladder
   const used = new Set()
   const assigned = []
+  const remapped = {} // nombre -> dirección S7-200 que la sustituye
+  const changes = [] // «Peso IW64 -> AIW0»
+  const extra = [] // símbolos que añade la exportación (marcas de flanco)
   const cursors = { V: 0, I: 0, Q: 0, M: 0, VW: S7200.wordStart, T: S7200.timerStart, AIW: 0, AQW: 0 }
   for (const e of [...Object.values(plc.steps), ...Object.values(plc.variables)]) {
     if (e?.address?.trim()) used.add(e.address.trim().toUpperCase())
@@ -83,27 +101,46 @@ function makeAddresses(ladder, plc) {
   }
   const cache = new Map()
   const numeric = new Set()
+  // Dirección S7-200 para una variable según su tipo.
+  const fresh = (op) => {
+    if (op.kind === 'step' || op.kind === 'trans' || op.kind === 'aux' || op.kind === 'edge') return next('V')
+    if (op.kind === 'timer') return next('T')
+    const type = plc.variables[op.name]?.type ?? (numeric.has(op.name) ? 'memory' : 'input')
+    if (type === 'analogIn') return next('AIW')
+    if (type === 'analogOut') return next('AQW')
+    if (numeric.has(op.name)) return next('VW')
+    return next({ input: 'I', output: 'Q', memory: 'V', counter: 'VW' }[type] ?? 'V')
+  }
   return {
     assigned,
+    remapped,
+    changes,
+    extra,
     markNumeric: (name) => numeric.add(name),
     of(op) {
       if (op.kind === 'num') return constant(op.value)
+      if (op.kind === 'bit') return op.address
       // Primer ciclo: la marca de sistema SM0.1 (salvo que se haya indicado otra).
       if (op.kind === 'first') return (plc.variables.PrimerCiclo?.address || 'SM0.1').toUpperCase()
-      const known = resolver.address(op)
-      if (known) return known.toUpperCase()
       const key = `${op.kind}:${op.label ?? op.name ?? op.key}`
       if (cache.has(key)) return cache.get(key)
-      let address
-      if (op.kind === 'step') address = next('V')
-      else if (op.kind === 'timer') address = next('T')
-      else if (op.kind === 'trans' || op.kind === 'aux') address = next('V')
-      else {
-        const type = plc.variables[op.name]?.type ?? (numeric.has(op.name) ? 'memory' : 'input')
-        if (type === 'analogIn') address = next('AIW')
-        else if (type === 'analogOut') address = next('AQW')
-        else address = numeric.has(op.name) ? next('VW') : next({ input: 'I', output: 'Q', memory: 'M', counter: 'VW' }[type] ?? 'M')
+      // Marca de un flanco (segmento propio, ver toS7200): una por entrada y sentido.
+      if (op.kind === 'edge') {
+        const address = fresh(op)
+        cache.set(key, address)
+        extra.push({ name: op.name, address, comment: op.comment })
+        return address
       }
+      const known = resolver.address(op)
+      if (known && validS7200(known)) return known.toUpperCase()
+      if (known) {
+        const address = fresh(op)
+        cache.set(key, address)
+        remapped[resolver.name(op)] = address
+        changes.push(`${resolver.name(op)} ${known.toUpperCase()} -> ${address}`)
+        return address
+      }
+      const address = fresh(op)
       cache.set(key, address)
       assigned.push(`${resolver.name(op)} = ${address}`)
       return address
@@ -239,15 +276,38 @@ export function toS7200(ladder, plc, { title = '' } = {}) {
     return pad('TON', `${address}, ${constant(pt)}`)
   }
 
+  // Flancos: cada ↑x / ↓x se calcula en un segmento propio (LD x, EU, = marca) y en la red se usa
+  // esa marca como contacto normal. Un flanco dentro de un bloque (LD … EU … ALD) es AWL válido,
+  // pero Micro/WIN no lo puede dibujar en KOP y marca el segmento «No válido».
+  const edgesDone = new Set()
+  const edgeNetworks = []
+  const withEdgeBits = (n) => {
+    if (n.type === 'contact' && (n.kind === 'P' || n.kind === 'N')) {
+      const source = at(n.operand)
+      const name = `Flanco${n.kind === 'P' ? 'Sube' : 'Baja'}_${symbolName(ladder.resolver.name(n.operand))}`.slice(0, 23)
+      const bit = at({ kind: 'edge', name, comment: `${n.kind === 'P' ? 'Flanco de subida' : 'Flanco de bajada'} de ${ladder.resolver.name(n.operand)}` })
+      if (!edgesDone.has(bit)) {
+        edgesDone.add(bit)
+        edgeNetworks.push({ comment: `${n.kind === 'P' ? '^' : 'v'}${ansiText(ladder.resolver.name(n.operand))}: flanco en ${bit}`, lines: [pad('LD', source), n.kind === 'P' ? 'EU' : 'ED', pad('=', bit)] })
+      }
+      return { type: 'contact', kind: 'NO', operand: { kind: 'bit', address: bit } }
+    }
+    if (n.items) return { ...n, items: n.items.map(withEdgeBits) }
+    if (n.item) return { ...n, item: withEdgeBits(n.item) }
+    return n
+  }
+
   const body = []
   let number = 0
   for (const s of ladder.sections) {
     for (const r of s.rungs) {
-      const scaling = realCompares(r.network)
+      const network = withEdgeBits(r.network)
+      for (const e of edgeNetworks.splice(0)) body.push(`Network ${++number} // ${e.comment}`, ...e.lines)
+      const scaling = realCompares(network)
       if (scaling.length) body.push(`Network ${++number} // Escalado (REAL) para las comparaciones de la red siguiente`, pad('LD', 'SM0.0'), ...scaling)
       body.push(`Network ${++number} // ${ansiText(r.comment).slice(0, 120)}`)
       if (number === 1 || s.rungs[0] === r) body.push(`// ${ansiText(s.title)}`)
-      body.push(...block(r.network))
+      body.push(...block(network))
       for (const o of r.outputs) {
         if (o.type === 'coil') body.push(pad('=', at(o.operand)))
         else if (o.type === 'set') body.push(pad('S', `${at(o.operand)}, 1`))
@@ -270,6 +330,14 @@ export function toS7200(ladder, plc, { title = '' } = {}) {
   if (addresses.assigned.length) {
     warnings.push(`Direcciones asignadas al exportar (no estaban en la tabla de variables): ${addresses.assigned.join(', ')}.`)
   }
+  if (addresses.changes.length) {
+    warnings.push(
+      `Direcciones que no existen en un S7-200, cambiadas por otras válidas: ${addresses.changes.join(', ')}. Para evitarlo, elige el formato de direcciones S7-200 en la tabla de variables.`,
+    )
+  }
+  if (body.some((line) => /\b(AIW|AQW)\d+/.test(line))) {
+    warnings.push('Usa entradas o salidas analógicas: en Micro/WIN elige una CPU 222 o superior (la 221 no admite módulos de ampliación) y añade el módulo analógico (EM 231 / EM 232 / EM 235).')
+  }
   const text = [
     ...head,
     ...body,
@@ -286,12 +354,12 @@ export function toS7200(ladder, plc, { title = '' } = {}) {
     'END_INTERRUPT_BLOCK',
     '',
   ].join('\r\n')
-  return { text, assigned: addresses.assigned, warnings, addressOf: at }
+  return { text, assigned: addresses.assigned, remapped: addresses.remapped, extraSymbols: addresses.extra, warnings, addressOf: at }
 }
 
 // Tabla de símbolos para pegar en Micro/WIN (Símbolo, Dirección, Comentario separados por
 // tabuladores; una fila por línea). Usa las mismas direcciones que el programa.
-export function s7200Symbols(ladder, plc, stepNodes, symbols, addressOf) {
+export function s7200Symbols(ladder, plc, stepNodes, symbols, addressOf, extraSymbols = []) {
   const rows = []
   const seen = new Set()
   const add = (name, address, comment = '') => {
@@ -308,5 +376,6 @@ export function s7200Symbols(ladder, plc, stepNodes, symbols, addressOf) {
   for (const [name] of ladder.resolver.internal) {
     if (/^(Tr|Aux)\d+$/.test(name)) add(name, addressOf({ kind: name.startsWith('Tr') ? 'trans' : 'aux', name }), name.startsWith('Tr') ? 'Transición franqueable' : 'Auxiliar de flanco')
   }
+  for (const e of extraSymbols) add(e.name, e.address, e.comment)
   return rows.join('\r\n')
 }

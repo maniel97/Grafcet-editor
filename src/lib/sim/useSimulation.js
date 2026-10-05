@@ -53,17 +53,26 @@ export function useSimulation(nodes, edges, plc, enabled) {
   // o uno de Micro/WIN) en la CPU simulada, en lugar del grafcet. Solo se rehace (y la CPU vuelve a
   // empezar) si cambian el programa o las direcciones, no al mover la planta.
   const cpuConfig = plc.cpu
-  const cpuText = useMemo(() => {
+  // { text, remapped }: remapped, direcciones que la exportación ha cambiado (no existían en un
+  // S7-200); la CPU simulada las usa para enlazar sus entradas y salidas.
+  const cpuProgram = useMemo(() => {
     if (!enabled || !cpuConfig?.enabled) return null
-    if (cpuConfig.source === 'file') return cpuConfig.text ?? ''
-    return toS7200(generateLadder(nodes, edges, plc), plc, { title: '' }).text
+    if (cpuConfig.source === 'file') return { text: cpuConfig.text ?? '', remapped: {} }
+    const out = toS7200(generateLadder(nodes, edges, plc), plc, { title: '' })
+    return { text: out.text, remapped: out.remapped }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [enabled, cpuConfig, nodes, edges, plc.variables, plc.steps, plc.scheme])
   const addressKey = compiled ? compiled.variables.map((v) => `${v.name}=${v.address}:${v.type}`).join('|') : ''
   const cpuSetup = useMemo(
-    () => (cpuText === null || !compiled ? null : makeCpuRunner(cpuText, compiled.variables)),
+    () =>
+      cpuProgram === null || !compiled
+        ? null
+        : makeCpuRunner(
+            cpuProgram.text,
+            compiled.variables.map((v) => (cpuProgram.remapped[v.name] ? { ...v, address: cpuProgram.remapped[v.name] } : v)),
+          ),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [cpuText, addressKey],
+    [cpuProgram, addressKey],
   )
   const cpuRunner = cpuSetup?.runner ?? null
   // Fase = etapas activas (con el autómata no hay etapas: null).
@@ -289,7 +298,7 @@ export function useSimulation(nodes, edges, plc, enabled) {
 
   return {
     // Autómata: { errors, warnings } del programa y el error de ejecución (si se ha parado).
-    cpu: cpuSetup ? { errors: cpuSetup.errors, warnings: cpuSetup.warnings, error: sim?.cpuError ?? null, source: cpuConfig?.source ?? 'generated', text: cpuText } : null,
+    cpu: cpuSetup ? { errors: cpuSetup.errors, warnings: cpuSetup.warnings, error: sim?.cpuError ?? null, source: cpuConfig?.source ?? 'generated', text: cpuProgram?.text ?? null } : null,
     compiled,
     sim,
     view: stableView,

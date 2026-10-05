@@ -147,3 +147,36 @@ describe('STL de S7-200 con una entrada analógica (umbrales en bruto)', () => {
     expect(out.map(([, sim]) => sim)).toEqual(['0', '1', '1', '2', '2', '0'])
   })
 })
+
+// Lo que Micro/WIN rechazaba al importar (capturas de un usuario, CPU 221):
+// ERROR 37 con direcciones de S7-300 (IW64, MW102) y segmentos «No válido» con flancos en un bloque.
+describe('importable en Micro/WIN', async () => {
+  const { EXAMPLES } = await import('../../src/lib/examples')
+  const { generateLadder } = await import('../../src/lib/ladder/generate')
+  const { toS7200, validS7200 } = await import('../../src/lib/ladder/exportS7200')
+  const ADDRESS = /^(SM\d+\.\d|[IQMV]\d+\.\d|(AI|AQ|I|Q|M|V)W\d+|[TC]\d+)$/
+
+  it('direcciones válidas y no válidas', () => {
+    for (const a of ['I0.0', 'Q15.7', 'M31.7', 'V100.3', 'AIW0', 'AQW62', 'VW100', 'MW30', 'T37', 'C255', 'SM0.1']) expect(validS7200(a), a).toBe(true)
+    for (const a of ['IW64', 'MW102', 'M32.0', 'I16.0', 'AIW1', 'T256', '%IX0.0', 'PIW256']) expect(validS7200(a), a).toBe(false)
+  })
+
+  for (const example of EXAMPLES) {
+    it(`${example.id}: solo direcciones de S7-200 y flancos en su propio segmento`, () => {
+      const p = example.build()
+      const { text } = toS7200(generateLadder(p.nodes, p.edges, p.plc), p.plc, { title: example.id })
+      const networks = text.split(/\r\n(?=Network \d+)/).slice(1)
+      for (const net of networks) {
+        const lines = net.split('\r\n').filter((l) => l && !l.startsWith('//') && !l.startsWith('Network') && !l.startsWith('END_') && !/^[A-Z_]+_BLOCK|^TITLE|^BEGIN/.test(l))
+        for (const line of lines) {
+          for (const token of line.split(/[\s,]+/).slice(1)) if (ADDRESS.test(token)) expect(validS7200(token), `${token} en «${line}»`).toBe(true)
+        }
+        if (lines.some((l) => l === 'EU' || l === 'ED')) {
+          expect(lines).toHaveLength(3)
+          expect(lines[0]).toMatch(/^LD /)
+          expect(lines[2]).toMatch(/^= /)
+        }
+      }
+    })
+  }
+})
