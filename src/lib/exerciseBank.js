@@ -67,7 +67,7 @@ export const BANK = [
     statement: 'Con una pieza colocada (**Pieza**) y al pulsar **Marcha**, la broca baja girando (**Bajar**, **Motor_broca**) hasta su final de carrera de abajo (**Fc_abajo**). Allí repasa **2 s** girando y después sube (**Subir**) hasta **Fc_arriba**, donde se para.',
     scenarios: [scenario('pieza', 'Pieza y Marcha', 9, [[0.3, 'Pieza', 1], ...press(0.6, 'Marcha')])],
     requirements: [{ id: 'timer' }],
-    hints: ['Cuatro etapas: reposo, bajar, repasar y subir.', 'El motor de la broca gira en las tres de trabajo: es una acción de cada una de ellas.', 'La espera es la transición `2s/X2` (la etapa en la que repasa).'],
+    hints: ['Cuatro etapas: reposo, bajar, repasar y subir.', 'El motor de la broca gira mientras baja y mientras repasa (etapas 1 y 2): es una acción de las dos. Al subir ya no gira.', 'La espera es la transición `2s/X2` (la etapa en la que repasa).'],
   }),
   entry('ej-garaje', 2, 'garaje', 'Puerta de garaje', 'Abrir, esperar y cerrar, con una fotocélula de seguridad.', {
     statement: 'Al pulsar **Abrir**, con la puerta cerrada (**Cerrada**), la puerta sube (**Subir**) hasta **Abierta**. Espera **5 s** abierta y baja (**Bajar**) hasta **Cerrada**.\n\n- Mientras la puerta se mueve se enciende la **Luz**.\n- Si la fotocélula (**Foto**) ve algo mientras baja, vuelve a subir (seguridad); y no empieza a bajar si hay algo delante.',

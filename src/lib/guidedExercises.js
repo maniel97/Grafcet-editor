@@ -21,7 +21,177 @@ const comprobar = {
   hint: N_('Pulsa Comprobar hasta que todo salga en verde.'),
 }
 
+// --- Pasos que se repiten en los guiados ---------------------------------------------------------
+const initialStep = (title, text) => ({
+  target: () => one('[data-tour="Etapa inicial"]'),
+  free: true,
+  title,
+  text,
+  waitFor: () => steps().length >= 1,
+  hint: N_('Pulsa «Etapa inicial» en la barra.'),
+})
+// Etapa con su contenido: la del número dado contiene todos esos textos.
+const stepHas = (label, ...texts) => () => {
+  const node = stepNode(label)()
+  return Boolean(node) && texts.every((x) => node.textContent.includes(x))
+}
+const lastStepOrPanel = firstOf(panel, emptyTransition, () => [steps().at(-1), plusBelow()].filter(Boolean))
+const loopBack = (lastCondition, text) => ({
+  target: () => [loopButton() ?? transitions().find((n) => n.textContent.replace(/\s+/g, '') === lastCondition), stepNode('0')()].filter(Boolean),
+  free: true,
+  title: N_('Vuelta al principio'),
+  text,
+  waitFor: verified,
+  hint: N_('Bucle de la última transición a la etapa 0 (Verificar en verde).'),
+})
+const done = (text) => ({ target: exercisePanel, title: N_('¡Ejercicio resuelto!'), text })
+
+export const GUIDED_MORE = {
+  'ej-luz-pulsador': {
+    id: 'guiado-luz-pulsador',
+    title: N_('Luz con un solo pulsador (guiado)'),
+    auto: true,
+    steps: [
+      {
+        target: exercisePanel,
+        title: N_('El ejercicio'),
+        text: N_('Un solo pulsador, P, enciende la luz y, al volver a pulsarlo, la apaga: como el telerruptor de una escalera.\nLa clave de este ejercicio es el flanco: que cuente el instante de pulsar, no el tiempo que se mantiene pulsado.'),
+      },
+      initialStep(N_('La luz apagada'), N_('1. Pulsa «Etapa inicial» en la barra de arriba: la etapa 0 es la luz apagada.')),
+      {
+        target: lastStepOrPanel,
+        free: true,
+        title: N_('Encender con ↑P'),
+        text: N_('1. Selecciona la etapa 0 y pulsa su + de abajo: una transición.\n2. Doble clic en ella. En su panel, borra T1, pulsa el botón ↑ que hay debajo del campo («Flanco de subida») y escribe P. Queda ↑P.\n↑P se cumple solo en el instante en que P pasa de 0 a 1.'),
+        waitFor: () => transitions().some((n) => /↑\s*P$/.test(n.textContent.trim())),
+        hint: N_('Transición ↑P debajo de la etapa 0.'),
+      },
+      {
+        target: firstOf(panel, () => [steps().at(-1), plusBelow(), plusAction()].filter(Boolean)),
+        free: true,
+        title: N_('La luz encendida'),
+        text: N_('1. Selecciona la transición ↑P y pulsa su + de abajo: la etapa 1.\n2. Con la etapa 1 seleccionada, pulsa su + de la derecha y escribe Luz.'),
+        waitFor: stepHas('1', 'Luz'),
+        hint: N_('Etapa 1 con la acción Luz.'),
+      },
+      {
+        target: lastStepOrPanel,
+        free: true,
+        title: N_('Apagar con otro ↑P'),
+        text: N_('Para apagar, otra pulsación: otra vez ↑P.\n1. Selecciona la etapa 1 y pulsa su + de abajo.\n2. En su panel: botón ↑ y P.'),
+        waitFor: () => transitions().filter((n) => /↑\s*P$/.test(n.textContent.trim())).length >= 2,
+        hint: N_('Transición ↑P debajo de la etapa 1.'),
+      },
+      {
+        target: () => transitions().at(-1),
+        title: N_('¿Por qué el flanco?'),
+        text: N_('Si las dos transiciones fueran P a secas, al mantener pulsado se cumplirían una detrás de otra y la luz se encendería y apagaría sin parar. Con ↑P, cada pulsación cuenta una sola vez, la mantengas lo que la mantengas.'),
+      },
+      loopBack('↑P', N_('1. Selecciona la última transición ↑P y pulsa «Bucle» (la flecha hacia arriba, a su izquierda).\n2. Haz clic sobre la etapa 0.')),
+      comprobar,
+      done(N_('Pruébalo en la simulación: mantén pulsado P y verás que la luz no parpadea.')),
+    ],
+  },
+  'ej-semaforo': {
+    id: 'guiado-semaforo',
+    title: N_('Semáforo (guiado)'),
+    auto: true,
+    steps: [
+      {
+        target: exercisePanel,
+        title: N_('El ejercicio'),
+        text: N_('Un semáforo que funciona solo: rojo 10 s, verde 8 s, ámbar 3 s y vuelta a empezar. No hay pulsadores: las transiciones son temporizaciones.'),
+      },
+      initialStep(N_('El rojo'), N_('1. Pulsa «Etapa inicial» en la barra de arriba.\nEn el siguiente paso le pondrás la acción Rojo.')),
+      {
+        target: firstOf(panel, () => [stepNode('0')(), plusAction()].filter(Boolean)),
+        free: true,
+        title: N_('Su luz'),
+        text: N_('1. Selecciona la etapa 0 y pulsa el + de su derecha.\n2. Escribe Rojo.'),
+        waitFor: stepHas('0', 'Rojo'),
+        hint: N_('Acción Rojo en la etapa 0.'),
+      },
+      {
+        target: lastStepOrPanel,
+        free: true,
+        title: N_('Una temporización'),
+        text: N_('El rojo dura 10 s: la transición se cumple a los 10 s de activarse la etapa 0.\n1. Selecciona la etapa 0 y pulsa su + de abajo.\n2. Doble clic en la transición y escribe 10s/X0 («10 segundos desde que se activa X0»).'),
+        waitFor: transitionWith('10s/X0'),
+        hint: N_('Transición 10s/X0.'),
+      },
+      {
+        target: lastStepOrPanel,
+        free: true,
+        title: N_('El verde y el ámbar'),
+        text: N_('Lo mismo para las otras dos luces, siempre debajo de lo último:\n• etapa 1 con Verde, y transición 8s/X1\n• etapa 2 con Ámbar, y transición 3s/X2\n(Cada temporización mira su propia etapa: X1, X2.)'),
+        waitFor: () => stepHas('1', 'Verde')() && stepHas('2', 'Ámbar')() && transitionWith('8s/X1')() && transitionWith('3s/X2')(),
+        hint: N_('Etapas Verde y Ámbar con 8s/X1 y 3s/X2.'),
+      },
+      loopBack('3s/X2', N_('Tras el ámbar, otra vez rojo.\n1. Selecciona la transición 3s/X2 y pulsa «Bucle».\n2. Haz clic sobre la etapa 0.')),
+      comprobar,
+      done(N_('Pulsa Simular y mira el semáforo de la planta: rojo, verde, ámbar… En el cronograma se ven las tres luces turnándose.')),
+    ],
+  },
+  'ej-taladradora': {
+    id: 'guiado-taladradora',
+    title: N_('Taladradora (guiado)'),
+    auto: true,
+    steps: [
+      {
+        target: exercisePanel,
+        title: N_('El ejercicio'),
+        text: N_('Con una pieza puesta y Marcha, la broca baja girando hasta abajo (Fc_abajo), repasa 2 s girando y sube (Subir) hasta arriba (Fc_arriba).\nFc_abajo y Fc_arriba no los tocas tú: los da la planta cuando la broca llega.'),
+      },
+      initialStep(N_('El reposo'), N_('1. Pulsa «Etapa inicial» en la barra de arriba: la broca arriba y quieta.')),
+      {
+        target: lastStepOrPanel,
+        free: true,
+        title: N_('Arrancar'),
+        text: N_('Arranca con Marcha, pero solo si hay pieza.\n1. Selecciona la etapa 0 y pulsa su + de abajo.\n2. Doble clic en la transición y escribe Marcha * Pieza (el * es «y»).'),
+        waitFor: () => transitions().some((n) => /Marcha.*Pieza/.test(n.textContent)),
+        hint: N_('Transición Marcha * Pieza.'),
+      },
+      {
+        target: firstOf(panel, () => [steps().at(-1), plusBelow(), plusAction()].filter(Boolean)),
+        free: true,
+        title: N_('Bajar girando'),
+        text: N_('1. Selecciona la transición y pulsa su + de abajo: la etapa 1.\n2. Dos acciones con el + de su derecha: Motor_broca y Bajar.'),
+        waitFor: stepHas('1', 'Motor_broca', 'Bajar'),
+        hint: N_('Etapa 1 con Motor_broca y Bajar.'),
+      },
+      {
+        target: lastStepOrPanel,
+        free: true,
+        title: N_('Hasta abajo'),
+        text: N_('1. Selecciona la etapa 1 y pulsa su + de abajo.\n2. Escribe Fc_abajo: el final de carrera de abajo.'),
+        waitFor: transitionWith('Fc_abajo'),
+        hint: N_('Transición Fc_abajo.'),
+      },
+      {
+        target: lastStepOrPanel,
+        free: true,
+        title: N_('Repasar 2 s'),
+        text: N_('Abajo, la broca sigue girando 2 s sin bajar.\n1. Etapa 2 debajo, con la acción Motor_broca.\n2. Debajo, la transición 2s/X2: «2 segundos desde que se activa la etapa 2».'),
+        waitFor: () => stepHas('2', 'Motor_broca')() && transitionWith('2s/X2')(),
+        hint: N_('Etapa 2 con Motor_broca y transición 2s/X2.'),
+      },
+      {
+        target: lastStepOrPanel,
+        free: true,
+        title: N_('Subir'),
+        text: N_('1. Etapa 3 debajo, con la acción Subir (al subir ya no gira).\n2. Debajo, la transición Fc_arriba.'),
+        waitFor: () => stepHas('3', 'Subir')() && transitionWith('Fc_arriba')(),
+        hint: N_('Etapa 3 con Subir y transición Fc_arriba.'),
+      },
+      loopBack('Fc_arriba', N_('Arriba, vuelta al reposo.\n1. Selecciona la transición Fc_arriba y pulsa «Bucle».\n2. Haz clic sobre la etapa 0.')),
+      comprobar,
+      done(N_('Pruébalo con la planta: Simular, activa «Pieza colocada» y pulsa Marcha. La etapa activa sigue a la broca.')),
+    ],
+  },
+}
+
 export const GUIDED = {
+  ...GUIDED_MORE,
   'ej-marcha-paro': {
     id: 'guiado-marcha-paro',
     title: N_('Marcha y paro de un motor (guiado)'),
