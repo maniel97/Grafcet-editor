@@ -19,6 +19,16 @@ Em **Editar** colocam-se aparelhos e puxam-se condutores de borne a borne. Em **
 
 Em Usar, cada aparelho pode ter avarias (contacto aberto, soldado, condutor cortado). «Avaria ao acaso (oculta)» esconde uma para a procurar com o **multímetro**, medindo tensões entre bornes como na oficina.
 
+## Eletro-hidráulica
+
+Na paleta, o grupo **Hidráulica** (ISO 1219): central hidráulica (motor, bomba e depósito), válvula limitadora de pressão, manómetro, distribuidores 4/3 e 4/2, cilindro e regulador de caudal. Monta-se e simula-se como a pneumática, com três diferenças que se veem ao simular:
+
+- **O óleo não se comprime**: com as duas ligações do cilindro fechadas (centro fechado ou em tandem do 4/3), fica parado onde estiver, mesmo a meio curso.
+- **A bomba dá caudal, não pressão**: se o óleo não tem saída (cilindro no fim de curso, centro fechado), a pressão sobe até a **limitadora** abrir e o óleo voltar por ela ao depósito. O **manómetro** mostra-o: pressão baixa ao mover, a da regulação no fim de curso, 0 com o centro em tandem (a bomba descarrega).
+- Uma ligação sem tubo **derrama óleo**, e sem limitadora há um aviso de que a pressão sobe sem controlo.
+
+Os tubos com pressão veem-se a laranja. Há dois circuitos em «Inserir montagem»: a prensa (4/3 em tandem) e o elevador com descida travada (centro fechado).
+
 > **Atenção:** as linhas pneumáticas (tubos) não se misturam com os condutores elétricos: uma eletroválvula comanda-se pela sua bobina elétrica e move o cilindro pelos seus tubos.
 
 ```ejemplo estrella-triangulo-plc

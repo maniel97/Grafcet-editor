@@ -15,6 +15,7 @@
 // Puro: se prueba sin navegador.
 import { POTENTIALS, isMotor, isSecondary, terminalsOf } from './catalog'
 import { pneuStep } from './pneumatic'
+import { hydroStep } from './hydraulic'
 import { t as tr } from '../i18n'
 
 const key = (c, t) => `${c}:${t}`
@@ -72,7 +73,7 @@ export function voltageBetween(a, b) {
 export function elecInit() {
   // faults: averías provocadas { [componente o cable]: 'open' | 'welded' | 'cut' }; hidden: si se
   // han puesto al azar sin decir dónde (para practicar el diagnóstico con el polímetro).
-  return { pressed: {}, latched: {}, opened: {}, tripped: {}, pos: {}, coils: {}, timers: {}, counts: {}, impulse: {}, safety: {}, safetyReset: {}, knob: {}, faults: {}, hidden: false, pneu: {}, pneuSignals: {}, spinning: {}, view: null }
+  return { pressed: {}, latched: {}, opened: {}, tripped: {}, pos: {}, coils: {}, timers: {}, counts: {}, impulse: {}, safety: {}, safetyReset: {}, knob: {}, faults: {}, hidden: false, pneu: {}, hydro: {}, pneuSignals: {}, spinning: {}, view: null }
 }
 
 const components = (schematic) => schematic?.components ?? []
@@ -117,9 +118,9 @@ export function elecAction(schematic, state, id, action) {
     if (c.type === 'thermal') return { ...s, tripped: { ...s.tripped, [id]: !s.tripped[id] } }
     // Neumática: válvula de palanca (se queda), unidad de mantenimiento (abrir o cortar el aire) y
     // regulador de caudal (+25 %; de 100 % vuelve a 25 %).
-    if (c.type === 'pvalve' && c.manual === 'lever') return { ...s, latched: { ...s.latched, [id]: !s.latched[id] } }
+    if ((c.type === 'pvalve' || c.type === 'hvalve') && c.manual === 'lever') return { ...s, latched: { ...s.latched, [id]: !s.latched[id] } }
     if (c.type === 'frl') return { ...s, opened: { ...s.opened, [id]: !s.opened[id] } }
-    if (c.type === 'throttle') {
+    if (c.type === 'throttle' || c.type === 'hthrottle') {
       const now = s.knob[id] ?? Number(c.setting ?? 0.5)
       return { ...s, knob: { ...s.knob, [id]: now >= 0.999 ? 0.25 : Math.min(1, Math.round((now + 0.25) * 4) / 4) } }
     }
@@ -612,17 +613,22 @@ export function elecStep(schematic, state, { physical = {}, analog = {}, plcOut 
   const solenoids = new Set(list.filter((c) => c.type === 'valve' && c.tag && loads[c.id]).map((c) => c.tag))
   const air = pneuStep(schematic, s.pneu, { solenoids, manual: (c) => s.pressed[c.id] || s.latched[c.id], opened: s.opened, setting: (c) => s.knob[c.id] ?? Number(c.setting ?? 0.5), faults: s.faults }, dt)
   view.pneu = air.view
-  view.pneuSignals = air.signals
+  // Hidráulica: las mismas electroválvulas, y la bomba con su motor del esquema.
+  const running = new Set(list.filter((c) => isMotor(c.type) && c.tag && motors[c.id]?.running).map((c) => c.tag))
+  const oil = hydroStep(schematic, s.hydro, { solenoids, motors: (tag) => running.has(tag), manual: (c) => s.pressed[c.id] || s.latched[c.id], setting: (c) => s.knob[c.id] ?? Number(c.setting ?? 0.5), faults: s.faults }, dt)
+  view.hydro = oil.view
+  view.pneuSignals = { ...air.signals, ...oil.signals }
   // Un cilindro neumático puede mover un cilindro de la planta: su orden de salir (presión en A y
   // escape en B) y la de entrar.
   for (const c of list) {
-    if (c.type !== 'pcylinder' || !air.view) continue
-    const a = air.view.ports[key(c.id, 'A')]
-    const b = c.acting === 'single' ? 'R' : air.view.ports[key(c.id, 'B')]
+    const fluid = c.type === 'pcylinder' ? air.view : c.type === 'hcylinder' ? oil.view : null
+    if (!fluid) continue
+    const a = fluid.ports[key(c.id, 'A')]
+    const b = c.acting === 'single' ? 'R' : fluid.ports[key(c.id, 'B')]
     if (c.signal) actuators[c.signal] = a === 'P' && b !== 'P' ? 1 : 0
     if (c.reverse && c.acting !== 'single') actuators[c.reverse] = b === 'P' && a !== 'P' ? 1 : 0
   }
-  return { state: { ...after, pneu: air.state, pneuSignals: air.signals, view }, plcIn, plcInAnalog, actuators }
+  return { state: { ...after, pneu: air.state, hydro: oil.state, pneuSignals: view.pneuSignals, view }, plcIn, plcInAnalog, actuators }
 }
 
 // Motor trifásico: gira con las tres fases distintas; el sentido, por el orden de las fases.

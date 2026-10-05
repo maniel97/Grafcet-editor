@@ -110,7 +110,7 @@ export default function ElecStatic({ schematic, sheetId, info = {} }) {
           <g key={c.id} transform={`translate(${c.x} ${c.y})`}>
             <ElecSymbol c={{ ...c, timed: false }} view={null} />
             {!BOXED.has(c.type) &&
-              !['rail', 'plc', 'terminal', 'pcylinder', 'airsource'].includes(c.type) &&
+              !['rail', 'plc', 'terminal', 'pcylinder', 'hcylinder', 'airsource', 'hgauge', 'htank'].includes(c.type) &&
               terms.map((t, i) => {
                 const text = c.type === 'contact' ? numbers[c.id]?.[i] : t.id
                 return text ? (
@@ -125,7 +125,7 @@ export default function ElecStatic({ schematic, sheetId, info = {} }) {
               </text>
             )}
             {label.map(([t, size, weight], i) => (
-              <text key={i} x={c.type === 'pcylinder' ? 30 : w + (BOXED.has(c.type) ? 16 : 3)} y={(c.type === 'pcylinder' ? 50 : 32) + i * 12} fontSize={size} fontWeight={weight} fill={i ? '#334155' : INK}>
+              <text key={i} x={c.type === 'pcylinder' || c.type === 'hcylinder' ? 30 : w + (BOXED.has(c.type) ? 16 : ['pvalve', 'hvalve'].includes(c.type) ? 9 : 3)} y={(c.type === 'pcylinder' || c.type === 'hcylinder' ? 50 : 32) + i * 12} fontSize={size} fontWeight={weight} fill={i ? '#334155' : INK}>
                 {t}
               </text>
             ))}

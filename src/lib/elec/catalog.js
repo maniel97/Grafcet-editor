@@ -53,14 +53,18 @@ const TWO_SPEED = ['1U', '1V', '1W', '2U', '2V', '2W']
 
 // Conexión neumática (se une con tubos, no con cables).
 const pneu = (id, x, y, side) => ({ id, x, y, side, pneu: true })
+// Conexión hidráulica: también con tubos, pero de aceite (no se une con una de aire).
+const hydro = (id, x, y, side) => ({ id, x, y, side, pneu: true, hydro: true })
 // Válvulas: una casilla por posición (80 px), con el accionamiento a cada lado (40 px). Las
 // conexiones se dibujan en la casilla de reposo: la de la derecha (o la central en las de 3
 // posiciones); la de la izquierda es la del pilotaje 14.
 export const VALVE_SIDE = 40
 export const VALVE_SQUARE = 80
-export const valveSquares = (c) => (c.ways === '5/3' ? 3 : 2)
+export const valveSquares = (c) => (c.ways === '5/3' || c.ways === '4/3' ? 3 : 2)
 export const restSquare = () => 1
-export const isPneumatic = (type) => ELEC_TYPES[type]?.group === N_('Neumática')
+// Neumática e hidráulica se unen con tubos (no cables) y se identifican sin guion (1V1, 0P1).
+export const isPneumatic = (type) => ELEC_TYPES[type]?.group === N_('Neumática') || ELEC_TYPES[type]?.group === N_('Hidráulica')
+export const isHydraulic = (type) => ELEC_TYPES[type]?.group === N_('Hidráulica')
 // Señales de los detectores de un cilindro (A: a0 dentro, a1 fuera).
 export const cylinderSignals = (tag) => (tag ? [`${tag.toLowerCase()}0`, `${tag.toLowerCase()}1`] : [])
 
@@ -450,6 +454,34 @@ export const ELEC_TYPES = {
     terminals: (c) => (c.acting === 'single' ? [pneu('A', 20, 60, 'bottom')] : [pneu('A', 20, 60, 'bottom'), pneu('B', 140, 60, 'bottom')]),
   },
   throttle: { label: N_('Regulador de caudal'), group: N_('Neumática'), prefix: '1V', defaults: { setting: 0.5, text: '' }, size: () => ({ w: 40, h: 80 }), terminals: () => [pneu('2', 20, 0, 'top'), pneu('1', 20, 80, 'bottom')] },
+  // Hidráulica (ISO 1219-1; conexiones P presión, T retorno al depósito, A y B utilización). Como la
+  // neumática, sin caudales: lib/elec/hydraulic.js. El grupo hidráulico lleva el motor, la bomba y
+  // el depósito; con motor (identificador de un motor del esquema, -M1) solo bombea si gira.
+  hpump: { label: N_('Grupo hidráulico (bomba)'), group: N_('Hidráulica'), prefix: '0P', defaults: { motor: '', text: '' }, size: () => ({ w: 80, h: 100 }), terminals: () => [hydro('P', 48, 0, 'top'), hydro('T', 72, 0, 'top')] },
+  hrelief: { label: N_('Válvula limitadora de presión'), group: N_('Hidráulica'), prefix: '0V', defaults: { setting: 100, text: '' }, size: () => ({ w: 60, h: 80 }), terminals: () => [hydro('P', 20, 80, 'bottom'), hydro('T', 20, 0, 'top')] },
+  hgauge: { label: N_('Manómetro'), group: N_('Hidráulica'), prefix: '0Z', defaults: { text: '' }, size: () => ({ w: 40, h: 50 }), terminals: () => [hydro('1', 20, 50, 'bottom')] },
+  htank: { label: N_('Depósito (retorno)'), group: N_('Hidráulica'), prefix: '0Z', defaults: { text: '' }, size: () => ({ w: 40, h: 30 }), terminals: () => [hydro('T', 20, 0, 'top')] },
+  hvalve: {
+    label: N_('Distribuidor hidráulico'),
+    group: N_('Hidráulica'),
+    prefix: '1V',
+    defaults: { ways: '4/3', center: 'closed', sol14: '', sol12: '', manual: 'none', text: '' },
+    size: (c) => ({ w: VALVE_SIDE * 2 + VALVE_SQUARE * valveSquares(c), h: 80 }),
+    terminals: (c) => {
+      const x0 = VALVE_SIDE + VALVE_SQUARE * restSquare(c)
+      return [hydro('A', x0 + 20, 0, 'top'), hydro('B', x0 + 60, 0, 'top'), hydro('P', x0 + 20, 80, 'bottom'), hydro('T', x0 + 60, 80, 'bottom')]
+    },
+  },
+  hcylinder: {
+    label: N_('Cilindro hidráulico'),
+    group: N_('Hidráulica'),
+    prefix: '',
+    letterTag: true,
+    defaults: { time: 2, initial: 0, text: '' },
+    size: () => ({ w: 160, h: 60 }),
+    terminals: () => [hydro('A', 20, 60, 'bottom'), hydro('B', 140, 60, 'bottom')],
+  },
+  hthrottle: { label: N_('Regulador de caudal con antirretorno'), group: N_('Hidráulica'), prefix: '1V', defaults: { setting: 0.5, text: '' }, size: () => ({ w: 40, h: 80 }), terminals: () => [hydro('2', 20, 0, 'top'), hydro('1', 20, 80, 'bottom')] },
   plc: {
     label: N_('Autómata (E/S)'),
     group: N_('Autómata'),

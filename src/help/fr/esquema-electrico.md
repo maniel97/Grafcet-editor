@@ -19,6 +19,16 @@ En **Éditer** on place les appareils et on tire les fils de borne à borne. En 
 
 En Utiliser, chaque appareil peut avoir des pannes (contact ouvert, collé, fil coupé). « Panne au hasard (cachée) » en cache une pour la chercher avec le **multimètre**, en mesurant les tensions entre bornes comme à l’atelier.
 
+## Électrohydraulique
+
+Dans la palette, le groupe **Hydraulique** (ISO 1219) : centrale hydraulique (moteur, pompe et réservoir), limiteur de pression, manomètre, distributeurs 4/3 et 4/2, vérin et régleur de débit. On le monte et on le simule comme le pneumatique, avec trois différences visibles en simulation :
+
+- **L’huile ne se comprime pas** : avec les deux orifices du vérin fermés (centre fermé ou tandem du 4/3), il reste où il est, même à mi-course.
+- **La pompe donne du débit, pas de la pression** : si l’huile n’a pas de sortie (vérin en butée, centre fermé), la pression monte jusqu’à ce que le **limiteur** s’ouvre et que l’huile retourne au réservoir par lui. Le **manomètre** l’indique : pression faible en mouvement, celle du tarage en butée, 0 avec le centre tandem (la pompe débite à vide).
+- Un orifice sans tube **répand de l’huile**, et sans limiteur un avertissement indique que la pression monte sans contrôle.
+
+Les tubes sous pression s’affichent en orange. Deux montages dans « Insérer un montage » : la presse (4/3 tandem) et l’élévateur à descente freinée (centre fermé).
+
 > **Attention :** les conduites pneumatiques (tubes) ne se mélangent pas avec les fils électriques : un distributeur se commande par sa bobine électrique et fait bouger le vérin par ses tubes.
 
 ```ejemplo estrella-triangulo-plc

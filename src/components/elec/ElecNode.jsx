@@ -26,6 +26,7 @@ const HINTS = {
   litbutton: N_('Mantén pulsado para accionarlo'),
   frl: N_('Clic: abrir o cortar el aire'),
   throttle: N_('Clic: abrir más el regulador (+25 %)'),
+  hthrottle: N_('Clic: abrir más el regulador (+25 %)'),
 }
 
 // Componente del esquema eléctrico en el lienzo (React Flow): símbolo, bornes (handles) y rótulos.
@@ -37,9 +38,10 @@ export default function ElecNode({ data }) {
   const terminals = terminalsOf(c)
   const use = mode === 'use'
   // Con el polímetro o las averías, el clic es para la herramienta, no para accionar.
-  const momentary = use && !tool && (MOMENTARY.has(c.type) || (c.type === 'pvalve' && c.manual === 'button'))
-  const toggle = use && !tool && (TOGGLES.has(c.type) || (c.type === 'pvalve' && c.manual === 'lever') || c.type === 'frl' || c.type === 'throttle')
-  const hint = c.type === 'pvalve' ? { button: tr('Mantén pulsado para accionar la válvula'), lever: tr('Clic: mover la palanca') }[c.manual] : tr(HINTS[c.type])
+  const valve = c.type === 'pvalve' || c.type === 'hvalve'
+  const momentary = use && !tool && (MOMENTARY.has(c.type) || (valve && c.manual === 'button'))
+  const toggle = use && !tool && (TOGGLES.has(c.type) || (valve && c.manual === 'lever') || c.type === 'frl' || c.type === 'throttle' || c.type === 'hthrottle')
+  const hint = valve ? { button: tr('Mantén pulsado para accionar la válvula'), lever: tr('Clic: mover la palanca') }[c.manual] : tr(HINTS[c.type])
   const fault = view?.faults?.[c.id]
   const label = tr(ELEC_TYPES[c.type]?.label) ?? c.type
   const tag = c.type === 'contact' || c.type === 'maincontacts' ? c.ref : c.tag
@@ -47,17 +49,18 @@ export default function ElecNode({ data }) {
   // Estado al simular (para leerlo y para las pruebas): cargas y motores, encendidos; contactos,
   // cerrados; protecciones, disparadas.
   const air = view?.pneu
-  const cyl = air?.cylinders?.[c.id]
+  const oil = view?.hydro
+  const cyl = air?.cylinders?.[c.id] ?? oil?.cylinders?.[c.id]
   const on = view
-    ? c.type === 'pvalve'
-      ? air?.valves?.[c.id] === '14'
-      : c.type === 'pcylinder'
+    ? valve
+      ? (air?.valves?.[c.id] ?? oil?.valves?.[c.id]) === '14'
+      : c.type === 'pcylinder' || c.type === 'hcylinder'
         ? (cyl?.pos ?? 0) >= 0.98
         : Boolean(view.loads?.[c.id] ?? view.motors?.[c.id]?.running ?? view.closed?.[c.id])
     : undefined
   // Números de borne junto a cada borne (los de los contactos auxiliares, calculados).
   const boxed = ['psu', 'phasemonitor', 'vfd', 'softstarter', 'safetyrelay'].includes(c.type)
-  const termLabel = (t, i) => (c.type === 'contact' ? numbers?.[i] : rail || c.type === 'plc' || c.type === 'terminal' || boxed || c.type === 'pcylinder' || c.type === 'airsource' ? null : t.id)
+  const termLabel = (t, i) => (c.type === 'contact' ? numbers?.[i] : rail || c.type === 'plc' || c.type === 'terminal' || boxed || ['pcylinder', 'hcylinder', 'airsource', 'hgauge', 'htank'].includes(c.type) ? null : t.id)
 
   // Potenciómetro (modo Usar): la rueda lo gira 1 % (con Mayús, 0,1 %; con Ctrl, 10 %) en vez de
   // hacer zoom (nowheel: React Flow no la usa para el zoom).
@@ -123,7 +126,7 @@ export default function ElecNode({ data }) {
       </svg>
       {!rail && c.type !== 'plc' && (
         // Rótulo a la derecha; la descripción se parte en líneas para no pisar al aparato de al lado.
-        <div className="pointer-events-none absolute top-[22px] w-[92px] text-[11px] leading-tight text-slate-900" style={c.type === 'pcylinder' ? { left: 30, top: 40 } : { left: w + (boxed ? 16 : 2) }}>
+        <div className="pointer-events-none absolute top-[22px] w-[92px] text-[11px] leading-tight text-slate-900" style={c.type === 'pcylinder' || c.type === 'hcylinder' ? { left: 30, top: 40 } : { left: w + (boxed ? 16 : ['pvalve', 'hvalve'].includes(c.type) ? 8 : 2) }}>
           {/* Neumática: identificación ISO 1219-2, sin guion (1V1, A). */}
           <div className="font-semibold">{c.type === 'terminal' ? `${showTag(tag)}:${c.n ?? 1}` : isPneumatic(c.type) ? tag : showTag(tag)}</div>
           {c.text && <div className="text-[10px] text-slate-600">{c.text}</div>}
@@ -152,6 +155,13 @@ export default function ElecNode({ data }) {
           {cyl?.note && <div className="text-amber-700">{cyl.note}</div>}
           {c.type === 'pvalve' && <div className="text-slate-600">{`${c.ways ?? '5/2'} ${c.ways === '5/3' ? ({ closed: tr('centro cerrado'), exhaust: tr('centro a escape'), pressure: tr('centro a presión') }[c.center] ?? tr('centro cerrado')) : c.sol12 ? tr('biestable') : c.ways === '3/2' && c.normally === 'NO' ? tr('NA') : tr('monoestable')}`}</div>}
           {c.type === 'throttle' && <div className="text-slate-600">{`Abierto ${Math.round((view?.knob?.[c.id] ?? Number(c.setting ?? 0.5)) * 100)} %`}</div>}
+          {c.type === 'hthrottle' && <div className="text-slate-600">{`Abierto ${Math.round((view?.knob?.[c.id] ?? Number(c.setting ?? 0.5)) * 100)} %`}</div>}
+          {c.type === 'hvalve' && <div className="text-slate-600">{c.ways === '4/2' ? `4/2 ${c.sol12 ? tr('biestable') : tr('monoestable')}` : `4/3 ${{ closed: tr('centro cerrado'), tandem: tr('centro en tándem'), open: tr('centro abierto'), float: tr('centro flotante') }[c.center] ?? tr('centro cerrado')}`}</div>}
+          {c.type === 'hrelief' && <div className={oil?.relief?.[c.id] ? 'font-semibold text-red-700' : 'text-slate-600'}>{oil?.relief?.[c.id] ? tr('Abierta: {n} bar', { n: c.setting ?? 100 }) : `${c.setting ?? 100} bar`}</div>}
+          {c.type === 'hgauge' && view && <div className="font-mono font-semibold text-red-700">{`${oil?.gauges?.[c.id] ?? 0} bar`}</div>}
+          {c.type === 'hpump' && view && !oil?.pumps?.[c.id] && <div className="text-slate-600">{tr('Parada: su motor no gira')}</div>}
+          {c.type === 'hpump' && oil?.spill && <div className="font-semibold text-amber-700">{tr('Se derrama aceite: una conexión sin tubo')}</div>}
+          {c.type === 'hpump' && oil?.overpressure && <div className="font-semibold text-red-700">{tr('Sin limitadora: la presión sube sin control')}</div>}
           {c.type === 'airsource' && air?.leaks && <div className="font-semibold text-amber-700">{tr('Fuga: el aire sale por un escape')}</div>}
           {c.type === 'motor1' && <div className="text-slate-600">{c.capacitor === 'start' ? tr('Condensador de arranque') : tr('Condensador permanente')}</div>}
           {view?.motors?.[c.id]?.running && view.motors[c.id].speed < 1 && <div className="text-green-700">{tr('{pct} % de velocidad', { pct: Math.round(view.motors[c.id].speed * 100) })}</div>}

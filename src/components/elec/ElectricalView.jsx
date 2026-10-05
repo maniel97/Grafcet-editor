@@ -104,6 +104,21 @@ const PALETTE = [
       { key: 'throttle', type: 'throttle', label: N_('Regulador de caudal'), preset: {} },
     ],
   },
+  {
+    group: N_('Hidráulica'),
+    items: [
+      { key: 'hpump', type: 'hpump', label: N_('Grupo hidráulico (motor, bomba y depósito)'), preset: {} },
+      { key: 'hrelief', type: 'hrelief', label: N_('Válvula limitadora de presión'), preset: {} },
+      { key: 'hgauge', type: 'hgauge', label: N_('Manómetro'), preset: {} },
+      { key: 'htank', type: 'htank', label: N_('Retorno al depósito'), preset: {} },
+      { key: 'hvalve:43c', type: 'hvalve', label: N_('Distribuidor 4/3 centro cerrado'), preset: { ways: '4/3', center: 'closed', bistable: true } },
+      { key: 'hvalve:43t', type: 'hvalve', label: N_('Distribuidor 4/3 centro en tándem'), preset: { ways: '4/3', center: 'tandem', bistable: true } },
+      { key: 'hvalve:42', type: 'hvalve', label: N_('Distribuidor 4/2 (bobina y muelle)'), preset: { ways: '4/2' } },
+      { key: 'hvalve:43m', type: 'hvalve', label: N_('Distribuidor 4/3 de palanca'), preset: { ways: '4/3', center: 'closed', manual: 'lever' } },
+      { key: 'hcylinder', type: 'hcylinder', label: N_('Cilindro hidráulico de doble efecto'), preset: {} },
+      { key: 'hthrottle', type: 'hthrottle', label: N_('Regulador de caudal con antirretorno'), preset: {} },
+    ],
+  },
   ...['Mando', 'Potencia', N_('Autómata')].map((group) => ({
     group,
     items: Object.entries(ELEC_TYPES)
@@ -177,6 +192,13 @@ const HINTS = {
   pvalve: N_('Válvula distribuidora: la bobina 14 es una electroválvula del esquema (-Y1); sin bobina 12, vuelve con su muelle (monoestable); con las dos, se queda donde está (biestable, memoria).'),
   pcylinder: N_('Cilindro: sale con presión en A y escape en B. Sus detectores (a0 dentro, a1 fuera) accionan los finales de carrera del esquema enlazados con esa señal.'),
   throttle: N_('Regulador de caudal unidireccional: frena el cilindro (mejor en el escape). Al simular, un clic lo abre más.'),
+  hpump: N_('Grupo hidráulico: motor, bomba y depósito. La bomba da caudal: si el aceite no tiene salida, la presión sube hasta la limitadora. Con un motor asignado (-M1), solo bombea si ese motor gira.'),
+  hrelief: N_('Limitadora de presión: abre y devuelve el aceite al depósito cuando la presión llega a su tarado. Sin ella, la presión subiría hasta romper algo.'),
+  hgauge: N_('Manómetro: al simular marca la presión: baja al mover, la del tarado al llegar al tope o con el aceite parado, 0 si la bomba descarga.'),
+  htank: N_('Retorno al depósito (T): el aceite que vuelve. Se dibuja aparte para no llevar tubos largos al grupo.'),
+  hvalve: N_('Distribuidor hidráulico: P presión, T depósito, A y B al cilindro. La posición central del 4/3 decide qué pasa en reposo: cerrado (el cilindro se queda quieto, la bomba contra la limitadora) o en tándem (quieto y la bomba descarga sin esfuerzo).'),
+  hcylinder: N_('Cilindro hidráulico: sale con presión en A y B a depósito. El aceite no se comprime: con A y B cerradas se queda quieto donde esté. Detectores a0 (dentro) y a1 (fuera).'),
+  hthrottle: N_('Regulador de caudal con antirretorno: frena el cilindro en un sentido. Al simular, un clic lo abre más.'),
 }
 
 // Referencia de cada aparato (identificador IEC 81346 y bornes).
@@ -229,13 +251,20 @@ const NORMS = {
   pvalve: N_('ISO 1219-1 · conexiones ISO 5599: 1 presión, 2 y 4 utilización, 3 y 5 escape; pilotajes 14 (abre 1→4) y 12 (abre 1→2) · 1V1.'),
   pcylinder: N_('ISO 1219-1 · ISO 1219-2 lo identifica 1A1; aquí, con letra (A, B…) para escribir las secuencias A+ B+ A− B−.'),
   throttle: N_('ISO 1219-1: estrangulación regulable con antirretorno en paralelo · 1V2.'),
+  hpump: N_('ISO 1219-1 (triángulo relleno: hidráulica) · 0P1 · P presión, T depósito.'),
+  hrelief: N_('ISO 1219-1: válvula normalmente cerrada con muelle regulable y pilotaje desde la entrada · 0V1.'),
+  hgauge: N_('ISO 1219-1 · 0Z1.'),
+  htank: N_('ISO 1219-1: depósito abierto a la atmósfera.'),
+  hvalve: N_('ISO 1219-1 · conexiones P, T, A y B · 1V1.'),
+  hcylinder: N_('ISO 1219-1 · ISO 1219-2 lo identifica 1A1; aquí, con letra (A, B…).'),
+  hthrottle: N_('ISO 1219-1: estrangulación regulable con antirretorno en paralelo · 1V2.'),
 }
 
 // Bobinas de una válvula nueva: las primeras electroválvulas -Y libres (las que no mueve ya otra
 // válvula), existan ya en el esquema o no; las de accionamiento manual no llevan bobina.
 function solenoidsFor(components, preset) {
   if (preset.manual && preset.manual !== 'none') return { sol14: '', sol12: '' }
-  const taken = new Set(components.filter((c) => c.type === 'pvalve').flatMap((c) => [c.sol14, c.sol12]).filter(Boolean))
+  const taken = new Set(components.filter((c) => c.type === 'pvalve' || c.type === 'hvalve').flatMap((c) => [c.sol14, c.sol12]).filter(Boolean))
   const pick = () => {
     const free = components.filter((c) => c.type === 'valve' && c.tag && !taken.has(c.tag)).map((c) => c.tag)
     const tag = free[0] ?? nextTag([...components, ...[...taken].map((t) => ({ tag: t }))], 'Y')
@@ -249,7 +278,7 @@ function solenoidsFor(components, preset) {
 // Vista previa de un aparato de la paleta: su símbolo (con sus bornes) tal como queda en el esquema.
 function ElecPreview({ item }) {
   const c = { id: 'preview', type: item.type, x: 0, y: 0, tag: ELEC_TYPES[item.type].letterTag ? 'A' : `${item.prefix ?? ELEC_TYPES[item.type].prefix}1`, ...ELEC_TYPES[item.type].defaults, ...item.preset }
-  if (c.type === 'pvalve' && (c.manual ?? 'none') === 'none') Object.assign(c, { sol14: 'Y1', ...(c.bistable ? { sol12: 'Y2' } : {}) })
+  if ((c.type === 'pvalve' || c.type === 'hvalve') && (c.manual ?? 'none') === 'none') Object.assign(c, { sol14: 'Y1', ...(c.bistable ? { sol12: 'Y2' } : {}) })
   if (c.type === 'rail') c.length = 160
   if (c.type === 'plc') Object.assign(c, { inputs: 4, outputs: 3 })
   if (c.type === 'contact' || c.type === 'maincontacts') c.ref = 'KM1'
@@ -439,7 +468,7 @@ function Inner({ schematic, onChange, elecState, onAction, variables = [], build
       ...t.defaults,
       ...(t.defaults?.text ? { text: tr(t.defaults.text) } : {}),
       ...item.preset,
-      ...(item.type === 'pvalve' ? solenoidsFor(allComponents, item.preset) : {}),
+      ...(item.type === 'pvalve' || item.type === 'hvalve' ? solenoidsFor(allComponents, item.preset) : {}),
       ...(ref ? { ref } : {}),
       ...(strip ? { n: nextTerminalNumber(components, strip) } : {}),
     }
@@ -611,8 +640,9 @@ function Inner({ schematic, onChange, elecState, onAction, variables = [], build
         const p = view?.pot?.[`${w.from.c}:${w.from.t}`]
         const sel = selectedWires.includes(w.id)
         if (pneumaticIds.has(w.from.c)) {
-          // Tubo de aire: azul con presión; gris a escape o sin aire.
-          const air = view?.pneu?.ports?.[`${w.from.c}:${w.from.t}`]
+          // Tubo de aire: azul con presión; gris a escape o sin aire. De aceite: naranja con presión.
+          const oil = view?.hydro?.ports?.[`${w.from.c}:${w.from.t}`]
+          const air = view?.pneu?.ports?.[`${w.from.c}:${w.from.t}`] ?? oil
           return {
             id: w.id,
             source: w.from.c,
@@ -623,7 +653,7 @@ function Inner({ schematic, onChange, elecState, onAction, variables = [], build
             selected: sel,
             selectable: mode === 'edit',
             style: {
-              stroke: view?.faults?.[w.id] ? '#dc2626' : sel ? '#2563eb' : air === 'P' ? '#0284c7' : '#64748b',
+              stroke: view?.faults?.[w.id] ? '#dc2626' : sel ? '#2563eb' : oil === 'P' ? '#ea580c' : air === 'P' ? '#0284c7' : '#64748b',
               strokeWidth: air === 'P' ? 2.6 : 1.6,
               ...(view?.faults?.[w.id] ? { strokeDasharray: '6 4' } : {}),
             },
@@ -688,6 +718,11 @@ function Inner({ schematic, onChange, elecState, onAction, variables = [], build
     if (wires.some(same)) return
     // Tubos de aire entre conexiones neumáticas; cables entre bornes eléctricos.
     const isAir = (id, t) => Boolean(terminalsOf(components.find((c) => c.id === id) ?? {}).find((x) => x.id === t)?.pneu)
+    const isOil = (id, t) => Boolean(terminalsOf(components.find((c) => c.id === id) ?? {}).find((x) => x.id === t)?.hydro)
+    if (isOil(source, sourceHandle) !== isOil(target, targetHandle)) {
+      setMessage({ kind: 'warn', text: tr('Un tubo de aceite solo une conexiones hidráulicas.') })
+      return
+    }
     if (isAir(source, sourceHandle) !== isAir(target, targetHandle)) {
       setMessage({ kind: 'warn', text: tr('Un tubo de aire solo une conexiones neumáticas (y un cable, bornes eléctricos).') })
       return
@@ -720,7 +755,7 @@ function Inner({ schematic, onChange, elecState, onAction, variables = [], build
   const short = view?.short
   // Hay autómata o aparatos enlazados con la planta, pero el esquema no está conectado.
   // (Los detectores de los cilindros neumáticos, a0 / a1…, son del propio esquema: no cuentan.)
-  const ownSignals = new Set(allComponents.filter((c) => c.type === 'pcylinder').flatMap((c) => cylinderSignals(c.tag)))
+  const ownSignals = new Set(allComponents.filter((c) => c.type === 'pcylinder' || c.type === 'hcylinder').flatMap((c) => cylinderSignals(c.tag)))
   const hiddenWarning = simulating && !sch.enabled && components.some((c) => c.type === 'plc' || (c.signal && !ownSignals.has(c.signal)))
 
   return (
@@ -1298,7 +1333,7 @@ function WireProperties({ wire, number, onChange, onDelete }) {
 // Propiedades del componente seleccionado.
 function Properties({ c, components, variables, onChange, onDelete }) {
   const t = ELEC_TYPES[c.type]
-  const isLoad = ['coil', 'valve', 'lamp', 'buzzer', 'brake', 'pcylinder'].includes(c.type) || isMotor(c.type)
+  const isLoad = ['coil', 'valve', 'lamp', 'buzzer', 'brake', 'pcylinder', 'hcylinder'].includes(c.type) || isMotor(c.type)
   const isContact = ['pushbutton', 'switch', 'limit', 'emergency', 'sensor3', 'litbutton', 'doorswitch', 'lightcurtain', 'transmitter'].includes(c.type)
   const signals = variables.filter((v) =>
     c.type === 'transmitter' ? v.type === 'analogIn' : isLoad ? v.type === 'output' : v.type !== 'output' && v.type !== 'analogIn' && v.type !== 'analogOut',
@@ -1326,7 +1361,7 @@ function Properties({ c, components, variables, onChange, onDelete }) {
     </label>
   )
   // Los contactos también pueden accionarlos los detectores de los cilindros neumáticos (a0, a1…).
-  const cylSignals = isContact && c.type !== 'transmitter' ? components.filter((x) => x.type === 'pcylinder').flatMap((x) => cylinderSignals(x.tag)) : []
+  const cylSignals = isContact && c.type !== 'transmitter' ? components.filter((x) => x.type === 'pcylinder' || x.type === 'hcylinder').flatMap((x) => cylinderSignals(x.tag)) : []
   const signalSelect = (key, label) =>
     select(key, label, [
       ['', tr('(sin enlazar)')],
@@ -1440,6 +1475,45 @@ function Properties({ c, components, variables, onChange, onDelete }) {
         </>
       )}
       {c.type === 'throttle' && text('setting', 'Apertura (0,05 a 1)', { type: 'number', min: 0.05, max: 1, step: 0.05 })}
+      {c.type === 'hvalve' && (
+        <>
+          {select('ways', tr('Vías / posiciones'), [
+            ['4/3', '4/3'],
+            ['4/2', '4/2'],
+          ])}
+          {c.ways !== '4/2' &&
+            select('center', tr('Posición central'), [
+              ['closed', tr('Cerrada')],
+              ['tandem', tr('Tándem (P→T, A y B cerradas)')],
+              ['open', tr('Abierta (todas unidas)')],
+              ['float', tr('Flotante (A y B a depósito)')],
+            ])}
+          {select('manual', 'Accionamiento manual', [
+            ['none', '(ninguno)'],
+            ['button', 'Pulsador'],
+            ['lever', tr('Palanca (se queda)')],
+          ])}
+          {solenoidSelect('sol14', tr('Bobina 14 (electroválvula)'), tr('(sin bobina)'))}
+          {solenoidSelect('sol12', c.ways === '4/2' ? tr('Bobina 12 (sin ella: muelle)') : tr('Bobina 12'), '(muelle)')}
+        </>
+      )}
+      {c.type === 'hcylinder' && (
+        <>
+          {text('time', tr('Tiempo de carrera (s)'), { type: 'number', min: 0.1, step: 0.1 })}
+          {select('initial', tr('Al empezar'), [
+            ['0', 'Dentro'],
+            ['1', 'Fuera'],
+          ])}
+          <p className="text-slate-500">{`Detectores: ${cylinderSignals(c.tag).join(' (dentro) y ')} (fuera)`}</p>
+        </>
+      )}
+      {c.type === 'hthrottle' && text('setting', 'Apertura (0,05 a 1)', { type: 'number', min: 0.05, max: 1, step: 0.05 })}
+      {c.type === 'hrelief' && text('setting', tr('Tarado (bar)'), { type: 'number', min: 10, max: 400, step: 10 })}
+      {c.type === 'hpump' &&
+        select('motor', tr('Motor que la mueve'), [
+          ['', tr('(ninguno: siempre en marcha)')],
+          ...components.filter((x) => isMotor(x.type) && x.tag).map((x) => [x.tag, showTag(x.tag)]),
+        ])}
       {c.type === 'potentiometer' && text('initial', tr('Posición al empezar (0 a 1)'), { type: 'number', min: 0, max: 1, step: 0.05 })}
       {c.type === 'vfd' && text('speed2', '2ª velocidad (Hz)', { type: 'number', min: 1, max: 50, step: 1 })}
       {c.type === 'softstarter' && text('ramp', 'Rampa (s)', { type: 'number', min: 0.5, step: 0.5 })}
@@ -1518,14 +1592,14 @@ function Properties({ c, components, variables, onChange, onDelete }) {
         </>
       )}
       {(isContact || isLoad) &&
-        signalSelect('signal', c.type === 'transmitter' ? tr('Mide en la planta (analógica)') : c.type === 'pcylinder' ? tr('Al salir, mueve en la planta') : isLoad ? tr('Mueve en la planta') : c.type === 'doorswitch' ? tr('Puerta abierta en la planta') : tr('Lo acciona en la planta'))}
+        signalSelect('signal', c.type === 'transmitter' ? tr('Mide en la planta (analógica)') : c.type === 'pcylinder' || c.type === 'hcylinder' ? tr('Al salir, mueve en la planta') : isLoad ? tr('Mueve en la planta') : c.type === 'doorswitch' ? tr('Puerta abierta en la planta') : tr('Lo acciona en la planta'))}
       {isMotor(c.type) && signalSelect('reverse', tr('Giro inverso en la planta'))}
       {c.type === 'motor1' &&
         select('capacitor', 'Condensador', [
           ['permanent', 'Permanente'],
           ['start', tr('De arranque (con interruptor centrífugo)')],
         ])}
-      {c.type === 'pcylinder' && c.acting !== 'single' && signalSelect('reverse', tr('Al entrar, mueve en la planta'))}
+      {((c.type === 'pcylinder' && c.acting !== 'single') || c.type === 'hcylinder') && signalSelect('reverse', tr('Al entrar, mueve en la planta'))}
       {c.type !== 'rail' && text('text', tr('Descripción'))}
       <button type="button" onClick={onDelete} className="flex items-center gap-1 rounded border border-red-200 px-2 py-0.5 text-red-700 hover:bg-red-50">
         <Trash2 size={12} />{' '}{tr('Eliminar')}

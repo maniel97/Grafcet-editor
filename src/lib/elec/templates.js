@@ -585,6 +585,82 @@ ELEC_TEMPLATES.push(
     },
   },
   {
+    id: 'electrohidraulica-prensa',
+    title: N_('Prensa hidráulica con 4/3 en tándem'),
+    description: N_('Electrohidráulica: mientras se pulsa S1 (-Y1) el cilindro baja, y con S2 (-Y2) sube. Al soltar, el distribuidor vuelve al centro: el cilindro se queda quieto donde esté (el aceite no se comprime) y la bomba descarga al depósito (el manómetro marca 0). Al llegar al tope, la presión sube hasta la limitadora.'),
+    build(ox, oy, prefix) {
+      const b = builder(ox, oy, prefix)
+      b.add('Lp', 'rail', 0, 0, { potential: 'L+', length: 300 })
+      b.add('M', 'rail', 0, 400, { potential: 'M', length: 300 })
+      for (const [k, x, text] of [
+        [1, 20, 'Bajar'],
+        [2, 120, 'Subir'],
+      ]) {
+        b.add(`S${k}`, 'pushbutton', x, 60, { tag: `S${k}`, contact: 'NO', text })
+        b.add(`Y${k}`, 'valve', x, 240, { tag: `Y${k}`, text })
+        b.wire('Lp', tap(x + 20), `S${k}`, '13')
+        b.wire(`S${k}`, '14', `Y${k}`, 'A1')
+        b.wire(`Y${k}`, 'A2', 'M', tap(x + 20))
+      }
+      b.add('B1', 'limit', 220, 60, { tag: 'B1', contact: 'NO', signal: 'a1', text: 'Abajo' })
+      b.add('H1', 'lamp', 220, 240, { tag: 'H1', color: 'green', text: 'Abajo' })
+      b.wire('Lp', tap(240), 'B1', '13')
+      b.wire('B1', '14', 'H1', 'X1')
+      b.wire('H1', 'X2', 'M', tap(240))
+      // Aceite: grupo -> distribuidor 4/3 (centro en tándem) -> cilindro; limitadora y manómetro en P.
+      b.add('A', 'hcylinder', 440, 20, { tag: 'A', time: 3, initial: 0, text: 'Prensa' })
+      b.add('V1', 'hvalve', 340, 220, { tag: '1V1', ways: '4/3', center: 'tandem', sol14: 'Y1', sol12: 'Y2', manual: 'none' })
+      b.add('P', 'hpump', 440, 420, { tag: '0P1', motor: '' })
+      b.add('R', 'hrelief', 620, 400, { tag: '0V1', setting: 100 })
+      b.add('T', 'htank', 620, 340, { tag: '0Z2' })
+      b.add('G', 'hgauge', 280, 420, { tag: '0Z1' })
+      b.wire('V1', 'A', 'A', 'A')
+      b.wire('V1', 'B', 'A', 'B')
+      b.wire('P', 'P', 'V1', 'P')
+      b.wire('V1', 'T', 'P', 'T')
+      b.wire('P', 'P', 'R', 'P')
+      b.wire('R', 'T', 'T', 'T')
+      b.wire('G', '1', 'P', 'P')
+      return b
+    },
+  },
+  {
+    id: 'electrohidraulica-elevador',
+    title: N_('Elevador hidráulico con bajada frenada'),
+    description: N_('Electrohidráulica: S1 (-Y1) sube la plataforma y S2 (-Y2) la baja, frenada por el regulador 1V2 (el aceite pasa libre al subir y estrangulado al bajar). Centro cerrado: al soltar, la plataforma se queda sujeta a media altura y la bomba trabaja contra la limitadora.'),
+    build(ox, oy, prefix) {
+      const b = builder(ox, oy, prefix)
+      b.add('Lp', 'rail', 0, 0, { potential: 'L+', length: 200 })
+      b.add('M', 'rail', 0, 400, { potential: 'M', length: 200 })
+      for (const [k, x, text] of [
+        [1, 20, 'Subir'],
+        [2, 120, 'Bajar'],
+      ]) {
+        b.add(`S${k}`, 'pushbutton', x, 60, { tag: `S${k}`, contact: 'NO', text })
+        b.add(`Y${k}`, 'valve', x, 240, { tag: `Y${k}`, text })
+        b.wire('Lp', tap(x + 20), `S${k}`, '13')
+        b.wire(`S${k}`, '14', `Y${k}`, 'A1')
+        b.wire(`Y${k}`, 'A2', 'M', tap(x + 20))
+      }
+      b.add('A', 'hcylinder', 340, 20, { tag: 'A', time: 3, initial: 0, text: 'Plataforma' })
+      b.add('Q', 'hthrottle', 280, 120, { tag: '1V2', setting: 0.4 })
+      b.add('V1', 'hvalve', 240, 240, { tag: '1V1', ways: '4/3', center: 'closed', sol14: 'Y1', sol12: 'Y2', manual: 'none' })
+      b.add('P', 'hpump', 340, 440, { tag: '0P1', motor: '' })
+      b.add('R', 'hrelief', 520, 420, { tag: '0V1', setting: 120 })
+      b.add('T', 'htank', 520, 360, { tag: '0Z2' })
+      b.add('G', 'hgauge', 180, 440, { tag: '0Z1' })
+      b.wire('V1', 'A', 'Q', '1')
+      b.wire('Q', '2', 'A', 'A')
+      b.wire('V1', 'B', 'A', 'B')
+      b.wire('P', 'P', 'V1', 'P')
+      b.wire('V1', 'T', 'P', 'T')
+      b.wire('P', 'P', 'R', 'P')
+      b.wire('R', 'T', 'T', 'T')
+      b.wire('G', '1', 'P', 'P')
+      return b
+    },
+  },
+  {
     id: 'secuencia-ab',
     title: N_('Secuencia A+ B+ A− B− con finales de carrera'),
     description: N_('Electroneumática sin autómata: cada movimiento lo da el final de carrera del anterior (válvulas biestables). Mientras S1 (marcha) esté pulsado, repite el ciclo: A+ con S1 y b0, B+ con a1, A− con b1 y B− con a0.'),

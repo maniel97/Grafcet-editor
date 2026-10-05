@@ -3,11 +3,12 @@
 import { VALVE_SIDE, VALVE_SQUARE, terminalsOf, valveSquares } from '../../lib/elec/catalog'
 import { valveBlocked, valvePaths } from '../../lib/elec/pneumatic'
 import { INK } from './elecColors'
+import { HydroSymbol } from './HydroSymbols'
 
 const AIR = '#bfdbfe'
 const ACTIVE = '#dbeafe'
 
-function Arrow({ x1, y1, x2, y2 }) {
+export function Arrow({ x1, y1, x2, y2 }) {
   const a = Math.atan2(y2 - y1, x2 - x1)
   const h = (d) => `${x2 - 7 * Math.cos(a + d)} ${y2 - 7 * Math.sin(a + d)}`
   return (
@@ -22,13 +23,13 @@ function Arrow({ x1, y1, x2, y2 }) {
 const portSpot = (c, p) =>
   c.ways === '3/2' ? { 1: [20, 'b'], 2: [20, 't'], 3: [60, 'b'] }[p] : { 1: [40, 'b'], 2: [60, 't'], 3: [60, 'b'], 4: [20, 't'], 5: [20, 'b'] }[p]
 
-function Spring({ x, dir }) {
+export function Spring({ x, dir }) {
   // Muelle en zigzag hacia fuera de la válvula (dir: -1 izquierda, 1 derecha).
   const pts = [0, 1, 2, 3, 4, 5, 6].map((i) => `${x + dir * i * 4} ${i % 2 ? 30 : 50}`)
   return <polyline points={pts.join(' ')} fill="none" stroke={INK} strokeWidth="1.4" />
 }
 
-function Solenoid({ x, tag, on }) {
+export function Solenoid({ x, tag, on }) {
   return (
     <g>
       <rect x={x} y="30" width="16" height="20" fill={on ? '#bbf7d0' : 'white'} stroke={INK} strokeWidth="1.6" />
@@ -42,7 +43,7 @@ function Solenoid({ x, tag, on }) {
   )
 }
 
-function Manual({ kind, x }) {
+export function Manual({ kind, x }) {
   // Pulsador (seta) o palanca, a la izquierda.
   return kind === 'lever' ? (
     <path d={`M ${x} 40 L ${x - 12} 40 M ${x - 6} 40 L ${x - 14} 28`} fill="none" stroke={INK} strokeWidth="1.6" />
@@ -99,17 +100,18 @@ function Valve({ c, view }) {
   )
 }
 
-function Cylinder({ c, view }) {
-  const s = view?.pneu?.cylinders?.[c.id]
+// Cilindro neumático o hidráulico (fluid: 'pneu' o 'hydro'; el lado con presión, de su color).
+export function Cylinder({ c, view, fluid = 'pneu', color = AIR }) {
+  const s = view?.[fluid]?.cylinders?.[c.id]
   const pos = s?.pos ?? (Number(c.initial) ? 1 : 0)
-  const ports = view?.pneu?.ports ?? {}
+  const ports = view?.[fluid]?.ports ?? {}
   const px = 10 + pos * 132
   const single = c.acting === 'single'
   const [a0, a1] = c.tag ? [`${c.tag.toLowerCase()}0`, `${c.tag.toLowerCase()}1`] : ['', '']
   return (
     <g>
-      {ports[`${c.id}:A`] === 'P' && <rect x="6" y="10" width={px - 6} height="26" fill={AIR} />}
-      {!single && ports[`${c.id}:B`] === 'P' && <rect x={px + 8} y="10" width={154 - px - 8} height="26" fill={AIR} />}
+      {ports[`${c.id}:A`] === 'P' && <rect x="6" y="10" width={px - 6} height="26" fill={color} />}
+      {!single && ports[`${c.id}:B`] === 'P' && <rect x={px + 8} y="10" width={154 - px - 8} height="26" fill={color} />}
       <rect x="4" y="8" width="152" height="30" fill="none" stroke={INK} strokeWidth="2" />
       <rect x={px} y="10" width="8" height="26" fill={INK} />
       <rect x={px + 8} y="20" width="150" height="6" fill="#94a3b8" stroke={INK} strokeWidth="1" />
@@ -183,6 +185,6 @@ export function PneuSymbol({ c, view }) {
     case 'pcylinder':
       return <Cylinder c={c} view={view} />
     default:
-      return null
+      return <HydroSymbol c={c} view={view} />
   }
 }

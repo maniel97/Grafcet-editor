@@ -1273,3 +1273,30 @@ test('paneles flotantes del simulador: sacar, mover, redimensionar, devolver y r
   expect(Math.abs(now.y - where.y)).toBeLessThan(2)
   expectNoErrors(errors)
 })
+
+test('esquema eléctrico: prensa electrohidráulica (4/3 en tándem, manómetro y limitadora)', async ({ page }) => {
+  const errors = await openEditor(page)
+  await page.getByRole('button', { name: 'Esquema eléctrico' }).click()
+  const view = page.getByRole('region', { name: 'Esquema eléctrico' })
+  await view.getByLabel('Insertar montaje').selectOption('electrohidraulica-prensa')
+  await view.getByRole('button', { name: 'Pantalla completa' }).click()
+  await page.getByRole('button', { name: /Simular/ }).click()
+  const gauge = view.locator('[data-elec="hgauge"]')
+  const cylinder = view.locator('[data-elec="hcylinder"]')
+  // El rótulo es «0Z1» y debajo la lectura: «0Z1» + «0 bar».
+  await expect(gauge).toContainText(/0Z10 bar$/)
+  const b = await view.locator('[data-elec="pushbutton"][data-tag="S1"]').boundingBox()
+  await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2)
+  await page.mouse.down()
+  await expect(view.locator('[data-elec="hvalve"]')).toHaveAttribute('data-on', '1')
+  await expect(gauge).toContainText('30 bar') // presión de trabajo al bajar
+  // Al tope: la presión sube hasta la limitadora, que abre; el final de carrera enciende H1.
+  await expect(cylinder).toHaveAttribute('data-on', '1', { timeout: 6000 })
+  await expect(gauge).toContainText('100 bar')
+  await expect(view.locator('[data-elec="hrelief"]')).toContainText('Abierta')
+  await expect(view.locator('[data-elec="lamp"][data-tag="H1"]')).toHaveAttribute('data-on', '1')
+  await page.mouse.up()
+  // Centro en tándem: la bomba descarga.
+  await expect(gauge).toContainText(/0Z10 bar$/)
+  expectNoErrors(errors)
+})
