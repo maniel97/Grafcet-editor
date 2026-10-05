@@ -9,7 +9,7 @@ When simulating, it opens next to the grafcet if the project has a plant; in the
 ## Use and Edit
 
 - **Use**: it is operated like the machine: push buttons, switches, part feeders. The inputs given by the plant appear in the panel marked “plant”. Potentiometers are adjusted with the mouse wheel (with Shift, finer), with the arrow keys or, on a touch screen, by dragging your finger slowly.
-- **Edit**: elements are placed and configured. Drag them from the palette, rotate them with **R**, delete them with **Del**. In their properties you choose each one's variable (if it does not exist, it is added to the table). Sizes (a conveyor's length, a cylinder's stroke, an image's size…) are changed by dragging the small squares of the selected element; on a touch screen or interactive whiteboard, two fingers zoom and pan.
+- **Edit**: elements are placed and configured. Click one in the palette and place it with a click wherever you want (dragging places a row; double-clicking in the palette puts it in a free spot), or drag it from the palette; rotate them with **R**, delete them with **Del**. In their properties you choose each one's variable (if it does not exist, it is added to the table). Sizes (a conveyor's length, a cylinder's stroke, an image's size…) are changed by dragging the small squares of the selected element; on a touch screen or interactive whiteboard, two fingers zoom and pan.
 
 “Connections” shows what is connected and what is missing: grafcet inputs nobody gives, outputs that move nothing.
 

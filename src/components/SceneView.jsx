@@ -34,6 +34,7 @@ import { downloadFile } from '../lib/projectFile'
 import { N_, t as tr } from '../lib/i18n'
 import { maxPanelWidth } from './panelWidth'
 import { applyResize, resizeHandles, resizeMeasure } from '../lib/sim/sceneHandles'
+import { collides, freeSpot, stampRow } from '../lib/sim/sceneStamp'
 
 // Pantalla táctil o pizarra digital (puntero «grueso»): tiradores y botones más grandes.
 const coarsePointer = () => typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches
@@ -1790,6 +1791,15 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
   // Teclado de la escena (solo con el foco en ella, para no mezclarse con los atajos del grafcet).
   const onKeyDown = (ev) => {
     if (mode !== 'edit' || ['INPUT', 'SELECT', 'TEXTAREA'].includes(ev.target.tagName)) return
+    if (stamp && !ev.ctrlKey && !ev.metaKey) {
+      const k = ev.key.toLowerCase()
+      if (k === 'escape') setStamp(null)
+      else if (k === 'r') setStamp({ ...stamp, rot: ((stamp.rot ?? 0) + 90) % 360 })
+      else if (k === 'enter') addItem(stamp.item)
+      else return
+      ev.preventDefault()
+      return
+    }
     const ctrl = ev.ctrlKey || ev.metaKey
     const key = ev.key.toLowerCase()
     const actions = {
@@ -1844,20 +1854,69 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
 
   // Mandos y señalización: con un clic (o soltados en el panel) van al panel; soltados en la
   // escena, a la máquina.
-  const add = (type, preset = {}, at = null, place = null) => {
+  // Elemento nuevo del tipo, con sus valores por defecto (textos en el idioma elegido).
+  const makeElement = (type, preset, x, y, rot = 0, place = null) => ({
+    id: newId(),
+    type,
+    x,
+    y,
+    rot,
+    ...SCENE_TYPES[type].defaults,
+    ...(SCENE_TYPES[type].defaults.text ? { text: tr(SCENE_TYPES[type].defaults.text) } : {}),
+    ...preset,
+    ...(place ? { place } : {}),
+  })
+  // Zona de la escena que se ve ahora (para poner lo nuevo a la vista).
+  const visibleArea = () => {
     const el = scrollRef.current
-    let x = snap(at ? at.x : el ? (el.scrollLeft + el.clientWidth / 2) / zoom : W / 2)
-    let y = snap(at ? at.y : el ? (el.scrollTop + el.clientHeight / 2) / zoom : H / 2)
+    return el ? { x: el.scrollLeft / zoom, y: el.scrollTop / zoom, w: el.clientWidth / zoom, h: el.clientHeight / zoom } : { x: 0, y: 0, w: W, h: H }
+  }
+  // Sin `at` (doble clic en la paleta), en el primer hueco libre de la zona visible: no encima de
+  // lo que ya hay. Los mandos y pilotos, al panel.
+  const add = (type, preset = {}, at = null, place = null) => {
     const where = place ?? (DESK_TYPES.includes(type) && !at ? 'desk' : null)
-    // Con un clic, si ya hay algo justo en el centro, un poco más abajo a la derecha (no se tapan).
-    while (!at && elements.some((e) => e.x === x && e.y === y && !isDesk(e))) {
-      x += 30
-      y += 30
+    let x = at ? snap(at.x) : 0
+    let y = at ? snap(at.y) : 0
+    if (!at && !where) {
+      const probe = makeElement(type, preset, 0, 0)
+      ;({ x, y } = freeSpot(probe, elements.filter((e) => !isDesk(e)), (e) => boundsOf(e, 1), visibleArea()))
     }
-    const element = { id: newId(), type, x, y, rot: 0, ...SCENE_TYPES[type].defaults, ...(SCENE_TYPES[type].defaults.text ? { text: tr(SCENE_TYPES[type].defaults.text) } : {}), ...preset, ...(where ? { place: where } : {}) }
+    const element = makeElement(type, preset, x, y, 0, where)
     save([...elements, element])
     setSelected(element.id)
     setMode('edit')
+  }
+
+  // Tampón: con un clic en la paleta, la pieza queda «cargada»; cada clic en la escena pone una
+  // (vista previa fantasma bajo el cursor; R la gira) y arrastrar pone una fila (pincel). Esc, el
+  // clic derecho o volver a pulsarla en la paleta lo descargan.
+  const [stamp, setStamp] = useState(null) // { item, rot }
+  const [stampAt, setStampAt] = useState(null) // punto bajo el cursor (escena)
+  const [stampDrag, setStampDrag] = useState(null) // { from, to }
+  const stampable = (item) => !item.savedGroup && item.key !== 'pickplace'
+  // Al pasar a Usar, el tampón se descarga.
+  useEffect(() => {
+    if (mode !== 'edit') setStamp(null)
+  }, [mode])
+  const toggleStamp = (item) => {
+    setStampDrag(null)
+    setStamp((s) => (s?.item.key === item.key ? null : { item, rot: 0 }))
+    setSelection([])
+    setMode('edit')
+  }
+  const stampGhost = (x, y) => makeElement(stamp.item.type, stamp.item.preset, x, y, stamp.rot)
+  const stampPoints = () => {
+    if (!stamp) return []
+    if (stampDrag) {
+      const b = boundsOf(stampGhost(0, 0), 1)
+      return stampRow(stampDrag.from, stampDrag.to, { w: b.w, h: b.h })
+    }
+    return stampAt ? [stampAt] : []
+  }
+  const placeStamp = (points, place = null) => {
+    if (!stamp || !points.length) return
+    const made = points.map((p) => makeElement(stamp.item.type, stamp.item.preset, snap(p.x), snap(p.y), stamp.rot, place))
+    save([...elements, ...made]) // una fila entera, un solo paso de deshacer
   }
 
   const toScene = (ev) => {
@@ -2226,6 +2285,21 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
         <button type="button" onClick={onClose} title={tr('Cerrar la planta')} className="rounded p-1 hover:bg-slate-100">
           <X size={14} />
         </button>
+        {/* Tampón cargado: qué se pone y cómo terminar (en una pizarra no hay Esc ni clic derecho).
+            Flota sobre la escena: no mueve la paleta (el segundo clic caería en otro botón). */}
+        {stamp && mode === 'edit' && (
+          <div
+            role="status"
+            data-stamp-status=""
+            className="absolute left-1/2 top-14 z-30 flex max-w-[calc(100%-1rem)] -translate-x-1/2 flex-wrap items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-1 text-xs text-blue-900 shadow-md"
+          >
+            <strong>{tr('Poniendo: {pieza}', { pieza: tr(stamp.item.label) })}</strong>
+            <span>{tr('clic: una · arrastrar: una fila · R: girar')}</span>
+            <button type="button" onClick={() => setStamp(null)} className="ml-auto rounded-md bg-blue-600 px-2 py-0.5 font-medium text-white hover:bg-blue-700">
+              {tr('Terminar')}
+            </button>
+          </div>
+        )}
       </header>
 
       <div className="flex min-h-0 flex-1">
@@ -2251,8 +2325,15 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
                     onClick={() => {
                       clearTimeout(previewTimer.current)
                       setPreview(null)
+                      if (stampable(item)) toggleStamp(item)
+                      else addItem(item)
+                    }}
+                    onDoubleClick={() => {
+                      if (!stampable(item)) return
+                      setStamp(null)
                       addItem(item)
                     }}
+                    aria-pressed={stampable(item) ? stamp?.item.key === item.key : undefined}
                     onMouseEnter={(ev) => {
                       const at = { x: ev.clientX, y: ev.clientY }
                       clearTimeout(previewTimer.current)
@@ -2266,12 +2347,12 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
                       ev.dataTransfer.setData(DRAG_TYPE, item.key)
                       ev.dataTransfer.effectAllowed = 'copy'
                     }}
-                    title={tr('Arrastra a la escena (o pulsa para ponerlo en el centro)')}
+                    title={tr('Pulsa y pon uno o varios en la escena (arrastrando, una fila) · doble clic: en un hueco libre · también se puede arrastrar')}
                     onMouseLeave={() => {
                       clearTimeout(previewTimer.current)
                       setPreview(null)
                     }}
-                    className="block w-full rounded px-1 py-0.5 text-left hover:bg-blue-50"
+                    className={`block w-full rounded px-1 py-0.5 text-left ${stamp?.item.key === item.key ? 'bg-blue-600 text-white' : 'hover:bg-blue-50'}`}
                   >
                     + {tr(item.label)}
                   </button>
@@ -2524,6 +2605,84 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
                   </g>
                 )
               })()}
+            {stamp &&
+              (() => {
+                const points = stampPoints()
+                const others = elements.filter((e) => !isDesk(e))
+                return (
+                  <g data-stamp-ghosts={points.length} pointerEvents="none">
+                    {points.map((p, i) => {
+                      const ghost = stampGhost(snap(p.x), snap(p.y))
+                      const bad = collides(ghost, others, (e) => boundsOf(e, 1))
+                      const b = boundsOf(ghost, 1)
+                      return (
+                        <g key={i} opacity={0.5}>
+                          <g transform={`translate(${ghost.x} ${ghost.y})${turns(ghost) ? ` rotate(${ghost.rot ?? 0})` : ''}`}>{draw(ghost)}</g>
+                          <rect x={b.x - 3} y={b.y - 3} width={b.w + 6} height={b.h + 6} fill="none" stroke={bad ? '#dc2626' : '#2563eb'} strokeWidth={2 / zoom} strokeDasharray="5 3" />
+                        </g>
+                      )
+                    })}
+                    {points.length > 1 && (
+                      <text
+                        x={(() => {
+                          const b = boundsOf(stampGhost(snap(points.at(-1).x), snap(points.at(-1).y)), 1)
+                          return b.x + b.w + 8 / zoom
+                        })()}
+                        y={(() => {
+                          const b = boundsOf(stampGhost(snap(points.at(-1).x), snap(points.at(-1).y)), 1)
+                          return b.y + b.h / 2 + 5 / zoom
+                        })()}
+                        fontSize={14 / zoom}
+                        fontWeight="700"
+                        fill="#1d4ed8"
+                        stroke="white"
+                        strokeWidth={4 / zoom}
+                        paintOrder="stroke"
+                        data-stamp-count=""
+                      >
+                        ×{points.length}
+                      </text>
+                    )}
+                  </g>
+                )
+              })()}
+            {stamp && (
+              <rect
+                data-stamp-layer=""
+                x={-10000}
+                y={-10000}
+                width={20000}
+                height={20000}
+                fill="transparent"
+                style={{ cursor: 'crosshair', touchAction: 'none' }}
+                onPointerMove={(ev) => {
+                  const p = toScene(ev)
+                  setStampAt(p)
+                  if (stampDrag) setStampDrag({ ...stampDrag, to: p })
+                }}
+                onPointerLeave={() => !stampDrag && setStampAt(null)}
+                onPointerDown={(ev) => {
+                  if (ev.button !== 0) return
+                  ev.stopPropagation()
+                  ev.currentTarget.setPointerCapture?.(ev.pointerId)
+                  const p = toScene(ev)
+                  setStampAt(p)
+                  setStampDrag({ from: p, to: p })
+                }}
+                onPointerUp={(ev) => {
+                  if (!stampDrag) return
+                  ev.stopPropagation()
+                  placeStamp(stampPoints())
+                  setStampDrag(null)
+                  if (ev.pointerType !== 'mouse') setStampAt(null) // con el dedo no hay cursor que siga
+                }}
+                onPointerCancel={() => setStampDrag(null)}
+                onContextMenu={(ev) => {
+                  ev.preventDefault()
+                  setStamp(null)
+                }}
+              />
+            )}
             {marquee && (
               <rect
                 x={Math.min(marquee.x0, marquee.x1)}
@@ -2555,6 +2714,10 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
               ev.preventDefault()
               addItem(item, null, DESK_TYPES.includes(item.type) ? 'desk' : null)
             }}
+            onClick={() => {
+              if (stamp && DESK_TYPES.includes(stamp.item.type)) placeStamp([{ x: 0, y: 0 }], 'desk')
+            }}
+            style={stamp && DESK_TYPES.includes(stamp.item.type) ? { cursor: 'copy' } : undefined}
           >
             {deskItems.length === 0 && (
               <p className="py-3 text-xs text-slate-600">{tr('Panel de control: arrastra aquí pulsadores, pilotos, potenciómetros…')}</p>
@@ -2683,7 +2846,7 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
       {mode === 'edit' && (
         <p className="border-t border-slate-200 px-2 py-1 text-[11px] text-slate-500">
           {tr(
-            'Arrastra módulos a la escena o al panel · los cuadraditos de un elemento seleccionado cambian su medida (con Mayús, en proporción) · rueda o dos dedos: zoom · arrastrar el fondo (o con la rueda pulsada): desplazar · Ctrl+clic o Mayús+arrastrar: varios · R gira · Supr borra · Ctrl+C/V/D copia, pega, duplica · deshacer y rehacer: los de siempre · asigna las variables en el panel de la derecha. Piezas de {pequena} y {grande} px.',
+            'Pulsa un módulo de la paleta y ponlo con un clic en la escena (arrastrando, una fila; doble clic en la paleta: en un hueco libre) o arrástralo a la escena o al panel · los cuadraditos de un elemento seleccionado cambian su medida (con Mayús, en proporción) · rueda o dos dedos: zoom · arrastrar el fondo (o con la rueda pulsada): desplazar · Ctrl+clic o Mayús+arrastrar: varios · R gira · Supr borra · Ctrl+C/V/D copia, pega, duplica · deshacer y rehacer: los de siempre · asigna las variables en el panel de la derecha. Piezas de {pequena} y {grande} px.',
             { pequena: PIECE_SIZES.small[0], grande: PIECE_SIZES.large[0] },
           )}
         </p>

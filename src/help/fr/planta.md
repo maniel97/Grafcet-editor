@@ -9,7 +9,7 @@ En simulation, elle s’ouvre à côté du grafcet si le projet en a une ; dans 
 ## Utiliser et Éditer
 
 - **Utiliser** : on l’actionne comme la machine : boutons-poussoirs, interrupteurs, distributeurs de pièces. Les entrées données par la partie opérative apparaissent dans le panneau avec la marque correspondante. Les potentiomètres se règlent avec la molette (avec Maj, plus finement), avec les flèches du clavier ou, sur écran tactile, en faisant glisser le doigt lentement.
-- **Éditer** : on place et on configure les éléments. Faites-les glisser depuis la palette, tournez-les avec **R**, supprimez-les avec **Suppr**. Dans leurs propriétés on choisit la variable de chacun (si elle n’existe pas, elle est ajoutée à la table). Les dimensions (longueur d’un convoyeur, course d’un vérin, taille d’une image…) se changent en faisant glisser les petits carrés de l’élément sélectionné ; sur écran tactile ou tableau interactif, deux doigts zooment et déplacent la vue.
+- **Éditer** : on place et on configure les éléments. Cliquez sur un élément de la palette et posez-le d’un clic où vous voulez (en glissant, une rangée ; un double-clic dans la palette le pose dans un espace libre), ou faites-le glisser depuis la palette ; tournez-les avec **R**, supprimez-les avec **Suppr**. Dans leurs propriétés on choisit la variable de chacun (si elle n’existe pas, elle est ajoutée à la table). Les dimensions (longueur d’un convoyeur, course d’un vérin, taille d’une image…) se changent en faisant glisser les petits carrés de l’élément sélectionné ; sur écran tactile ou tableau interactif, deux doigts zooment et déplacent la vue.
 
 « Raccordements » montre ce qui est raccordé et ce qui manque : entrées du grafcet que personne ne donne, sorties qui ne font rien bouger.
 

@@ -138,13 +138,13 @@ test('escena de la planta: colocar mandos y piloto, asignar variables y accionar
   const palette = view.getByRole('navigation', { name: 'Elementos' })
   const props = view.getByLabel('Propiedades del elemento')
 
-  await palette.getByRole('button', { name: '+ Pulsador' }).click()
+  await palette.getByRole('button', { name: '+ Pulsador' }).dblclick()
   const pick = async (name, value) => {
     await props.getByRole('combobox', { name }).fill(value)
     await props.getByRole('combobox', { name }).press('Enter')
   }
   await pick('Entrada', 'Marcha')
-  await palette.getByRole('button', { name: '+ Pulsador' }).click()
+  await palette.getByRole('button', { name: '+ Pulsador' }).dblclick()
   await pick('Entrada', 'Paro')
   await props.getByRole('combobox', { name: 'Color' }).selectOption('red')
   // El segundo pulsador encima del primero: se aparta arrastrándolo.
@@ -154,7 +154,7 @@ test('escena de la planta: colocar mandos y piloto, asignar variables y accionar
   await page.mouse.down()
   await page.mouse.move(box.x + box.width / 2 + 120, box.y + box.height / 2, { steps: 4 })
   await page.mouse.up()
-  await palette.getByRole('button', { name: '+ Piloto' }).click()
+  await palette.getByRole('button', { name: '+ Piloto' }).dblclick()
   // La lista de sugerencias, justo debajo del campo; se elige con el ratón.
   const salida = props.getByRole('combobox', { name: 'Salida' })
   await salida.click()
@@ -273,7 +273,7 @@ test('escena: potenciómetro, calentador con termostato y detectores por tipo', 
   }
   await palette.getByRole('button', { name: '+ Detector inductivo' }).hover()
   await expect(page.getByRole('tooltip', { name: 'Vista previa: Detector inductivo' })).toContainText('solo detecta metal')
-  await palette.getByRole('button', { name: '+ Detector inductivo' }).click()
+  await palette.getByRole('button', { name: '+ Detector inductivo' }).dblclick()
   await expect(view.getByLabel('Propiedades del elemento').getByRole('combobox', { name: 'Tipo de detector' })).toHaveValue('inductive')
   expectNoErrors(errors)
 })
@@ -448,7 +448,7 @@ test('escena: escribir una variable nueva en un elemento la añade a la tabla', 
   const view = page.getByRole('region', { name: 'Escena de la planta' })
   await view.getByRole('radio', { name: /Editar/ }).click()
   const props = view.getByLabel('Propiedades del elemento')
-  await view.getByRole('button', { name: '+ Pulsador' }).click()
+  await view.getByRole('button', { name: '+ Pulsador' }).dblclick()
   const field = props.getByRole('combobox', { name: 'Entrada' })
 
   // Nombre nuevo: aviso de que se creará y, al confirmar, entrada nueva en la tabla y en el panel.
@@ -459,7 +459,7 @@ test('escena: escribir una variable nueva en un elemento la añade a la tabla', 
   await expect(page.getByText('Rearme', { exact: true }).first()).toBeVisible()
 
   // Errata: pregunta antes de crear.
-  await view.getByRole('button', { name: '+ Pulsador' }).click()
+  await view.getByRole('button', { name: '+ Pulsador' }).dblclick()
   await field.fill('Marhca')
   await field.press('Enter')
   await expect(props.getByRole('status')).toContainText('¿Querías decir Marcha?')
@@ -494,7 +494,7 @@ test('escena: rótulos con E/S y panel de conexiones', async ({ page }) => {
   await expect(panel.getByRole('list', { name: 'Conectadas' })).toContainText('Marcha')
   await expect(panel.getByLabel('Avisos de conexión')).toHaveCount(0)
   await view.getByRole('radio', { name: /Editar/ }).click()
-  await view.getByRole('button', { name: '+ Piloto' }).click()
+  await view.getByRole('button', { name: '+ Piloto' }).dblclick()
   await page.keyboard.press('Escape') // sin selección: vuelve el panel de conexiones
   await expect(view.getByRole('button', { name: /Conexiones/ })).toContainText('1')
   await panel.getByLabel('Avisos de conexión').getByRole('button', { name: /Piloto/ }).click()
@@ -515,7 +515,7 @@ test('escena: panel de control aparte de la máquina', async ({ page }) => {
     await props.getByRole('combobox', { name }).press('Enter')
   }
   // Con un clic, los mandos van al panel; arrastrado al panel, también.
-  await view.getByRole('button', { name: '+ Pulsador' }).click()
+  await view.getByRole('button', { name: '+ Pulsador' }).dblclick()
   await pick('Entrada', 'Marcha')
   await view.getByRole('button', { name: '+ Piloto' }).dragTo(desk)
   await expect(desk.locator('[data-element]')).toHaveCount(2)
@@ -549,10 +549,10 @@ test('escena: desviador y rampa en la paleta, con sus propiedades', async ({ pag
   const view = page.getByRole('region', { name: 'Escena de la planta' })
   await view.getByRole('radio', { name: /Editar/ }).click()
   const props = view.getByLabel('Propiedades del elemento')
-  await view.getByRole('button', { name: '+ Desviador' }).click()
+  await view.getByRole('button', { name: '+ Desviador' }).dblclick()
   await expect(props.getByRole('combobox', { name: 'Desviar (salida)' })).toBeVisible()
   await expect(props.getByRole('spinbutton', { name: 'Tiempo en recorrerla (s)' })).toHaveValue('0.5')
-  await view.getByRole('button', { name: '+ Rampa' }).click()
+  await view.getByRole('button', { name: '+ Rampa' }).dblclick()
   await expect(props).toContainText('Rampa')
   await expect(view.locator('svg[aria-label="Escena"] [data-element="diverter"]')).toHaveCount(1)
   await expect(view.locator('svg[aria-label="Escena"] [data-element="ramp"]')).toHaveCount(1)
@@ -617,7 +617,7 @@ test('escena: guardar una selección en «Mis grupos», colocarla, exportar e im
   await expect(groups.getByRole('button', { name: '+ Brazo XZ' })).toBeVisible()
 
   // Colocarlo: dos cilindros nuevos, el Z montado en el X nuevo.
-  await groups.getByRole('button', { name: '+ Brazo XZ' }).click()
+  await groups.getByRole('button', { name: '+ Brazo XZ' }).click() // los grupos se ponen enteros con un clic
   await expect(machine).toHaveCount(6)
   await expect(view.getByLabel('Selección')).toContainText('2 elementos seleccionados')
 
@@ -828,7 +828,7 @@ test('escena: sirena, semáforo, electroválvula, barrera, tubería, rótulo e i
   await view.getByRole('radio', { name: /Editar/ }).click()
   const svg = view.locator('svg[aria-label="Escena"]')
   for (const [name, type] of [['Sirena', 'siren'], ['Semáforo', 'trafficlight'], ['Electroválvula', 'valve'], ['Barrera', 'barrier'], ['Tubería', 'pipe'], ['Rótulo', 'label'], ['Imagen', 'image']]) {
-    await view.getByRole('button', { name: `+ ${name}`, exact: true }).click()
+    await view.getByRole('button', { name: `+ ${name}`, exact: true }).dblclick()
     await expect(svg.locator(`[data-element="${type}"]`)).toHaveCount(1)
   }
   const props = view.getByLabel('Propiedades del elemento')
@@ -873,7 +873,7 @@ test('planta: «Tope / pared» en la paleta, con su explicación', async ({ page
   const palette = view.getByRole('navigation', { name: 'Elementos' })
   await palette.getByRole('button', { name: '+ Tope / pared' }).hover()
   await expect(page.getByRole('tooltip', { name: 'Vista previa: Tope / pared' })).toContainText('medio recorrido')
-  await palette.getByRole('button', { name: '+ Tope / pared' }).click()
+  await palette.getByRole('button', { name: '+ Tope / pared' }).dblclick()
   await expect(view.locator('[aria-label="Plataforma Tope"]')).toHaveCount(1)
   expectNoErrors(errors)
 })

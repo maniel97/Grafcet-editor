@@ -9,7 +9,7 @@ Al simular se abre junto al grafcet, si el proyecto tiene planta; en el panel de
 ## Usar y Editar
 
 - **Usar**: se acciona como la máquina: pulsadores, interruptores, alimentadores de piezas. Las entradas que da la planta aparecen en el panel con la marca «planta». Los potenciómetros se ajustan con la rueda del ratón (con Mayús, más fino), con las flechas del teclado o, en pantalla táctil, arrastrando el dedo despacio.
-- **Editar**: se colocan y configuran elementos. Arrástralos desde la paleta, gíralos con **R**, bórralos con **Supr**. En sus propiedades se elige la variable de cada uno (si no existe, se añade a la tabla). Las medidas (largo de una cinta, carrera de un cilindro, tamaño de una imagen…) se cambian arrastrando los cuadraditos del elemento seleccionado; en pantalla táctil o pizarra digital, dos dedos hacen zoom y desplazan.
+- **Editar**: se colocan y configuran elementos. Pulsa uno de la paleta y ponlo con un clic donde quieras (arrastrando, pones una fila; doble clic en la paleta lo pone en un hueco libre), o arrástralo desde la paleta; gíralos con **R**, bórralos con **Supr**. En sus propiedades se elige la variable de cada uno (si no existe, se añade a la tabla). Las medidas (largo de una cinta, carrera de un cilindro, tamaño de una imagen…) se cambian arrastrando los cuadraditos del elemento seleccionado; en pantalla táctil o pizarra digital, dos dedos hacen zoom y desplazan.
 
 «Conexiones» muestra qué está conectado y qué falta: entradas del grafcet que nadie da, salidas que no mueven nada.
 
