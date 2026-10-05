@@ -14,9 +14,9 @@ test('ejercicio del alumno: enunciado, Comprobar, piezas bloqueadas y resuelto',
   const errors = await openEditor(page, undefined, { education: true })
   await page.getByRole('button', { name: /^Abrir/ }).click()
   await page.getByRole('menuitem', { name: /Ejercicios/ }).click()
-  await page.getByRole('button', { name: /Marcha y paro de un motor/ }).click()
+  await page.getByRole('button', { name: /^Nivel 1\s*Marcha y paro de un motor/ }).click()
   const panel = page.getByRole('complementary', { name: 'Ejercicio' })
-  await expect(panel).toContainText('Un motor se pone en marcha')
+  await expect(panel).toContainText('se pone en marcha al pulsar Marcha')
   await expect(page.locator('.react-flow__node-step')).toHaveCount(0) // sin la solución
 
   // Con el lienzo vacío: «Aún no has dibujado el grafcet».
@@ -226,7 +226,7 @@ test('pistas, requisitos y nota del ejercicio', async ({ page }) => {
   const errors = await openEditor(page, undefined, { education: true })
   await page.getByRole('button', { name: /^Abrir/ }).click()
   await page.getByRole('menuitem', { name: /Ejercicios/ }).click()
-  await page.getByRole('button', { name: /Marcha y paro de un motor/ }).click()
+  await page.getByRole('button', { name: /^Nivel 1\s*Marcha y paro de un motor/ }).click()
   const panel = page.getByRole('complementary', { name: 'Ejercicio' })
   const hints = panel.getByRole('region', { name: 'Pistas' })
   await expect(hints).toContainText('0 de 3')
@@ -331,5 +331,112 @@ test('datos del proceso y corregir las entregas de la clase', async ({ page }) =
   const csv = readFileSync(await download(page, () => review.getByRole('button', { name: 'Descargar CSV' }).click()).then((f) => f.path()), 'utf-8')
   expect(csv).toContain('Alumno/a;Archivo;Correctas;Total')
   expect(csv).toContain('Ana Pérez;ana.pdf;')
+  expectNoErrors(errors)
+})
+
+// Ejercicios guiados (fase 5): un robot hace cada uno entero, siguiendo la visita como un alumno.
+const guided = (page) => ({
+  open: async (title) => {
+    await page.getByRole('button', { name: /^Abrir un proyecto/ }).click()
+    await page.getByRole('menuitem', { name: /Ejercicios/ }).click()
+    await page.getByRole('button', { name: `Hacer guiado: ${title}` }).click()
+  },
+  title: (text) => expect(page.locator('.tour').getByRole('heading', { name: text, exact: true })).toBeVisible({ timeout: 15000 }),
+  next: () => page.locator('.tour').getByRole('button', { name: /^(Siguiente|Terminar)$/ }).click(),
+  step: (label) => page.locator('.react-flow__node-step').filter({ has: page.locator('.diagram-step-label', { hasText: new RegExp(`^${label}$`) }) }),
+  receptivity: async (node, text) => {
+    await node.dblclick()
+    await page.getByRole('combobox').first().fill(text)
+    await page.keyboard.press('Escape')
+  },
+  action: async (stepNode, text) => {
+    await stepNode.click()
+    await page.locator('[data-tour="mas-accion"]').click()
+    await expect(page.locator('[data-tour="propiedades"]').getByLabel('Texto de la acción').last()).toBeFocused()
+    await page.keyboard.type(text)
+    await page.keyboard.press('Escape')
+  },
+  below: async (node, kind) => {
+    await node.click()
+    await page.getByRole('button', { name: kind === 'step' ? 'Añadir etapa' : 'Añadir transición', exact: true }).click()
+  },
+})
+
+test('ejercicio guiado «Marcha y paro» de principio a fin', async ({ page }) => {
+  const errors = await openEditor(page, undefined, { education: true })
+  const g = guided(page)
+  await g.open('Marcha y paro de un motor')
+  await g.title('El ejercicio')
+  await g.next()
+  await g.title('La etapa inicial')
+  await page.getByRole('button', { name: 'Etapa inicial', exact: true }).click()
+  await g.title('Arrancar con Marcha')
+  await g.below(g.step('0'), 'transition')
+  await g.receptivity(page.locator('.react-flow__node-transition').first(), 'Marcha')
+  await g.title('La etapa de marcha')
+  await g.below(page.locator('.react-flow__node-transition').first(), 'step')
+  await g.title('El motor y el piloto')
+  await g.action(g.step('1'), 'Motor')
+  await g.action(g.step('1'), 'Piloto')
+  await g.title('Parar con Paro (NC)')
+  await g.below(g.step('1'), 'transition')
+  await page.getByRole('button', { name: 'Encuadrar todo el diagrama' }).click()
+  await g.receptivity(page.locator('.react-flow__node-transition').nth(1), '!Paro')
+  await g.title('Volver al reposo')
+  await page.locator('.react-flow__node-transition').nth(1).click()
+  await page.getByRole('button', { name: 'Bucle: volver a una etapa anterior' }).click()
+  await g.step('0').click()
+  await g.title('Comprobar')
+  await page.getByRole('complementary', { name: 'Ejercicio' }).getByRole('button', { name: 'Comprobar' }).click()
+  await g.title('¡Ejercicio resuelto!')
+  await g.next()
+  await expect(page.locator('.tour')).toHaveCount(0)
+  expectNoErrors(errors)
+})
+
+test('ejercicio guiado «Cilindros A+ B+ A− B−» de principio a fin', async ({ page }) => {
+  test.setTimeout(90_000)
+  const errors = await openEditor(page, undefined, { education: true })
+  const g = guided(page)
+  const fit = () => page.getByRole('button', { name: 'Encuadrar todo el diagrama' }).click()
+  const lastTransition = () => page.locator('.react-flow__node-transition').last()
+  await g.open('Cilindros A+ B+ A− B−')
+  await g.title('El ejercicio')
+  await g.next()
+  await g.title('El reposo')
+  await page.getByRole('button', { name: 'Etapa inicial', exact: true }).click()
+  await g.title('Arrancar solo si están dentro')
+  await g.below(g.step('0'), 'transition')
+  await g.receptivity(lastTransition(), 'Marcha * a0 * b0')
+  await g.title('Sale A')
+  await g.below(lastTransition(), 'step')
+  await g.action(g.step('1'), 'A+')
+  await g.title('Hasta a1')
+  await fit()
+  await g.below(g.step('1'), 'transition')
+  await g.receptivity(lastTransition(), 'a1')
+  await g.title('El resto: igual')
+  for (const [n, action, sensor] of [
+    [2, 'B+', 'b1'],
+    [3, 'A-', 'a0'],
+    [4, 'B-', 'b0'],
+  ]) {
+    await fit()
+    await g.below(lastTransition(), 'step')
+    await fit()
+    await g.action(g.step(String(n)), action)
+    await fit()
+    await g.below(g.step(String(n)), 'transition')
+    await g.receptivity(lastTransition(), sensor)
+  }
+  await g.title('Vuelta al principio')
+  await fit()
+  await lastTransition().click()
+  await page.getByRole('button', { name: 'Bucle: volver a una etapa anterior' }).click()
+  await g.step('0').click()
+  await g.title('Comprobar')
+  await page.getByRole('complementary', { name: 'Ejercicio' }).getByRole('button', { name: 'Comprobar' }).click()
+  await g.title('¡Ejercicio resuelto!')
+  await g.next()
   expectNoErrors(errors)
 })

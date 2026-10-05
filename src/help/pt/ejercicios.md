@@ -6,7 +6,7 @@ Um **exercício** traz um enunciado e o que o professor dá já feito (a planta,
 
 ## Para os alunos
 
-1. Abra o exercício: Abrir > Exercícios, ou com Abrir > Abrir ficheiro o ficheiro que o professor lhe deu (um .json ou a ficha de prática em PDF: o exercício vai dentro).
+1. Abra o exercício: Abrir > Exercícios, ou com Abrir > Abrir ficheiro o ficheiro que o professor lhe deu (um .json ou a ficha de prática em PDF: o exercício vai dentro). Há exercícios dos níveis 1 a 5; os marcados com **Guiado** acompanham-no passo a passo, dizendo-lhe o que clicar em cada momento.
 2. Leia o enunciado no painel **Exercício** (à direita; o botão da barra abre-o e fecha-o).
 3. Desenhe o grafcet. Pode simulá-lo e verificá-lo como sempre.
 4. Clique em **Comprovar** quantas vezes quiser. Cada verificação aparece a verde ou a vermelho, com o que falha. Se ficar bloqueado, abra uma **pista** (se o professor as oferecer): aparecem uma a uma e ficam contadas; se houver nota, cada uma pode descontar.

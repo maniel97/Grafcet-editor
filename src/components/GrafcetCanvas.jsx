@@ -215,6 +215,16 @@ export default function GrafcetCanvas() {
     deleteElements,
   } = useReactFlow()
   const wrapperRef = useRef(null)
+  // Con el lienzo estrecho (p. ej. el panel del ejercicio y el de propiedades abiertos a la vez),
+  // el minimapa tapaba lo que se acaba de añadir abajo a la derecha (su botón +): se oculta.
+  const [roomy, setRoomy] = useState(true)
+  useEffect(() => {
+    const el = wrapperRef.current
+    if (!el || typeof ResizeObserver === 'undefined') return
+    const observer = new ResizeObserver(([entry]) => setRoomy(entry.contentRect.width >= 1000))
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [])
   const fileInputRef = useRef(null)
   const lastNudgeRef = useRef(0)
 
@@ -767,12 +777,17 @@ export default function GrafcetCanvas() {
     },
     [getProject],
   )
+  // guided: con su visita paso a paso (lib/guidedExercises.js), si la tiene.
   const openExercise = useCallback(
-    (exercise) => {
+    async (exercise, { guided = false } = {}) => {
       const project = studentProject(exercise.teacher())
       replaceProject({ ...normalizeProject(project), name: exercise.title }, t('Antes de abrir el ejercicio «{ejercicio}»', { ejercicio: exercise.title }))
       setProjectsTab(null)
       setExerciseOpen(true)
+      if (guided) {
+        const { GUIDED } = await import('../lib/guidedExercises')
+        if (GUIDED[exercise.id]) setTour(GUIDED[exercise.id])
+      }
     },
     [replaceProject],
   )
@@ -1297,7 +1312,7 @@ export default function GrafcetCanvas() {
                 onToggleLock={() => setEditLocked((l) => !l)}
                 lockDisabled={simulating}
               />
-              <MiniMap pannable zoomable ariaLabel="Minimapa" />
+              {roomy && <MiniMap pannable zoomable ariaLabel="Minimapa" />}
               <GhostPreview preview={preview} />
             </ReactFlow>
             {menu && (

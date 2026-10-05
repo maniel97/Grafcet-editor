@@ -255,12 +255,16 @@ test('escena: potenciómetro, calentador con termostato y detectores por tipo', 
   await expect.poll(() => activeSteps(page)).toBe('s0')
   // Girar el potenciómetro a la derecha: Consigna > 70 -> X1 calienta hasta que salta el termostato.
   const pot = view.locator('[aria-label="Potenciómetro Consigna"]')
-  const b = await pot.boundingBox()
-  await page.mouse.move(b.x + b.width / 2, b.y + 22)
-  await page.mouse.down()
-  await page.mouse.move(b.x + b.width / 2 + 150, b.y + 22, { steps: 4 })
-  await page.mouse.up()
-  await expect(pot).toContainText('100 %')
+  // Se mide justo antes de arrastrar (y se reintenta): con el equipo cargado, el panel de la planta
+  // puede estar aún colocándose y el gesto caería fuera del mando.
+  await expect(async () => {
+    const b = await pot.boundingBox()
+    await page.mouse.move(b.x + b.width / 2, b.y + 22)
+    await page.mouse.down()
+    await page.mouse.move(b.x + b.width / 2 + 150, b.y + 22, { steps: 4 })
+    await page.mouse.up()
+    await expect(pot).toContainText('100 %', { timeout: 1000 })
+  }).toPass({ timeout: 15000 })
   await expect.poll(() => activeSteps(page)).toBe('s1')
   await expect.poll(() => activeSteps(page), { timeout: 5000 }).toBe('s2') // TS: 40 °C alcanzados
   await expect(view.locator('[aria-label="Calentador Horno"]')).toContainText('°C')
@@ -1065,7 +1069,8 @@ test('esquema eléctrico: electroneumática (5/2 monoestable, cilindro, regulado
   const s1 = await view.locator('[data-elec="pushbutton"][data-tag="S1"]').boundingBox()
   await page.mouse.move(s1.x + s1.width / 2, s1.y + s1.height / 2)
   await page.mouse.down()
-  await expect(view.locator('[data-elec="pvalve"]')).toHaveAttribute('data-on', '1')
+  // Con margen: con la batería entera en marcha, el equipo va cargado y la simulación tarda más.
+  await expect(view.locator('[data-elec="pvalve"]')).toHaveAttribute('data-on', '1', { timeout: 15000 })
   await expect(cylinder).toHaveAttribute('data-pos', '100', { timeout: 8000 })
   await expect(view.locator('[data-elec="lamp"][data-tag="H1"]')).toHaveAttribute('data-on', '1')
   await page.mouse.up()

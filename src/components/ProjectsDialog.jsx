@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
-import { BookOpen, GraduationCap, History, RotateCcw, Trash2, X } from 'lucide-react'
+import { BookOpen, GraduationCap, History, RotateCcw, Trash2, X, Footprints } from 'lucide-react'
 import { EXAMPLES, LEVELS } from '../lib/examples'
 import { EXERCISES } from '../lib/exercises'
 import { PRACTICE_GUIDES } from '../lib/practiceGuides'
+import { GUIDED } from '../lib/guidedExercises'
 import { listRecent, removeRecent } from '../lib/recent'
 import { t, N_ } from '../lib/i18n'
 
@@ -102,16 +103,28 @@ export default function ProjectsDialog({ initialTab = 'examples', onOpenExample,
             </p>
             <ul className="grid gap-3 sm:grid-cols-2">
               {EXERCISES.map((ex) => (
-                <li key={ex.id}>
+                <li key={ex.id} className="relative">
                   <button
                     type="button"
                     onClick={() => onOpenExercise(ex)}
                     className="flex h-full w-full flex-col gap-1 rounded-lg border border-slate-200 p-3 text-left hover:border-blue-400 hover:bg-blue-50"
                   >
                     <span className="text-xs font-medium uppercase tracking-wide text-slate-500">{t('Nivel {n}', { n: ex.level })}</span>
-                    <span className="font-medium">{ex.title}</span>
+                    <span className={`font-medium ${GUIDED[ex.id] ? 'pr-24' : ''}`}>{ex.title}</span>
                     <span className="text-sm text-slate-600">{ex.description}</span>
                   </button>
+                  {/* Con versión guiada: paso a paso, para quien empieza. */}
+                  {GUIDED[ex.id] && (
+                    <button
+                      type="button"
+                      onClick={() => onOpenExercise(ex, { guided: true })}
+                      aria-label={t('Hacer guiado: {titulo}', { titulo: ex.title })}
+                      title={t('Paso a paso: te dice qué pulsar en cada momento')}
+                      className="absolute right-2 top-2 flex items-center gap-1 rounded-md border border-green-300 bg-green-50 px-2 py-0.5 text-xs font-medium text-green-800 hover:bg-green-100"
+                    >
+                      <Footprints size={12} /> {t('Guiado')}
+                    </button>
+                  )}
                 </li>
               ))}
             </ul>

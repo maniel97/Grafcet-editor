@@ -6,7 +6,7 @@ An **exercise** comes with a statement and what the teacher provides already don
 
 ## For students
 
-1. Open the exercise: Open > Exercises, or with Open > Open file the file your teacher gave you (a .json or the PDF practice sheet: the exercise is inside).
+1. Open the exercise: Open > Exercises, or with Open > Open file the file your teacher gave you (a .json or the PDF practice sheet: the exercise is inside). There are exercises from level 1 to 5; the ones marked **Guided** walk you through step by step, telling you what to click at each moment.
 2. Read the statement in the **Exercise** panel (on the right; the toolbar button opens and closes it).
 3. Draw the grafcet. You can simulate and verify it as usual.
 4. Click **Check** as many times as you like. Each check shows in green or red, with what fails. If you get stuck, open a **hint** (if the teacher offers them): they appear one at a time and are counted; if there is a grade, each one can subtract.

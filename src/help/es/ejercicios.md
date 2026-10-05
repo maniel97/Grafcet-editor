@@ -6,7 +6,7 @@ Un **ejercicio** trae un enunciado y lo que el profesor da hecho (la planta, la 
 
 ## Para el alumnado
 
-1. Abre el ejercicio: Abrir > Ejercicios, o con Abrir > Abrir archivo el archivo que te haya dado el profesor (un .json o la hoja de prácticas en PDF: el ejercicio va dentro).
+1. Abre el ejercicio: Abrir > Ejercicios, o con Abrir > Abrir archivo el archivo que te haya dado el profesor (un .json o la hoja de prácticas en PDF: el ejercicio va dentro). Hay ejercicios de los niveles 1 a 5; los que llevan **Guiado** te acompañan paso a paso, diciéndote qué pulsar en cada momento.
 2. Lee el enunciado en el panel **Ejercicio** (a la derecha; el botón de la barra lo abre y lo cierra).
 3. Dibuja el grafcet. Puedes simularlo y verificarlo como siempre.
 4. Pulsa **Comprobar** cuantas veces quieras. Cada comprobación sale en verde o en rojo, con lo que falla. Si te atascas, abre una **pista** (si el profesor las ofrece): salen de una en una y quedan contadas; si hay nota, cada una puede restar.

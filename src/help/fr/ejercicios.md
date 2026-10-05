@@ -6,7 +6,7 @@ Un **exercice** contient un énoncé et ce que le professeur fournit déjà fait
 
 ## Pour les élèves
 
-1. Ouvrez l’exercice : Ouvrir > Exercices, ou avec Ouvrir > Ouvrir un fichier le fichier que le professeur vous a donné (un .json ou la fiche de TP en PDF : l’exercice est à l’intérieur).
+1. Ouvrez l’exercice : Ouvrir > Exercices, ou avec Ouvrir > Ouvrir un fichier le fichier que le professeur vous a donné (un .json ou la fiche de TP en PDF : l’exercice est à l’intérieur). Il y a des exercices des niveaux 1 à 5 ; ceux marqués **Guidé** vous accompagnent pas à pas, en vous disant quoi cliquer à chaque moment.
 2. Lisez l’énoncé dans le panneau **Exercice** (à droite ; le bouton de la barre l’ouvre et le ferme).
 3. Dessinez le grafcet. Vous pouvez le simuler et le vérifier comme d’habitude.
 4. Cliquez sur **Vérifier l’exercice** autant de fois que vous voulez. Chaque vérification s’affiche en vert ou en rouge, avec ce qui ne va pas. Si vous bloquez, ouvrez un **indice** (si le professeur en propose) : ils s’affichent un par un et sont comptés ; s’il y a une note, chacun peut retirer des points.

@@ -53,6 +53,9 @@ const linked = (from, to) => Boolean(from && to) && all('.react-flow__edge').som
 const slowStep = () => steps().find((n) => n.textContent.includes('Motor_lento'))
 const newParo = () => transitionsMatching(/^Paro$/).find((n) => linked(slowStep(), n))
 
+// Para los ejercicios guiados (lib/guidedExercises.js), que siguen el mismo patrón.
+export const tourHelpers = { all, one, steps, transitions, transitionWith, transitionsMatching, transitionMatching, stepActive, simulating, verified, firstOf, panel, plusBelow, plusAction, loopButton, stepNode, transitionNode, emptyTransition, linked }
+
 export const TUTORIALS = [
   {
     id: 'primer-grafcet',

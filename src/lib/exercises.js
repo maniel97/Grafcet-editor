@@ -6,6 +6,7 @@ import { EXAMPLES } from './examples'
 import { normalizeProject } from './projectFile'
 import { DEFAULT_EXERCISE, studentProject } from './exercise'
 import { buildPneumatic, parseSequence } from './pneumatic'
+import { BANK } from './exerciseBank'
 
 const fromExample = (id) => normalizeProject(EXAMPLES.find((e) => e.id === id).build())
 // Escenario de prueba: pulsar Marcha medio segundo y dejar que la máquina haga un ciclo.
@@ -30,7 +31,7 @@ export const EXERCISES = [
       prepare(fromExample('marcha-paro'), {
         title: 'Marcha y paro de un motor',
         statement:
-          'Un motor se pone en marcha al pulsar **Marcha** y se para al pulsar **Paro**.\n\n- Mientras está en marcha se enciende el **Piloto**.\n- **Paro** es un pulsador normalmente cerrado (NC): sin pulsar da 1.\n- Usa las variables de la tabla.',
+          'Un motor (**Motor**) se pone en marcha al pulsar **Marcha** y se para al pulsar **Paro**.\n\n- Mientras está en marcha se enciende el **Piloto**.\n- **Paro** es un pulsador normalmente cerrado (NC): sin pulsar da 1.\n- Usa las variables de la tabla.',
         checks: { warnings: false, sequence: '', scenario: '', behaviour: behaviour('marcha-paro'), requirements: [{ id: 'maxSteps', value: 3 }] },
         hints: { enabled: true, items: ['Necesitas dos etapas: una de reposo (la inicial) y otra con el motor en marcha.', 'En la etapa de marcha van dos acciones continuas: `Motor` y `Piloto`.', '**Paro** es NC: sin pulsar da 1. Para que la transición se cumpla al pulsarlo, escribe `!Paro`.'] },
       }, [marchaParo]),
@@ -46,7 +47,7 @@ export const EXERCISES = [
         {
           title: 'Cilindros A+ B+ A− B−',
           statement:
-            'Dos cilindros de doble efecto, A y B, con sus finales de carrera (a0, a1, b0, b1). Al pulsar **Marcha**, con los dos dentro, hacen la secuencia **A+ B+ A− B−**: cada movimiento empieza cuando el anterior llega a su final de carrera.\n\n- La planta y la tabla de variables están hechas: no se pueden cambiar.\n- Pruébalo en la simulación antes de comprobar.',
+            'Dos cilindros de doble efecto, A y B, con sus finales de carrera (a0, a1, b0, b1). Al pulsar **Marcha**, con los dos dentro, hacen la secuencia **A+ B+ A− B−** (salidas **A+**, **B+**, **A-**, **B-**): cada movimiento empieza cuando el anterior llega a su final de carrera.\n\n- La planta y la tabla de variables están hechas: no se pueden cambiar.\n- Pruébalo en la simulación antes de comprobar.',
           checks: { warnings: false, sequence: 'A+ B+ A- B-', scenario: 'prueba', behaviour: behaviour('prueba') },
           hints: { enabled: true, items: ['Una etapa por movimiento (A+, B+, A−, B−) y la inicial de reposo.', 'Cada transición espera el final de carrera del movimiento anterior: a1, b1, a0 y b0.', 'La primera transición es `Marcha · a0 · b0`: solo arranca con los dos cilindros dentro.'] },
         },
@@ -65,7 +66,7 @@ export const EXERCISES = [
         {
           title: 'Secuencia A+ B+ B− A−',
           statement:
-            'Dos cilindros de doble efecto, A y B, con sus finales de carrera. Al pulsar **Marcha**, con los dos dentro, hacen **A+ B+ B− A−**.\n\n- Una etapa por movimiento; cada transición espera al final de carrera del movimiento anterior.\n- Al acabar, el grafcet vuelve a su etapa inicial.',
+            'Dos cilindros de doble efecto, A y B, con sus finales de carrera. Al pulsar **Marcha**, con los dos dentro, hacen **A+ B+ B− A−** (salidas **A+**, **B+**, **B-**, **A-**).\n\n- Una etapa por movimiento; cada transición espera al final de carrera del movimiento anterior.\n- Al acabar, el grafcet vuelve a su etapa inicial.',
           checks: { warnings: false, sequence: 'A+ B+ B- A-', scenario: 'prueba', behaviour: behaviour('prueba') },
           hints: { enabled: true, items: ['Una etapa por movimiento y la inicial de reposo: cinco etapas en total.', 'El orden de los finales de carrera es a1, b1, b0 y a0.'] },
         },
@@ -73,7 +74,8 @@ export const EXERCISES = [
       )
     },
   },
-]
+  ...BANK,
+].sort((a, b) => a.level - b.level) // por niveles (estable: dentro de cada uno, en este orden)
 
 // Lo que recibe el alumnado al abrir un ejercicio de ejemplo.
 export const exerciseForStudent = (exercise) => studentProject(exercise.teacher())
