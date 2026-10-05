@@ -392,3 +392,17 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .tour-ring, .tour-done, .tour-check { animation: none; }
 }
+
+/* Planta en pantallas táctiles y pizarras digitales (puntero «grueso»): botones, desplegables y
+   elementos de la paleta con el tamaño mínimo cómodo para un dedo. Con ratón no cambia nada. */
+@media (pointer: coarse) {
+  .scene-touch button,
+  .scene-touch select,
+  .scene-touch [role='radio'] {
+    min-height: 40px;
+    min-width: 40px;
+  }
+  .scene-touch nav button {
+    padding-block: 8px;
+  }
+}

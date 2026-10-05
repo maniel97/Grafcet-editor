@@ -33,6 +33,10 @@ import { exportGroups, importGroups, loadGroups, makeGroup, placeGroup, storeGro
 import { downloadFile } from '../lib/projectFile'
 import { N_, t as tr } from '../lib/i18n'
 import { maxPanelWidth } from './panelWidth'
+import { applyResize, resizeHandles, resizeMeasure } from '../lib/sim/sceneHandles'
+
+// Pantalla táctil o pizarra digital (puntero «grueso»): tiradores y botones más grandes.
+const coarsePointer = () => typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches
 
 const W = 1200
 const H = 800
@@ -1915,6 +1919,79 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
     operate(e, 'up')
   }
 
+  // Pantalla táctil: dos dedos pellizcan (zoom) y arrastran (desplazar) a la vez. Con un dedo, lo
+  // de siempre: arrastrar el fondo desplaza y arrastrar un elemento lo mueve.
+  const touches = useRef(new Map())
+  const pinch = useRef(null)
+  const pinchInfo = () => {
+    const [a, b] = [...touches.current.values()]
+    return { dist: Math.hypot(a.x - b.x, a.y - b.y) || 1, mid: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 } }
+  }
+  const pinchDown = (ev) => {
+    if (ev.pointerType !== 'touch') return false
+    touches.current.set(ev.pointerId, { x: ev.clientX, y: ev.clientY })
+    if (touches.current.size !== 2) return false
+    // Segundo dedo: se deja lo que hiciera el primero y empieza el gesto.
+    const el = scrollRef.current
+    const rect = el.getBoundingClientRect()
+    const { dist, mid } = pinchInfo()
+    pinch.current = { dist, zoom: zoomRef.current, sx: (el.scrollLeft + mid.x - rect.left) / zoomRef.current, sy: (el.scrollTop + mid.y - rect.top) / zoomRef.current }
+    setPanning(null)
+    setDrag(null)
+    setMarquee(null)
+    setResize(null)
+    ev.stopPropagation()
+    return true
+  }
+  const pinchMove = (ev) => {
+    if (ev.pointerType !== 'touch' || !touches.current.has(ev.pointerId)) return false
+    touches.current.set(ev.pointerId, { x: ev.clientX, y: ev.clientY })
+    if (!pinch.current || touches.current.size < 2) return false
+    ev.stopPropagation()
+    const el = scrollRef.current
+    const rect = el.getBoundingClientRect()
+    const { dist, mid } = pinchInfo()
+    const next = Math.round(Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, (pinch.current.zoom * dist) / pinch.current.dist)) * 100) / 100
+    // El punto de la escena que estaba entre los dedos sigue entre los dedos.
+    pendingScroll.current = { left: pinch.current.sx * next - (mid.x - rect.left), top: pinch.current.sy * next - (mid.y - rect.top) }
+    zoomRef.current = next
+    setZoom(next)
+    if (next === zoom) {
+      el.scrollLeft = pendingScroll.current.left
+      el.scrollTop = pendingScroll.current.top
+    }
+    return true
+  }
+  const pinchUp = (ev) => {
+    if (ev.pointerType !== 'touch') return
+    touches.current.delete(ev.pointerId)
+    if (touches.current.size < 2) pinch.current = null
+  }
+
+  // Tiradores (modo Editar, un elemento seleccionado): arrastrar cambia su medida (lib/sim/
+  // sceneHandles.js). Se ve la medida mientras tanto; al soltar se guarda (un paso de deshacer).
+  // Un cilindro montado en otro se dibuja donde está ahora: de él solo cambia la carrera.
+  const [resize, setResize] = useState(null) // { id, handle, preview }
+  const startResize = (ev, original, handle) => {
+    ev.stopPropagation()
+    ev.preventDefault()
+    ev.currentTarget.setPointerCapture?.(ev.pointerId)
+    setResize({ id: original.id, handle, preview: original })
+  }
+  const moveResize = (ev, drawn) => {
+    if (!resize) return
+    const original = elements.find((x) => x.id === resize.id)
+    const next = applyResize(drawn, resize.handle, toScene(ev), { keepRatio: ev.shiftKey })
+    const preview = drawn.type === 'cylinder' ? { ...original, stroke: next.stroke } : next
+    setResize({ ...resize, preview })
+  }
+  const endResize = () => {
+    if (!resize) return
+    const original = elements.find((x) => x.id === resize.id)
+    if (original && JSON.stringify(original) !== JSON.stringify(resize.preview)) save(elements.map((x) => (x.id === resize.id ? resize.preview : x)))
+    setResize(null)
+  }
+
   // Potenciómetro: la posición del ratón respecto al mando (de −30 a +30 px) es el valor.
   const [knobDrag, setKnobDrag] = useState(null)
   const turnKnob = (ev, e) => onAction(e.id, `set:${Math.min(1, Math.max(0, (toScene(ev).x - e.x + 30) / 60))}`)
@@ -1995,7 +2072,7 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
     }
   }
 
-  const shown = elements.map((e) => (drag?.ids.includes(e.id) ? { ...e, x: e.x + drag.dx, y: e.y + drag.dy } : e))
+  const shown = elements.map((e) => (drag?.ids.includes(e.id) ? { ...e, x: e.x + drag.dx, y: e.y + drag.dy } : resize?.id === e.id ? resize.preview : e))
   // Los cilindros montados en el vástago de otro, donde están ahora.
   const machine = shown.filter((e) => !isDesk(e)).map((e) => (e.type === 'cylinder' ? placed(scene ?? { elements: [] }, state, e) : e))
   const labelled = (e) => !(e.type === 'label' || ((e.type === 'image' || e.type === 'pipe') && !e.text))
@@ -2016,7 +2093,7 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
       ref={sectionRef}
       tabIndex={-1}
       onKeyDown={onKeyDown}
-      className={`side-panel @container flex outline-none min-w-0 flex-col border-l border-slate-200 bg-white ${maximized ? 'absolute inset-y-0 left-0 right-80 z-20' : 'relative'}`}
+      className={`scene-touch side-panel @container flex outline-none min-w-0 flex-col border-l border-slate-200 bg-white ${maximized ? 'absolute inset-y-0 left-0 right-80 z-20' : 'relative'}`}
       style={maximized ? undefined : { width: width ?? '50%', flexShrink: 1, minWidth: MIN_WIDTH }}
     >
       {/* Separador: arrastrar para repartir el espacio entre el grafcet y la planta. */}
@@ -2285,7 +2362,10 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
           className={`paper min-h-0 min-w-0 flex-1 overflow-auto ${panning ? 'cursor-grabbing' : 'cursor-grab'}`}
           // Rueda pulsada y arrastrar: desplazar la vista (como en el lienzo del grafcet), también
           // empezando encima de un elemento. Con el botón izquierdo, desde el fondo (onBackgroundDown).
+          style={{ touchAction: 'none' }}
+          onPointerCancelCapture={pinchUp}
           onPointerDownCapture={(ev) => {
+            if (pinchDown(ev)) return
             if (ev.button !== 1) return
             ev.preventDefault()
             ev.stopPropagation()
@@ -2294,12 +2374,14 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
             setPanning({ x: ev.clientX, y: ev.clientY, left: el.scrollLeft, top: el.scrollTop })
           }}
           onPointerMoveCapture={(ev) => {
+            if (pinchMove(ev)) return
             if (!panning) return
             ev.stopPropagation()
             scrollRef.current.scrollLeft = panning.left - (ev.clientX - panning.x)
             scrollRef.current.scrollTop = panning.top - (ev.clientY - panning.y)
           }}
           onPointerUpCapture={(ev) => {
+            pinchUp(ev)
             if (!panning) return
             ev.stopPropagation()
             setPanning(null)
@@ -2396,6 +2478,52 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
                   <rect key={`sel-${e.id}`} data-selected={e.id} x={b.x - 4} y={b.y - 4} width={b.w + 8} height={b.h + 8} fill="none" stroke="#3b82f6" strokeDasharray="4 3" pointerEvents="none" />
                 )
               })}
+            {mode === 'edit' &&
+              selection.length === 1 &&
+              !drag &&
+              (() => {
+                const drawn = machine.find((e) => e.id === selection[0])
+                const handles = drawn ? resizeHandles(drawn) : []
+                if (!handles.length) return null
+                const coarse = coarsePointer()
+                const r = (coarse ? 11 : 6) / zoom // tamaño constante en pantalla
+                const hit = (coarse ? 24 : 11) / zoom
+                const active = resize && handles.find((h) => h.id === resize.handle)
+                return (
+                  <g data-handles={drawn.id}>
+                    {handles.map((h) => (
+                      <g
+                        key={h.id}
+                        data-handle={h.id}
+                        style={{ cursor: h.cursor, touchAction: 'none' }}
+                        onPointerDown={(ev) => startResize(ev, elements.find((x) => x.id === drawn.id), h.id)}
+                        onPointerMove={(ev) => moveResize(ev, drawn)}
+                        onPointerUp={endResize}
+                        onPointerCancel={endResize}
+                      >
+                        <circle cx={h.x} cy={h.y} r={hit} fill="transparent" />
+                        <rect x={h.x - r} y={h.y - r} width={2 * r} height={2 * r} rx={r * 0.3} fill="white" stroke="#2563eb" strokeWidth={2 / zoom} />
+                      </g>
+                    ))}
+                    {active && (
+                      <text
+                        x={active.x + 14 / zoom}
+                        y={active.y - 12 / zoom}
+                        fontSize={13 / zoom}
+                        fontWeight="600"
+                        fill="#1d4ed8"
+                        stroke="white"
+                        strokeWidth={4 / zoom}
+                        paintOrder="stroke"
+                        pointerEvents="none"
+                        data-measure=""
+                      >
+                        {resizeMeasure(drawn)}
+                      </text>
+                    )}
+                  </g>
+                )
+              })()}
             {marquee && (
               <rect
                 x={Math.min(marquee.x0, marquee.x1)}
@@ -2555,7 +2683,7 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
       {mode === 'edit' && (
         <p className="border-t border-slate-200 px-2 py-1 text-[11px] text-slate-500">
           {tr(
-            'Arrastra módulos a la escena o al panel · rueda: zoom · arrastrar el fondo (o con la rueda pulsada): desplazar · Ctrl+clic o Mayús+arrastrar: varios · R gira · Supr borra · Ctrl+C/V/D copia, pega, duplica · deshacer y rehacer: los de siempre · asigna las variables en el panel de la derecha. Piezas de {pequena} y {grande} px.',
+            'Arrastra módulos a la escena o al panel · los cuadraditos de un elemento seleccionado cambian su medida (con Mayús, en proporción) · rueda o dos dedos: zoom · arrastrar el fondo (o con la rueda pulsada): desplazar · Ctrl+clic o Mayús+arrastrar: varios · R gira · Supr borra · Ctrl+C/V/D copia, pega, duplica · deshacer y rehacer: los de siempre · asigna las variables en el panel de la derecha. Piezas de {pequena} y {grande} px.',
             { pequena: PIECE_SIZES.small[0], grande: PIECE_SIZES.large[0] },
           )}
         </p>
