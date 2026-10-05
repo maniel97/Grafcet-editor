@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { BookOpen, ChevronRight, Compass, Home, Info, Keyboard, Search, Shapes, X } from 'lucide-react'
-import { AUTHOR, LICENSE_NAME, LICENSE_URL, REPO_URL, SITE_URL, YEAR } from '../lib/about'
+import { AUTHOR, ISSUES_URL, LICENSE_NAME, LICENSE_URL, PRERELEASE, REPO_URL, SITE_URL, VERSION, YEAR } from '../lib/about'
 import { SHORTCUTS } from '../lib/shortcuts'
 import { N_, t } from '../lib/i18n'
 import Markdown from '../help/Markdown'
@@ -109,7 +109,10 @@ function About() {
         <h3 className="text-lg font-semibold">Grafcet Editor</h3>
         <p className="text-slate-600">
           {t('Editor y simulador de grafcet (IEC 60848) para la enseñanza de automatismos.')}
-          {build && ` ${t('Versión del {fecha}.', { fecha: build })}`}
+        </p>
+        <p className="text-slate-600" data-version={VERSION}>
+          {t('Versión {version}', { version: VERSION })}
+          {build && ` · ${t('compilación del {fecha}', { fecha: build })}`}
         </p>
         <p className="mt-1">
           <a href={SITE_URL} className={link} target="_blank" rel="noreferrer">
@@ -125,6 +128,19 @@ function About() {
           )}
         </p>
       </div>
+      {PRERELEASE && (
+        <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2" data-prerelease={PRERELEASE}>
+          <h4 className="font-semibold text-amber-900">{PRERELEASE === 'alpha' ? t('Estado: alfa (en pruebas)') : t('Estado: beta (en pruebas)')}</h4>
+          <p className="text-amber-900">
+            {t('Es una versión de prueba: puede tener fallos y algunas cosas pueden cambiar. Descarga tus proyectos (Guardar, archivo .json) en vez de fiarte solo de lo que guarda el navegador.')}{' '}
+            {REPO_URL && (
+              <a href={ISSUES_URL} className={link} target="_blank" rel="noreferrer">
+                {t('Avisar de un fallo')}
+              </a>
+            )}
+          </p>
+        </div>
+      )}
       <div>
         <h4 className="font-semibold">{t('Software libre')}</h4>
         <p className="text-slate-600">

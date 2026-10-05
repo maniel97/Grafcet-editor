@@ -294,6 +294,10 @@ test('ayuda: «Acerca de» con licencia, autoría y aviso de IA', async ({ page 
   await help.getByRole('navigation', { name: 'Secciones de la ayuda' }).getByRole('button', { name: 'Acerca de' }).click()
   const about = help.locator('[data-about]')
   await expect(about).toContainText('© 2026 Maniel Montes')
+  // Versión de package.json y aviso de versión de prueba con enlace para avisar de fallos.
+  await expect(about.locator('[data-version]')).toContainText('Versión 0.1.0-alpha.1')
+  await expect(about.locator('[data-prerelease]')).toContainText('Estado: alfa')
+  await expect(about.getByRole('link', { name: 'Avisar de un fallo' })).toHaveAttribute('href', 'https://github.com/maniel97/Grafcet-editor/issues')
   await expect(about).toContainText('GPL-3.0')
   await expect(about).toContainText('vibe coding')
   await expect(about).toContainText('no se envían a ningún servidor')

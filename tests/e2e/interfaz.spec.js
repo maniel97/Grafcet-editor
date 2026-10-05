@@ -50,7 +50,8 @@ for (const width of [1500, 1280, 1100]) {
 test('encuadre: todo lo dibujado visible al cargar y con el botón', async ({ page }) => {
   await page.setViewportSize({ width: 1200, height: 750 })
   const errors = await openEditor(page, 'encuadre-y-tabla.json')
-  await expect.poll(() => overflow(page)).toBe(null)
+  // Con margen: con toda la batería en marcha, el primer encuadre a veces tarda más de 5 s.
+  await expect.poll(() => overflow(page), { timeout: 15000 }).toBe(null)
   for (let i = 0; i < 3; i++) await page.getByRole('button', { name: 'Acercar', exact: true }).click()
   await expect.poll(() => overflow(page)).not.toBe(null)
   await page.getByRole('button', { name: 'Encuadrar todo el diagrama' }).click()

@@ -1,5 +1,9 @@
 # Grafcet Editor
 
+> ⚠️ **Versión alfa (0.1.0-alpha.1): en pruebas.** Puede tener fallos y algunas cosas pueden cambiar.
+> Guarda tus proyectos descargándolos (archivo `.json`). Los fallos, en
+> [Issues](https://github.com/maniel97/Grafcet-editor/issues).
+
 **Editor y simulador de grafcet (IEC 60848) para la enseñanza de automatismos.**
 Se usa en el navegador, sin instalar nada: **<https://grafcet-editor.com>** ·
 código: <https://github.com/maniel97/Grafcet-editor>
