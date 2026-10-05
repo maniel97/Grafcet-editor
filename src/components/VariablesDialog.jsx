@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Download, Pencil, Plus, Trash2, WandSparkles, X } from 'lucide-react'
+import { Download, Pencil, Trash2, WandSparkles, X } from 'lucide-react'
 import { SCHEMES, VARIABLE_TYPES, duplicatedAddresses, typeInfo } from '../lib/addressing'
 import { STEP_PREFIXES, resolveStepPrefix, setPreferredStepPrefix, stepVar } from '../lib/stepNames'
 import S7200Config from './S7200Config'
@@ -398,18 +398,22 @@ export default function VariablesDialog({
               </table>
             )}
             {/* Variables previstas que aún no se usan en el diagrama (se renombran en la tabla del lienzo). */}
-            <div className="mt-3 flex flex-wrap items-center gap-1 text-sm">
-              <span className="mr-1 text-xs text-slate-500">{t('Añadir:')}</span>
-              {VARIABLE_TYPES.map((x) => (
-                <button
-                  key={x.id}
-                  type="button"
-                  onClick={() => onAddVariable(x.id)}
-                  className="flex items-center gap-1 rounded-full border border-slate-300 px-2.5 py-0.5 text-xs hover:border-blue-400 hover:bg-blue-50"
-                >
-                  <Plus size={12} /> {t(t.label)}
-                </button>
-              ))}
+            {/* Un desplegable compacto: se elige el tipo y se añade (y vuelve a «Añadir variable…»). */}
+            <div className="mt-3 text-sm">
+              <select
+                value=""
+                onChange={(e) => e.target.value && onAddVariable(e.target.value)}
+                aria-label={t('Añadir variable')}
+                title={t('Añade a la tabla una variable prevista, aunque aún no se use en el grafcet')}
+                className="rounded border border-slate-300 bg-white px-2 py-1 text-xs hover:border-blue-400"
+              >
+                <option value="">{t('＋ Añadir variable…')}</option>
+                {VARIABLE_TYPES.map((x) => (
+                  <option key={x.id} value={x.id}>
+                    {`${t(x.label)} (${plc.scheme === 'iec' && ['I', 'Q', 'M'].includes(x.area) ? `%${x.area}X` : x.area})`}
+                  </option>
+                ))}
+              </select>
             </div>
           </>
         )}

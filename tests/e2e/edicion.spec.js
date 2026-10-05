@@ -146,3 +146,23 @@ test('el + de acción abre el panel listo para escribir', async ({ page }) => {
   await expect(page.locator('.react-flow__node-step').first()).toContainText('Motor')
   expectNoErrors(errors)
 })
+
+// Añadir variables previstas desde la tabla: un desplegable con el nombre de cada tipo (antes eran
+// botones con solo un «+», sin texto) que vuelve a «Añadir variable…» tras añadir.
+test('tabla de variables: añadir una variable prevista desde el desplegable', async ({ page }) => {
+  const errors = await openEditor(page)
+  await openExample(page, /^Marcha y paro de un motor/)
+  await page.getByTitle(/Tabla de variables: direcciones/).click()
+  const dialog = page.getByRole('dialog', { name: 'Tabla de variables' })
+  await dialog.getByRole('tab', { name: /^Variables/ }).click()
+  const add = dialog.getByRole('combobox', { name: 'Añadir variable' })
+  await expect(add.locator('option')).toHaveText(['＋ Añadir variable…', 'Entrada (I)', 'Salida (Q)', 'Marca (M)', 'Temporizador (T)', 'Contador (C)', 'Entrada analógica (AI)', 'Salida analógica (AQ)'])
+  const rows = await dialog.locator('tbody tr').count()
+  await add.selectOption('output')
+  await expect(dialog.locator('tbody tr')).toHaveCount(rows + 1)
+  await expect(add).toHaveValue('')
+  // El foco se queda en el diálogo (no salta a la tabla del lienzo a renombrar).
+  await expect(page.locator('.react-flow input:focus')).toHaveCount(0)
+  await page.screenshot({ path: process.env.SHOT ?? 'test-results/vars.png' })
+  expectNoErrors(errors)
+})

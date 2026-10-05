@@ -987,7 +987,7 @@ export default function GrafcetCanvas() {
               onExportCsv={exportCsv}
               tableShown={tableShown}
               onToggleTable={() => toggleTable()}
-              onAddVariable={(type) => plcTable.addVariable(type, { reveal: false })}
+              onAddVariable={(type) => plcTable.addVariable(type, { reveal: false, rename: false })}
               onRenameVariable={renameVar}
               onClose={() => setVariablesOpen(false)}
             />

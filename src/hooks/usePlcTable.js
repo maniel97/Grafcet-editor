@@ -99,11 +99,13 @@ export function usePlcTable({ nodes, plc, setPlc, plcRef, takeSnapshot, onOpenDi
       stepNodes,
       changePlc,
       lastAdded,
-      // reveal: si la tabla no está en el lienzo, se muestra para ver la variable nueva.
-      addVariable: (type, { reveal = true } = {}) => {
+      // reveal: si la tabla no está en el lienzo, se muestra para ver la variable nueva; rename: su
+      // nombre queda en edición en la tabla del lienzo (no al añadirla desde el diálogo, que perdería
+      // el foco).
+      addVariable: (type, { reveal = true, rename = true } = {}) => {
         const { plc: next, name } = addVariable(plcRef.current, type, stepNodes, symbols)
         changePlc(next)
-        setLastAdded(name)
+        if (rename) setLastAdded(name)
         if (reveal && !getNode(VARIABLES_TABLE_ID)) toggleTable()
       },
       // Devuelve false si el nombre no es válido o ya existe.

@@ -1069,8 +1069,8 @@ test('esquema eléctrico: electroneumática (5/2 monoestable, cilindro, regulado
   await page.getByRole('button', { name: /Simular/ }).click()
   const cylinder = view.locator('[data-elec="pcylinder"][data-tag="A"]')
   await expect(cylinder).toHaveAttribute('data-pos', '0')
-  const s1 = await view.locator('[data-elec="pushbutton"][data-tag="S1"]').boundingBox()
-  await page.mouse.move(s1.x + s1.width / 2, s1.y + s1.height / 2)
+  // hover espera a que el pulsador esté quieto (la vista se recoloca tras «Pantalla completa»).
+  await view.locator('[data-elec="pushbutton"][data-tag="S1"]').hover()
   await page.mouse.down()
   // Con margen: con la batería entera en marcha, el equipo va cargado y la simulación tarda más.
   await expect(view.locator('[data-elec="pvalve"]')).toHaveAttribute('data-on', '1', { timeout: 15000 })
@@ -1285,8 +1285,7 @@ test('esquema eléctrico: prensa electrohidráulica (4/3 en tándem, manómetro 
   const cylinder = view.locator('[data-elec="hcylinder"]')
   // El rótulo es «0Z1» y debajo la lectura: «0Z1» + «0 bar».
   await expect(gauge).toContainText(/0Z10 bar$/)
-  const b = await view.locator('[data-elec="pushbutton"][data-tag="S1"]').boundingBox()
-  await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2)
+  await view.locator('[data-elec="pushbutton"][data-tag="S1"]').hover()
   await page.mouse.down()
   await expect(view.locator('[data-elec="hvalve"]')).toHaveAttribute('data-on', '1')
   await expect(gauge).toContainText('30 bar') // presión de trabajo al bajar
