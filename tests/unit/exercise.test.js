@@ -94,3 +94,28 @@ describe('ejercicios de ejemplo', async () => {
     })
   }
 })
+
+describe('comportamiento en los ejercicios (fase 2)', async () => {
+  const { EXERCISES } = await import('../../src/lib/exercises')
+  const marchaParo = EXERCISES.find((e) => e.id === 'ej-marcha-paro')
+
+  it('la solución pasa la prueba de comportamiento', () => {
+    expect(runChecks(marchaParo.teacher()).find((r) => r.id === 'comportamiento-0')).toMatchObject({ ok: true })
+  })
+
+  it('error típico: «Paro» en vez de «!Paro» (el pulsador es NC): el motor ni llega a encenderse', () => {
+    const teacher = marchaParo.teacher()
+    const student = studentProject(teacher)
+    const grafcet = teacher.nodes.filter((n) => n.type !== 'note' && n.id !== 'variables-table')
+    const wrong = grafcet.map((n) => (n.type === 'transition' && n.data.condition === '!Paro' ? { ...n, data: { ...n.data, condition: 'Paro' } } : n))
+    const result = runChecks({ ...student, nodes: [...student.nodes, ...wrong], edges: teacher.edges }).find((r) => r.id === 'comportamiento-0')
+    expect(result.ok).toBe(false)
+    // Entra y sale de la etapa 1 en el mismo instante (evolución fugaz): el motor no se enciende.
+    expect(result.detail).toMatch(/^Motor: debería encenderse hacia 0,\d s y no se enciende/)
+    expect(result.scenario.name).toBe('Marcha y Paro') // para verlo en la simulación
+  })
+
+  it('el alumno no ve lo esperado en claro', () => {
+    expect(JSON.stringify(studentProject(marchaParo.teacher()))).not.toContain('"times"')
+  })
+})

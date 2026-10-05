@@ -11,13 +11,16 @@
 //   norma      Verificar sin errores (y, si el profesor lo pide, sin avisos)
 //   variables  con la tabla dada: solo se usan variables de la tabla (detecta erratas)
 //   secuencia  con planta y escenario de prueba: los cilindros hacen la secuencia esperada
+//   comportamiento (fase 2) con cada escenario elegido: las salidas cambian cuando en la solución
+//              del profesor (con un margen de tiempo) y llegan las mismas piezas a cada recogida
 import { N_, t } from './i18n'
 import { validateGrafcet } from './validation'
 import { buildPlcModel } from './plcModel'
 import { extractSymbols } from './symbols'
 import { parseSequence } from './pneumatic'
 import { compareSpacePhase, theoreticalSpacePhase } from './sim/spacePhase'
-import { scenarioMotion } from './sim/scenarioMotion'
+import { runScenarioWorld, scenarioMotion } from './sim/scenarioMotion'
+import { DEFAULT_TOLERANCE, compareBehaviour, expectedFrom } from './behaviour'
 
 const TABLE_ID = 'variables-table' // nodes/VARIABLES_TABLE_ID
 // Partes del proyecto del profesor que no viajan al alumnado: revelan la solución (la secuencia
@@ -36,12 +39,12 @@ export const DEFAULT_EXERCISE = {
   title: '',
   statement: '',
   parts: { plant: 'locked', variables: 'locked', electrical: 'given' },
-  checks: { warnings: false, sequence: '', scenario: '' },
+  checks: { warnings: false, sequence: '', scenario: '', behaviour: { scenarios: [], outputs: [], tolerance: DEFAULT_TOLERANCE, counts: true } },
   hints: { enabled: true, items: [] },
   processData: false,
 }
 
-export const exerciseConfig = (plc) => (plc?.exercise ? { ...DEFAULT_EXERCISE, ...plc.exercise, parts: { ...DEFAULT_EXERCISE.parts, ...plc.exercise.parts }, checks: { ...DEFAULT_EXERCISE.checks, ...plc.exercise.checks }, hints: { ...DEFAULT_EXERCISE.hints, ...plc.exercise.hints } } : null)
+export const exerciseConfig = (plc) => (plc?.exercise ? { ...DEFAULT_EXERCISE, ...plc.exercise, parts: { ...DEFAULT_EXERCISE.parts, ...plc.exercise.parts }, checks: { ...DEFAULT_EXERCISE.checks, ...plc.exercise.checks, behaviour: { ...DEFAULT_EXERCISE.checks.behaviour, ...plc.exercise.checks?.behaviour } }, hints: { ...DEFAULT_EXERCISE.hints, ...plc.exercise.hints } } : null)
 export const isStudent = (plc) => Boolean(plc?.exercise?.student)
 export const partMode = (plc, part) => plc?.exercise?.parts?.[part] ?? (plc?.exercise ? DEFAULT_EXERCISE.parts[part] : 'given')
 export const isLocked = (plc, part) => isStudent(plc) && partMode(plc, part) === 'locked'
@@ -66,6 +69,19 @@ export function unseal(text) {
 }
 
 // Lo que el corrector necesita, sacado de la solución del profesor (va sellado al alumno).
+// Pruebas de comportamiento: la solución del profesor con cada escenario elegido -> lo esperado.
+function behaviourFrom(project, behaviour) {
+  const scenarios = (project.plc.scenarios ?? []).filter((s) => behaviour?.scenarios?.includes(s.id))
+  if (!scenarios.length) return []
+  const model = buildPlcModel(project.nodes, project.edges, project.plc)
+  const sinks = behaviour.counts ? Object.fromEntries((project.plc.scene?.elements ?? []).filter((e) => e.type === 'sink').map((e) => [e.id, e.text || e.id])) : {}
+  return scenarios.map((scenario) => ({
+    scenario,
+    tolerance: Number(behaviour.tolerance) || DEFAULT_TOLERANCE,
+    expected: expectedFrom(runScenarioWorld(project.plc, model, scenario), behaviour.outputs, sinks),
+  }))
+}
+
 function checksFrom(project, config) {
   const scenario = (project.plc.scenarios ?? []).find((s) => s.id === config.checks.scenario) ?? null
   return {
@@ -74,6 +90,7 @@ function checksFrom(project, config) {
     scenario,
     // La tabla dada, para detectar variables que no están en ella.
     tableNames: config.parts.variables === 'none' ? null : Object.keys(project.plc.variables ?? {}),
+    behaviour: behaviourFrom(project, config.checks.behaviour),
   }
 }
 
@@ -183,6 +200,26 @@ export function runChecks(project) {
             ),
       )
     }
+  }
+  // 5. Comportamiento con cada escenario de prueba.
+  if (checks.behaviour?.length) {
+    const model = buildPlcModel(nodes, edges, plc)
+    checks.behaviour.forEach((test, i) => {
+      const title = t('Con «{escenario}», la máquina responde como debe', { escenario: test.scenario.name })
+      let result
+      try {
+        result = compareBehaviour(test.expected, runScenarioWorld(plc, model, test.scenario), test.tolerance)
+      } catch {
+        result = { ok: false, problems: [{ text: t('El grafcet no se puede simular: revisa lo que marca Verificar.') }] }
+      }
+      const more = result.problems.length - 1
+      results.push({
+        ...(result.ok
+          ? ok(`comportamiento-${i}`, title)
+          : fail(`comportamiento-${i}`, title, more > 0 ? t('{problema} (y {n} diferencias más)', { problema: result.problems[0].text, n: more }) : result.problems[0].text)),
+        scenario: test.scenario, // para verlo en la simulación
+      })
+    })
   }
   return results
 }

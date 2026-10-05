@@ -17,11 +17,12 @@ Um **exercício** traz um enunciado e o que o professor dá já feito (a planta,
 - Que cumpre a norma: Verificar sem erros.
 - Com a tabela de variáveis dada, que só usa as suas variáveis.
 - Nos exercícios com planta, que a máquina faz a sequência pedida com o cenário de teste do professor.
+- Com cada cenário de teste, que a máquina responde como a do professor: as saídas ligam-se e desligam-se nos mesmos momentos (com uma margem de tempo) e chegam as mesmas peças. Se algo falhar, **Ver na simulação** reproduz esse cenário para que veja onde.
 
 ## Para os professores
 
 1. Resolva o exercício no editor: essa é a sua solução e não se distribui.
-2. Se quiser verificar a sequência dos cilindros, grave na simulação um cenário de teste (por exemplo, carregar em Marcha e esperar um ciclo).
+2. Prepare os cenários de teste: grave-os na simulação (por exemplo, carregar em Marcha e esperar um ciclo) ou clique em **Desenhar cenário** e arraste na linha de cada entrada para decidir quando se prime; em baixo vê ao vivo o que faz o seu grafcet.
 3. Exportar > **Exercício para os alunos**: escreva o enunciado, escolha o que se dá feito (e se vai bloqueado) e o que se verifica. Clique em **Testar**: com a sua solução, tudo deve ficar a verde.
 4. **Guardar e descarregar para os alunos** cria o ficheiro a distribuir, sem o seu grafcet.
 

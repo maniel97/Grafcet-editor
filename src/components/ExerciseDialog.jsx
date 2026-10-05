@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { CircleCheck, CircleX, GraduationCap, X } from 'lucide-react'
 import { N_, t } from '../lib/i18n'
 import { DEFAULT_EXERCISE, PART_MODES, exerciseConfig, runChecks } from '../lib/exercise'
+import { buildPlcModel } from '../lib/plcModel'
 
 const PARTS = [
   ['plant', N_('Planta virtual')],
@@ -23,6 +24,19 @@ export default function ExerciseDialog({ plc, getProject, onSave, onExportStuden
   const set = (patch) => setDraft((d) => ({ ...d, ...patch }))
   const scenarios = plc.scenarios ?? []
   const hasCylinders = (plc.scene?.elements ?? []).some((e) => e.type === 'cylinder')
+  const hasSinks = (plc.scene?.elements ?? []).some((e) => e.type === 'sink')
+  // Salidas del proyecto (para elegir cuáles cuentan en las pruebas de comportamiento).
+  const outputs = (() => {
+    try {
+      const { nodes, edges } = getProject()
+      return buildPlcModel(nodes, edges, plc).variables.filter((v) => v.type === 'output').map((v) => v.name)
+    } catch {
+      return []
+    }
+  })()
+  const behaviour = draft.checks.behaviour ?? DEFAULT_EXERCISE.checks.behaviour
+  const setBehaviour = (patch) => set({ checks: { ...draft.checks, behaviour: { ...behaviour, ...patch } } })
+  const toggle = (list, item) => (list.includes(item) ? list.filter((x) => x !== item) : [...list, item])
   const store = () => onSave({ ...draft, student: undefined })
   // Probar con la solución del profesor (el proyecto abierto) y lo que hay ahora en el diálogo.
   const test = () => {
@@ -128,8 +142,53 @@ export default function ExerciseDialog({ plc, getProject, onSave, onExportStuden
               )}
             </div>
           )}
+          <div className="space-y-1.5 rounded-md bg-slate-50 p-2">
+            <p className="font-medium">{t('Pruebas de comportamiento')}</p>
+            <p className="text-xs text-slate-500">
+              {t('Con cada escenario elegido, la máquina del alumno tiene que responder como tu solución: las salidas se encienden y se apagan en los mismos momentos (con un margen) y llegan las mismas piezas a cada recogida. No se compara el dibujo.')}
+            </p>
+            {scenarios.length === 0 && <p className="text-xs text-amber-800">{t('Graba antes algún escenario en la simulación (o dibújalo en el editor de escenarios).')}</p>}
+            {scenarios.map((s) => (
+              <label key={s.id} className="flex items-center gap-2">
+                <input type="checkbox" checked={behaviour.scenarios.includes(s.id)} onChange={() => setBehaviour({ scenarios: toggle(behaviour.scenarios, s.id) })} />
+                {s.name}
+              </label>
+            ))}
+            {behaviour.scenarios.length > 0 && (
+              <>
+                <p className="pt-1 text-xs font-medium text-slate-500">{t('Salidas que cuentan (ninguna marcada: todas)')}</p>
+                <div className="flex flex-wrap gap-x-3 gap-y-1">
+                  {outputs.map((name) => (
+                    <label key={name} className="flex items-center gap-1 font-mono text-xs">
+                      <input type="checkbox" checked={behaviour.outputs.includes(name)} onChange={() => setBehaviour({ outputs: toggle(behaviour.outputs, name) })} />
+                      {name}
+                    </label>
+                  ))}
+                </div>
+                <label className="flex items-center gap-2">
+                  {t('Margen de tiempo')}
+                  <input
+                    id="exercise-tolerance"
+                    type="number"
+                    min="0.1"
+                    max="5"
+                    step="0.1"
+                    value={behaviour.tolerance}
+                    onChange={(e) => setBehaviour({ tolerance: Number(e.target.value) || 0.5 })}
+                    className="w-20 rounded-md border border-slate-300 px-2 py-0.5"
+                  />
+                  {t('s')}
+                </label>
+                {hasSinks && (
+                  <label className="flex items-center gap-2">
+                    <input type="checkbox" checked={behaviour.counts} onChange={(e) => setBehaviour({ counts: e.target.checked })} />
+                    {t('Contar las piezas de cada recogida')}
+                  </label>
+                )}
+              </>
+            )}
+          </div>
         </fieldset>
-
 
         <section aria-label={t('Prueba con tu solución')} className="space-y-2 rounded-md border border-slate-200 p-3">
           <div className="flex items-center justify-between gap-2">

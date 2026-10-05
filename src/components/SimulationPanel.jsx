@@ -118,7 +118,7 @@ function spacePhaseSource(diagram, mode, extra = {}) {
 const fmtTime = (v) => (v < 60 ? `${v.toFixed(1)} s` : `${Math.floor(v / 60)} min ${(v % 60).toFixed(1)} s`)
 
 // Panel de control de la simulación.
-export default function SimulationPanel({ simulation, scenarios = [], onScenariosChange, expectedSequence = '', onExpectedSequenceChange, cpuConfig, onCpuChange, onApplySymbols, sceneOpen, onToggleScene, elecOpen, onToggleElec, exportProps, onFocusNode, onClose }) {
+export default function SimulationPanel({ simulation, scenarios = [], onScenariosChange, onEditScenario, expectedSequence = '', onExpectedSequenceChange, cpuConfig, onCpuChange, onApplySymbols, sceneOpen, onToggleScene, elecOpen, onToggleElec, exportProps, onFocusNode, onClose }) {
   const { compiled, sim, playing, setPlaying, speed, setSpeed, setInput, step, advance, reset } = simulation
 
   // Las entradas que gobierna la planta virtual no se cambian a mano.
@@ -477,7 +477,7 @@ export default function SimulationPanel({ simulation, scenarios = [], onScenario
         )}
 
         <Section title={t('Escenarios de prueba')} count={scenarios.length}>
-          <ScenarioControls simulation={simulation} scenarios={scenarios} onChange={onScenariosChange} />
+          <ScenarioControls simulation={simulation} scenarios={scenarios} onChange={onScenariosChange} onEdit={onEditScenario} />
         </Section>
 
         <Section title={t('Cronograma')} defaultOpen>

@@ -17,11 +17,12 @@ An **exercise** comes with a statement and what the teacher provides already don
 - That it complies with the standard: Verify without errors.
 - With the variables table given, that you only use its variables.
 - In exercises with a plant, that the machine performs the required sequence with the teacher's test scenario.
+- With each test scenario, that the machine responds like the teacher's: outputs turn on and off at the same moments (within a time margin) and the same parts arrive. If something fails, **See it in the simulation** plays that scenario so you can see where.
 
 ## For teachers
 
 1. Solve the exercise in the editor: that is your solution and it is not handed out.
-2. If you want to check the cylinder sequence, record a test scenario in the simulation (for example, press Marcha and wait for a cycle).
+2. Prepare the test scenarios: record them in the simulation (for example, press Marcha and wait for a cycle) or click **Draw scenario** and drag along each input's row to decide when it is pressed; below you see live what your grafcet does.
 3. Export > **Exercise for students**: write the statement, choose what is given already done (and whether it is locked) and what is checked. Click **Test**: with your solution, everything must be green.
 4. **Save and download for students** creates the file to hand out, without your grafcet.
 

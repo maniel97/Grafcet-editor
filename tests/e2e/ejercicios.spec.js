@@ -60,8 +60,22 @@ test('ejercicio del alumno: enunciado, Comprobar, piezas bloqueadas y resuelto',
   await panel.getByRole('button', { name: 'Comprobar' }).click()
   await expect(panel.locator('[data-check="variables"]')).toHaveAttribute('data-ok', 'no')
   await expect(panel.locator('[data-check="variables"]')).toContainText('Marha')
-  // …y, corregida, todo en verde.
+  // …corregida, falta el Piloto: lo dice la prueba de comportamiento (como en la solución del
+  // profesor, el piloto se enciende con el motor).
   await receptivity(page, page.locator('.react-flow__node-transition').first(), 'Marcha')
+  await panel.getByRole('button', { name: 'Comprobar' }).click()
+  const behaviour = panel.locator('[data-check="comportamiento-0"]')
+  await expect(behaviour).toHaveAttribute('data-ok', 'no')
+  await expect(behaviour).toContainText('Piloto: debería encenderse hacia')
+  // Verlo en la simulación: se reproduce el escenario de prueba.
+  await behaviour.getByRole('button', { name: 'Verlo en la simulación' }).click()
+  await expect(page.locator('[data-tour="simulacion"]')).toContainText('Reproduciendo «Marcha y Paro»')
+  await page.locator('[data-tour="Simular"]').click() // Detener
+  // Con el Piloto, todo en verde.
+  await step(page, '1').click()
+  await page.locator('[data-tour="mas-accion"]').click()
+  await expect(page.locator('[data-tour="propiedades"]').getByLabel('Texto de la acción').last()).toBeFocused()
+  await page.keyboard.type('Piloto')
   await panel.getByRole('button', { name: 'Comprobar' }).click()
   await expect(panel.locator('[data-exercise="resuelto"]')).toBeVisible()
 
@@ -99,5 +113,30 @@ test('ejercicio del profesor: preparar, probar con su solución y descargar sin 
   expect(project.nodes.some((n) => n.type === 'step' || n.type === 'transition')).toBe(false)
   expect(project.plc.exercise).toMatchObject({ student: true, title: 'Mis cilindros' })
   expect(typeof project.plc.exercise.sealed).toBe('string')
+  expectNoErrors(errors)
+})
+
+// Editor de formas de onda: dibujar un pulso de Marcha y ver lo que hace el grafcet.
+test('editor de escenarios: dibujar un pulso y ver la respuesta del grafcet', async ({ page }) => {
+  const errors = await openEditor(page)
+  await openExample(page, /^Marcha y paro de un motor/)
+  await page.locator('[data-tour="Simular"]').click()
+  await page.getByRole('button', { name: 'Dibujar escenario' }).click()
+  const editor = page.getByRole('dialog', { name: 'Editor de escenarios' })
+  // Los detectores de la planta no se dibujan; Marcha y Paro (mandos) sí.
+  await expect(editor.locator('[data-input="Marcha"]')).toHaveCount(1)
+  await expect(editor.locator('[data-output="Motor"]')).toHaveAttribute('data-high', '0')
+  const row = await editor.locator('[data-row="Marcha"]').boundingBox()
+  // Arrastrar en la fila de Marcha de 0,5 s a 1 s (10 s en todo el ancho).
+  const x = (s) => row.x + (row.width * s) / 10
+  await page.mouse.move(x(0.55), row.y + row.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(x(1.05), row.y + row.height / 2, { steps: 4 })
+  await page.mouse.up()
+  // El motor se enciende (y sigue encendido: nadie pulsa Paro).
+  await expect.poll(async () => Number(await editor.locator('[data-output="Motor"]').getAttribute('data-high'))).toBeGreaterThan(80)
+  await editor.getByLabel('Nombre').fill('Arranque')
+  await editor.getByRole('button', { name: 'Guardar' }).click()
+  await expect(page.getByRole('textbox', { name: 'Nombre del escenario' })).toHaveValue('Arranque')
   expectNoErrors(errors)
 })

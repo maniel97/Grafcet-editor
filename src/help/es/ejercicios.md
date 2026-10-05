@@ -17,11 +17,12 @@ Un **ejercicio** trae un enunciado y lo que el profesor da hecho (la planta, la 
 - Que cumple la norma: Verificar sin errores.
 - Con la tabla de variables dada, que solo usas sus variables.
 - En los ejercicios con planta, que la máquina hace la secuencia pedida con el escenario de prueba del profesor.
+- Con cada escenario de prueba, que la máquina responde como la del profesor: las salidas se encienden y se apagan en los mismos momentos (con un margen de tiempo) y llegan las mismas piezas. Si algo falla, **Verlo en la simulación** reproduce ese escenario para que veas dónde.
 
 ## Para el profesorado
 
 1. Resuelve el ejercicio en el editor: esa es tu solución y no se reparte.
-2. Si quieres comprobar la secuencia de los cilindros, graba en la simulación un escenario de prueba (por ejemplo, pulsar Marcha y esperar un ciclo).
+2. Prepara los escenarios de prueba: grábalos en la simulación (por ejemplo, pulsar Marcha y esperar un ciclo) o pulsa **Dibujar escenario** y arrastra en la fila de cada entrada para decidir cuándo se pulsa; debajo ves en vivo lo que hace tu grafcet.
 3. Exportar > **Ejercicio para el alumnado**: escribe el enunciado, elige qué se da hecho (y si va bloqueado) y qué se comprueba. Pulsa **Probar**: con tu solución, todo debe salir en verde.
 4. **Guardar y descargar para el alumnado** crea el archivo que se reparte, sin tu grafcet.
 

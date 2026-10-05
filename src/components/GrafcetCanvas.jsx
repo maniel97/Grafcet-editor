@@ -76,6 +76,7 @@ const stripForShare = ({ nodes, edges }) => ({
 const ProjectsDialog = lazy(() => import('./ProjectsDialog'))
 const ExercisePanel = lazy(() => import('./ExercisePanel'))
 const ExerciseDialog = lazy(() => import('./ExerciseDialog'))
+const ScenarioEditor = lazy(() => import('./ScenarioEditor'))
 
 // Mientras se descarga una parte diferida (normalmente un instante).
 function Loading({ panel }) {
@@ -687,6 +688,22 @@ export default function GrafcetCanvas() {
     },
     [getProject],
   )
+  // Editor de formas de onda de un escenario ({ scenario: null } = uno nuevo).
+  const [editingScenario, setEditingScenario] = useState(null)
+  const saveScenario = useCallback(
+    (scenario) => setPlc((p) => {
+      const list = p.scenarios ?? []
+      return { ...p, scenarios: list.some((s) => s.id === scenario.id) ? list.map((s) => (s.id === scenario.id ? scenario : s)) : [...list, scenario] }
+    }),
+    [],
+  )
+  // «Verlo en la simulación»: se arranca la simulación y, en cuanto está lista, el escenario.
+  const [pendingReplay, setPendingReplay] = useState(null)
+  useEffect(() => {
+    if (!pendingReplay || !simulating || !simulation.sim) return
+    simulation.playScenario(pendingReplay)
+    setPendingReplay(null)
+  }, [pendingReplay, simulating, simulation])
   const openExercise = useCallback(
     (exercise) => {
       const project = studentProject(exercise.teacher())
@@ -937,6 +954,11 @@ export default function GrafcetCanvas() {
               onDownload={save}
               onClose={() => setExportFormat(null)}
             />
+          </Suspense>
+        )}
+        {editingScenario && (
+          <Suspense fallback={<Loading />}>
+            <ScenarioEditor getProject={getProject} scenario={editingScenario.scenario} onSave={saveScenario} onClose={() => setEditingScenario(null)} />
           </Suspense>
         )}
         {exportFormat === 'exercise' && (
@@ -1267,6 +1289,7 @@ export default function GrafcetCanvas() {
                 simulation={simulation}
                 scenarios={plc.scenarios}
                 onScenariosChange={(update) => setPlc((p) => ({ ...p, scenarios: update(p.scenarios ?? []) }))}
+                onEditScenario={(scenario) => setEditingScenario({ scenario })}
                 expectedSequence={plc.sequence ?? ''}
                 onExpectedSequenceChange={(sequence) => setPlc((p) => ({ ...p, sequence }))}
                 cpuConfig={plc.cpu}
@@ -1296,6 +1319,10 @@ export default function GrafcetCanvas() {
                     getProject={getProject}
                     onEdit={() => setExportFormat('exercise')}
                     onExportStudent={() => exportStudent()}
+                    onReplay={(scenario) => {
+                      if (!simulating) startSimulation()
+                      setPendingReplay(scenario)
+                    }}
                     onClose={() => setExerciseOpen(false)}
                   />
                 </Suspense>

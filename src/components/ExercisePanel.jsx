@@ -8,7 +8,8 @@ import Markdown from '../help/Markdown'
 // comprobación. El alumnado lo tiene abierto desde que abre el ejercicio. El profesor, en su
 // proyecto (con la solución), lo usa para probar el ejercicio antes de repartirlo.
 // getProject() -> { nodes, edges, plc } en este momento.
-export default function ExercisePanel({ plc, getProject, onEdit, onExportStudent, onClose }) {
+// onReplay(escenario): reproducirlo en la simulación (pruebas de comportamiento en rojo).
+export default function ExercisePanel({ plc, getProject, onEdit, onExportStudent, onReplay, onClose }) {
   const config = exerciseConfig(plc)
   const student = isStudent(plc)
   const [results, setResults] = useState(null)
@@ -72,6 +73,11 @@ export default function ExercisePanel({ plc, getProject, onEdit, onExportStudent
                     <div className="min-w-0">
                       <p className={`font-medium ${r.ok ? 'text-green-900' : 'text-red-800'}`}>{r.title}</p>
                       {r.detail && <p className={r.ok ? 'text-green-800' : 'text-red-800'}>{r.detail}</p>}
+                      {!r.ok && r.scenario && onReplay && (
+                        <button type="button" onClick={() => onReplay(r.scenario)} className="mt-1 rounded-md border border-red-300 bg-white px-2 py-0.5 text-xs text-red-800 hover:bg-red-100">
+                          {t('Verlo en la simulación')}
+                        </button>
+                      )}
                     </div>
                   </li>
                 ))}

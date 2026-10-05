@@ -11,6 +11,10 @@ const fromExample = (id) => normalizeProject(EXAMPLES.find((e) => e.id === id).b
 // Escenario de prueba: pulsar Marcha medio segundo y dejar que la máquina haga un ciclo.
 const pressMarcha = (duration) => ({ id: 'prueba', name: 'Pulsar Marcha', duration, events: [{ t: 0.1, name: 'Marcha', value: 1 }, { t: 0.6, name: 'Marcha', value: 0 }] })
 
+// Marcha a los 0,5 s y Paro (NC: pulsarlo es ponerlo a 0) a los 3 s.
+const marchaParo = { id: 'marcha-paro', name: 'Marcha y Paro', duration: 5, events: [{ t: 0.5, name: 'Marcha', value: 1 }, { t: 1, name: 'Marcha', value: 0 }, { t: 3, name: 'Paro', value: 0 }, { t: 3.5, name: 'Paro', value: 1 }] }
+const behaviour = (...scenarios) => ({ scenarios, outputs: [], tolerance: 0.5, counts: true })
+
 const prepare = (project, exercise, scenarios = []) => ({
   ...project,
   plc: { ...project.plc, scenarios: [...(project.plc.scenarios ?? []), ...scenarios], exercise: { ...DEFAULT_EXERCISE, ...exercise } },
@@ -27,8 +31,8 @@ export const EXERCISES = [
         title: 'Marcha y paro de un motor',
         statement:
           'Un motor se pone en marcha al pulsar **Marcha** y se para al pulsar **Paro**.\n\n- Mientras está en marcha se enciende el **Piloto**.\n- **Paro** es un pulsador normalmente cerrado (NC): sin pulsar da 1.\n- Usa las variables de la tabla.',
-        checks: { warnings: false, sequence: '', scenario: '' },
-      }),
+        checks: { warnings: false, sequence: '', scenario: '', behaviour: behaviour('marcha-paro') },
+      }, [marchaParo]),
   },
   {
     id: 'ej-cilindros',
@@ -42,7 +46,7 @@ export const EXERCISES = [
           title: 'Cilindros A+ B+ A− B−',
           statement:
             'Dos cilindros de doble efecto, A y B, con sus finales de carrera (a0, a1, b0, b1). Al pulsar **Marcha**, con los dos dentro, hacen la secuencia **A+ B+ A− B−**: cada movimiento empieza cuando el anterior llega a su final de carrera.\n\n- La planta y la tabla de variables están hechas: no se pueden cambiar.\n- Pruébalo en la simulación antes de comprobar.',
-          checks: { warnings: false, sequence: 'A+ B+ A- B-', scenario: 'prueba' },
+          checks: { warnings: false, sequence: 'A+ B+ A- B-', scenario: 'prueba', behaviour: behaviour('prueba') },
         },
         [pressMarcha(8)],
       ),
@@ -60,7 +64,7 @@ export const EXERCISES = [
           title: 'Secuencia A+ B+ B− A−',
           statement:
             'Dos cilindros de doble efecto, A y B, con sus finales de carrera. Al pulsar **Marcha**, con los dos dentro, hacen **A+ B+ B− A−**.\n\n- Una etapa por movimiento; cada transición espera al final de carrera del movimiento anterior.\n- Al acabar, el grafcet vuelve a su etapa inicial.',
-          checks: { warnings: false, sequence: 'A+ B+ B- A-', scenario: 'prueba' },
+          checks: { warnings: false, sequence: 'A+ B+ B- A-', scenario: 'prueba', behaviour: behaviour('prueba') },
         },
         [pressMarcha(8)],
       )
