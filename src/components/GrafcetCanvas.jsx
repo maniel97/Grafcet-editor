@@ -17,7 +17,7 @@ import { useSimulation } from '../lib/sim/useSimulation'
 import { explainTransition } from '../lib/sim/explain'
 import { useSettings } from '../lib/settings'
 import { initialNodes, initialEdges, defaultEdgeOptions } from '../lib/initialDiagram'
-import { saveProject, loadProject, normalizeProject } from '../lib/projectFile'
+import { downloadFile, saveProject, loadProject, normalizeProject } from '../lib/projectFile'
 import { pushRecent } from '../lib/recent'
 import { EMPTY_PLC } from '../lib/addressing'
 import { nextStepLabel, nextTransitionLabel, findFreePosition } from '../lib/layout'
@@ -704,6 +704,15 @@ export default function GrafcetCanvas() {
     simulation.playScenario(pendingReplay)
     setPendingReplay(null)
   }, [pendingReplay, simulating, simulation])
+  // Hoja de prácticas en PDF con el ejercicio dentro (lib/exerciseSheetPdf.js, que se carga al usarla).
+  const exportSheet = useCallback(
+    async (config = plcRef.current.exercise) => {
+      const { exerciseSheetPdf } = await import('../lib/exerciseSheetPdf')
+      const bytes = await exerciseSheetPdf({ ...getProject(), plc: { ...plcRef.current, exercise: config } })
+      downloadFile(bytes, fileName('pdf', 'ejercicio'), 'application/pdf')
+    },
+    [getProject],
+  )
   const openExercise = useCallback(
     (exercise) => {
       const project = studentProject(exercise.teacher())
@@ -904,7 +913,7 @@ export default function GrafcetCanvas() {
         <input
           ref={fileInputRef}
           type="file"
-          accept=".json,application/json"
+          accept=".json,.pdf,application/json,application/pdf"
           className="hidden"
           onChange={(e) => {
             const file = e.target.files?.[0]
@@ -971,6 +980,7 @@ export default function GrafcetCanvas() {
                 setExerciseOpen(true)
               }}
               onExportStudent={exportStudent}
+              onExportSheet={exportSheet}
               onClose={() => setExportFormat(null)}
             />
           </Suspense>
@@ -1173,6 +1183,8 @@ export default function GrafcetCanvas() {
               onNodeClick={(e, node) => {
                 if (loopSource) return node.type === 'step' && finishLoop(node.id)
                 if (isDoubleTap(e, node.id)) openNodeEditor(node)
+                // Con el panel de propiedades ya abierto basta un clic: pasa a editar el nodo pulsado.
+                else if (editingId && node.id !== editingId && node.type !== 'variables' && node.type !== 'note') openNodeEditor(node)
               }}
               onNodeDoubleClick={(_, node) => openNodeEditor(node)}
               onPaneClick={() => {

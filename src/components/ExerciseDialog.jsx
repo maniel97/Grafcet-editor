@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { CircleCheck, CircleX, GraduationCap, X } from 'lucide-react'
+import { CircleCheck, CircleX, FileText, GraduationCap, X } from 'lucide-react'
 import { N_, t } from '../lib/i18n'
 import { DEFAULT_EXERCISE, PART_MODES, exerciseConfig, runChecks } from '../lib/exercise'
 import { buildPlcModel } from '../lib/plcModel'
@@ -13,7 +13,8 @@ const PARTS = [
 // Preparar un ejercicio a partir del proyecto abierto, que es la solución del profesor
 // (lib/exercise.js). Se guarda en el proyecto (plc.exercise); «Para el alumnado» descarga la
 // versión sin solución. getProject() -> { nodes, edges, plc } en este momento.
-export default function ExerciseDialog({ plc, getProject, onSave, onExportStudent, onClose }) {
+// onExportSheet(config) -> promesa: la hoja de prácticas en PDF con el ejercicio dentro.
+export default function ExerciseDialog({ plc, getProject, onSave, onExportStudent, onExportSheet, onClose }) {
   const dialogRef = useRef(null)
   useEffect(() => {
     if (!dialogRef.current.open) dialogRef.current.showModal()
@@ -21,6 +22,7 @@ export default function ExerciseDialog({ plc, getProject, onSave, onExportStuden
   const initial = exerciseConfig(plc) ?? { ...DEFAULT_EXERCISE, title: '', checks: { ...DEFAULT_EXERCISE.checks, sequence: plc.sequence ?? '', scenario: plc.scenarios?.[0]?.id ?? '' } }
   const [draft, setDraft] = useState(initial)
   const [results, setResults] = useState(null)
+  const [making, setMaking] = useState(false) // generando la hoja en PDF
   const set = (patch) => setDraft((d) => ({ ...d, ...patch }))
   const scenarios = plc.scenarios ?? []
   const hasCylinders = (plc.scene?.elements ?? []).some((e) => e.type === 'cylinder')
@@ -68,6 +70,25 @@ export default function ExerciseDialog({ plc, getProject, onSave, onExportStuden
           <span className="text-xs font-medium text-slate-500">{t('Título')}</span>
           <input id="exercise-title-input" value={draft.title} onChange={(e) => set({ title: e.target.value })} className={field} />
         </label>
+        {/* Cabecera de la hoja de prácticas en PDF (opcional). */}
+        <div className="grid gap-2 sm:grid-cols-3">
+          {[
+            ['subject', N_('Asignatura')],
+            ['course', N_('Curso')],
+            ['teacher', N_('Profesor/a')],
+          ].map(([key, label]) => (
+            <label key={key} className="block">
+              <span className="text-xs font-medium text-slate-500">{t(label)}</span>
+              <input
+                id={`exercise-sheet-${key}`}
+                value={draft.sheet?.[key] ?? ''}
+                onChange={(e) => set({ sheet: { ...DEFAULT_EXERCISE.sheet, ...draft.sheet, [key]: e.target.value } })}
+                placeholder={t('(opcional)')}
+                className={field}
+              />
+            </label>
+          ))}
+        </div>
         <label className="block">
           <span className="text-xs font-medium text-slate-500">{t('Enunciado')}</span>
           <textarea
@@ -227,6 +248,25 @@ export default function ExerciseDialog({ plc, getProject, onSave, onExportStuden
         >
           {t('Guardar y descargar para el alumnado')}
         </button>
+        {onExportSheet && (
+          <button
+            type="button"
+            disabled={making}
+            onClick={async () => {
+              store()
+              setMaking(true)
+              try {
+                await onExportSheet({ ...draft, student: undefined })
+              } finally {
+                setMaking(false)
+              }
+            }}
+            title={t('Una hoja de prácticas para imprimir o repartir, con el ejercicio dentro: al abrir el PDF en el editor se carga el ejercicio')}
+            className="flex items-center gap-1 rounded-md border border-blue-300 px-3 py-1.5 text-sm text-blue-800 hover:bg-blue-50 disabled:opacity-60"
+          >
+            <FileText size={14} /> {making ? t('Generando…') : t('Hoja de prácticas (PDF)')}
+          </button>
+        )}
         <button
           type="button"
           onClick={() => {

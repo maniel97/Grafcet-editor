@@ -140,3 +140,47 @@ test('editor de escenarios: dibujar un pulso y ver la respuesta del grafcet', as
   await expect(page.getByRole('textbox', { name: 'Nombre del escenario' })).toHaveValue('Arranque')
   expectNoErrors(errors)
 })
+
+// Hoja de prácticas en PDF con el ejercicio dentro: se descarga y, al abrir el PDF, se carga el
+// ejercicio en modo alumno.
+test('hoja de prácticas en PDF: se imprime como una hoja y el editor abre el ejercicio de dentro', async ({ page }) => {
+  const errors = await openEditor(page)
+  await openExample(page, /^Cilindros A\+ B\+/)
+  await page.getByRole('button', { name: /Exportar/ }).click()
+  await page.getByRole('menuitem', { name: /Ejercicio para el alumnado/ }).click()
+  const dialog = page.getByRole('dialog', { name: 'Ejercicio para el alumnado' })
+  await dialog.getByLabel('Título').fill('Mis cilindros')
+  await dialog.getByLabel('Asignatura').fill('Automatismos industriales')
+  await dialog.getByLabel('Profesor/a').fill('Ana Ruiz')
+  await dialog.getByLabel('Enunciado').fill('Haz **A+ B+ A− B−** al pulsar Marcha.')
+  const file = await download(page, () => dialog.getByRole('button', { name: 'Hoja de prácticas (PDF)' }).click())
+  expect(file.suggestedFilename()).toMatch(/\.pdf$/)
+  const pdf = readFileSync(await file.path())
+  expect(pdf.subarray(0, 5).toString()).toBe('%PDF-')
+  expect(pdf.toString('latin1')).toContain('/EmbeddedFiles')
+  if (process.env.SHEET_OUT) (await import('fs')).writeFileSync(process.env.SHEET_OUT, pdf)
+
+  // Abrir el PDF en el editor: el ejercicio, en modo alumno y sin la solución.
+  await page.keyboard.press('Escape')
+  await page.locator('input[type=file]').first().setInputFiles({ name: 'hoja.pdf', mimeType: 'application/pdf', buffer: pdf })
+  const panel = page.getByRole('complementary', { name: 'Ejercicio' })
+  await expect(panel).toContainText('Mis cilindros')
+  await expect(panel).not.toContainText('Vista del profesor')
+  await expect(page.locator('.react-flow__node-step')).toHaveCount(0)
+  await panel.getByRole('button', { name: 'Comprobar' }).click()
+  await expect(panel.locator('[data-check="grafcet"]')).toHaveAttribute('data-ok', 'no')
+  expectNoErrors(errors)
+})
+
+// Un PDF sin ejercicio dentro: aviso claro, sin romper nada.
+test('abrir un PDF sin ejercicio dentro avisa', async ({ page }) => {
+  const errors = await openEditor(page)
+  const messages = []
+  page.on('dialog', (d) => {
+    messages.push(d.message())
+    d.dismiss()
+  })
+  await page.locator('input[type=file]').first().setInputFiles({ name: 'otro.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.3\n%%EOF\n') })
+  await expect.poll(async () => messages.join(' ') + (await page.locator('body').innerText())).toContain('no lleva dentro ningún proyecto')
+  expectNoErrors(errors)
+})

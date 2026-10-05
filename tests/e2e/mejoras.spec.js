@@ -884,3 +884,24 @@ test('Abrir > Nuevo…: título, S7-200 con su CPU, enunciado y tabla de variabl
   await expect(page.locator('.react-flow__node-step')).toHaveCount(2)
   expectNoErrors(errors)
 })
+
+// Con el panel de propiedades abierto, un clic en otro nodo pasa a editarlo (sin doble clic).
+test('panel de propiedades abierto: un clic en otra transición o etapa la edita', async ({ page }) => {
+  const errors = await openEditor(page)
+  await openExample(page, /^Marcha y paro de un motor/)
+  const panel = page.locator('[data-tour="propiedades"]')
+  const transitions = page.locator('.react-flow__node-transition')
+  await transitions.nth(0).dblclick()
+  await expect(panel.getByRole('heading', { name: 'Transición' })).toBeVisible()
+  const condition = panel.getByLabel('Receptividad / condición')
+  const first = await condition.inputValue()
+  await transitions.nth(1).click()
+  await expect(condition).not.toHaveValue(first)
+  await page.locator('.react-flow__node-step').nth(1).click()
+  await expect(panel.getByRole('heading', { name: 'Etapa' })).toBeVisible()
+  // Sin el panel abierto, un clic solo selecciona.
+  await panel.getByTitle('Cerrar').click()
+  await transitions.nth(0).click()
+  await expect(panel).toHaveCount(0)
+  expectNoErrors(errors)
+})

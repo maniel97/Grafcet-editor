@@ -31,7 +31,7 @@ export function toRgb(css) {
 // Las fuentes estándar del PDF solo tienen los caracteres de WinAnsi (sirven los acentos, la ñ,
 // «», ·); el resto se sustituye. ↑ y ↓ (flancos) se dibujan como flechas.
 const WINANSI_EXTRA = '€‚ƒ„…†‡ˆ‰Š‹ŒŽ‘’“”•–—˜™š›œžŸ'
-const REPLACE = { '≥': '>=', '≤': '<=', '≠': '<>', '→': '->', '←': '<-', '×': 'x' }
+const REPLACE = { '≥': '>=', '≤': '<=', '≠': '<>', '→': '->', '←': '<-', '×': 'x', '−': '-', '‑': '-', '⁄': '/' }
 export const ARROW_GLYPHS = { '↑': 'up', '↓': 'down' }
 const encodable = (ch) => ch.charCodeAt(0) < 256 || WINANSI_EXTRA.includes(ch)
 export const pdfSafe = (text) => [...text].map((ch) => (encodable(ch) ? ch : (REPLACE[ch] ?? '?'))).join('')
@@ -266,8 +266,12 @@ export const svgRenderedText = (text) => text.replace(/[\r\n]/g, '').replace(/\t
 // SVG se mide carácter a carácter con getExtentOfChar. El SVG tiene que estar en el documento.
 export function captureSvgScene(svg) {
   const items = []
-  const root = svg.getScreenCTM()?.inverse()
-  if (!root) return items
+  // Desde la esquina del dibujo: el viewBox puede no empezar en 0,0 (esquema eléctrico) y la figura
+  // se coloca por su esquina; sin restarlo, el dibujo salía desplazado (y tapaba su título).
+  const screen = svg.getScreenCTM()
+  if (!screen) return items
+  const vb = svg.viewBox?.baseVal
+  const root = new DOMMatrix().translate(-(vb?.x ?? 0), -(vb?.y ?? 0)).multiply(screen.inverse())
   const toLocal = (x, y) => {
     const p = new DOMPoint(x, y).matrixTransform(root)
     return [p.x, p.y]

@@ -42,9 +42,11 @@ export const DEFAULT_EXERCISE = {
   checks: { warnings: false, sequence: '', scenario: '', behaviour: { scenarios: [], outputs: [], tolerance: DEFAULT_TOLERANCE, counts: true } },
   hints: { enabled: true, items: [] },
   processData: false,
+  // Cabecera de la hoja de prácticas en PDF (lib/exerciseSheet.js).
+  sheet: { subject: '', course: '', teacher: '' },
 }
 
-export const exerciseConfig = (plc) => (plc?.exercise ? { ...DEFAULT_EXERCISE, ...plc.exercise, parts: { ...DEFAULT_EXERCISE.parts, ...plc.exercise.parts }, checks: { ...DEFAULT_EXERCISE.checks, ...plc.exercise.checks, behaviour: { ...DEFAULT_EXERCISE.checks.behaviour, ...plc.exercise.checks?.behaviour } }, hints: { ...DEFAULT_EXERCISE.hints, ...plc.exercise.hints } } : null)
+export const exerciseConfig = (plc) => (plc?.exercise ? { ...DEFAULT_EXERCISE, ...plc.exercise, parts: { ...DEFAULT_EXERCISE.parts, ...plc.exercise.parts }, checks: { ...DEFAULT_EXERCISE.checks, ...plc.exercise.checks, behaviour: { ...DEFAULT_EXERCISE.checks.behaviour, ...plc.exercise.checks?.behaviour } }, hints: { ...DEFAULT_EXERCISE.hints, ...plc.exercise.hints }, sheet: { ...DEFAULT_EXERCISE.sheet, ...plc.exercise.sheet } } : null)
 export const isStudent = (plc) => Boolean(plc?.exercise?.student)
 export const partMode = (plc, part) => plc?.exercise?.parts?.[part] ?? (plc?.exercise ? DEFAULT_EXERCISE.parts[part] : 'given')
 export const isLocked = (plc, part) => isStudent(plc) && partMode(plc, part) === 'locked'
@@ -114,6 +116,7 @@ export function studentProject(project) {
       parts: config.parts,
       hints: config.hints,
       processData: config.processData,
+      sheet: config.sheet,
       sealed: seal(checksFrom(project, config)),
     },
   }

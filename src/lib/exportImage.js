@@ -140,7 +140,7 @@ export async function savePdf(images, options = DEFAULT_PDF_OPTIONS, name = file
         pdf.setFontSize(8)
         pdf.setTextColor(120)
         const text = [options.title?.trim(), image.sheetName, date, total > 1 ? `página ${number} de ${total}` : null]
-        pdf.text(pdfSafe(text.filter(Boolean).join(' · ')), PAGE_MARGIN, layout.pageH - PAGE_MARGIN / 2)
+        pdf.text(pdfSafe(text.filter(Boolean).join(' · ')), PAGE_MARGIN, layout.pageH - PAGE_MARGIN / 2, { horizontalScale: 1 }) // (ver lib/dossierPdf.js)
       }
     }
   }
@@ -157,14 +157,14 @@ function drawTitleBlock(pdf, origin, cells) {
     pdf.setFont('helvetica', 'normal')
     pdf.setFontSize(5.5)
     pdf.setTextColor(100, 116, 139)
-    pdf.text(pdfSafe(c.label), origin.x + c.x + 1.2, origin.y + c.y + 2.6)
+    pdf.text(pdfSafe(c.label), origin.x + c.x + 1.2, origin.y + c.y + 2.6, { horizontalScale: 1 })
     pdf.setFont('helvetica', c.strong ? 'bold' : 'normal')
     pdf.setFontSize(c.strong ? 9 : 8)
     pdf.setTextColor(15, 23, 42)
     let text = pdfSafe(c.value ?? '')
     const room = c.w - 2.4
     while (text.length > 1 && pdf.getTextWidth(text) > room) text = `${text.slice(0, -2)}…`
-    pdf.text(text, origin.x + c.x + 1.2, origin.y + c.y + c.h - 2)
+    pdf.text(text, origin.x + c.x + 1.2, origin.y + c.y + c.h - 2, { horizontalScale: 1 })
   }
   // Marco exterior más grueso.
   const right = Math.max(...cells.map((c) => c.x + c.w))

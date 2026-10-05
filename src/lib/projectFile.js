@@ -3,6 +3,8 @@
 import { EMPTY_PLC } from './addressing'
 import { fileName } from './fileNames'
 import { sceneFromPlant } from './sim/scene'
+import { t } from './i18n'
+import { attachmentsOf, isPdf } from './pdfAttach'
 
 const FORMAT = 'grafcet-editor'
 const VERSION = 1
@@ -17,17 +19,27 @@ export function downloadFile(content, filename, type) {
 }
 
 // `plc` es la tabla de variables (lib/addressing.js); viaja dentro del mismo proyecto.
-export function saveProject({ nodes, edges, viewport, plc, name }, filename = fileName('json')) {
-  const project = { format: FORMAT, version: VERSION, savedAt: new Date().toISOString(), name, nodes, edges, viewport, plc }
-  downloadFile(JSON.stringify(project, null, 2), filename, 'application/json')
+export const projectJson = ({ nodes, edges, viewport, plc, name }) =>
+  JSON.stringify({ format: FORMAT, version: VERSION, savedAt: new Date().toISOString(), name, nodes, edges, viewport, plc }, null, 2)
+
+export function saveProject(project, filename = fileName('json')) {
+  downloadFile(projectJson(project), filename, 'application/json')
 }
 
+// Un .json, o un PDF que lleve un proyecto adjunto (la hoja de un ejercicio: lib/exerciseSheet.js).
 export async function loadProject(file) {
   let project
-  try {
-    project = JSON.parse(await file.text())
-  } catch {
-    throw new Error('El archivo no es un JSON válido.')
+  const bytes = new Uint8Array(await file.arrayBuffer())
+  if (isPdf(bytes)) {
+    const attached = attachmentsOf(bytes).find((a) => a.name.toLowerCase().endsWith('.json'))
+    if (!attached) throw new Error(t('Este PDF no lleva dentro ningún proyecto ni ejercicio de Grafcet.'))
+    project = JSON.parse(new TextDecoder().decode(attached.data))
+  } else {
+    try {
+      project = JSON.parse(new TextDecoder().decode(bytes))
+    } catch {
+      throw new Error('El archivo no es un JSON válido.')
+    }
   }
   const normalized = normalizeProject(project)
   if (!normalized) throw new Error('El archivo no contiene un proyecto Grafcet.')

@@ -107,16 +107,14 @@ export function dossierData({ nodes, edges, plc, issues, options }) {
   return { model, tables: { variables, steps, plantIO }, issues, listing, notes }
 }
 
-// Figuras SVG: ladder, planta y cronograma (el del escenario elegido).
-export async function dossierFigures({ nodes, edges, plc, scenarioId, model }) {
+// Figuras de la planta ({ plant }) y del esquema eléctrico ({ electrical: [una por hoja con algo
+// dibujado] }); también para la hoja del ejercicio (lib/exerciseSheetPdf.js).
+export async function partFigures(plc, model) {
   const { renderToStaticMarkup } = await import('react-dom/server')
   const figures = {}
-  const ladder = generateLadder(nodes, edges, plc)
-  figures.ladder = await figureFromMarkup(renderToStaticMarkup(createElement(LadderDiagram, { ladder, mode: 'both' })))
   if (plc.scene?.elements?.length) {
     figures.plant = await figureFromMarkup(renderToStaticMarkup(createElement(SceneStatic, { scene: plc.scene, variables: model.variables })))
   }
-  // Esquema eléctrico: una figura por hoja con algo dibujado.
   const elec = plc.electrical
   if (elec?.components?.length) {
     const info = { project: plc.titleBlock?.project || '', author: plc.titleBlock?.author ?? '', company: plc.titleBlock?.company ?? '', date: plc.titleBlock?.date ?? '' }
@@ -127,6 +125,16 @@ export async function dossierFigures({ nodes, edges, plc, scenarioId, model }) {
       if (fig) figures.electrical.push(fig)
     }
   }
+  return figures
+}
+
+// Figuras SVG: ladder, planta y cronograma (el del escenario elegido).
+export async function dossierFigures({ nodes, edges, plc, scenarioId, model }) {
+  const { renderToStaticMarkup } = await import('react-dom/server')
+  const figures = {}
+  const ladder = generateLadder(nodes, edges, plc)
+  figures.ladder = await figureFromMarkup(renderToStaticMarkup(createElement(LadderDiagram, { ladder, mode: 'both' })))
+  Object.assign(figures, await partFigures(plc, model))
   const scenarios = plc.scenarios ?? []
   const scenario = scenarios.find((s) => s.id === scenarioId) ?? scenarios[0]
   if (scenario) {

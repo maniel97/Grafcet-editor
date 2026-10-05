@@ -4,7 +4,7 @@ An **exercise** comes with a statement and what the teacher provides already don
 
 ## For students
 
-1. Open the exercise: Open > Exercises, or the file your teacher gave you.
+1. Open the exercise: Open > Exercises, or with Open > Open file the file your teacher gave you (a .json or the PDF practice sheet: the exercise is inside).
 2. Read the statement in the **Exercise** panel (on the right; the toolbar button opens and closes it).
 3. Draw the grafcet. You can simulate and verify it as usual.
 4. Click **Check** as many times as you like. Each check shows in green or red, with what fails.
@@ -25,6 +25,7 @@ An **exercise** comes with a statement and what the teacher provides already don
 2. Prepare the test scenarios: record them in the simulation (for example, press Marcha and wait for a cycle) or click **Draw scenario** and drag along each input's row to decide when it is pressed; below you see live what your grafcet does.
 3. Export > **Exercise for students**: write the statement, choose what is given already done (and whether it is locked) and what is checked. Click **Test**: with your solution, everything must be green.
 4. **Save and download for students** creates the file to hand out, without your grafcet.
+5. **Practice sheet (PDF)** creates a sheet like the usual ones, to print or hand out: a header for the name, the statement, what is provided (table, plant, wiring diagram), the assessment criteria in words and the test scenarios. The exercise file travels inside the PDF as an attachment: opening the PDF in the editor loads the exercise. Anyone can assess the exercise from the paper without knowing the program, and the **fingerprint** in the footer identifies the file inside.
 
 > **Watch out:** the checks travel sealed in the file, but it is not a security system: the checker is based on behaviour, not on copying your grafcet.
 

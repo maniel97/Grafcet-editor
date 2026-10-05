@@ -31,7 +31,9 @@ export function renderDossierPdf(jsPDF, pages) {
         pdf.setFont(it.font ?? 'helvetica', it.style === 'bold' ? 'bold' : 'normal')
         pdf.setFontSize(it.size)
         pdf.setTextColor(...(it.color ?? [15, 23, 42]))
-        pdf.text(pdfSafe(it.text), it.x, it.y, it.align ? { align: it.align } : undefined)
+        // horizontalScale explícito: el de los textos de una figura vectorial (drawScene) se queda
+        // en el estado del PDF y estrecharía o ensancharía todo lo que viene después.
+        pdf.text(pdfSafe(it.text), it.x, it.y, { horizontalScale: 1, ...(it.align ? { align: it.align } : {}) })
       } else if (it.t === 'line') {
         pdf.setDrawColor(...(it.color ?? [15, 23, 42]))
         pdf.setLineWidth(it.width ?? 0.2)
@@ -40,7 +42,10 @@ export function renderDossierPdf(jsPDF, pages) {
         pdf.setLineDashPattern([], 0)
       } else if (it.t === 'rect') {
         if (it.fill) pdf.setFillColor(...it.fill)
-        if (it.stroke) pdf.setDrawColor(...it.stroke)
+        if (it.stroke) {
+          pdf.setDrawColor(...it.stroke)
+          pdf.setLineWidth(it.width ?? 0.2)
+        }
         pdf.rect(it.x, it.y, it.w, it.h, it.fill && it.stroke ? 'FD' : it.fill ? 'F' : 'S')
       } else if (it.t === 'figure') {
         drawFigure(pdf, it, index)

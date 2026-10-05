@@ -191,7 +191,7 @@ export default function Toolbar({
         disabled={locked}
         items={[
           { id: 'new', label: N_('Nuevo'), hint: N_('Proyecto en blanco: título, autómata y tabla de variables'), icon: FilePlus, onSelect: onNew },
-          { id: 'file', label: N_('Abrir archivo'), hint: N_('Proyecto .json guardado (Ctrl+O)'), icon: FileJson, onSelect: onOpen },
+          { id: 'file', label: N_('Abrir archivo'), hint: N_('Proyecto .json, o la hoja PDF de un ejercicio (Ctrl+O)'), icon: FileJson, onSelect: onOpen },
           { id: 'examples', label: N_('Ejemplos'), hint: N_('Grafcets típicos listos para usar'), icon: BookOpen, onSelect: onOpenExamples },
           { id: 'exercises', label: N_('Ejercicios'), hint: N_('Ejercicios con autocorrección, por niveles'), icon: GraduationCap, onSelect: onOpenExercises },
           { id: 'recent', label: N_('Trabajos anteriores'), hint: N_('Recuperar lo que había antes de abrir o limpiar'), icon: History, onSelect: onOpenRecent },
