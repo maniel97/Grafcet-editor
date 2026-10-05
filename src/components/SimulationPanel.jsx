@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
-import { AlertTriangle, ChevronDown, ChevronRight, Factory, Pause, Play, RotateCcw, SkipForward, Square, Timer, Zap } from 'lucide-react'
+import { createPortal } from 'react-dom'
+import { AlertTriangle, ChevronDown, ChevronRight, Factory, Pause, PictureInPicture2, Play, RotateCcw, SkipForward, Square, Timer, Zap } from 'lucide-react'
+import FloatingWidget from './FloatingWidget'
 import Chronogram from './Chronogram'
 import SpacePhase from './SpacePhase'
 import { buildSpacePhase, compareSpacePhase, theoreticalSpacePhase } from '../lib/sim/spacePhase'
@@ -18,20 +20,76 @@ import { t } from '../lib/i18n'
 
 const SPEEDS = [0.25, 0.5, 1, 2, 5, 10]
 
-function Section({ title, count, children, defaultOpen = true, tour }) {
+// Sección plegable del panel. Con floatId y floating (lib/floating.js, desde el lienzo), se puede
+// sacar al lienzo como panel flotante: con su botón o arrastrando el título hasta el lienzo.
+// children: el contenido, o una función ({ width }) que lo pinta al ancho disponible (width
+// indefinido: el del panel).
+function Section({ title, count, children, defaultOpen = true, tour, floatId, floating }) {
   const [open, setOpen] = useState(defaultOpen)
+  const content = (size) => (typeof children === 'function' ? children(size) : children)
+  const out = floatId && floating?.isOpen(floatId)
+  if (out) {
+    return (
+      <section data-floated={floatId} className="border-b border-slate-100">
+        <div className="flex items-center gap-1 px-4 py-2 text-xs text-slate-500">
+          <PictureInPicture2 size={14} className="shrink-0" />
+          <span className="min-w-0 truncate font-medium uppercase tracking-wide" title={title}>{title}</span>
+          <span className="shrink-0 whitespace-nowrap">· {t('en el lienzo')}</span>
+          <button type="button" onClick={() => floating.dock(floatId)} className="ml-auto shrink-0 rounded border border-slate-300 px-1.5 py-0.5 hover:bg-slate-100">
+            {t('Devolver')}
+          </button>
+        </div>
+        {floating.layer &&
+          createPortal(
+            <FloatingWidget
+              id={floatId}
+              title={title}
+              rect={floating.rect(floatId)}
+              host={() => floating.layer}
+              z={floating.z(floatId)}
+              onFocus={() => floating.focus(floatId)}
+              onChange={(rect) => floating.move(floatId, rect)}
+              onDock={() => floating.dock(floatId)}
+            >
+              {(size) => <div data-tour={tour}>{content(size)}</div>}
+            </FloatingWidget>,
+            floating.layer,
+          )}
+      </section>
+    )
+  }
   return (
     <section data-tour={tour} className="border-b border-slate-100">
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        className="flex w-full items-center gap-1 px-4 py-2 text-left text-xs font-medium uppercase tracking-wide text-slate-500 hover:bg-slate-50"
-      >
-        {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-        {title}
-        {count !== undefined && <span className="ml-auto font-normal normal-case">{count}</span>}
-      </button>
-      {open && <div className="px-4 pb-3">{children}</div>}
+      <div className="flex items-center">
+        <button
+          type="button"
+          onClick={() => setOpen((o) => !o)}
+          // El título se puede arrastrar hasta el lienzo para sacar la sección (con ratón).
+          draggable={Boolean(floatId && floating)}
+          onDragStart={(ev) => {
+            ev.dataTransfer.setData('application/x-grafcet-float', floatId)
+            ev.dataTransfer.effectAllowed = 'move'
+          }}
+          title={floatId && floating ? t('Arrastra el título hasta el lienzo para sacarlo como panel flotante') : undefined}
+          className="flex min-w-0 flex-1 items-center gap-1 px-4 py-2 text-left text-xs font-medium uppercase tracking-wide text-slate-500 hover:bg-slate-50"
+        >
+          {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+          {title}
+          {count !== undefined && <span className="ml-auto font-normal normal-case">{count}</span>}
+        </button>
+        {floatId && floating && (
+          <button
+            type="button"
+            onClick={() => floating.open(floatId)}
+            title={t('Sacar al lienzo como panel flotante (se mueve y se redimensiona)')}
+            aria-label={t('Sacar «{titulo}» al lienzo', { titulo: title })}
+            className="mr-2 rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+          >
+            <PictureInPicture2 size={14} />
+          </button>
+        )}
+      </div>
+      {open && <div className="px-4 pb-3">{content(undefined)}</div>}
     </section>
   )
 }
@@ -118,7 +176,8 @@ function spacePhaseSource(diagram, mode, extra = {}) {
 const fmtTime = (v) => (v < 60 ? `${v.toFixed(1)} s` : `${Math.floor(v / 60)} min ${(v % 60).toFixed(1)} s`)
 
 // Panel de control de la simulación.
-export default function SimulationPanel({ simulation, scenarios = [], onScenariosChange, onEditScenario, expectedSequence = '', onExpectedSequenceChange, cpuConfig, onCpuChange, onApplySymbols, sceneOpen, onToggleScene, elecOpen, onToggleElec, exportProps, onFocusNode, onClose }) {
+// floating: paneles flotantes (lib/floating.js) que da el lienzo; sin él, nada se puede sacar.
+export default function SimulationPanel({ floating, simulation, scenarios = [], onScenariosChange, onEditScenario, expectedSequence = '', onExpectedSequenceChange, cpuConfig, onCpuChange, onApplySymbols, sceneOpen, onToggleScene, elecOpen, onToggleElec, exportProps, onFocusNode, onClose }) {
   const { compiled, sim, playing, setPlaying, speed, setSpeed, setInput, step, advance, reset } = simulation
 
   // Las entradas que gobierna la planta virtual no se cambian a mano.
@@ -476,12 +535,15 @@ export default function SimulationPanel({ simulation, scenarios = [], onScenario
         </Section>
         )}
 
-        <Section title={t('Escenarios de prueba')} count={scenarios.length}>
+        <Section title={t('Escenarios de prueba')} count={scenarios.length} floatId="escenarios" floating={floating}>
           <ScenarioControls simulation={simulation} scenarios={scenarios} onChange={onScenariosChange} onEdit={onEditScenario} />
         </Section>
 
-        <Section title={t('Cronograma')} defaultOpen>
-          <Chronogram samples={sim.samples} signals={signals} now={state.time} />
+        <Section title={t('Cronograma')} defaultOpen floatId="cronograma" floating={floating}>
+          {({ width } = {}) => (
+          <>
+          {/* Flotante y más ancho: a tamaño natural y con más segundos a la vista. */}
+          <Chronogram samples={sim.samples} signals={signals} now={state.time} {...(width ? { width, window: Math.max(20, Math.round((20 * width) / 280)) } : {})} />
           <div className="mt-1 flex items-center gap-1 text-xs">
             <span className="text-slate-400">{t('Exportar todo:')}</span>
             <button
@@ -500,10 +562,14 @@ export default function SimulationPanel({ simulation, scenarios = [], onScenario
               {t('CSV')}
             </button>
           </div>
+          </>
+          )}
         </Section>
 
         {simulation.cylinders?.length > 0 && (
-          <Section title={t('Diagrama espacio-fase')} tour="espacio-fase">
+          <Section title={t('Diagrama espacio-fase')} tour="espacio-fase" floatId="espacio-fase" floating={floating}>
+            {({ width } = {}) => (
+            <>
             <div className="mb-1 flex items-center gap-1 text-xs" role="radiogroup" aria-label={t('Eje horizontal')}>
               {[
                 ['fase', t('Fases')],
@@ -544,7 +610,7 @@ export default function SimulationPanel({ simulation, scenarios = [], onScenario
             {spacePhase ? (
               <>
                 <div className="paper overflow-hidden rounded border border-slate-200">
-                  <SpacePhase diagram={spacePhase} mode={phaseMode} expected={expectedDiagram} signals={phaseSignals} />
+                  <SpacePhase diagram={spacePhase} mode={phaseMode} expected={expectedDiagram} signals={phaseSignals} {...(width ? { width } : {})} />
                 </div>
                 {comparison && (
                   <p role="status" data-comparison={comparison.ok ? 'ok' : 'distinta'} className={`mt-1 text-xs ${comparison.ok ? 'text-green-800' : 'text-red-700'}`}>
@@ -573,6 +639,8 @@ export default function SimulationPanel({ simulation, scenarios = [], onScenario
               </>
             ) : (
               <p className="text-xs text-slate-500">{t('Aparece cuando se mueve algún cilindro de la planta: haz un ciclo.')}</p>
+            )}
+            </>
             )}
           </Section>
         )}

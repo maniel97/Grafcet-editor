@@ -20,6 +20,14 @@
 
 In the examples that have one, the **plant** (cylinders, conveyors, sensors…) moves with your outputs and switches the inputs by itself: it is like testing on the machine. The **wiring diagram** shows the wired PLC and is simulated too. See [The virtual plant](planta) and [The wiring diagram](esquema-electrico).
 
+## Floating panels
+
+The **chronogram**, the **displacement-step diagram** and the **test scenarios** can be taken out of the panel: with the button in their title or by dragging the title onto the canvas.
+
+- They move by their title bar and resize by their edges and corners (with the keyboard: arrows to move, Shift + arrows for the size).
+- Wider, they show more: the chronogram, more seconds.
+- **Put back** returns them to the panel. Their place and size are remembered.
+
 ## Scenarios
 
 “Record scenario” notes the input changes with their instant. They are saved in the project and replayed with a click: that way you check, after each change, that everything still works. The timing chart shows inputs, steps and outputs over time.

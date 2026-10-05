@@ -20,6 +20,14 @@
 
 Nos exemplos que a têm, a **planta** (cilindros, tapetes, detetores…) move-se com as suas saídas e ativa sozinha as entradas: é como testar na máquina. O **esquema elétrico** mostra o autómato cablado e também se simula. Ver [A planta virtual](planta) e [O esquema elétrico](esquema-electrico).
 
+## Painéis flutuantes
+
+O **cronograma**, o **diagrama espaço-fase** e os **cenários de teste** podem sair do painel: com o botão do seu título ou arrastando o título até à área de trabalho.
+
+- Movem-se pela barra de título e redimensionam-se pelos bordos e cantos (com o teclado: setas para mover, Shift + setas para o tamanho).
+- Mais largos, mostram mais: o cronograma, mais segundos.
+- **Devolver** volta a pô-los no painel. O seu lugar e tamanho são recordados.
+
 ## Cenários
 
 «Gravar cenário» regista as mudanças de entradas com o seu instante. Guardam-se no projeto e reproduzem-se com um clique: assim comprova, após cada alteração, que tudo continua a funcionar. O cronograma mostra entradas, etapas e saídas ao longo do tempo.

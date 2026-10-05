@@ -16,6 +16,7 @@ import { edgeTypes } from '../edges'
 import { useSimulation } from '../lib/sim/useSimulation'
 import { explainTransition } from '../lib/sim/explain'
 import { useSettings } from '../lib/settings'
+import { useFloating } from './useFloating'
 import { initialNodes, initialEdges, defaultEdgeOptions } from '../lib/initialDiagram'
 import { downloadFile, saveProject, loadProjects, normalizeProject } from '../lib/projectFile'
 import { pushRecent } from '../lib/recent'
@@ -215,6 +216,8 @@ export default function GrafcetCanvas() {
     deleteElements,
   } = useReactFlow()
   const wrapperRef = useRef(null)
+  // Paneles flotantes del simulador (cronograma, espacio-fase, escenarios) sobre el lienzo.
+  const { floating, layerRef: floatLayerRef, dropProps: floatDrop } = useFloating()
   // Con el lienzo estrecho (p. ej. el panel del ejercicio y el de propiedades abiertos a la vez),
   // el minimapa tapaba lo que se acaba de añadir abajo a la derecha (su botón +): se oculta.
   const [roomy, setRoomy] = useState(true)
@@ -1208,7 +1211,10 @@ export default function GrafcetCanvas() {
             </button>
           </div>
         )}
-        <div className="relative flex min-h-0 flex-1">
+        <div className="relative flex min-h-0 flex-1" {...floatDrop}>
+          {/* Capa de los paneles flotantes del simulador: sobre toda la zona de trabajo (grafcet,
+              planta, esquema); solo los paneles reciben los clics. */}
+          {simulating && <div ref={floatLayerRef} data-float-layer className="pointer-events-none absolute inset-0 z-30" />}
           <div
             ref={wrapperRef}
             onPointerDownCapture={() => setLastPanel(null)}
@@ -1383,6 +1389,7 @@ export default function GrafcetCanvas() {
           {simulating ? (
             <Suspense fallback={<Loading panel />}>
               <SimulationPanel
+                floating={floating}
                 sceneOpen={Boolean(sceneView)}
                 onToggleScene={() => {
                   setSceneView((v) => (v ? null : 'split'))

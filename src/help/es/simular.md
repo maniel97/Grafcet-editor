@@ -20,6 +20,14 @@
 
 En los ejemplos que la tienen, la **planta** (cilindros, cintas, detectores…) se mueve con tus salidas y activa sola las entradas: es como probar en la máquina. El **esquema eléctrico** muestra el autómata cableado y también se simula. Ver [La planta virtual](planta) y [El esquema eléctrico](esquema-electrico).
 
+## Paneles flotantes
+
+El **cronograma**, el **diagrama espacio-fase** y los **escenarios de prueba** se pueden sacar del panel: con el botón de su título o arrastrando el título hasta el lienzo.
+
+- Se mueven por su barra de título y se redimensionan por los bordes y las esquinas (con el teclado: flechas para mover, Mayús + flechas para el tamaño).
+- Más anchos, muestran más: el cronograma, más segundos.
+- **Devolver** los vuelve al panel. Su sitio y su tamaño se recuerdan.
+
 ## Escenarios
 
 «Grabar escenario» anota los cambios de entradas con su instante. Se guardan en el proyecto y se reproducen con un clic: así compruebas, tras cada cambio, que todo sigue funcionando. El cronograma muestra entradas, etapas y salidas en el tiempo.

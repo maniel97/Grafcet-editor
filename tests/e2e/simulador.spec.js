@@ -1208,3 +1208,65 @@ test('potenciómetro: ajuste fino con la rueda y el teclado', async ({ page }) =
   await expect(knob).toHaveAttribute('aria-valuenow', '100')
   expectNoErrors(errors)
 })
+
+// Paneles flotantes: el cronograma y el espacio-fase salen al lienzo (con su botón o arrastrando
+// el título), se mueven, se redimensionan, vuelven al panel y se recuerdan.
+test('paneles flotantes del simulador: sacar, mover, redimensionar, devolver y recordar', async ({ page }) => {
+  await page.setViewportSize({ width: 1700, height: 1000 })
+  const errors = await openEditor(page)
+  await openExample(page, /^Cilindros A\+ B\+/)
+  await page.locator('[data-tour="Simular"]').click()
+  const panel = page.locator('[data-tour="simulacion"]')
+
+  // Con el botón del título.
+  await panel.getByRole('button', { name: 'Sacar «Cronograma» al lienzo' }).click()
+  const chrono = page.getByRole('region', { name: 'Cronograma (flotante)' })
+  await expect(chrono).toBeVisible()
+  await expect(panel.locator('[data-floated="cronograma"]')).toContainText('en el lienzo')
+  const before = await chrono.boundingBox()
+  // Mover por la barra de título.
+  const bar = chrono.getByRole('toolbar')
+  const b = await bar.boundingBox()
+  await page.mouse.move(b.x + 40, b.y + b.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(b.x + 140, b.y + b.height / 2 + 120, { steps: 6 })
+  await page.mouse.up()
+  const moved = await chrono.boundingBox()
+  expect(Math.abs(moved.x - before.x - 100)).toBeLessThan(2)
+  expect(Math.abs(moved.y - before.y - 120)).toBeLessThan(2)
+  // Redimensionar por la esquina: más ancho, y el cronograma se dibuja más ancho (más segundos).
+  const corner = await chrono.locator('[data-resize="se"]').boundingBox()
+  await page.mouse.move(corner.x + corner.width / 2, corner.y + corner.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(corner.x + 200, corner.y + 80, { steps: 6 })
+  await page.mouse.up()
+  const bigger = await chrono.boundingBox()
+  expect(bigger.width).toBeGreaterThan(moved.width + 150)
+  const viewBox = await chrono.getByRole('img', { name: 'Cronograma' }).getAttribute('viewBox')
+  expect(Number(viewBox.split(' ')[2])).toBeGreaterThan(400)
+  // Con el teclado: flechas mueven.
+  await bar.focus()
+  await page.keyboard.press('ArrowLeft')
+  expect((await chrono.boundingBox()).x).toBeLessThan(bigger.x)
+
+  // El espacio-fase, arrastrando su título hasta el lienzo.
+  await panel.getByRole('button', { name: /^Diagrama espacio-fase/ }).dragTo(page.locator('[data-tour="lienzo"]'), { targetPosition: { x: 200, y: 760 } })
+  await expect(page.getByRole('region', { name: 'Diagrama espacio-fase (flotante)' })).toBeVisible()
+
+  // Devolver el cronograma al panel.
+  await chrono.getByRole('button', { name: 'Devolver «Cronograma» al panel' }).click()
+  await expect(chrono).toHaveCount(0)
+  await expect(panel.getByRole('button', { name: 'Sacar «Cronograma» al lienzo' })).toBeVisible()
+
+  // Se recuerda: al volver a entrar y simular, el espacio-fase sigue fuera, en su sitio.
+  const where = await page.getByRole('region', { name: 'Diagrama espacio-fase (flotante)' }).boundingBox()
+  await page.reload()
+  await page.waitForSelector('.react-flow__node')
+  await page.locator('[data-tour="Simular"]').click()
+  const again = page.getByRole('region', { name: 'Diagrama espacio-fase (flotante)' })
+  await expect(again).toBeVisible()
+  const now = await again.boundingBox()
+  expect(Math.abs(now.x - where.x)).toBeLessThan(2)
+  expect(Math.abs(now.y - where.y)).toBeLessThan(2)
+  expectNoErrors(errors)
+})
