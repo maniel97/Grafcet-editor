@@ -53,6 +53,25 @@ const linked = (from, to) => Boolean(from && to) && all('.react-flow__edge').som
 const slowStep = () => steps().find((n) => n.textContent.includes('Motor_lento'))
 const newParo = () => transitionsMatching(/^Paro$/).find((n) => linked(slowStep(), n))
 
+// Tutorial del profesorado: el modo educativo, el escenario guardado y el diálogo del ejercicio.
+const education = () => {
+  try {
+    return JSON.parse(localStorage.getItem('grafcet-editor:settings'))?.education === true
+  } catch {
+    return false
+  }
+}
+const scenarioSaved = () => Boolean(one('[data-scenario]'))
+const exerciseDialogOpen = () => Boolean(one('#exercise-title-input'))
+const behaviourChecked = () => Boolean(one('[data-tour="pruebas-comportamiento"] input[type=checkbox]:checked'))
+const dialogAllGreen = () => {
+  const items = all('[data-tour="probar-ejercicio"] [data-check]')
+  return items.length > 0 && items.every((i) => i.dataset.ok === 'si')
+}
+const exerciseSaved = () => Boolean(one('[data-tour="ejercicio"]')) && !exerciseDialogOpen()
+const behaviourRed = () => Boolean(one('[data-tour="ejercicio"] [data-check^="comportamiento"][data-ok="no"]'))
+const solved = () => Boolean(one('[data-exercise="resuelto"]'))
+
 // Para los ejercicios guiados (lib/guidedExercises.js), que siguen el mismo patrón.
 export const tourHelpers = { all, one, steps, transitions, transitionWith, transitionsMatching, transitionMatching, stepActive, simulating, verified, firstOf, panel, plusBelow, plusAction, loopButton, stepNode, transitionNode, emptyTransition, linked }
 
@@ -283,6 +302,106 @@ export const TUTORIALS = [
         target: 'planta',
         title: N_('¡Hecho!'),
         text: N_('Así se prueba un programa sin máquina. Con «Editar» puedes cambiar la planta, y con las averías (en Usar, sobre cada elemento) practicar qué pasa si un detector falla. Más en el artículo La planta virtual.'),
+      },
+    ],
+  },
+  {
+    id: 'preparar-ejercicio',
+    title: N_('Prepara tu primer ejercicio'),
+    description: N_('Para profesorado: de tu solución a un ejercicio con autocorrección. Qué se le dice al editor, cómo lo comprueba y cómo se reparte.'),
+    start: 'marcha-paro',
+    auto: true,
+    steps: [
+      {
+        target: 'lienzo',
+        title: N_('Tu solución'),
+        text: N_('Esto es un marcha-paro resuelto: el motor arranca con Marcha y se para con Paro (NC). Haz de cuenta que es tu solución.\nVas a convertirlo en un ejercicio. Lo importante: al editor no se le escriben reglas. Todo lo que comprueba sale de tu solución y de lo que marques en un diálogo.'),
+      },
+      {
+        target: 'Opciones',
+        free: true,
+        title: N_('El modo educativo'),
+        text: N_('Las herramientas de clase están escondidas para no llenar los menús.\n1. Pulsa Opciones (el engranaje de arriba a la derecha).\n2. Marca «Mostrar las herramientas para clase» (Modo educativo) y pulsa Listo.'),
+        waitFor: education,
+        hint: N_('Opciones > Modo educativo.'),
+      },
+      {
+        target: firstOf(() => one('[data-tour="simulacion"]'), () => one('[data-tour="Simular"]')),
+        free: true,
+        title: N_('Un escenario de prueba'),
+        text: N_('Para comprobar el comportamiento, el editor necesita saber qué hace una persona con la máquina: un escenario de prueba (qué se pulsa y cuándo).\n1. Pulsa Simular.\n2. En el panel de la derecha, en «Escenarios de prueba», pulsa «Grabar escenario».\n3. En la planta, pulsa Marcha; espera un par de segundos y pulsa Paro.\n4. Pulsa «Detener y guardar».\n(Otra forma: «Dibujar escenario», sin simular.)'),
+        waitFor: scenarioSaved,
+        hint: N_('Graba un escenario: Marcha, espera, Paro, y guárdalo.'),
+      },
+      {
+        target: 'Simular',
+        title: N_('Termina de simular'),
+        text: N_('El escenario queda guardado en el proyecto. Pulsa Detener para volver a editar.'),
+        waitFor: () => !simulating(),
+        hint: N_('Pulsa Detener.'),
+      },
+      {
+        target: 'Exportar',
+        free: true,
+        title: N_('Prepara el ejercicio'),
+        text: N_('Abre Exportar > «Ejercicio para el alumnado». Ahí se dice todo lo que tendrá el ejercicio.'),
+        waitFor: exerciseDialogOpen,
+        hint: N_('Exportar > Ejercicio para el alumnado.'),
+      },
+      {
+        target: firstOf(() => one('[data-tour="pruebas-comportamiento"]'), () => one('#exercise-title-input')),
+        free: true,
+        title: N_('Qué se comprueba'),
+        text: N_('Arriba van el título, el enunciado (con negrita y listas) y lo que recibe hecho el alumnado (tabla, planta, esquema; dado o bloqueado).\nLo que se comprueba:\n• Que cumple la norma y usa las variables de la tabla: siempre.\n• El comportamiento: marca tu escenario en «Pruebas de comportamiento». El editor ejecutará tu solución con él, apuntará cuándo se enciende y se apaga cada salida, y exigirá lo mismo al alumno (con un margen de tiempo).\nMarca tu escenario.'),
+        waitFor: behaviourChecked,
+        hint: N_('Marca tu escenario en «Pruebas de comportamiento».'),
+      },
+      {
+        target: firstOf(() => one('[data-tour="probar-ejercicio"]')),
+        free: true,
+        title: N_('Pruébalo con tu solución'),
+        text: N_('Pulsa «Probar» (en el recuadro «Prueba con tu solución»). Con tu solución todo tiene que salir en verde: si algo sale en rojo, el ejercicio pediría algo que ni tu solución cumple.'),
+        waitFor: dialogAllGreen,
+        hint: N_('Pulsa Probar: todo en verde.'),
+      },
+      {
+        target: firstOf(() => one('[data-tour="probar-ejercicio"]')),
+        free: true,
+        title: N_('Guárdalo'),
+        text: N_('Pulsa «Guardar» (abajo). Al guardar se fija lo que se comprueba con tu solución de este momento.'),
+        waitFor: exerciseSaved,
+        hint: N_('Pulsa Guardar.'),
+      },
+      {
+        target: () => one('[data-tour="ejercicio"]'),
+        title: N_('La vista del profesor'),
+        text: N_('A la derecha, el panel del ejercicio: lo que verá el alumnado (enunciado y «Comprobar»), con una franja de profesor para editarlo y descargarlo. Aquí «Comprobar» corrige tu proyecto como corregirá el del alumno.'),
+      },
+      {
+        target: firstOf(panel, () => transitions().find((n) => n.querySelector('.overline')), () => one('[data-tour="ejercicio"]')),
+        free: true,
+        title: N_('Rómpelo a propósito'),
+        text: N_('La mejor forma de ver qué compara el editor: equivócate como lo haría un alumno.\n1. Haz doble clic en la transición de abajo (la de Paro, con la raya encima: !Paro).\n2. Cambia !Paro por Paro (sin la exclamación).\n3. En el panel del ejercicio, pulsa «Comprobar».'),
+        waitFor: behaviourRed,
+        hint: N_('Cambia !Paro por Paro y pulsa Comprobar.'),
+      },
+      {
+        target: firstOf(() => one('[data-tour="ejercicio"] [data-check^="comportamiento"][data-ok="no"]'), () => one('[data-tour="ejercicio"]')),
+        title: N_('Qué ha detectado'),
+        text: N_('La norma se cumple y las variables son las de la tabla, pero la máquina no responde como tu solución: con tu escenario, el motor no se enciende cuando debía. El mensaje dice qué salida, cuándo se esperaba y qué ha pasado; «Verlo en la simulación» reproduce el escenario para verlo.\nEl aviso amarillo recuerda que tu solución ha cambiado: se comprueba contra lo que guardaste.'),
+      },
+      {
+        target: () => one('[data-tour="ejercicio"]'),
+        free: true,
+        title: N_('Déjalo como estaba'),
+        text: N_('Vuelve a poner !Paro (o pulsa Ctrl+Z) y pulsa Comprobar: todo en verde.'),
+        waitFor: solved,
+        hint: N_('Vuelve a !Paro y comprueba.'),
+      },
+      {
+        target: () => one('[data-tour="ejercicio"]'),
+        title: N_('Listo para repartir'),
+        text: N_('• «Para el alumnado» descarga el ejercicio sin tu grafcet.\n• En el diálogo, «Hoja de prácticas (PDF)» crea una hoja para imprimir con el ejercicio dentro.\n• También puedes pedir requisitos (una temporización, un contador…), escribir pistas y mostrar una nota.\n• Abrir > «Corregir entregas» corrige de golpe los dossiers de la clase.\nTodo está explicado en el artículo Ejercicios de la ayuda.'),
       },
     ],
   },

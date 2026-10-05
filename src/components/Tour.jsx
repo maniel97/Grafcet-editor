@@ -66,6 +66,9 @@ export default function Tour({ tour, onClose }) {
   const [done, setDone] = useState(false)
   const [bubble, setBubble] = useState({ w: WIDTH, h: 160 })
   const [auto, setAuto] = useState(autoAdvance)
+  // Con un diálogo modal abierto, la visita se pinta dentro de él: si no, el diálogo (que va en la
+  // capa superior del navegador) la taparía justo cuando explica qué hacer en él.
+  const [host, setHost] = useState(null)
   const bubbleRef = useRef(null)
   const step = tour.steps[index]
   const last = index === tour.steps.length - 1
@@ -75,6 +78,17 @@ export default function Tour({ tour, onClose }) {
     setDone(!step.waitFor)
     const memory = {} // estado propio de esta vez en el paso (lib/tutorials.js, sequence)
     const tick = () => {
+      const modal = [...document.querySelectorAll('dialog[open]')].findLast((d) => d.matches(':modal')) ?? null
+      setHost((prev) => (prev === modal ? prev : modal))
+      // Lo señalado dentro de un diálogo largo puede quedar fuera de la vista: se trae una vez. (Solo
+      // en diálogos: en el lienzo, desplazar su contenedor descolocaría el grafcet.)
+      if (!memory.scrolled) {
+        const el = elementsOf(step.target)[0]
+        if (el?.closest('dialog')) {
+          memory.scrolled = true
+          el.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+        }
+      }
       const next = areaOf(step.target)
       setArea((prev) => (same(prev, next) ? prev : next))
       if (step.waitFor?.(memory)) setDone(true)
@@ -223,6 +237,6 @@ export default function Tour({ tour, onClose }) {
         </div>
       </section>
     </div>,
-    document.body,
+    host ?? document.body,
   )
 }

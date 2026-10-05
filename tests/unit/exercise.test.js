@@ -152,3 +152,27 @@ describe('fase 3: requisitos, pistas y nota', async () => {
     expect(results.find((r) => r.id === 'requisito-counter')).toMatchObject({ ok: true })
   })
 })
+
+describe('lo que se comprueba se fija al guardar el ejercicio', async () => {
+  const { EXERCISES } = await import('../../src/lib/exercises')
+  const { freezeChecks, exerciseStale } = await import('../../src/lib/exercise')
+  const saved = () => {
+    const teacher = EXERCISES.find((e) => e.id === 'ej-marcha-paro').teacher()
+    return { ...teacher, plc: { ...teacher.plc, exercise: { ...teacher.plc.exercise, frozen: freezeChecks(teacher) } } }
+  }
+  const broken = (project) => ({ ...project, nodes: project.nodes.map((n) => (n.data?.condition === '!Paro' ? { ...n, data: { ...n.data, condition: 'Paro' } } : n)) })
+
+  it('el profesor estropea su solución tras guardar: Comprobar lo ve en rojo y avisa de que ha cambiado', () => {
+    const project = saved()
+    expect(runChecks(project).every((r) => r.ok)).toBe(true)
+    expect(exerciseStale(project)).toBe(false)
+    const changed = broken(project)
+    expect(runChecks(changed).find((r) => r.id === 'comportamiento-0').ok).toBe(false)
+    expect(exerciseStale(changed)).toBe(true)
+  })
+
+  it('la versión del alumnado lleva lo guardado', () => {
+    const project = saved()
+    expect(studentProject(broken(project)).plc.exercise.sealed).toBe(project.plc.exercise.frozen)
+  })
+})

@@ -24,6 +24,9 @@ An **exercise** comes with a statement and what the teacher provides already don
 
 ## For teachers
 
+```tutorial preparar-ejercicio
+```
+
 1. Solve the exercise in the editor: that is your solution and it is not handed out.
 2. Prepare the test scenarios: record them in the simulation (for example, press Marcha and wait for a cycle) or click **Draw scenario** and drag along each input's row to decide when it is pressed; below you see live what your grafcet does.
 3. Export > **Exercise for students**: write the statement, choose what is given already done (and whether it is locked) and what is checked. Click **Test**: with your solution, everything must be green.

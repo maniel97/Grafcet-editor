@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { CircleCheck, CircleDashed, CircleX, Download, GraduationCap, Lightbulb, Pencil, X } from 'lucide-react'
 import { language, t } from '../lib/i18n'
-import { exerciseConfig, hintsOf, isStudent, runChecks } from '../lib/exercise'
+import { exerciseConfig, exerciseStale, hintsOf, isStudent, runChecks } from '../lib/exercise'
 import { gradeOf } from '../lib/requirements'
 import Markdown from '../help/Markdown'
 
@@ -17,6 +17,7 @@ export default function ExercisePanel({ plc, getProject, onEdit, onExportStudent
   const student = isStudent(plc)
   const [results, setResults] = useState(null)
   const [checkedAt, setCheckedAt] = useState(null)
+  const [stale, setStale] = useState(false) // profesor: su solución ha cambiado desde que guardó
   // El profesor prueba las pistas sin que cuenten (no se guarda en su proyecto).
   const [teacherShown, setTeacherShown] = useState(0)
   if (!config) return null
@@ -33,7 +34,9 @@ export default function ExercisePanel({ plc, getProject, onEdit, onExportStudent
   const solved = results && results.length > 0 && passed === results.length
 
   const check = () => {
-    const found = runChecks(getProject())
+    const project = getProject()
+    const found = runChecks(project)
+    if (!student) setStale(exerciseStale(project))
     setResults(found)
     setCheckedAt(new Date())
     onChecked?.(found)
@@ -109,6 +112,11 @@ export default function ExercisePanel({ plc, getProject, onEdit, onExportStudent
                 <p className="flex items-start gap-1.5 text-xs text-slate-500">
                   <CircleDashed size={14} className="mt-0.5 shrink-0" />
                   {t('Arregla lo que sale en rojo, empezando por arriba, y vuelve a comprobar.')}
+                </p>
+              )}
+              {stale && (
+                <p role="note" data-stale className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-950">
+                  {t('Tu solución ha cambiado desde que guardaste el ejercicio: se comprueba contra lo que guardaste entonces (igual que al alumnado). Si el cambio es bueno, vuelve a guardar el ejercicio (Editar el ejercicio > Guardar).')}
                 </p>
               )}
               {config.grade.enabled && (

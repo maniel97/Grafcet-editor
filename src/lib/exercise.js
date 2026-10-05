@@ -129,6 +129,19 @@ function checksFrom(project, config) {
   }
 }
 
+// Al guardar el ejercicio se fija lo que se comprueba con la solución de ese momento (frozen,
+// sellado): desde entonces el profesor y el alumnado se comprueban contra eso.
+export function freezeChecks(project) {
+  const config = exerciseConfig(project.plc)
+  return config ? seal(checksFrom(project, { ...config, frozen: undefined })) : null
+}
+// ¿Ha cambiado la solución desde que se guardó el ejercicio? (hay que volver a guardarlo)
+export function exerciseStale(project) {
+  const config = exerciseConfig(project.plc)
+  if (!config?.frozen || isStudent(project.plc)) return false
+  return config.frozen !== freezeChecks(project)
+}
+
 // Proyecto del profesor (con su solución) -> proyecto para el alumnado (sin solución).
 export function studentProject(project) {
   const config = exerciseConfig(project.plc)
@@ -154,7 +167,7 @@ export function studentProject(project) {
       processData: config.processData,
       ...(config.processData ? { process: { ...EMPTY_PROCESS } } : {}),
       sheet: config.sheet,
-      sealed: seal(checksFrom(project, config)),
+      sealed: config.frozen ?? seal(checksFrom(project, config)),
     },
   }
   // Del lienzo solo se da la tabla de variables (si se da); el grafcet y las notas no.
@@ -175,7 +188,9 @@ export function runChecks(project) {
   const { nodes, edges, plc } = project
   const config = exerciseConfig(plc)
   if (!config) return []
-  const checks = isStudent(plc) ? unseal(plc.exercise.sealed) : checksFrom(project, config)
+  // El profesor comprueba contra lo guardado (frozen), como se comprobará al alumno: si estropea su
+  // solución, lo ve en rojo. Sin guardar todavía, contra su solución tal como está.
+  const checks = isStudent(plc) ? unseal(plc.exercise.sealed) : config.frozen ? unseal(config.frozen) : checksFrom(project, config)
   if (!checks) return [fail('sellado', t('El ejercicio está dañado'), t('No se han podido leer sus comprobaciones: vuelve a abrir el archivo que te dieron.'))]
   const results = []
 

@@ -24,6 +24,9 @@ Um **exercício** traz um enunciado e o que o professor dá já feito (a planta,
 
 ## Para os professores
 
+```tutorial preparar-ejercicio
+```
+
 1. Resolva o exercício no editor: essa é a sua solução e não se distribui.
 2. Prepare os cenários de teste: grave-os na simulação (por exemplo, carregar em Marcha e esperar um ciclo) ou clique em **Desenhar cenário** e arraste na linha de cada entrada para decidir quando se prime; em baixo vê ao vivo o que faz o seu grafcet.
 3. Exportar > **Exercício para os alunos**: escreva o enunciado, escolha o que se dá feito (e se vai bloqueado) e o que se verifica. Clique em **Testar**: com a sua solução, tudo deve ficar a verde.

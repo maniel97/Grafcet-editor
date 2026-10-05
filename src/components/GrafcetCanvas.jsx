@@ -51,7 +51,7 @@ import { buildPlcModel } from '../lib/plcModel'
 import { t } from '../lib/i18n'
 import { FIRST_TOUR, markTourSeen, tourSeen } from '../lib/tours'
 import { tutorialById } from '../lib/tutorials'
-import { bumpProcess, isLocked, isStudent, keepProgress, studentProject } from '../lib/exercise'
+import { bumpProcess, freezeChecks, isLocked, isStudent, keepProgress, studentProject } from '../lib/exercise'
 
 // Partes que no hacen falta al abrir el editor: se descargan la primera vez que se usan, para que
 // la carga inicial sea más ligera (importa sobre todo publicado en internet).
@@ -726,7 +726,15 @@ export default function GrafcetCanvas() {
     if (student) setExerciseOpen(true)
   }, [student])
   const getProject = useCallback(() => ({ nodes: getNodes(), edges: getEdges(), plc: plcRef.current, name: projectNameRef.current }), [getNodes, getEdges])
-  const saveExercise = useCallback((config) => setPlc((p) => ({ ...p, exercise: config })), [])
+  // Guardar el ejercicio fija lo que se comprueba con la solución de ahora (lib/exercise.js frozen).
+  const saveExercise = useCallback(
+    (config) => {
+      const { frozen: _old, ...clean } = config
+      const frozen = freezeChecks({ ...getProject(), plc: { ...plcRef.current, exercise: clean } })
+      setPlc((p) => ({ ...p, exercise: { ...clean, frozen } }))
+    },
+    [getProject],
+  )
   // Versión para el alumnado (sin la solución), como archivo .json.
   const exportStudent = useCallback(
     (config = plcRef.current.exercise) => {

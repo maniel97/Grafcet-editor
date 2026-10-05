@@ -24,6 +24,9 @@ Un **exercice** contient un énoncé et ce que le professeur fournit déjà fait
 
 ## Pour les professeurs
 
+```tutorial preparar-ejercicio
+```
+
 1. Résolvez l’exercice dans l’éditeur : c’est votre solution et elle n’est pas distribuée.
 2. Préparez les scénarios de test : enregistrez-les en simulation (par exemple, appuyer sur Marcha et attendre un cycle) ou cliquez sur **Dessiner un scénario** et faites glisser sur la ligne de chaque entrée pour décider quand elle est actionnée ; en dessous, vous voyez en direct ce que fait votre grafcet.
 3. Exporter > **Exercice pour les élèves** : écrivez l’énoncé, choisissez ce qui est fourni (et s’il est verrouillé) et ce qui est vérifié. Cliquez sur **Tester** : avec votre solution, tout doit être vert.

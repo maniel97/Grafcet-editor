@@ -46,7 +46,7 @@ export default function ExerciseDialog({ plc, getProject, onSave, onExportStuden
   // Probar con la solución del profesor (el proyecto abierto) y lo que hay ahora en el diálogo.
   const test = () => {
     const project = getProject()
-    setResults(runChecks({ ...project, plc: { ...project.plc, exercise: draft } }))
+    setResults(runChecks({ ...project, plc: { ...project.plc, exercise: { ...draft, frozen: undefined } } }))
   }
   const field = 'mt-0.5 w-full rounded-md border border-slate-300 px-2 py-1 text-sm focus:border-blue-500 focus:outline-none'
 
@@ -168,7 +168,7 @@ export default function ExerciseDialog({ plc, getProject, onSave, onExportStuden
               )}
             </div>
           )}
-          <div className="space-y-1.5 rounded-md bg-slate-50 p-2">
+          <div data-tour="pruebas-comportamiento" className="space-y-1.5 rounded-md bg-slate-50 p-2">
             <p className="font-medium">{t('Pruebas de comportamiento')}</p>
             <p className="text-xs text-slate-500">
               {t('Con cada escenario elegido, la máquina del alumno tiene que responder como tu solución: las salidas se encienden y se apagan en los mismos momentos (con un margen) y llegan las mismas piezas a cada recogida. No se compara el dibujo.')}
@@ -314,7 +314,7 @@ export default function ExerciseDialog({ plc, getProject, onSave, onExportStuden
           )}
         </fieldset>
 
-        <section aria-label={t('Prueba con tu solución')} className="space-y-2 rounded-md border border-slate-200 p-3">
+        <section data-tour="probar-ejercicio" aria-label={t('Prueba con tu solución')} className="space-y-2 rounded-md border border-slate-200 p-3">
           <div className="flex items-center justify-between gap-2">
             <p className="font-medium">{t('Prueba con tu solución')}</p>
             <button type="button" onClick={test} className="rounded-md border border-slate-300 px-3 py-1 hover:bg-slate-100">
@@ -345,7 +345,7 @@ export default function ExerciseDialog({ plc, getProject, onSave, onExportStuden
           type="button"
           onClick={() => {
             store()
-            onExportStudent({ ...draft, student: undefined })
+            onExportStudent({ ...draft, student: undefined, frozen: undefined })
           }}
           className="rounded-md border border-blue-300 px-3 py-1.5 text-sm text-blue-800 hover:bg-blue-50"
         >
@@ -359,7 +359,7 @@ export default function ExerciseDialog({ plc, getProject, onSave, onExportStuden
               store()
               setMaking(true)
               try {
-                await onExportSheet({ ...draft, student: undefined })
+                await onExportSheet({ ...draft, student: undefined, frozen: undefined })
               } finally {
                 setMaking(false)
               }

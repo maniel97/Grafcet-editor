@@ -76,7 +76,7 @@ export default function ScenarioControls({ simulation, scenarios, onChange, onEd
       )}
       <ul className="space-y-1">
         {scenarios.map((s) => (
-          <li key={s.id} className="flex items-center gap-1">
+          <li key={s.id} data-scenario={s.id} className="flex items-center gap-1">
             <button
               type="button"
               onClick={() => playScenario(s)}

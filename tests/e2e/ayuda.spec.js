@@ -224,3 +224,65 @@ test('wiki en inglés', async ({ page }) => {
   await expect(help.getByRole('region', { name: 'Search results' }).getByRole('button', { name: /^Enclosure/ })).toBeVisible()
   expectNoErrors(errors)
 })
+
+// El tutorial del profesorado, hecho por un robot: del marcha-paro resuelto a un ejercicio, con un
+// escenario grabado en la planta, el diálogo (la visita se ve sobre él), romper y arreglar.
+test('tutorial «Prepara tu primer ejercicio» (profesorado) de principio a fin', async ({ page }) => {
+  test.setTimeout(120_000)
+  const errors = await openEditor(page)
+  const tut = tutorial(page)
+  await tut.start('Ejercicios', 'preparar-ejercicio')
+  await tut.title('Tu solución')
+  await tut.next()
+
+  await tut.title('El modo educativo')
+  await page.getByTitle(/^Opciones/).click()
+  const options = page.getByRole('dialog', { name: 'Opciones' })
+  await options.getByLabel('Mostrar las herramientas para clase').check()
+  await options.getByRole('button', { name: 'Listo' }).click()
+
+  await tut.title('Un escenario de prueba')
+  await page.locator('[data-tour="Simular"]').click()
+  await page.locator('[data-tour="simulacion"]').getByRole('button', { name: 'Grabar escenario' }).click()
+  await hold(page, 'Pulsador Marcha')
+  await page.waitForTimeout(1500)
+  await hold(page, 'Pulsador Paro')
+  await page.waitForTimeout(500)
+  await page.locator('[data-tour="simulacion"]').getByRole('button', { name: 'Detener y guardar' }).click()
+
+  await tut.title('Termina de simular')
+  await page.locator('[data-tour="Simular"]').click()
+
+  await tut.title('Prepara el ejercicio')
+  await page.getByRole('button', { name: /Exportar/ }).click()
+  await page.getByRole('menuitem', { name: /Ejercicio para el alumnado/ }).click()
+  const dialog = page.getByRole('dialog', { name: 'Ejercicio para el alumnado' })
+
+  // La visita se ve encima del diálogo.
+  await tut.title('Qué se comprueba')
+  await expect(dialog.locator('.tour')).toHaveCount(1)
+  if (process.env.TOUR_SHOT) await page.screenshot({ path: process.env.TOUR_SHOT })
+  await dialog.locator('[data-tour="pruebas-comportamiento"] input[type=checkbox]').first().check()
+  await tut.title('Pruébalo con tu solución')
+  await dialog.getByRole('button', { name: 'Probar' }).click()
+  await tut.title('Guárdalo')
+  await dialog.getByRole('button', { name: 'Guardar', exact: true }).click()
+
+  await tut.title('La vista del profesor')
+  await tut.next()
+  await tut.title('Rómpelo a propósito')
+  const panel = page.getByRole('complementary', { name: 'Ejercicio' })
+  await tut.receptivity(page.locator('.react-flow__node-transition').nth(1), 'Paro')
+  await panel.getByRole('button', { name: 'Comprobar' }).click()
+  await tut.title('Qué ha detectado')
+  await expect(panel.locator('[data-stale]')).toBeVisible()
+  await tut.next()
+
+  await tut.title('Déjalo como estaba')
+  await tut.receptivity(page.locator('.react-flow__node-transition').nth(1), '!Paro')
+  await panel.getByRole('button', { name: 'Comprobar' }).click()
+  await tut.title('Listo para repartir')
+  await tut.next()
+  await expect(page.locator('.tour')).toHaveCount(0)
+  expectNoErrors(errors)
+})
