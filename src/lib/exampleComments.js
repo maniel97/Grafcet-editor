@@ -63,6 +63,18 @@ export const EXAMPLE_COMMENTS = {
     },
     steps: { 0: 'Reposo: A y B dentro', 1: 'Sale A', 2: 'Sale B', 3: 'Entra A', 4: 'Entra B' },
   },
+  'prensa-hidraulica': {
+    variables: {
+      Marcha: 'Pulsador de marcha (un ciclo)',
+      a0: 'Detector: prensa arriba',
+      a1: 'Detector: prensa abajo',
+      'A+': 'Electroválvula: bajar la prensa',
+      'A-': 'Electroválvula: subir la prensa',
+      Prensando: 'Piloto: prensando',
+      '3s/X2': 'Tiempo de prensado',
+    },
+    steps: { 0: 'Reposo: prensa arriba', 1: 'Baja', 2: 'Prensa (distribuidor al centro)', 3: 'Sube' },
+  },
   pickplace: {
     variables: {
       Marcha: 'Pulsador de marcha (un ciclo)',

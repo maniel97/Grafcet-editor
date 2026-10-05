@@ -9,6 +9,7 @@ import { EXAMPLE_COMMENTS } from './exampleComments'
 import { buildPlcModel } from './plcModel'
 import { generatePlcWiring } from './elec/generate'
 import { pneumaticCircuit } from './elec/pneumaticCircuit'
+import { hydraulicCircuit } from './elec/hydraulicCircuit'
 import { powerPart } from './elec/templates'
 import { terminalAddress } from './elec/catalog'
 
@@ -296,6 +297,54 @@ export const EXAMPLES = [
       )
       const components = [...wiring.components.map((c) => (c.type === 'valve' ? { ...c, signal: '' } : c)), ...air.components]
       return { ...project, plc: { ...project.plc, electrical: { enabled: true, components, wires: [...wiring.wires, ...air.wires] } } }
+    },
+  },
+  {
+    id: 'prensa-hidraulica',
+    level: 5,
+    title: 'Prensa electrohidráulica con autómata',
+    description: 'Baja, prensa 3 s y sube: autómata, distribuidor 4/3 en tándem, grupo hidráulico con limitadora y manómetro, y el cilindro de la planta.',
+    tags: ['Lineal', 'Hidráulica', 'Temporización', 'Esquema eléctrico', 'Autómata', 'Planta'],
+    build() {
+      const { nodes, edges } = cycle([
+        { actions: [] },
+        'Marcha · a0',
+        { actions: ['A+'] },
+        'a1',
+        { actions: ['Prensando'] },
+        '3s/X2',
+        { actions: ['A-'] },
+        'a0',
+      ])
+      nodes.push(
+        note(
+          'nota',
+          520,
+          0,
+          '# Prensa electrohidráulica\n**Nivel 5.** Abre el **Esquema eléctrico**: las salidas del autómata dan tensión a las electroválvulas del distribuidor **4/3 en tándem** (1V1).\n\n- `A+` baja la prensa hasta `a1`; prensa **3 s** sin ninguna orden: con el distribuidor en el centro, el aceite encerrado sujeta el cilindro y la bomba descarga (el manómetro marca 0).\n- `A-` la sube hasta `a0`.\n- Al llegar al tope, la presión sube hasta la limitadora (0V1).\n\nPruébalo: **Simular** y pulsa Marcha.',
+          { width: 320, height: 330 },
+        ),
+      )
+      const scene = {
+        elements: [
+          { id: 'marcha', type: 'button', x: 80, y: 100, rot: 0, variable: 'Marcha', contact: 'NO', color: 'green', text: 'Marcha' },
+          { id: 'A', type: 'cylinder', x: 260, y: 40, rot: 90, text: 'Prensa', extend: 'A+', retract: 'A-', retracted: 'a0', extended: 'a1', stroke: 100, time: 3 },
+          { id: 'prensando', type: 'lamp', x: 0, y: 0, rot: 0, variable: 'Prensando', color: 'yellow', text: 'Prensando', place: 'desk' },
+        ],
+      }
+      return { nodes, edges, plc: { scene } }
+    },
+    // Esquema: el cableado del autómata y, a su derecha, la parte hidráulica; las electroválvulas
+    // mueven el distribuidor y el cilindro hidráulico, el de la planta.
+    after(project) {
+      const vars = buildPlcModel(project.nodes, project.edges, project.plc).variables
+      const wiring = generatePlcWiring(vars, project.plc.scene)
+      const valveOf = (name) => wiring.components.find((c) => c.type === 'valve' && c.signal === name)?.tag ?? ''
+      const right = Math.max(...wiring.components.map((c) => c.x + (c.type === 'rail' ? Number(c.length) : 160))) + 260
+      const top = Math.min(...wiring.components.map((c) => c.y))
+      const oil = hydraulicCircuit([{ tag: 'A', sol14: valveOf('A+'), sol12: valveOf('A-'), signal: 'A+', reverse: 'A-', time: 3, text: 'Prensa' }], right, top, 'oil')
+      const components = [...wiring.components.map((c) => (c.type === 'valve' ? { ...c, signal: '' } : c)), ...oil.components]
+      return { ...project, plc: { ...project.plc, electrical: { enabled: true, components, wires: [...wiring.wires, ...oil.wires] } } }
     },
   },
   {

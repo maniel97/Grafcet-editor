@@ -138,3 +138,47 @@ describe('hidráulica: montajes', () => {
     expect(gauge(st)).toBe(120)
   })
 })
+
+describe('hidráulica: ejemplo «Prensa electrohidráulica con autómata»', () => {
+  it('Marcha: baja, prensa 3 s sujeta por el aceite (bomba a 0 bar) y sube; la planta la sigue', async () => {
+    const { EXAMPLES } = await import('../../src/lib/examples')
+    const { normalizeProject } = await import('../../src/lib/projectFile')
+    const { buildPlcModel } = await import('../../src/lib/plcModel')
+    const { compile, evolve, initialState } = await import('../../src/lib/sim/engine')
+    const { sceneAction } = await import('../../src/lib/sim/scene')
+    const { advanceWorld, makeWorld } = await import('../../src/lib/sim/world')
+    const project = normalizeProject(EXAMPLES.find((e) => e.id === 'prensa-hidraulica').build())
+    const elec = project.plc.electrical
+    const valve = elec.components.find((x) => x.type === 'hvalve')
+    expect([valve.sol14, valve.sol12].every(Boolean)).toBe(true)
+    const model = buildPlcModel(project.nodes, project.edges, project.plc)
+    const compiled = compile(model)
+    const scene = project.plc.scene
+    const world = makeWorld(scene, () => null, elec, model.variables)
+    let w = sceneAction(scene, world.init(), 'marcha', 'press')
+    let inputs = world.inputs(w)
+    let state = evolve(compiled, initialState(compiled), inputs, 0).state
+    const cyl = elec.components.find((x) => x.type === 'hcylinder').id
+    const seen = []
+    let pressing = null
+    let plantMax = 0
+    for (let t = 0.1; t <= 12 + 1e-9; t += 0.1) {
+      const r = advanceWorld(compiled, { state, inputs, world: w }, t, { world })
+      ;({ state, inputs } = r)
+      w = r.world
+      if (t > 0.5) w = sceneAction(scene, w, 'marcha', 'release')
+      const h = w.elec.view.hydro
+      const pos = h.cylinders[cyl].pos
+      const now = pos > 0.98 ? 'abajo' : pos < 0.02 ? 'arriba' : 'moviendo'
+      if (seen.at(-1) !== now) seen.push(now)
+      // A mitad del prensado: quieto abajo y la bomba descargando (centro en tándem).
+      if (!pressing && now === 'abajo' && h.valves[valve.id] === '0') pressing = { pos, bar: Object.values(h.gauges)[0] }
+      plantMax = Math.max(plantMax, w.pos.A ?? 0)
+    }
+    expect(seen).toEqual(['arriba', 'moviendo', 'abajo', 'moviendo', 'arriba'])
+    expect(pressing).toMatchObject({ bar: 0 })
+    expect(pressing.pos).toBeGreaterThan(0.98)
+    expect(plantMax).toBeGreaterThan(0.95)
+    expect(w.pos.A).toBe(0)
+  })
+})
