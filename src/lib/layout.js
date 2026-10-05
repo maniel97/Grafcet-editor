@@ -6,6 +6,9 @@ export const GRID = 10
 const SIZE = {
   step: { width: 56, height: 56 },
   transition: { width: 56, height: 24 },
+  // Antes de medirse (justo al abrir un proyecto), la tabla de variables ocupa al menos esto: así
+  // un nodo nuevo no se pone encima de ella.
+  variables: { width: 420, height: 260 },
 }
 // La receptividad se dibuja fuera de la caja de la transición: se reserva hueco para ella,
 // proporcional al tamaño del texto del diagrama (140px con la letra por defecto de 14px).
@@ -53,8 +56,8 @@ export function nextTransitionLabel(nodes) {
 
 function rectOf(node) {
   const base = SIZE[node.type] ?? SIZE.step
-  const width = node.measured?.width ?? base.width
-  const height = node.measured?.height ?? base.height
+  const width = node.measured?.width ?? node.width ?? base.width
+  const height = node.measured?.height ?? node.height ?? base.height
   const extra = node.type === 'transition' ? transitionLabelSpace() : 0
   return { x: node.position.x, y: node.position.y, width: width + extra, height }
 }

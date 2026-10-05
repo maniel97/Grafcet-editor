@@ -1512,9 +1512,11 @@ const PALETTE_BY_KEY = Object.fromEntries(PALETTE_ITEMS.map((i) => [i.key, i]))
 // modo Editar, los botones y atajos de edición de siempre (deshacer, rehacer, copiar, pegar…)
 // actúan sobre la escena, con su propio historial.
 // onCreateVariable(name, type): añade una variable nueva a la tabla (escrita en un elemento).
-export default function SceneView({ scene, onChange, worldState, values, time, variables, onAction, onHistory, onCreateVariable, maximized, onToggleMaximize, onClose }) {
+// editLocked: ejercicio con la planta bloqueada (solo se usa: no se edita).
+export default function SceneView({ scene, onChange, worldState, values, time, variables, onAction, onHistory, onCreateVariable, maximized, onToggleMaximize, onClose, editLocked = false }) {
   const elements = scene?.elements ?? []
-  const [mode, setMode] = useState('use')
+  const [modeState, setMode] = useState('use')
+  const mode = editLocked ? 'use' : modeState
   // Selección: ids de los elementos (Ctrl+clic añade o quita; recuadro con el ratón).
   const [selection, setSelection] = useState([])
   const selected = selection.length === 1 ? selection[0] : null
@@ -2203,7 +2205,9 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
           {[
             ['use', tr('Usar'), Hand, tr('Accionar pulsadores, interruptores y alimentadores')],
             ['edit', tr('Editar'), MousePointer2, tr('Colocar, mover y configurar elementos')],
-          ].map(([id, label, Icon, title]) => (
+          ]
+            .filter(([id]) => !(editLocked && id === 'edit'))
+            .map(([id, label, Icon, title]) => (
             <button
               key={id}
               type="button"

@@ -50,6 +50,7 @@ import { buildPlcModel } from '../lib/plcModel'
 import { t } from '../lib/i18n'
 import { FIRST_TOUR, markTourSeen, tourSeen } from '../lib/tours'
 import { tutorialById } from '../lib/tutorials'
+import { isLocked, isStudent, studentProject } from '../lib/exercise'
 
 // Partes que no hacen falta al abrir el editor: se descargan la primera vez que se usan, para que
 // la carga inicial sea más ligera (importa sobre todo publicado en internet).
@@ -73,6 +74,8 @@ const stripForShare = ({ nodes, edges }) => ({
   edges: edges.map(({ selected: _s, ...e }) => e),
 })
 const ProjectsDialog = lazy(() => import('./ProjectsDialog'))
+const ExercisePanel = lazy(() => import('./ExercisePanel'))
+const ExerciseDialog = lazy(() => import('./ExerciseDialog'))
 
 // Mientras se descarga una parte diferida (normalmente un instante).
 function Loading({ panel }) {
@@ -231,6 +234,12 @@ export default function GrafcetCanvas() {
     const frame = requestAnimationFrame(() =>
       requestAnimationFrame(() => {
         const others = nodes.filter((n) => n.id !== table.id && !n.hidden)
+        // Sin nada más dibujado (p. ej. un ejercicio recién abierto) no hay «a la izquierda de»: se
+        // queda donde está (si no, su posición sería infinita).
+        if (!others.length) {
+          setNodes((nds) => nds.map((n) => (n.id === table.id ? { ...n, data: { ...n.data, autoPlace: undefined } } : n)))
+          return
+        }
         let left = Math.min(...others.map((n) => n.position.x))
         const top = Math.min(...others.filter((n) => n.type !== 'note').map((n) => n.position.y))
         // Los enlaces (bucles incluidos), en coordenadas del lienzo.
@@ -350,6 +359,7 @@ export default function GrafcetCanvas() {
   // Renombrar una variable en todo el diagrama (renameVar, más abajo), para la tabla del lienzo.
   const renameVarRef = useRef(null)
   const renameEverywhere = useCallback((from, to) => renameVarRef.current?.(from, to) ?? null, [])
+  const tableLocked = isLocked(plc, 'variables') // ejercicio con la tabla dada bloqueada
   const editorApi = useMemo(
     () => ({
       takeSnapshot,
@@ -365,13 +375,14 @@ export default function GrafcetCanvas() {
       toggleTable,
       simulating,
       readOnly,
+      tableLocked,
       connecting,
       editingNoteId,
       setEditingNoteId,
       sim: simulating ? simulation.view : null,
       explainTransition: simulating ? explainNow : null,
     }),
-    [takeSnapshot, renameEverywhere, markedIssues, plcView, plcTable, highlight, setHighlight, toggleTable, simulating, readOnly, connecting, editingNoteId, simulation.view, explainNow],
+    [takeSnapshot, renameEverywhere, markedIssues, plcView, plcTable, highlight, setHighlight, toggleTable, simulating, readOnly, connecting, editingNoteId, simulation.view, explainNow, tableLocked],
   )
 
   // --- Edición -----------------------------------------------------------------------------------
@@ -658,6 +669,34 @@ export default function GrafcetCanvas() {
     },
     [replaceProject],
   )
+  // Ejercicios (lib/exercise.js): panel con el enunciado y «Comprobar»; el alumnado lo tiene
+  // abierto en cuanto abre un ejercicio. El profesor lo prepara en Exportar > Ejercicio.
+  const [exerciseOpen, setExerciseOpen] = useState(false)
+  const student = isStudent(plc)
+  useEffect(() => {
+    if (student) setExerciseOpen(true)
+  }, [student])
+  const getProject = useCallback(() => ({ nodes: getNodes(), edges: getEdges(), plc: plcRef.current, name: projectNameRef.current }), [getNodes, getEdges])
+  const saveExercise = useCallback((config) => setPlc((p) => ({ ...p, exercise: config })), [])
+  // Versión para el alumnado (sin la solución), como archivo .json.
+  const exportStudent = useCallback(
+    (config = plcRef.current.exercise) => {
+      const project = { ...getProject(), plc: { ...plcRef.current, exercise: config } }
+      const forStudents = studentProject(project)
+      saveProject(forStudents, fileName('json', 'ejercicio'))
+    },
+    [getProject],
+  )
+  const openExercise = useCallback(
+    (exercise) => {
+      const project = studentProject(exercise.teacher())
+      replaceProject({ ...normalizeProject(project), name: exercise.title }, t('Antes de abrir el ejercicio «{ejercicio}»', { ejercicio: exercise.title }))
+      setProjectsTab(null)
+      setExerciseOpen(true)
+    },
+    [replaceProject],
+  )
+
   // Tutorial de la ayuda: abre su proyecto de partida (vacío: solo la etapa 0) y lo guía.
   const startTutorial = useCallback(
     async (id) => {
@@ -778,6 +817,10 @@ export default function GrafcetCanvas() {
           canRedo={activeSceneHistory ? activeSceneHistory.canRedo : canRedo}
           historyUnlocked={Boolean(activeSceneHistory)}
           onExport={onExport}
+          onOpenExercises={() => setProjectsTab('exercises')}
+          exerciseShown={Boolean(plc.exercise)}
+          exerciseOpen={exerciseOpen}
+          onToggleExercise={() => setExerciseOpen((o) => !o)}
           onSave={save}
           onOpen={() => fileInputRef.current?.click()}
           onOpenExamples={() => setProjectsTab('examples')}
@@ -825,6 +868,7 @@ export default function GrafcetCanvas() {
         {variablesOpen && (
           <Suspense fallback={<Loading />}>
             <VariablesDialog
+              locked={isLocked(plc, 'variables')}
               plc={plc}
               stepNodes={stepNodes}
               symbols={symbols}
@@ -866,6 +910,7 @@ export default function GrafcetCanvas() {
             <ProjectsDialog
               initialTab={projectsTab}
               onOpenExample={openExample}
+              onOpenExercise={openExercise}
               onRestore={restoreRecent}
               onClose={() => setProjectsTab(null)}
             />
@@ -894,7 +939,21 @@ export default function GrafcetCanvas() {
             />
           </Suspense>
         )}
-        {exportFormat && exportFormat !== 'dossier' && exportFormat !== 'share' && (
+        {exportFormat === 'exercise' && (
+          <Suspense fallback={<Loading />}>
+            <ExerciseDialog
+              plc={plc}
+              getProject={getProject}
+              onSave={(config) => {
+                saveExercise(config)
+                setExerciseOpen(true)
+              }}
+              onExportStudent={exportStudent}
+              onClose={() => setExportFormat(null)}
+            />
+          </Suspense>
+        )}
+        {exportFormat && exportFormat !== 'dossier' && exportFormat !== 'share' && exportFormat !== 'exercise' && (
           <Suspense fallback={<Loading />}>
             <ExportDialog
               source={exportSource}
@@ -1149,6 +1208,7 @@ export default function GrafcetCanvas() {
           {elecView && (
             <Suspense fallback={<Loading panel />}>
               <ElectricalView
+                editLocked={isLocked(plc, 'electrical')}
                 schematic={plc.electrical}
                 onChange={(electrical) => setPlc((p) => ({ ...p, electrical }))}
                 elecState={simulating ? (simulation.sim?.world?.elec ?? null) : null}
@@ -1175,6 +1235,7 @@ export default function GrafcetCanvas() {
               {/* contents: no cambia el diseño; solo marca la planta como el último panel tocado. */}
               <div className="contents" onPointerDownCapture={() => setLastPanel('scene')}>
               <SceneView
+                editLocked={isLocked(plc, 'plant')}
                 scene={plc.scene}
                 onChange={(scene) => setPlc((p) => ({ ...p, scene }))}
                 worldState={simulation.sim.world}
@@ -1228,6 +1289,17 @@ export default function GrafcetCanvas() {
                 previousSteps={previousSteps}
               />
               {verifyOpen && <VerifyPanel issues={issues} onFocus={focusIssue} onHelp={openArticle} onClose={() => setVerifyOpen(false)} />}
+              {exerciseOpen && plc.exercise && (
+                <Suspense fallback={null}>
+                  <ExercisePanel
+                    plc={plc}
+                    getProject={getProject}
+                    onEdit={() => setExportFormat('exercise')}
+                    onExportStudent={() => exportStudent()}
+                    onClose={() => setExerciseOpen(false)}
+                  />
+                </Suspense>
+              )}
             </>
           )}
         </div>

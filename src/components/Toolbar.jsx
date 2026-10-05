@@ -5,6 +5,7 @@ import ToolbarDropdown from './ToolbarDropdown'
 import Logo from './Logo'
 import { t, N_ } from '../lib/i18n'
 import {
+  GraduationCap,
   Square,
   Minus,
   RectangleHorizontal,
@@ -114,6 +115,10 @@ export default function Toolbar({
   onOpen,
   onOpenExamples,
   onOpenRecent,
+  onOpenExercises,
+  exerciseShown = false,
+  exerciseOpen = false,
+  onToggleExercise,
   onOpenPneumatic,
   onClear,
   onOpenSettings,
@@ -188,6 +193,7 @@ export default function Toolbar({
           { id: 'new', label: N_('Nuevo'), hint: N_('Proyecto en blanco: título, autómata y tabla de variables'), icon: FilePlus, onSelect: onNew },
           { id: 'file', label: N_('Abrir archivo'), hint: N_('Proyecto .json guardado (Ctrl+O)'), icon: FileJson, onSelect: onOpen },
           { id: 'examples', label: N_('Ejemplos'), hint: N_('Grafcets típicos listos para usar'), icon: BookOpen, onSelect: onOpenExamples },
+          { id: 'exercises', label: N_('Ejercicios'), hint: N_('Ejercicios con autocorrección, por niveles'), icon: GraduationCap, onSelect: onOpenExercises },
           { id: 'recent', label: N_('Trabajos anteriores'), hint: N_('Recuperar lo que había antes de abrir o limpiar'), icon: History, onSelect: onOpenRecent },
           { id: 'pneumatic', label: N_('Secuencia neumática'), hint: N_('Crear el grafcet y la planta de una secuencia como A+ B+ B− A−'), icon: Wind, onSelect: onOpenPneumatic },
         ]}
@@ -240,6 +246,9 @@ export default function Toolbar({
         primary
         badge={<VerifyBadge {...issueCounts} />}
       />
+      {exerciseShown && (
+        <ToolButton icon={GraduationCap} label={N_('Ejercicio')} title={N_('Enunciado y «Comprobar»')} onClick={onToggleExercise} active={exerciseOpen} primary />
+      )}
       <ToolButton icon={Search} label={N_('Buscar')} title={N_('Buscar en el diagrama: etapas, receptividades, acciones y notas (Ctrl+F)')} onClick={onSearch} iconOnly />
 
       <div className="ml-auto" />

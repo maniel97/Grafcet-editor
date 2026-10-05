@@ -81,6 +81,7 @@ export default function VariablesDialog({
   onAddVariable,
   onRenameVariable,
   onClose,
+  locked = false, // ejercicio: la tabla la da el profesor bloqueada
 }) {
   const dialogRef = useRef(null)
   const [tab, setTab] = useState('steps')
@@ -141,6 +142,7 @@ export default function VariablesDialog({
           value={plc.scheme}
           onChange={(e) => onChange((p) => ({ ...p, scheme: e.target.value }))}
           aria-label={t('Formato de direcciones')}
+          disabled={locked}
         >
           {SCHEMES.map((s) => (
             <option key={s.id} value={s.id}>
@@ -158,6 +160,7 @@ export default function VariablesDialog({
               onChange((p) => ({ ...p, stepPrefix: e.target.value }))
             }}
             aria-label={t('Nombre de las variables de etapa')}
+            disabled={locked}
           >
             {STEP_PREFIXES.map((p) => (
               <option key={p.id} value={p.id}>
@@ -177,6 +180,7 @@ export default function VariablesDialog({
         <button
           type="button"
           onClick={() => onAutoAssign(true)}
+          disabled={locked}
           title={t('Vuelve a asignar todas las direcciones en orden (se puede deshacer)')}
           className="rounded-md border border-slate-300 px-3 py-1 hover:bg-slate-100"
         >
@@ -234,7 +238,12 @@ export default function VariablesDialog({
         )}
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-4">
+      {locked && (
+        <p role="note" className="mx-5 mt-2 rounded-md bg-amber-50 px-3 py-1.5 text-sm text-amber-900">
+          {t('Ejercicio: la tabla de variables la da el profesor y no se puede cambiar. Usa estos nombres en el grafcet.')}
+        </p>
+      )}
+      <fieldset disabled={locked} className="min-h-0 min-w-0 flex-1 overflow-y-auto px-5 pb-4">
         {tab === 'steps' ? (
           <table className="w-full">
             <thead className="sticky top-0 bg-white">
@@ -404,7 +413,7 @@ export default function VariablesDialog({
             </div>
           </>
         )}
-      </div>
+      </fieldset>
     </dialog>
   )
 }

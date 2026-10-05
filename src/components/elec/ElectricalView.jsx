@@ -288,7 +288,8 @@ export default function ElectricalView(props) {
   )
 }
 
-function Inner({ schematic, onChange, elecState, onAction, variables = [], buildVariables, scene, simulating, onHistory, onActivate, maximized, onToggleMaximize, onClose, titleInfo = {}, exportProps = {} }) {
+// editLocked: ejercicio con el esquema bloqueado (solo se usa: no se edita).
+function Inner({ schematic, onChange, elecState, onAction, variables = [], buildVariables, scene, simulating, onHistory, onActivate, maximized, onToggleMaximize, onClose, titleInfo = {}, exportProps = {}, editLocked = false }) {
   const sch = schematic ?? EMPTY
   const allComponents = useMemo(() => sch.components ?? [], [sch.components])
   const allWires = useMemo(() => sch.wires ?? [], [sch.wires])
@@ -310,7 +311,8 @@ function Inner({ schematic, onChange, elecState, onAction, variables = [], build
   const { screenToFlowPosition, fitView, getNodes, zoomIn, zoomOut } = useReactFlow()
   const wrapperRef = useRef(null)
   // Al empezar o acabar la simulación, Usar o Editar (se puede cambiar a mano).
-  const [mode, setMode] = useState(simulating ? 'use' : 'edit')
+  const [modeState, setMode] = useState(simulating ? 'use' : 'edit')
+  const mode = editLocked ? 'use' : modeState
   const [wasSimulating, setWasSimulating] = useState(simulating)
   if (wasSimulating !== simulating) {
     setWasSimulating(simulating)
@@ -756,7 +758,9 @@ function Inner({ schematic, onChange, elecState, onAction, variables = [], build
             {[
               ['use', tr('Usar'), Hand],
               ['edit', tr('Editar'), MousePointer2],
-            ].map(([id, label, Icon]) => (
+            ]
+              .filter(([id]) => !(editLocked && id === 'edit'))
+              .map(([id, label, Icon]) => (
               <button
                 key={id}
                 type="button"

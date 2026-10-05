@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
-import { BookOpen, History, RotateCcw, Trash2, X } from 'lucide-react'
+import { BookOpen, GraduationCap, History, RotateCcw, Trash2, X } from 'lucide-react'
 import { EXAMPLES, LEVELS } from '../lib/examples'
+import { EXERCISES } from '../lib/exercises'
 import { listRecent, removeRecent } from '../lib/recent'
 import { t, N_ } from '../lib/i18n'
 
 const TABS = [
   { id: 'examples', label: N_('Ejemplos'), icon: BookOpen },
+  { id: 'exercises', label: N_('Ejercicios'), icon: GraduationCap },
   { id: 'recent', label: N_('Trabajos anteriores'), icon: History },
 ]
 
@@ -14,7 +16,7 @@ const when = (iso) =>
 
 // Abrir un ejemplo o recuperar un trabajo anterior. Lo que hay en el lienzo antes de abrir se
 // guarda solo como trabajo anterior (y también se puede deshacer con Ctrl+Z).
-export default function ProjectsDialog({ initialTab = 'examples', onOpenExample, onRestore, onClose }) {
+export default function ProjectsDialog({ initialTab = 'examples', onOpenExample, onOpenExercise, onRestore, onClose }) {
   const dialogRef = useRef(null)
   const [tab, setTab] = useState(initialTab)
   const [recent, setRecent] = useState(() => listRecent())
@@ -88,6 +90,27 @@ export default function ProjectsDialog({ initialTab = 'examples', onOpenExample,
                 </ul>
               </section>
             ))}
+          </div>
+        ) : tab === 'exercises' ? (
+          <div className="space-y-3">
+            <p className="text-sm text-slate-600">
+              {t('Se abre el enunciado con lo que se da hecho (planta, tabla de variables…). Dibuja el grafcet y pulsa «Comprobar» cuantas veces quieras. Cada profesor puede preparar los suyos en Exportar > Ejercicio para el alumnado.')}
+            </p>
+            <ul className="grid gap-3 sm:grid-cols-2">
+              {EXERCISES.map((ex) => (
+                <li key={ex.id}>
+                  <button
+                    type="button"
+                    onClick={() => onOpenExercise(ex)}
+                    className="flex h-full w-full flex-col gap-1 rounded-lg border border-slate-200 p-3 text-left hover:border-blue-400 hover:bg-blue-50"
+                  >
+                    <span className="text-xs font-medium uppercase tracking-wide text-slate-500">{t('Nivel {n}', { n: ex.level })}</span>
+                    <span className="font-medium">{ex.title}</span>
+                    <span className="text-sm text-slate-600">{ex.description}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
           </div>
         ) : (
           <>

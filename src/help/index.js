@@ -12,6 +12,7 @@ export const SECTIONS = [
   { title: N_('Estructurar'), articles: ['macroetapas', 'grafcets-parciales', 'encapsulacion', 'gemma', 'hojas'] },
   { title: N_('Comprobar y simular'), articles: ['verificar', 'simular', 'planta', 'esquema-electrico'] },
   { title: N_('Al autómata'), articles: ['variables', 'ladder'] },
+  { title: N_('En clase'), articles: ['ejercicios'] },
 ]
 
 // Texto del artículo en el idioma elegido (o en español).

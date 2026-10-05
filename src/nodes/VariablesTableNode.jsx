@@ -87,7 +87,9 @@ function HeaderButton({ icon: Icon, title, onClick, active }) {
 // arrastrar una variable a otra sección cambia su tipo.
 export default function VariablesTableNode({ id, data, selected }) {
   // En solo lectura (simulando o con la edición bloqueada) la tabla se ve pero no se edita.
-  const { plcTable, setHighlight, readOnly, renameEverywhere } = useEditor()
+  const { plcTable, setHighlight, readOnly: editLocked, tableLocked, renameEverywhere } = useEditor()
+  // Bloqueada al simular, con el lienzo bloqueado o en un ejercicio que la da bloqueada.
+  const readOnly = editLocked || tableLocked
   const [dragging, setDragging] = useState(null) // nombre de la variable que se arrastra
   const [dropTarget, setDropTarget] = useState(null)
   if (!plcTable) return null
