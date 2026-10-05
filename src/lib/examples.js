@@ -1125,6 +1125,65 @@ export const EXAMPLES = [
     },
   },
   {
+    id: 'clasificacion-frente',
+    level: 3,
+    title: 'Clasificación por tamaño con cinta reversible (vista de frente)',
+    description: 'Cada pieza cae sobre la cinta; una barrera óptica a media altura distingue las altas, y la cinta las lleva a un extremo o al otro, por donde caen a su recogida.',
+    tags: ['Vista de frente', 'Gravedad', 'Divergencia en O', 'Temporización', 'Planta'],
+    build() {
+      const nodes = [
+        step('s0', '0', 200, 0, [], { initial: true }),
+        trans('t1', 'Marcha', 200, 100),
+        step('s1', '1', 200, 170, ['Soltar']),
+        trans('t2', 'Pieza', 200, 270),
+        step('s2', '2', 200, 340),
+        // Se espera a que la pieza se asiente para mirar su altura; elección excluyente.
+        trans('t3', '0.5s/X2 · Alta', 80, 440),
+        trans('t4', '0.5s/X2 · !Alta', 320, 440),
+        step('s3', '3', 80, 510, ['Atras']),
+        step('s4', '4', 320, 510, ['Adelante']),
+        trans('t5', '3s/X3', 80, 610),
+        trans('t6', '3s/X4', 320, 610),
+        note(
+          'nota',
+          600,
+          0,
+          '# Clasificación por tamaño\n**Nivel 3.** Planta **de frente**, con gravedad.\n\n- `Soltar` deja caer una pieza sobre el centro de la cinta (pequeñas y grandes, alternas).\n- `Pieza` (debajo de la cinta) ve que ha llegado; `Alta` es una barrera a media altura: solo la corta una pieza grande.\n- Grandes a la izquierda (`Atras`), pequeñas a la derecha (`Adelante`): la cinta las lleva al extremo y **caen** a su recogida.\n- Elección excluyente: `Alta` / `!Alta`, tras 0,5 s para que la pieza se asiente.\n\nPruébalo: **Simular** y activa Marcha.',
+          { width: 330, height: 360 },
+        ),
+      ]
+      const edges = links([
+        ['s0', 't1'],
+        ['t1', 's1'],
+        ['s1', 't2'],
+        ['t2', 's2'],
+        ['s2', 't3'],
+        ['s2', 't4'],
+        ['t3', 's3'],
+        ['t4', 's4'],
+        ['s3', 't5'],
+        ['s4', 't6'],
+        ['t5', 's0'],
+        ['t6', 's0'],
+      ])
+      // Medidas comprobadas en la simulación (tests/unit/exampleRuns.test.js): la pieza cae al
+      // centro de la cinta, Alta solo corta las grandes y cada extremo cae en su recogida.
+      const scene = {
+        gravity: true,
+        elements: [
+          { id: 'alimentador', type: 'feeder', x: 300, y: 180, rot: 0, trigger: 'Soltar', auto: false, spacing: 0, sizes: 'mixed', material: 'plastic', color: 'amber' },
+          { id: 'cinta', type: 'conveyor', x: 100, y: 300, rot: 0, motor: 'Adelante', reverse: 'Atras', length: 400, time: 4, text: 'Cinta' },
+          { id: 'pieza', type: 'sensor', x: 300, y: 345, rot: 270, variable: 'Pieza', contact: 'NO', kind: 'optical', range: 70, color: 'amber' },
+          { id: 'alta', type: 'sensor', x: 240, y: 249, rot: 0, variable: 'Alta', contact: 'NO', kind: 'optical', range: 120, color: 'amber' },
+          { id: 'grandes', type: 'sink', x: 70, y: 430, rot: 0, text: 'Grandes' },
+          { id: 'pequenas', type: 'sink', x: 530, y: 430, rot: 0, text: 'Pequeñas' },
+          { id: 'marcha', type: 'switch', x: 0, y: 0, rot: 0, variable: 'Marcha', contact: 'NO', text: 'Marcha', place: 'desk' },
+        ],
+      }
+      return { nodes, edges, plc: { scene } }
+    },
+  },
+  {
     id: 'elevador-frente',
     level: 5,
     title: 'Estación de elevación (vista de frente)',

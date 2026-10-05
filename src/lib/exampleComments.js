@@ -473,6 +473,20 @@ export const EXAMPLE_COMMENTS = {
     },
     steps: { 0: 'Reposo (C a 0)', 1: 'Expulsando', 2: 'Recogiendo el expulsor (C + 1)', 3: 'Lote listo' },
   },
+  'clasificacion-frente': {
+    variables: {
+      Marcha: 'Interruptor de marcha',
+      Pieza: 'Detector: pieza sobre la cinta',
+      Alta: 'Barrera a media altura: pieza grande',
+      Soltar: 'Soltar una pieza sobre la cinta',
+      Adelante: 'Cinta hacia la derecha (pequeñas)',
+      Atras: 'Cinta hacia la izquierda (grandes)',
+      '0.5s/X2': 'Pieza asentada en la cinta',
+      '3s/X3': 'Grande en su recogida',
+      '3s/X4': 'Pequeña en su recogida',
+    },
+    steps: { 0: 'Parado', 1: 'Soltando una pieza', 2: 'Midiendo la altura', 3: 'Grande a la izquierda', 4: 'Pequeña a la derecha' },
+  },
   'apilador-trampilla': {
     variables: {
       Marcha: 'Interruptor de marcha',

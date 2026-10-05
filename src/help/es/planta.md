@@ -40,6 +40,10 @@ Una taladradora con su planta.
 Con gravedad: las piezas caen del cargador.
 ```
 
+```ejemplo clasificacion-frente
+Con gravedad: cada pieza cae sobre la cinta y, por un extremo u otro, a su recogida.
+```
+
 Para probarla paso a paso:
 
 ```tutorial planta

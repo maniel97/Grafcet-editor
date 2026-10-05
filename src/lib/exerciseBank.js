@@ -117,6 +117,18 @@ export const BANK = [
     requirements: [{ id: 'timer' }, { id: 'edge' }],
     hints: ['Un grafcet para el semáforo y otro, pequeño, que recuerda la petición (dos etapas).', 'La petición se recuerda con `↑Pulsador` y se borra cuando los peatones tienen verde (`X3`).', 'El verde de coches termina con `10s/X0 · X11`: tiempo mínimo y petición.'],
   }),
+  entry('ej-clasificacion-frente', 3, 'clasificacion-frente', 'Clasificación por tamaño (vista de frente)', 'Gravedad, una barrera óptica y una cinta reversible.', {
+    statement: 'Planta vista de frente, con gravedad. Con el interruptor **Marcha** encendido, la máquina repite el ciclo:\n\n- **Soltar** deja caer una pieza sobre el centro de la cinta; **Pieza** (debajo de la cinta) la detecta.\n- **Alta** es una barrera a media altura: solo la corta una pieza grande.\n- Grandes a la izquierda (**Atras**) y pequeñas a la derecha (**Adelante**): la cinta la lleva al extremo, por donde cae a su recogida. Después, la siguiente.\n- Ojo: una pieza pequeña también corta **Alta** un instante mientras cae.',
+    scenarios: [scenario('marcha', 'Marcha durante 17 s', 26, [[0.5, 'Marcha', 1], [17, 'Marcha', 0]])],
+    requirements: [{ id: 'or' }, { id: 'timer' }],
+    hints: ['Cinco etapas: parada, soltando, midiendo, a la izquierda y a la derecha.', 'Para no confundir una pequeña que cae con una grande, mira Alta cuando la pieza ya está quieta: `0.5s/X2 · Alta` y `0.5s/X2 · !Alta`.', 'Cada sentido dura lo que tarda la pieza en llegar al extremo y caer: unos 3 s (`3s/X3`, `3s/X4`).'],
+  }),
+  entry('ej-cargador', 3, 'cargador-gravedad', 'Cargador por gravedad con expulsor', 'Una pila que baja sola, un expulsor y lotes de 5.', {
+    statement: 'Planta vista de frente, con gravedad. Las piezas se apilan en el tubo de un cargador (en la simulación, **Reponer** deja caer una más).\n\n- Con un flanco de **Marcha**, si hay pieza (**Hay_pieza**) y el expulsor está dentro (**a0**), el expulsor sale (**A+**) hasta **a1** y vuelve (**A-**): la pieza de abajo sale a la cinta (**Cinta**, que funciona mientras tanto) y la de encima baja sola.\n- Así hasta un lote de **5** piezas; entonces se enciende **Lote_listo** y se espera a una nueva Marcha.\n- Si el cargador se queda vacío, se espera a que haya pieza.',
+    scenarios: [scenario('lote', 'Reponer 6 piezas y Marcha', 30, [...press(0.3, 'Reponer', 0.2), ...press(0.8, 'Reponer', 0.2), ...press(1.3, 'Reponer', 0.2), ...press(1.8, 'Reponer', 0.2), ...press(2.3, 'Reponer', 0.2), ...press(2.8, 'Reponer', 0.2), ...press(5, 'Marcha')])],
+    requirements: [{ id: 'counter' }, { id: 'edge' }, { id: 'or' }],
+    hints: ['Cuenta las expulsiones con `C`: `C:=0` al empezar y `C:=C+1` al expulsar.', 'Arranca con el flanco `↑Marcha`, y solo si hay pieza y el expulsor está dentro.', 'Al volver el expulsor: otra expulsión si `[C < 5]` (y hay pieza), o el lote listo si `[C >= 5]`.'],
+  }),
   // --- Nivel 4 ---------------------------------------------------------------------------------
   entry('ej-emergencia', 4, 'emergencia', 'Paro de emergencia con forzado', 'Un grafcet de seguridad que fuerza al de producción.', {
     statement: 'Con **Marcha**, un carro avanza (**Avanzar**) hasta **Fc_delante** y retrocede (**Retroceder**) hasta **Fc_detras**.\n\n- Con **Emergencia**, todo se para al momento y se enciende la **Alarma**.\n- Con **Rearme** (y sin emergencia), la producción vuelve a su situación inicial y espera una nueva Marcha.',
@@ -128,6 +140,12 @@ export const BANK = [
     scenarios: [scenario('modos', 'Manual, y después un ciclo automático', 12, [...press(0.5, 'Avanzar', 1.5), ...press(2.5, 'Retroceder', 1.5), [5, 'Auto', 1], ...press(5.5, 'Ciclo')])],
     requirements: [{ id: 'conditional' }],
     hints: ['Dos grafcets: conducción (manual / automático) y producción (el ciclo).', 'En manual, el cilindro se mueve con acciones condicionadas: `A+` si `Avanzar`, `A-` si `Retroceder`.', 'En manual, la conducción mantiene la producción en su inicio: `F/GP{INIT}`.'],
+  }),
+  entry('ej-apilador', 4, 'apilador-trampilla', 'Apilador con trampilla', 'Gravedad, una pila de 3 y una trampilla que la deja caer.', {
+    statement: 'Planta vista de frente, con gravedad. Con el interruptor **Marcha**, la cinta (**Cinta**) lleva cajas que chocan con un tope y caen una sobre otra encima de una trampilla.\n\n- Cuando la pila llega a **3** cajas, el detector **Pila** la ve: la trampilla se abre (**Abrir**, hasta **b1**) y la pila cae a la recogida. La trampilla se cierra sola por su peso (**b0**).\n- Ojo: una caja que cae también cruza el haz de **Pila** un instante: solo cuenta si se mantiene **1 s**.\n- Al apagar Marcha, la cinta se para.',
+    scenarios: [scenario('pilas', 'Marcha 30 s', 34, [[0.5, 'Marcha', 1], [30, 'Marcha', 0]])],
+    requirements: [{ id: 'timer' }],
+    hints: ['La cinta va en la etapa de apilar; la trampilla se abre en otra y se espera a que se cierre en una tercera.', 'Para no abrir con una caja que cae, usa la temporización sobre la variable: `1s/Pila`.', 'Antes de volver a apilar, espera la trampilla cerrada y el haz libre: `b0 · !Pila`.'],
   }),
   // --- Nivel 5 ---------------------------------------------------------------------------------
   entry('ej-encapsulacion', 5, 'encapsulacion', 'Paro inmediato con encapsulación', 'Una etapa encapsulante corta el ciclo esté donde esté.', {

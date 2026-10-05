@@ -40,6 +40,10 @@ A drilling machine with its plant.
 With gravity: parts fall from the feeder.
 ```
 
+```ejemplo clasificacion-frente
+With gravity: each part falls onto the belt and, off one end or the other, into its bin.
+```
+
 To try it step by step:
 
 ```tutorial planta

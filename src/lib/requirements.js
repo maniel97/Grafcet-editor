@@ -4,7 +4,8 @@
 import { N_, t } from './i18n'
 import { normalizeAction } from './actions'
 
-const TIMER = /\d+(?:[.,]\d+)?\s*(?:ms|s|min|h)\s*\/\s*[XE]\d+/i
+// Temporización «t/x» sobre una etapa (2s/X2) o sobre cualquier variable (1s/Pila), como en la norma.
+const TIMER = /\d+(?:[.,]\d+)?\s*(?:ms|s|min|h)\s*\/\s*[\p{L}_][\p{L}\p{N}_]*/iu
 const COUNT = /:=\s*[A-Za-z_]\w*\s*[+-]\s*\d/
 
 const stepsOf = (nodes) => nodes.filter((n) => n.type === 'step')

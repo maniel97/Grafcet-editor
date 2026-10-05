@@ -201,3 +201,10 @@ describe('apilador con trampilla', () => {
     expect(state.values.C).toBe(world.counts.recogida / 3)
   })
 })
+
+describe('clasificación por tamaño con cinta reversible (vista de frente)', () => {
+  it('cada pieza cae en su recogida: grandes a la izquierda y pequeñas a la derecha', () => {
+    const { world } = runExample('clasificacion-frente', 24, { marcha: 'toggle' })
+    expect(world.counts).toEqual({ grandes: 3, pequenas: 3 })
+  })
+})

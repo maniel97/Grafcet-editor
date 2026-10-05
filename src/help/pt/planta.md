@@ -40,6 +40,10 @@ Um engenho de furar com a sua planta.
 Com gravidade: as peças caem do carregador.
 ```
 
+```ejemplo clasificacion-frente
+Com gravidade: cada peça cai no tapete e, por uma ponta ou pela outra, na sua recolha.
+```
+
 Para a experimentar passo a passo:
 
 ```tutorial planta

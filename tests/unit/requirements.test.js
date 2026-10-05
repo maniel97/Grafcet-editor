@@ -43,3 +43,10 @@ describe('nota', () => {
     expect(gradeOf([{ ok: false }], { max: 10, hintPenalty: 1 }, 3)).toBe(0)
   })
 })
+
+describe('temporización sobre una variable', () => {
+  it('1s/Pila también es una temporización (no solo 2s/X2)', () => {
+    const nodes = [{ id: 't', type: 'transition', data: { condition: '1s/Pila · Marcha' } }]
+    expect(checkRequirements(nodes, [], [{ id: 'timer' }])[0].ok).toBe(true)
+  })
+})

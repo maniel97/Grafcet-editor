@@ -40,6 +40,10 @@ Une perceuse avec sa partie opérative.
 Avec gravité : les pièces tombent du chargeur.
 ```
 
+```ejemplo clasificacion-frente
+Avec gravité : chaque pièce tombe sur le convoyeur puis, par un bout ou l’autre, dans son bac.
+```
+
 Pour l’essayer pas à pas :
 
 ```tutorial planta
