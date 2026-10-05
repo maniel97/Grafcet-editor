@@ -1,7 +1,8 @@
 # Grafcet Editor
 
 **Editor y simulador de grafcet (IEC 60848) para la enseñanza de automatismos.**
-Se usa en el navegador, sin instalar nada: **<https://grafcet-editor.com>**
+Se usa en el navegador, sin instalar nada: **<https://grafcet-editor.com>** ·
+código: <https://github.com/maniel97/Grafcet-editor>
 
 Gratis, de código abierto (GPL-3.0) y sin enviar nada a ningún servidor: todo funciona en tu
 navegador, también sin conexión (se puede instalar como aplicación).

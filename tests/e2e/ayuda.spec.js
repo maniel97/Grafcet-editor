@@ -299,6 +299,7 @@ test('ayuda: «Acerca de» con licencia, autoría y aviso de IA', async ({ page 
   await expect(about).toContainText('no se envían a ningún servidor')
   await expect(about).toContainText('no tiene relación con Siemens')
   await expect(about.getByRole('link', { name: 'grafcet-editor.com' })).toHaveAttribute('href', 'https://grafcet-editor.com')
+  await expect(about.getByRole('link', { name: 'Código fuente' })).toHaveAttribute('href', 'https://github.com/maniel97/Grafcet-editor')
   if (process.env.SHOT) await page.screenshot({ path: process.env.SHOT })
   expectNoErrors(errors)
 })
