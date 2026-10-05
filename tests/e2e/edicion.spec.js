@@ -165,3 +165,22 @@ test('tabla de variables: añadir una variable prevista desde el desplegable', a
   await expect(page.locator('.react-flow input:focus')).toHaveCount(0)
   expectNoErrors(errors)
 })
+
+// Una asignación escrita en una acción nueva (que sale continua) pasa sola a «memorizada al
+// activar»: como continua no hacía nada (el contador no contaba) y no avisaba de nada.
+test('escribir C:=C+1 en una acción nueva la pasa a memorizada al activar', async ({ page }) => {
+  const errors = await openEditor(page)
+  await openExample(page, /^Taladradora\s*Secuencia/)
+  await page.locator('.react-flow__node-step').filter({ hasText: 'Motor_broca' }).first().dblclick()
+  const panel = page.locator('[data-tour="propiedades"]')
+  await panel.getByRole('button', { name: 'Añadir acción', exact: true }).click()
+  const kind = panel.getByLabel('Tipo de acción').last()
+  await expect(kind).toHaveValue('continuous')
+  await panel.getByLabel('Texto de la acción').last().fill('C:=C+1')
+  await expect(kind).toHaveValue('stored-on')
+  // Una acción normal sigue siendo continua.
+  await panel.getByRole('button', { name: 'Añadir acción', exact: true }).click()
+  await panel.getByLabel('Texto de la acción').last().fill('Piloto')
+  await expect(panel.getByLabel('Tipo de acción').last()).toHaveValue('continuous')
+  expectNoErrors(errors)
+})

@@ -1,6 +1,7 @@
 // Guardado y carga de proyectos como .json local, sin servidor.
 
 import { EMPTY_PLC } from './addressing'
+import { fixAssignmentKind } from './actions'
 import { fileName } from './fileNames'
 import { sceneFromPlant } from './sim/scene'
 import { t } from './i18n'
@@ -88,7 +89,8 @@ function normalizeEdge(edge) {
 
 function normalizeNode(node) {
   const n = { ...node, selected: false }
-  if (n.type === 'step') n.data = { ...n.data, actions: n.data?.actions ?? [] }
+  // Asignaciones guardadas como continuas (no hacían nada): memorizadas al activar.
+  if (n.type === 'step') n.data = { ...n.data, actions: (n.data?.actions ?? []).map(fixAssignmentKind) }
   return n
 }
 

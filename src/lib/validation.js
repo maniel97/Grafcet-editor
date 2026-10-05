@@ -5,7 +5,7 @@
 
 import { frameOf, macroName, membersOf } from './frames'
 import { parseForcing } from './forcing'
-import { normalizeAction } from './actions'
+import { misplacedAssignment, normalizeAction } from './actions'
 import { checkExclusive, describeExample, exclusiveFix } from './exclusivity'
 import { t } from './i18n'
 
@@ -122,6 +122,22 @@ export function validateGrafcet(nodes, edges) {
   for (const s of steps) {
     const g = grafcetOf(s)
     if (g) grafcetSteps.set(g, [...(grafcetSteps.get(g) ?? []), s])
+  }
+  // Una asignación como acción continua o condicionada no hace nada (IEC 60848: solo memorizada o
+  // al evento).
+  for (const s of steps) {
+    for (const raw of s.data.actions ?? []) {
+      if (!misplacedAssignment(raw)) continue
+      add(
+        'error',
+        t('{etapa}: la acción «{accion}» es una asignación y está como {tipo}: así no hace nada. Ponla memorizada (al activar ↑ o al desactivar ↓) o al evento.', {
+          etapa: stepName(s),
+          accion: normalizeAction(raw).text.trim(),
+          tipo: normalizeAction(raw).kind === 'conditional' ? t('condicionada') : t('continua'),
+        }),
+        [s.id],
+      )
+    }
   }
   const forcedOn = new Map() // id de etapa que fuerza -> [ids de etapas que activa]
   for (const s of steps) {

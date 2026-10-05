@@ -1,6 +1,6 @@
 import { useRef } from 'react'
 import { CircleHelp, Plus, Trash2, X } from 'lucide-react'
-import { ACTION_KINDS, ACTION_PRESETS, actionKind, normalizeAction } from '../lib/actions'
+import { ACTION_KINDS, ACTION_PRESETS, actionKind, isAssignment, normalizeAction } from '../lib/actions'
 import AutocompleteInput from './AutocompleteInput'
 import { useDraft } from './useDraft'
 import { t, N_ } from '../lib/i18n'
@@ -64,7 +64,8 @@ function ActionRow({ action, onChange, onRemove, vocabulary, otherTexts }) {
             value={action.text}
             placeholder={t('p. ej. Motor ON, A:=1, F/G2{3}')}
             aria-label={t('Texto de la acción')}
-            onChange={(text) => onChange({ text })}
+            // Una asignación (A:=1, C:=C+1) no hace nada como continua: pasa a memorizada al activar.
+            onChange={(text) => onChange(isAssignment(text) && action.kind === 'continuous' ? { text, kind: 'stored-on' } : { text })}
           />
         </div>
         <button

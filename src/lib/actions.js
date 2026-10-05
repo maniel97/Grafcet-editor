@@ -42,6 +42,20 @@ export function normalizeAction(action) {
   return { text: '', kind: 'continuous', condition: '', ...action }
 }
 
+// Asignación (A:=1, C:=C+1, N:=5). IEC 60848: solo existe memorizada (al activar o al desactivar
+// la etapa) o al evento; como continua o condicionada no haría nada (la simulación y el ladder la
+// saltan), así que al escribirla se pasa sola a «memorizada al activar».
+export const isAssignment = (text) => /^\s*[\p{L}_][\p{L}\p{N}_.]*\s*:=/u.test(text ?? '')
+export const misplacedAssignment = (action) => {
+  const a = normalizeAction(action)
+  return isAssignment(a.text) && (a.kind === 'continuous' || a.kind === 'conditional')
+}
+// La acción con su tipo corregido si es una asignación continua (la devuelve igual si no).
+export function fixAssignmentKind(action) {
+  const a = normalizeAction(action)
+  return isAssignment(a.text) && a.kind === 'continuous' ? { ...a, kind: 'stored-on' } : action
+}
+
 // Acciones habituales para añadir con un clic.
 export const ACTION_PRESETS = [
   { text: 'A+', kind: 'continuous' },
