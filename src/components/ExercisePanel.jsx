@@ -11,7 +11,8 @@ import Markdown from '../help/Markdown'
 // getProject() -> { nodes, edges, plc } en este momento.
 // onReplay(escenario): reproducirlo en la simulación (pruebas de comportamiento en rojo).
 // onHintShown(): el alumno ha abierto una pista más (se guarda en su proyecto: exercise.hintsShown).
-export default function ExercisePanel({ plc, getProject, onEdit, onExportStudent, onReplay, onHintShown, onClose }) {
+// onChecked(resultados): tras cada comprobación (para los datos del proceso, si el ejercicio los pide).
+export default function ExercisePanel({ plc, getProject, onEdit, onExportStudent, onReplay, onHintShown, onChecked, onClose }) {
   const config = exerciseConfig(plc)
   const student = isStudent(plc)
   const [results, setResults] = useState(null)
@@ -32,8 +33,10 @@ export default function ExercisePanel({ plc, getProject, onEdit, onExportStudent
   const solved = results && results.length > 0 && passed === results.length
 
   const check = () => {
-    setResults(runChecks(getProject()))
+    const found = runChecks(getProject())
+    setResults(found)
     setCheckedAt(new Date())
+    onChecked?.(found)
   }
 
   return (
@@ -58,6 +61,13 @@ export default function ExercisePanel({ plc, getProject, onEdit, onExportStudent
               </button>
             </div>
           </div>
+        )}
+        {config.processData && (
+          <p role="note" data-process-notice className="rounded-md border border-blue-200 bg-blue-50 p-2.5 text-xs text-blue-950">
+            {student
+              ? t('Tu profesor ha pedido anotar datos del proceso: solo totales (veces que compruebas, minutos con actividad, simulaciones y pistas vistas), nunca lo que haces en cada momento. Salen en una página de tu dossier.')
+              : t('Este ejercicio anota datos del proceso del alumnado (solo totales). Se le avisa aquí mismo y salen en una página de su dossier.')}
+          </p>
         )}
         <section aria-label={t('Enunciado')}>
           <h3 className="mb-1 text-xs font-medium uppercase tracking-wide text-slate-500">{t('Enunciado')}</h3>

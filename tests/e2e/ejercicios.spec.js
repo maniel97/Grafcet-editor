@@ -1,6 +1,6 @@
 import { readFileSync } from 'fs'
 import { expect, test } from '@playwright/test'
-import { download, expectNoErrors, openEditor, openExample } from './helpers'
+import { download, expectNoErrors, loadProject, openEditor, openExample } from './helpers'
 
 const step = (page, label) => page.locator('.react-flow__node-step').filter({ has: page.locator('.diagram-step-label', { hasText: new RegExp(`^${label}$`) }) })
 const receptivity = async (page, node, text) => {
@@ -266,5 +266,70 @@ test('el profesor quita las pistas y pide nota', async ({ page }) => {
   await expect(panel.locator('[data-check="requisito-edge"]')).toHaveAttribute('data-ok', 'no')
   await expect(panel.locator('[data-grade]')).toContainText(/Nota: \d+(,\d)? de 10/)
   await expect(panel.locator('[data-grade]')).not.toContainText('Nota: 10 de 10')
+  expectNoErrors(errors)
+})
+
+// Fase 4: datos del proceso (activados por el profesor, avisados al alumno, en el dossier) y
+// corregir las entregas de una clase (con las comprobaciones del profesor, parecidos y CSV).
+test('datos del proceso y corregir las entregas de la clase', async ({ page }) => {
+  test.setTimeout(120_000)
+  const errors = await openEditor(page)
+  // El profesor prepara el ejercicio y guarda su proyecto (con la solución).
+  await openExample(page, /^Marcha y paro de un motor/)
+  await page.getByRole('button', { name: /Exportar/ }).click()
+  await page.getByRole('menuitem', { name: /Ejercicio para el alumnado/ }).click()
+  const dialog = page.getByRole('dialog', { name: 'Ejercicio para el alumnado' })
+  await dialog.getByLabel('Título').fill('Marcha y paro')
+  await dialog.getByLabel('Anotar datos del proceso del alumnado (solo totales)').check()
+  const forStudents = await download(page, () => dialog.getByRole('button', { name: 'Guardar y descargar para el alumnado' }).click())
+  await page.keyboard.press('Escape')
+  const teacher = JSON.parse(readFileSync(await download(page, () => page.getByTitle(/Guardar proyecto/).click()).then((f) => f.path()), 'utf-8'))
+  const student = JSON.parse(readFileSync(await forStudents.path(), 'utf-8'))
+
+  // Un alumno: su ejercicio con el grafcet resuelto (el de la solución, para no dibujarlo aquí).
+  const grafcet = teacher.nodes.filter((n) => n.type === 'step' || n.type === 'transition')
+  await loadProject(page, { ...student, nodes: [...student.nodes, ...grafcet], edges: teacher.edges })
+  const panel = page.getByRole('complementary', { name: 'Ejercicio' })
+  await expect(panel.getByRole('note')).toContainText('solo totales')
+  await panel.getByRole('button', { name: 'Comprobar' }).click()
+  await expect(panel.locator('[data-exercise="resuelto"]')).toBeVisible()
+  await panel.getByRole('button', { name: 'Comprobar' }).click()
+  await page.locator('[data-tour="Simular"]').click()
+  await page.locator('[data-tour="Simular"]').click()
+  // Su dossier: con la página de datos del proceso y el proyecto dentro.
+  await page.getByRole('button', { name: /Exportar/ }).click()
+  await page.getByRole('menuitem', { name: /Dossier de la práctica/ }).click()
+  const dossier = page.getByRole('dialog', { name: 'Dossier de la práctica' })
+  await dossier.getByRole('textbox', { name: 'Alumno/a' }).fill('Ana Pérez')
+  await expect(dossier.getByLabel('Vista previa del dossier')).toContainText('Datos del proceso')
+  await expect(dossier.getByLabel('Vista previa del dossier')).toContainText('Veces que se ha comprobado')
+  const file = await download(page, () => dossier.getByRole('button', { name: 'Guardar PDF' }).click())
+  const pdf = readFileSync(await file.path())
+  await dossier.getByRole('button', { name: 'Cerrar', exact: true }).last().click()
+
+  // El profesor, con su ejercicio abierto, corrige: la entrega de Ana y una copia suya.
+  await loadProject(page, teacher)
+  await page.getByRole('button', { name: /^Abrir un proyecto/ }).click()
+  await page.getByRole('menuitem', { name: /Corregir entregas/ }).click()
+  const review = page.getByRole('dialog', { name: 'Corregir entregas' })
+  await expect(review.locator('[data-class-mode="profesor"]')).toContainText('Marcha y paro')
+  await review.getByLabel('Archivos de las entregas').setInputFiles([
+    { name: 'ana.pdf', mimeType: 'application/pdf', buffer: pdf },
+    { name: 'copia.pdf', mimeType: 'application/pdf', buffer: pdf },
+  ])
+  const rows = review.locator('tbody tr')
+  await expect(rows).toHaveCount(2)
+  await expect(rows.first().locator('[data-score]')).toHaveText(/^(\d+) \/ \1$/) // todo bien
+  await expect(rows.first()).toContainText('2 comprobaciones · ')
+  await expect(rows.first()).toContainText('1 simulación')
+  await expect(review.locator('[data-similar]')).toContainText('Ana Pérez — Ana Pérez')
+  if (process.env.CLASS_SHOT) {
+    await rows.first().locator('summary').click()
+    await page.screenshot({ path: process.env.CLASS_SHOT })
+    await rows.first().locator('summary').click()
+  }
+  const csv = readFileSync(await download(page, () => review.getByRole('button', { name: 'Descargar CSV' }).click()).then((f) => f.path()), 'utf-8')
+  expect(csv).toContain('Alumno/a;Archivo;Correctas;Total')
+  expect(csv).toContain('Ana Pérez;ana.pdf;')
   expectNoErrors(errors)
 })

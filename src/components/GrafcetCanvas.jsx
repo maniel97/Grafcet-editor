@@ -50,7 +50,7 @@ import { buildPlcModel } from '../lib/plcModel'
 import { t } from '../lib/i18n'
 import { FIRST_TOUR, markTourSeen, tourSeen } from '../lib/tours'
 import { tutorialById } from '../lib/tutorials'
-import { isLocked, isStudent, studentProject } from '../lib/exercise'
+import { bumpProcess, isLocked, isStudent, keepProgress, studentProject } from '../lib/exercise'
 
 // Partes que no hacen falta al abrir el editor: se descargan la primera vez que se usan, para que
 // la carga inicial sea más ligera (importa sobre todo publicado en internet).
@@ -79,6 +79,7 @@ const ExerciseDialog = lazy(() => import('./ExerciseDialog'))
 const ScenarioEditor = lazy(() => import('./ScenarioEditor'))
 const ProjectChooser = lazy(() => import('./ProjectChooser'))
 const GuideDialog = lazy(() => import('./GuideDialog'))
+const ClassDialog = lazy(() => import('./ClassDialog'))
 
 // Mientras se descarga una parte diferida (normalmente un instante).
 function Loading({ panel }) {
@@ -117,15 +118,28 @@ export default function GrafcetCanvas() {
     document.title = projectName ? `${projectName} · Grafcet Editor` : 'Grafcet Editor'
   }, [projectName])
   useAutosave(nodes, edges, plc, projectName)
-  // Deshacer y rehacer no devuelven pistas ya vistas de un ejercicio (cuentan para la nota).
-  const restorePlc = useCallback(
-    (restored) =>
-      setPlc((current) => {
-        const seen = Math.max(current?.exercise?.hintsShown ?? 0, restored?.exercise?.hintsShown ?? 0)
-        return restored?.exercise?.student && seen ? { ...restored, exercise: { ...restored.exercise, hintsShown: seen } } : restored
-      }),
-    [],
-  )
+  // Deshacer y rehacer no devuelven pistas ya vistas de un ejercicio (cuentan para la nota) ni
+  // borran los totales del proceso.
+  const restorePlc = useCallback((restored) => setPlc((current) => keepProgress(restored, current)), [])
+  // Datos del proceso (solo si el ejercicio los pide): minutos con actividad. Cuenta un minuto si
+  // la pestaña está a la vista y ha habido uso (ratón, teclado, toque) en los dos últimos.
+  const recordingProcess = Boolean(plc.exercise?.student && plc.exercise?.processData)
+  useEffect(() => {
+    if (!recordingProcess) return
+    let last = Date.now()
+    const touch = () => {
+      last = Date.now()
+    }
+    const events = ['pointerdown', 'keydown', 'wheel']
+    for (const e of events) window.addEventListener(e, touch, { passive: true })
+    const id = setInterval(() => {
+      if (document.visibilityState === 'visible' && Date.now() - last < 120_000) setPlc((p) => bumpProcess(p, { minutes: 1 }))
+    }, 60_000)
+    return () => {
+      for (const e of events) window.removeEventListener(e, touch)
+      clearInterval(id)
+    }
+  }, [recordingProcess])
   const { takeSnapshot, undo, redo, canUndo, canRedo } = useHistory({ get: () => plcRef.current, set: restorePlc })
 
   // --- Estado de la interfaz -----------------------------------------------------------------
@@ -660,6 +674,8 @@ export default function GrafcetCanvas() {
     [getNodes, getEdges, takeSnapshot, setNodes, setEdges, setViewport, fitWhenReady],
   )
 
+  // Corregir entregas (ClassDialog).
+  const [classOpen, setClassOpen] = useState(false)
   // Un archivo con varios proyectos (un guion de prácticas en PDF): se elige cuál (ProjectChooser).
   const [choosing, setChoosing] = useState(null) // { fileName, items }
   const openLoaded = useCallback(
@@ -798,6 +814,7 @@ export default function GrafcetCanvas() {
     setNodes((nds) => (nds.some((n) => n.selected) ? nds.map((n) => ({ ...n, selected: false })) : nds))
     setSimulating(true)
     simulation.setPlaying(true)
+    setPlc((p) => bumpProcess(p, { simulations: 1 }))
     // Con planta montada, la escena se ve junto al grafcet desde el principio.
     if (plc.scene?.elements?.length) setSceneView((v) => v ?? 'split')
   }, [setNodes, setMenu, simulation, plc.scene])
@@ -882,6 +899,7 @@ export default function GrafcetCanvas() {
           historyUnlocked={Boolean(activeSceneHistory)}
           onExport={onExport}
           onOpenExercises={() => setProjectsTab('exercises')}
+          onOpenClass={() => setClassOpen(true)}
           exerciseShown={Boolean(plc.exercise)}
           exerciseOpen={exerciseOpen}
           onToggleExercise={() => setExerciseOpen((o) => !o)}
@@ -1005,6 +1023,11 @@ export default function GrafcetCanvas() {
               onDownload={save}
               onClose={() => setExportFormat(null)}
             />
+          </Suspense>
+        )}
+        {classOpen && (
+          <Suspense fallback={<Loading />}>
+            <ClassDialog getProject={getProject} onOpen={(project, name) => openLoaded(project, `${name}.json`)} onClose={() => setClassOpen(false)} />
           </Suspense>
         )}
         {choosing && (
@@ -1383,6 +1406,7 @@ export default function GrafcetCanvas() {
                     getProject={getProject}
                     onEdit={() => setExportFormat('exercise')}
                     onExportStudent={() => exportStudent()}
+                    onChecked={(results) => setPlc((p) => bumpProcess(p, { checks: 1, lastPassed: results.filter((r) => r.ok).length, lastTotal: results.length }))}
                     onHintShown={() => setPlc((p) => ({ ...p, exercise: { ...p.exercise, hintsShown: (p.exercise.hintsShown ?? 0) + 1 } }))}
                     onReplay={(scenario) => {
                       if (!simulating) startSimulation()

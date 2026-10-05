@@ -224,6 +224,27 @@ export function buildDossier(content, options, measure) {
     heading('Problemas encontrados y cómo se resolvieron')
     richText(content.problems)
   }
+  // Datos del proceso de un ejercicio que los pide: siempre a la vista, en su propia página.
+  if (content.process) {
+    const p = content.process
+    heading('Datos del proceso')
+    paragraph([{ text: 'El ejercicio pedía anotar estos datos (solo totales, nunca lo que se hace en cada momento). Los ha anotado el editor mientras se hacía el ejercicio.' }], 10)
+    w.y += 2
+    table(
+      [
+        { label: 'Dato', width: 0.6 },
+        { label: 'Total', width: 0.4 },
+      ],
+      [
+        ['Ejercicio', p.title || '—'],
+        ['Veces que se ha comprobado', String(p.checks ?? 0)],
+        ['Minutos con actividad', String(p.minutes ?? 0)],
+        ['Simulaciones', String(p.simulations ?? 0)],
+        ['Pistas vistas', p.hintsTotal ? `${p.hintsShown ?? 0} de ${p.hintsTotal}` : 'sin pistas'],
+        ['Última comprobación', p.lastTotal ? `${p.lastPassed} de ${p.lastTotal} correctas` : 'ninguna'],
+      ],
+    )
+  }
   if (S.notes && content.notes?.length) {
     heading('Notas del lienzo')
     content.notes.forEach((n, i) => {

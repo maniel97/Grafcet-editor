@@ -29,6 +29,17 @@ Un **exercice** contient un énoncé et ce que le professeur fournit déjà fait
 5. **Fiche de TP (PDF)** crée une fiche comme d’habitude, à imprimer ou distribuer : en-tête pour le nom, énoncé, ce qui est fourni (table, partie opérative, schéma), critères d’évaluation en toutes lettres et scénarios de test. Le fichier de l’exercice voyage dans le PDF en pièce jointe : ouvrir le PDF dans l’éditeur charge l’exercice. N’importe qui peut évaluer l’exercice avec le papier, sans connaître le logiciel, et l’**empreinte** du pied de page identifie le fichier joint.
 6. **Exigences, indices et note** (dans la même fenêtre) : cochez ce que le grafcet doit utiliser (une temporisation, un compteur, un front, une divergence en OU ou en ET, une action conditionnelle ou mémorisée, un nombre maximal d’étapes). Écrivez des indices, un par ligne, du plus général au plus précis, ou décochez **Proposer des indices** si vous préférez les donner en personne. La **note** est facultative et indicative : la part de critères remplis, et chaque indice vu peut retirer des points.
 
+## Corriger les rendus
+
+Avec votre exercice ouvert (celui qui contient votre solution), Ouvrir > **Corriger les rendus** et ajoutez les dossiers PDF de la classe (ils contiennent le projet) ou leurs .json.
+
+- Chaque rendu est corrigé à nouveau avec **vos** vérifications, pas avec celles du fichier.
+- Le tableau montre chaque critère, les indices vus, la note (si vous la demandez) et les données du processus (si vous les demandez).
+- Il signale les **travaux très semblables** (même dessin et même logique) : un avertissement, pas une preuve.
+- **Télécharger le CSV** l’emmène dans un tableur. Rien ne sort de votre navigateur.
+
+**Données du processus** (dans la fenêtre de l’exercice, désactivées par défaut) : seuls des totaux sont notés (vérifications, minutes actives, simulations et indices vus). L’élève en est averti à l’ouverture de l’exercice et elles apparaissent sur une page de son dossier.
+
 ## Livret de TP
 
 Plusieurs TP dans un seul PDF, comme un livret classique : Exporter > **Livret de TP**.

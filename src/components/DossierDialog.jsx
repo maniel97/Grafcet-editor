@@ -75,6 +75,10 @@ export default function DossierDialog({ nodes, edges, plc, issues, projectName, 
       issues: data.issues,
       listing: data.listing,
       notes: data.notes,
+      // Datos del proceso (si el ejercicio los pide): solo totales.
+      process: plc.exercise?.student && plc.exercise.processData
+        ? { ...plc.exercise.process, title: plc.exercise.title, hintsShown: plc.exercise.hintsShown ?? 0, hintsTotal: plc.exercise.hints?.count ?? 0 }
+        : null,
     }
     return buildDossier(content, options, measure)
   }, [ready, projectName, today, options, plc.titleBlock, grafcet, figures, data, measure])

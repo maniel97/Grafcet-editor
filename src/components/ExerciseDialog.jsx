@@ -281,6 +281,17 @@ export default function ExerciseDialog({ plc, getProject, onSave, onExportStuden
         </fieldset>
 
         <fieldset className="space-y-1.5">
+          <legend className="text-xs font-medium text-slate-500">{t('Datos del proceso')}</legend>
+          <label className="flex items-center gap-2">
+            <input type="checkbox" checked={Boolean(draft.processData)} onChange={(e) => set({ processData: e.target.checked })} />
+            {t('Anotar datos del proceso del alumnado (solo totales)')}
+          </label>
+          <p className="text-xs text-slate-500">
+            {t('Veces que comprueba, minutos con actividad, simulaciones y pistas vistas; nada de lo que hace en cada momento. El alumno lo ve avisado al abrir el ejercicio y los datos salen en una página de su dossier. Desactivado por defecto.')}
+          </p>
+        </fieldset>
+
+        <fieldset className="space-y-1.5">
           <legend className="text-xs font-medium text-slate-500">{t('Nota')}</legend>
           <label className="flex items-center gap-2">
             <input type="checkbox" checked={draft.grade.enabled} onChange={(e) => set({ grade: { ...draft.grade, enabled: e.target.checked } })} />

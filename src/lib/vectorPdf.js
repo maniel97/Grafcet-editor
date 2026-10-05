@@ -106,6 +106,9 @@ export function parsePath(d) {
         return null
     }
   }
+  // Algún número que no se ha podido leer (p. ej. faltan coordenadas): mejor medirlo en el
+  // navegador (sampledPath) que dejar un NaN, que rompe el PDF entero.
+  if (subpaths.some((sp) => sp.points.some(([px, py]) => !Number.isFinite(px) || !Number.isFinite(py)))) return null
   return subpaths
 }
 
@@ -398,7 +401,9 @@ export function drawScene(pdf, items, layout) {
       pdf.roundedRect(X(it.x + h), Y(it.y + h), (it.w - it.width) * k, (it.h - it.width) * k, it.radius * k, it.radius * k, 'S')
     } else if (it.t === 'path') {
       dash(false)
-      for (const sub of it.subpaths) {
+      for (const raw of it.subpaths) {
+        // Por si acaso: un punto no válido no puede tumbar el PDF entero.
+        const sub = { ...raw, points: raw.points.filter(([px, py]) => Number.isFinite(px) && Number.isFinite(py)) }
         if (sub.points.length < 2) continue
         const [first, ...rest] = sub.points
         const deltas = []

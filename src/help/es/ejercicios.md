@@ -29,6 +29,17 @@ Un **ejercicio** trae un enunciado y lo que el profesor da hecho (la planta, la 
 5. **Hoja de prácticas (PDF)** crea una hoja como las de siempre, para imprimir o repartir: cabecera para el nombre, enunciado, lo que se da (tabla, planta, esquema), los criterios de evaluación en palabras y los escenarios de prueba. El archivo del ejercicio va dentro del PDF como adjunto: al abrir el PDF en el editor se carga el ejercicio. Cualquiera puede evaluar el ejercicio con el papel, sin conocer el programa, y la **huella** del pie identifica el archivo de dentro.
 6. **Requisitos, pistas y nota** (en el mismo diálogo): marca lo que el grafcet tiene que usar (una temporización, un contador, un flanco, una divergencia en O o en Y, una acción condicionada o memorizada, un máximo de etapas). Escribe pistas, una por línea, de la más general a la más concreta, o desmarca **Ofrecer pistas** si prefieres darlas en persona. La **nota** es opcional y orientativa: la parte de criterios cumplidos, y cada pista vista puede restar.
 
+## Corregir entregas
+
+Con tu ejercicio abierto (el que tiene tu solución), Abrir > **Corregir entregas** y añade los dossiers en PDF de la clase (llevan el proyecto dentro) o sus .json.
+
+- Cada entrega se corrige de nuevo con **tus** comprobaciones, no con las que trae el archivo.
+- La tabla muestra cada criterio, las pistas vistas, la nota (si la pides) y los datos del proceso (si los pides).
+- Avisa de **trabajos muy parecidos** (mismo dibujo y misma lógica): es un aviso, no una prueba.
+- **Descargar CSV** la lleva a una hoja de cálculo. Nada sale de tu navegador.
+
+**Datos del proceso** (en el diálogo del ejercicio, desactivados por defecto): se anotan solo totales (veces que comprueba, minutos con actividad, simulaciones y pistas vistas). El alumno lo ve avisado al abrir el ejercicio y salen en una página de su dossier.
+
 ## Guion de prácticas
 
 Varias prácticas en un solo PDF, como un guion de los de siempre: Exportar > **Guion de prácticas**.

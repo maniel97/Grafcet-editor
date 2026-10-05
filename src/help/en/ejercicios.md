@@ -29,6 +29,17 @@ An **exercise** comes with a statement and what the teacher provides already don
 5. **Practice sheet (PDF)** creates a sheet like the usual ones, to print or hand out: a header for the name, the statement, what is provided (table, plant, wiring diagram), the assessment criteria in words and the test scenarios. The exercise file travels inside the PDF as an attachment: opening the PDF in the editor loads the exercise. Anyone can assess the exercise from the paper without knowing the program, and the **fingerprint** in the footer identifies the file inside.
 6. **Requirements, hints and grade** (in the same dialog): tick what the grafcet must use (a timer, a counter, an edge, an OR or AND divergence, a conditional or stored action, a maximum number of steps). Write hints, one per line, from the most general to the most specific, or untick **Offer hints** if you prefer to give them in person. The **grade** is optional and only a guide: the share of criteria met, and each hint seen can subtract.
 
+## Mark submissions
+
+With your exercise open (the one with your solution), Open > **Mark submissions** and add the class PDF reports (they carry the project inside) or their .json files.
+
+- Each submission is marked again with **your** checks, not with the ones in the file.
+- The table shows each criterion, the hints seen, the grade (if you ask for it) and the process data (if you ask for them).
+- It warns about **very similar work** (same drawing and same logic): a warning, not proof.
+- **Download CSV** takes it to a spreadsheet. Nothing leaves your browser.
+
+**Process data** (in the exercise dialog, off by default): only totals are recorded (times they check, active minutes, simulations and hints seen). Students are told when they open the exercise and the data appear on a page of their report.
+
 ## Practice guide
 
 Several practices in a single PDF, like a classic practice guide: Export > **Practice guide**.

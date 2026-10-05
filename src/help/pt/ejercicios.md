@@ -29,6 +29,17 @@ Um **exercício** traz um enunciado e o que o professor dá já feito (a planta,
 5. **Ficha de prática (PDF)** cria uma ficha como as de sempre, para imprimir ou distribuir: cabeçalho para o nome, enunciado, o que se fornece (tabela, planta, esquema), os critérios de avaliação por extenso e os cenários de teste. O ficheiro do exercício vai dentro do PDF como anexo: ao abrir o PDF no editor carrega-se o exercício. Qualquer pessoa pode avaliar o exercício com o papel, sem conhecer o programa, e a **impressão digital** do rodapé identifica o ficheiro de dentro.
 6. **Requisitos, pistas e nota** (no mesmo diálogo): marque o que o grafcet tem de usar (uma temporização, um contador, um flanco, uma divergência em OU ou em E, uma ação condicional ou memorizada, um máximo de etapas). Escreva pistas, uma por linha, da mais geral à mais concreta, ou desmarque **Oferecer pistas** se preferir dá-las pessoalmente. A **nota** é opcional e orientativa: a parte de critérios cumpridos, e cada pista vista pode descontar.
 
+## Corrigir entregas
+
+Com o seu exercício aberto (o que tem a sua solução), Abrir > **Corrigir entregas** e adicione os dossiers em PDF da turma (levam o projeto dentro) ou os seus .json.
+
+- Cada entrega é corrigida de novo com as **suas** verificações, não com as que traz o ficheiro.
+- A tabela mostra cada critério, as pistas vistas, a nota (se a pedir) e os dados do processo (se os pedir).
+- Avisa de **trabalhos muito parecidos** (mesmo desenho e mesma lógica): é um aviso, não uma prova.
+- **Descarregar CSV** leva-a para uma folha de cálculo. Nada sai do seu navegador.
+
+**Dados do processo** (no diálogo do exercício, desativados por defeito): registam-se só totais (vezes que verifica, minutos com atividade, simulações e pistas vistas). O aluno é avisado ao abrir o exercício e os dados saem numa página do seu dossier.
+
 ## Guião de práticas
 
 Várias práticas num só PDF, como um guião de sempre: Exportar > **Guião de práticas**.

@@ -49,12 +49,34 @@ export const DEFAULT_EXERCISE = {
   hints: { enabled: true, items: [] },
   // Nota: solo si el profesor la quiere; hintPenalty: lo que resta cada pista vista.
   grade: { enabled: false, max: 10, hintPenalty: 0 },
+  // Datos del proceso: desactivados por defecto (privacidad). Si el profesor los activa, el alumno
+  // lo ve avisado y se anotan solo totales (exercise.process), que salen en su dossier.
   processData: false,
   // Cabecera de la hoja de prácticas en PDF (lib/exerciseSheet.js).
   sheet: { subject: '', course: '', cycle: '', center: '', teacher: '' },
 }
 
 export const exerciseConfig = (plc) => (plc?.exercise ? { ...DEFAULT_EXERCISE, ...plc.exercise, parts: { ...DEFAULT_EXERCISE.parts, ...plc.exercise.parts }, checks: { ...DEFAULT_EXERCISE.checks, ...plc.exercise.checks, behaviour: { ...DEFAULT_EXERCISE.checks.behaviour, ...plc.exercise.checks?.behaviour } }, hints: { ...DEFAULT_EXERCISE.hints, ...plc.exercise.hints }, grade: { ...DEFAULT_EXERCISE.grade, ...plc.exercise.grade }, sheet: { ...DEFAULT_EXERCISE.sheet, ...plc.exercise.sheet } } : null)
+// Totales del proceso (sin líneas de tiempo): veces que se ha comprobado, minutos con actividad,
+// simulaciones y el resultado de la última comprobación.
+export const EMPTY_PROCESS = { checks: 0, minutes: 0, simulations: 0, lastPassed: null, lastTotal: null }
+// Anotar en el proyecto del alumno (solo si el ejercicio lo pide): patch suma números, salvo
+// lastPassed / lastTotal, que se sustituyen.
+export function bumpProcess(plc, patch) {
+  if (!plc?.exercise?.student || !plc.exercise.processData) return plc
+  const process = { ...EMPTY_PROCESS, ...plc.exercise.process }
+  for (const [key, value] of Object.entries(patch)) process[key] = key.startsWith('last') ? value : (process[key] ?? 0) + value
+  return { ...plc, exercise: { ...plc.exercise, process } }
+}
+// Al deshacer o rehacer no se pierde lo ya anotado (pistas vistas y totales del proceso).
+export function keepProgress(restored, current) {
+  const r = restored?.exercise
+  const c = current?.exercise
+  if (!r?.student || !c?.student) return restored
+  const exercise = { ...r, hintsShown: Math.max(r.hintsShown ?? 0, c.hintsShown ?? 0) }
+  if (r.processData && c.process) exercise.process = { ...c.process }
+  return { ...restored, exercise }
+}
 export const isStudent = (plc) => Boolean(plc?.exercise?.student)
 export const partMode = (plc, part) => plc?.exercise?.parts?.[part] ?? (plc?.exercise ? DEFAULT_EXERCISE.parts[part] : 'given')
 export const isLocked = (plc, part) => isStudent(plc) && partMode(plc, part) === 'locked'
@@ -130,6 +152,7 @@ export function studentProject(project) {
       hintsShown: 0,
       grade: config.grade,
       processData: config.processData,
+      ...(config.processData ? { process: { ...EMPTY_PROCESS } } : {}),
       sheet: config.sheet,
       sealed: seal(checksFrom(project, config)),
     },
