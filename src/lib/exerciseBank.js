@@ -130,6 +130,12 @@ export const BANK = [
     hints: ['Cuenta las expulsiones con `C`: `C:=0` al empezar y `C:=C+1` al expulsar.', 'Arranca con el flanco `↑Marcha`, y solo si hay pieza y el expulsor está dentro.', 'Al volver el expulsor: otra expulsión si `[C < 5]` (y hay pieza), o el lote listo si `[C >= 5]`.'],
   }),
   // --- Nivel 4 ---------------------------------------------------------------------------------
+  entry('ej-prensa-hidraulica', 4, 'prensa-hidraulica', 'Prensa electrohidráulica', 'Bajar, prensar sin orden (el aceite sujeta) y subir.', {
+    statement: 'Una prensa hidráulica con distribuidor 4/3 en tándem (míralo en el **Esquema eléctrico**). Con **Marcha** y la prensa arriba (**a0**):\n\n- Baja (**A+**) hasta abajo (**a1**).\n- Prensa **3 s** con el piloto **Prensando** encendido y **sin ninguna orden** al distribuidor: en el centro, el aceite encerrado la sujeta.\n- Sube (**A-**) hasta **a0** y espera una nueva Marcha.',
+    scenarios: [scenario('ciclo', 'Marcha: un ciclo completo', 12, [...press(0.5, 'Marcha')])],
+    requirements: [{ id: 'timer' }],
+    hints: ['Cuatro etapas: reposo, bajar, prensar y subir.', 'En la etapa de prensar no hace falta mandar nada al cilindro: solo el piloto. El distribuidor vuelve al centro y el cilindro se queda quieto.', 'Para salir del prensado, una temporización sobre su etapa: `3s/X2`.'],
+  }),
   entry('ej-emergencia', 4, 'emergencia', 'Paro de emergencia con forzado', 'Un grafcet de seguridad que fuerza al de producción.', {
     statement: 'Con **Marcha**, un carro avanza (**Avanzar**) hasta **Fc_delante** y retrocede (**Retroceder**) hasta **Fc_detras**.\n\n- Con **Emergencia**, todo se para al momento y se enciende la **Alarma**.\n- Con **Rearme** (y sin emergencia), la producción vuelve a su situación inicial y espera una nueva Marcha.',
     scenarios: [scenario('emergencia', 'Emergencia a mitad de ciclo y rearme', 10, [...press(0.5, 'Marcha'), ...press(1.2, 'Emergencia'), ...press(3, 'Rearme'), ...press(4.5, 'Marcha')])],
