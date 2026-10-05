@@ -19,6 +19,8 @@ Pendant la simulation, la section **« Diagramme espace-phase »** du panneau de
 
 - **Phases** ou **Temps** : l’axe horizontal par phases (étapes) ou en secondes (diagramme espace-temps).
 - Si à la fin tout est revenu en position initiale, la dernière phase est notée « 5=1 » : le cycle est bouclé.
+- **Séquence attendue** (par ex. `A+ B+ B− A−` ; le générateur pneumatique la remplit) : son diagramme est dessiné en gris dessous et on vérifie s’ils coïncident ; sinon, il indique dans quelle phase est la différence. Elle figure aussi dans le dossier du TP, avec le scénario de test.
+- **Lignes de signaux** : à chaque changement de phase, la fin de course qui déclenche le mouvement suivant (`a1`, `b1`…).
 
 ## Plus de réalisme
 

@@ -79,3 +79,63 @@ describe('cilindros que aparecen a mitad de la simulación', () => {
     expect(diagram.rows[1].levels[0]).toBe(0)
   })
 })
+
+describe('diagrama teórico, comparación y señales', async () => {
+  const { parseSequence } = await import('../../src/lib/pneumatic')
+  const { theoreticalSpacePhase, compareSpacePhase, signalsOf, movesOf } = await import('../../src/lib/sim/spacePhase')
+  const theory = (text) => theoreticalSpacePhase(parseSequence(text).groups)
+
+  it('A+ B+ B− A−: posiciones de libro, fases y movimientos', () => {
+    const d = theory('A+ B+ B- A-')
+    expect(levels(d)).toEqual({ A: [0, 1, 1, 1, 0], B: [0, 0, 1, 0, 0] })
+    expect(movesOf(d)).toEqual([['A+'], ['B+'], ['B−'], ['A−']])
+  })
+
+  it('simultáneos y cilindros que empiezan fuera', () => {
+    const d = theory('A+ (B- C+) A-')
+    expect(levels(d)).toEqual({ A: [0, 1, 1, 0], B: [1, 1, 0, 0], C: [0, 0, 1, 1] })
+    expect(movesOf(d)[1]).toEqual(['B−', 'C+'])
+  })
+
+  it('compara lo grabado con lo esperado: coincide o dice la primera fase distinta', () => {
+    const { diagram } = record('cilindros', 8, { actions: { marcha: 'press' } })
+    expect(compareSpacePhase(diagram, theory('A+ B+ A- B-'))).toEqual({ ok: true })
+    expect(compareSpacePhase(diagram, theory('A+ B+ B- A-'))).toEqual({ ok: false, phase: 3, expected: ['B−'], got: ['A−'] })
+    expect(compareSpacePhase(diagram, theory('A+ B+ A- B- A+'))).toMatchObject({ ok: false, phase: 5, got: null })
+  })
+
+  it('las esperas de lo grabado no cuentan al comparar (A+, espera, A−)', () => {
+    const recorded = { phases: [{}, {}, {}], rows: [{ id: 'x', name: 'Broca', letter: 'A', levels: [0, 1, 1, 0] }] }
+    expect(compareSpacePhase(recorded, theory('A+ A-'))).toEqual({ ok: true })
+  })
+
+  it('líneas de señal: el final de carrera que da paso a cada movimiento', () => {
+    const signals = signalsOf(theory('A+ B+ B- A-'))
+    expect(signals.map((s) => s.sensor)).toEqual(['a1', 'b1', 'b0'])
+    expect(signals[0]).toMatchObject({ boundary: 1, from: { row: 0, level: 1 }, to: { row: 1, level: 0 } })
+    // Con la planta: los nombres de sus detectores.
+    const { diagram } = record('cilindros', 8, { actions: { marcha: 'press' } })
+    expect(signalsOf(diagram).map((s) => s.sensor)).toEqual(['a1', 'b1', 'a0'])
+  })
+})
+
+describe('secuencia del generador neumático', async () => {
+  const { buildPneumatic, parseSequence, sequenceText } = await import('../../src/lib/pneumatic')
+  it('se guarda normalizada en el proyecto y sobrevive al abrirlo', () => {
+    const groups = parseSequence('a+ (b+ c-) B- A-').groups
+    expect(sequenceText(groups)).toBe('A+ (B+ C−) B− A−')
+    const project = normalizeProject(buildPneumatic(groups))
+    expect(project.plc.sequence).toBe('A+ (B+ C−) B− A−')
+    expect(parseSequence(project.plc.sequence).groups).toEqual(groups)
+  })
+})
+
+describe('dossier: lo que hace la planta con un escenario', async () => {
+  const { scenarioMotion } = await import('../../src/lib/dossierContent')
+  it('el escenario «pulsar Marcha» da el ciclo A+ B+ A− B−', () => {
+    const project = normalizeProject(EXAMPLES.find((e) => e.id === 'cilindros').build())
+    const model = buildPlcModel(project.nodes, project.edges, project.plc)
+    const scenario = { id: 'e', name: 'Un ciclo', duration: 6, events: [{ t: 0.1, name: 'Marcha', value: 1 }, { t: 0.6, name: 'Marcha', value: 0 }] }
+    expect(levels(scenarioMotion(project.plc, scenario, model))).toEqual({ A: [0, 1, 1, 0, 0], B: [0, 0, 1, 1, 0] })
+  })
+})

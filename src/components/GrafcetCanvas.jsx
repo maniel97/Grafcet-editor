@@ -1205,6 +1205,8 @@ export default function GrafcetCanvas() {
                 simulation={simulation}
                 scenarios={plc.scenarios}
                 onScenariosChange={(update) => setPlc((p) => ({ ...p, scenarios: update(p.scenarios ?? []) }))}
+                expectedSequence={plc.sequence ?? ''}
+                onExpectedSequenceChange={(sequence) => setPlc((p) => ({ ...p, sequence }))}
                 cpuConfig={plc.cpu}
                 onCpuChange={(cpu) => setPlc((p) => ({ ...p, cpu }))}
                 onApplySymbols={(symbols) => setPlc((p) => ({ ...p, variables: applySymbols(p.variables, symbols) }))}

@@ -19,6 +19,8 @@ Mientras simulas, la sección **«Diagrama espacio-fase»** del panel dibuja lo 
 
 - **Fases** o **Tiempo**: el eje horizontal por fases (etapas) o en segundos (diagrama espacio-tiempo).
 - Si al final todos vuelven a su posición inicial, la última fase se marca «5=1»: el ciclo se cierra.
+- **Secuencia esperada** (p. ej. `A+ B+ B− A−`; el generador neumático la deja puesta): su diagrama se dibuja en gris debajo y se comprueba si coincide; si no, dice en qué fase está la diferencia. También sale en el dossier, con el escenario de prueba.
+- **Líneas de señal**: en cada cambio de fase, el final de carrera que da paso al movimiento siguiente (`a1`, `b1`…).
 
 ## Más realismo
 

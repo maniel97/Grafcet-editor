@@ -19,6 +19,8 @@ Enquanto simula, a secção **«Diagrama espaço-fase»** do painel desenha o qu
 
 - **Fases** ou **Tempo**: o eixo horizontal por fases (etapas) ou em segundos (diagrama espaço-tempo).
 - Se no fim todos voltarem à posição inicial, a última fase marca-se «5=1»: o ciclo fecha-se.
+- **Sequência esperada** (p. ex. `A+ B+ B− A−`; o gerador pneumático deixa-a preenchida): o seu diagrama desenha-se a cinzento por baixo e verifica-se se coincidem; se não, diz em que fase está a diferença. Também aparece no dossier, com o cenário de teste.
+- **Linhas de sinal**: em cada mudança de fase, o fim de curso que dá passagem ao movimento seguinte (`a1`, `b1`…).
 
 ## Mais realismo
 

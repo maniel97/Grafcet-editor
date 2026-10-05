@@ -2,7 +2,9 @@ import { useEffect, useMemo, useState } from 'react'
 import { AlertTriangle, ChevronDown, ChevronRight, Factory, Pause, Play, RotateCcw, SkipForward, Square, Timer, Zap } from 'lucide-react'
 import Chronogram from './Chronogram'
 import SpacePhase from './SpacePhase'
-import { buildSpacePhase } from '../lib/sim/spacePhase'
+import { buildSpacePhase, compareSpacePhase, theoreticalSpacePhase } from '../lib/sim/spacePhase'
+import { parseSequence } from '../lib/pneumatic'
+import { useDraft } from './useDraft'
 import ScenarioControls from './ScenarioControls'
 import CpuControls from './CpuControls'
 import { chronogramCsv } from '../lib/sim/scenario'
@@ -98,12 +100,12 @@ function chronogramSource(samples, signals, now) {
 }
 
 // Fuente de exportación del diagrama espacio-fase (o espacio-tiempo) con los datos de este momento.
-function spacePhaseSource(diagram, mode) {
+function spacePhaseSource(diagram, mode, extra = {}) {
   return svgMarkupSource(
     async () => {
       const { renderToStaticMarkup } = await import('react-dom/server')
       const width = Math.round(Math.min(2400, Math.max(480, 64 + diagram.phases.length * 70)))
-      return renderToStaticMarkup(<SpacePhase diagram={diagram} mode={mode} width={width} standalone />)
+      return renderToStaticMarkup(<SpacePhase diagram={diagram} mode={mode} width={width} standalone {...extra} />)
     },
     {
       kind: 'espacio-fase',
@@ -116,7 +118,7 @@ function spacePhaseSource(diagram, mode) {
 const fmtTime = (v) => (v < 60 ? `${v.toFixed(1)} s` : `${Math.floor(v / 60)} min ${(v % 60).toFixed(1)} s`)
 
 // Panel de control de la simulación.
-export default function SimulationPanel({ simulation, scenarios = [], onScenariosChange, cpuConfig, onCpuChange, onApplySymbols, sceneOpen, onToggleScene, elecOpen, onToggleElec, exportProps, onFocusNode, onClose }) {
+export default function SimulationPanel({ simulation, scenarios = [], onScenariosChange, expectedSequence = '', onExpectedSequenceChange, cpuConfig, onCpuChange, onApplySymbols, sceneOpen, onToggleScene, elecOpen, onToggleElec, exportProps, onFocusNode, onClose }) {
   const { compiled, sim, playing, setPlaying, speed, setSpeed, setInput, step, advance, reset } = simulation
 
   // Las entradas que gobierna la planta virtual no se cambian a mano.
@@ -130,6 +132,16 @@ export default function SimulationPanel({ simulation, scenarios = [], onScenario
   // Diagrama espacio-fase de los cilindros de la planta (lib/sim/spacePhase.js), por fases o en el tiempo.
   const [phaseMode, setPhaseMode] = useState('fase')
   const spacePhase = useMemo(() => buildSpacePhase(sim?.motion, simulation.cylinders ?? []), [sim?.motion, simulation.cylinders])
+  const [phaseSignals, setPhaseSignals] = useState(false)
+  // Secuencia esperada (p. ej. la del enunciado, o la del generador neumático): su diagrama teórico
+  // se dibuja debajo y se compara con lo que ha hecho la planta.
+  const sequenceDraft = useDraft(expectedSequence)
+  const expectedParsed = useMemo(() => (expectedSequence.trim() ? parseSequence(expectedSequence) : null), [expectedSequence])
+  const expectedDiagram = useMemo(
+    () => (expectedParsed && !expectedParsed.errors.length ? theoreticalSpacePhase(expectedParsed.groups) : null),
+    [expectedParsed],
+  )
+  const comparison = useMemo(() => compareSpacePhase(spacePhase, expectedDiagram), [spacePhase, expectedDiagram])
 
   // Teclas 1–9: cambian las primeras entradas (fuera de los campos de texto).
   useEffect(() => {
@@ -509,16 +521,49 @@ export default function SimulationPanel({ simulation, scenarios = [], onScenario
                 </button>
               ))}
             </div>
+            <label className="mb-1 flex items-center gap-1.5 text-xs text-slate-600">
+              <input type="checkbox" checked={phaseSignals} onChange={(e) => setPhaseSignals(e.target.checked)} />
+              {t('Líneas de señal (finales de carrera)')}
+            </label>
+            <label className="mb-1 block text-xs text-slate-600">
+              {t('Secuencia esperada')}
+              <input
+                value={sequenceDraft.text}
+                onFocus={sequenceDraft.focus}
+                onBlur={sequenceDraft.blur}
+                onChange={(e) => {
+                  sequenceDraft.set(e.target.value)
+                  onExpectedSequenceChange?.(e.target.value)
+                }}
+                placeholder={t('p. ej. A+ B+ B− A−')}
+                spellCheck={false}
+                className="mt-0.5 block w-full rounded border border-slate-300 px-1.5 py-0.5 font-mono text-xs focus:border-blue-500 focus:outline-none"
+              />
+            </label>
+            {expectedParsed?.errors.length > 0 && <p className="mb-1 text-xs text-red-700">{t(expectedParsed.errors[0])}</p>}
             {spacePhase ? (
               <>
                 <div className="paper overflow-hidden rounded border border-slate-200">
-                  <SpacePhase diagram={spacePhase} mode={phaseMode} />
+                  <SpacePhase diagram={spacePhase} mode={phaseMode} expected={expectedDiagram} signals={phaseSignals} />
                 </div>
+                {comparison && (
+                  <p role="status" data-comparison={comparison.ok ? 'ok' : 'distinta'} className={`mt-1 text-xs ${comparison.ok ? 'text-green-800' : 'text-red-700'}`}>
+                    {comparison.ok
+                      ? t('✓ Coincide con la secuencia esperada.')
+                      : comparison.got
+                        ? t('Fase {fase}: se esperaba {esperado} y se ha hecho {hecho}.', {
+                            fase: comparison.phase,
+                            esperado: comparison.expected.join(' '),
+                            hecho: comparison.got.join(' '),
+                          })
+                        : t('Fase {fase}: se esperaba {esperado} y aún no ha pasado.', { fase: comparison.phase, esperado: comparison.expected.join(' ') })}
+                  </p>
+                )}
                 <div className="mt-1 flex items-center gap-1 text-xs">
                   <span className="text-slate-400">{t('Exportar:')}</span>
                   <button
                     type="button"
-                    onClick={() => setChronoExport(spacePhaseSource(spacePhase, phaseMode))}
+                    onClick={() => setChronoExport(spacePhaseSource(spacePhase, phaseMode, { expected: expectedDiagram, signals: phaseSignals }))}
                     title={t('PNG, SVG o PDF, con vista previa')}
                     className="rounded border border-slate-300 px-1.5 py-0.5 text-slate-600 hover:bg-slate-100"
                   >

@@ -32,8 +32,36 @@ test('diagrama espacio-fase y espacio-tiempo de un ciclo de cilindros', async ({
   await diagram.scrollIntoViewIfNeeded()
   await page.screenshot({ path: `${process.env.SHOT ?? 'test-results'}/espacio-fase.png` })
 
+  // Comparación con la secuencia esperada (se guarda en el proyecto) y líneas de señal.
+  const sequence = section.getByLabel('Secuencia esperada')
+  await sequence.fill('A+ B+ B- A-')
+  await expect(section.getByRole('status')).toHaveText('Fase 3: se esperaba B− y se ha hecho A−.')
+  await sequence.fill('A+ B+ A- B-')
+  await expect(section.getByRole('status')).toHaveText('✓ Coincide con la secuencia esperada.')
+  await expect(diagram.locator('[data-expected]')).toHaveCount(2)
+  await section.getByLabel('Líneas de señal (finales de carrera)').check()
+  await expect(diagram.locator('[data-signal]')).toHaveCount(3)
+  await diagram.scrollIntoViewIfNeeded()
+  await diagram.screenshot({ path: `${process.env.SHOT ?? 'test-results'}/senales.png` })
+
   // Exportar: el diálogo con la vista previa.
   await section.getByRole('button', { name: 'Imagen o PDF' }).click()
   await expect(page.getByRole('dialog').filter({ hasText: 'espacio-fase' })).toBeVisible()
+  expectNoErrors(errors)
+})
+
+// El generador neumático enseña el diagrama teórico y deja la secuencia como «esperada».
+test('generador neumático: diagrama teórico y secuencia esperada', async ({ page }) => {
+  const errors = await openEditor(page)
+  await page.getByRole('button', { name: /^Abrir/ }).click()
+  await page.getByRole('menuitem', { name: /Secuencia neumática/ }).click()
+  const dialog = page.getByRole('dialog', { name: 'Secuencia neumática' })
+  await dialog.getByLabel('Secuencia').fill('A+ B+ B- A-')
+  const preview = dialog.locator('svg[data-space-phase="fase"]')
+  await expect(preview.locator('[data-phase-label]')).toHaveText(['1', '2', '3', '4', '5=1'])
+  await expect(preview.locator('[data-signal]')).toHaveText(['a1', 'b1', 'b0'])
+  await dialog.getByRole('button', { name: 'Crear grafcet' }).click()
+  await page.locator('[data-tour="Simular"]').click()
+  await expect(page.locator('[data-tour="espacio-fase"]').getByLabel('Secuencia esperada')).toHaveValue('A+ B+ B− A−')
   expectNoErrors(errors)
 })

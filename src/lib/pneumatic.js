@@ -61,7 +61,12 @@ export function parseSequence(text) {
 const sensor = (cyl, dir) => `${cyl.toLowerCase()}${dir === '+' ? '1' : '0'}`
 const show = (groups) => groups.map((g) => (g.length > 1 ? `(${g.map((m) => m.cyl + m.dir).join(' ')})` : g[0].cyl + g[0].dir)).join(' ')
 
-// Grupos -> proyecto { name, nodes, edges, plc } (con planta si withScene).
+// Grupos -> texto normalizado: «A+ (B+ C−) B− A−».
+export const sequenceText = (groups) =>
+  groups.map((g) => (g.length > 1 ? `(${g.map((m) => m.cyl + (m.dir === '+' ? '+' : '−')).join(' ')})` : g[0].cyl + (g[0].dir === '+' ? '+' : '−'))).join(' ')
+
+// Grupos -> proyecto { name, nodes, edges, plc } (con planta si withScene). plc.sequence: la secuencia,
+// que el diagrama espacio-fase de la simulación usa como «secuencia esperada».
 export function buildPneumatic(groups, { withScene = true } = {}) {
   const cylinders = [...new Set(groups.flat().map((m) => m.cyl))]
   const first = new Map()
@@ -114,7 +119,7 @@ export function buildPneumatic(groups, { withScene = true } = {}) {
     variables[`${c.toLowerCase()}0`] = { type: 'input' }
     variables[`${c.toLowerCase()}1`] = { type: 'input' }
   }
-  const plc = { variables }
+  const plc = { variables, sequence: sequenceText(groups) }
   if (withScene) {
     plc.scene = {
       elements: [

@@ -19,6 +19,8 @@ While you simulate, the **“Displacement-step diagram”** section of the panel
 
 - **Steps** or **Time**: the horizontal axis by steps or in seconds (displacement-time diagram).
 - If at the end everything is back in its initial position, the last step is marked “5=1”: the cycle is closed.
+- **Expected sequence** (e.g. `A+ B+ B− A−`; the pneumatic generator fills it in): its diagram is drawn in grey underneath and it is checked whether they match; if not, it says in which step the difference is. It also appears in the exercise report, with the test scenario.
+- **Signal lines**: at each change of step, the limit switch that triggers the next movement (`a1`, `b1`…).
 
 ## More realism
 

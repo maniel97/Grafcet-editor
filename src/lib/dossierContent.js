@@ -4,6 +4,10 @@
 import { createElement } from 'react'
 import LadderDiagram from '../components/LadderDiagram'
 import Chronogram from '../components/Chronogram'
+import SpacePhase from '../components/SpacePhase'
+import { buildSpacePhase, compareSpacePhase, cylindersOf, motionSample, pushMotion, theoreticalSpacePhase } from './sim/spacePhase'
+import { advanceWorld, makeWorld } from './sim/world'
+import { parseSequence } from './pneumatic'
 import { SceneStatic } from '../components/SceneView'
 import ElecStatic from '../components/elec/ElecStatic'
 import { elecSheetsOf, sheetOfComponent } from './elec/sheet'
@@ -138,5 +142,56 @@ export async function dossierFigures({ nodes, edges, plc, scenarioId, model }) {
     const markup = renderToStaticMarkup(createElement(Chronogram, { samples, signals, now: span, window: span, width, standalone: true }))
     figures.chronogram = await figureFromMarkup(markup, scenario.name)
   }
+  Object.assign(figures, await spacePhaseFigures(plc, scenario, model, renderToStaticMarkup))
   return figures
+}
+
+// Lo que hace la planta con el escenario (sin tiempo real): el registro de movimientos de sus
+// cilindros, como el que anota la simulación. null si no hay cilindros.
+export function scenarioMotion(plc, scenario, model) {
+  const cylinders = cylindersOf(plc.scene)
+  if (!cylinders.length || !scenario) return null
+  const compiled = compile(model)
+  const world = makeWorld(plc.scene, () => null, plc.electrical, compiled.variables)
+  let w = world.init()
+  let inputs = { ...Object.fromEntries(compiled.variables.filter((v) => v.type === 'input').map((v) => [v.name, 0])), ...world.inputs(w) }
+  let state = evolve(compiled, initialState(compiled), inputs, 0).state
+  const phase = (s) => [...s.active].sort().join(',')
+  let trace = pushMotion([], motionSample(0, w, cylinders, phase(state)))
+  let next = 0
+  const end = scenario.duration ?? (scenario.events.at(-1)?.t ?? 0) + 1
+  for (let t = 0.05; t <= end + 1e-9; t = Math.round((t + 0.05) * 1e6) / 1e6) {
+    const r = advanceWorld(compiled, { state, inputs, world: w }, t, { world, scenario, next })
+    ;({ state, inputs, next } = r)
+    w = r.world
+    trace = pushMotion(trace, motionSample(t, w, cylinders, phase(state)))
+  }
+  return buildSpacePhase(trace, cylinders)
+}
+
+// Figuras del diagrama espacio-fase para el dossier: el esperado (plc.sequence) y el de la planta
+// con el escenario elegido, más el resultado de compararlos.
+async function spacePhaseFigures(plc, scenario, model, renderToStaticMarkup) {
+  const parsed = plc.sequence?.trim() ? parseSequence(plc.sequence) : null
+  const expected = parsed && !parsed.errors.length ? theoreticalSpacePhase(parsed.groups) : null
+  const recorded = scenarioMotion(plc, scenario, model)
+  const figs = []
+  const draw = async (diagram, name, extra = {}) => {
+    const width = Math.round(Math.min(1400, Math.max(480, 64 + diagram.phases.length * 70)))
+    const markup = renderToStaticMarkup(createElement(SpacePhase, { diagram, width, standalone: true, signals: true, ...extra }))
+    const fig = await figureFromMarkup(markup, name)
+    if (fig) figs.push(fig)
+  }
+  if (expected) await draw(expected, `Esperado: ${plc.sequence.trim()}`)
+  if (recorded) await draw(recorded, `Con la planta (escenario «${scenario.name}»)`, { expected })
+  if (!figs.length) return {}
+  const result = compareSpacePhase(recorded, expected)
+  const text = !result
+    ? null
+    : result.ok
+      ? 'Lo que hace la planta coincide con la secuencia esperada.'
+      : result.got
+        ? `Fase ${result.phase}: se esperaba ${result.expected.join(' ')} y la planta ha hecho ${result.got.join(' ')}.`
+        : `Fase ${result.phase}: se esperaba ${result.expected.join(' ')} y el escenario acaba antes.`
+  return { spacePhase: figs, spacePhaseResult: text }
 }

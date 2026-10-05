@@ -22,6 +22,7 @@ export const DOSSIER_SECTIONS = [
   { id: 'plant', label: 'Planta virtual' },
   { id: 'electrical', label: 'Esquema eléctrico' },
   { id: 'chronogram', label: 'Cronograma' },
+  { id: 'spacePhase', label: 'Diagrama espacio-fase' },
   { id: 'notes', label: 'Notas del lienzo' },
 ]
 
@@ -43,7 +44,7 @@ export const LADDER_LISTINGS = [
 
 export const DEFAULT_DOSSIER = {
   page: 'a4',
-  sections: { cover: true, toc: true, statement: true, grafcet: true, variables: true, verification: true, ladder: true, plant: true, electrical: true, chronogram: true, notes: false },
+  sections: { cover: true, toc: true, statement: true, grafcet: true, variables: true, verification: true, ladder: true, plant: true, electrical: true, chronogram: true, spacePhase: true, notes: false },
   cover: {},
   statement: '',
   ladderListing: '',
@@ -365,6 +366,13 @@ export function buildDossier(content, options, measure) {
     if (content.figures.chronogram.name) paragraph([{ text: `Escenario: ${content.figures.chronogram.name}` }], 10)
     y += 2
     figure(content.figures.chronogram)
+  }
+  // Diagrama espacio-fase: el esperado (la secuencia del proyecto) y el de la planta con el
+  // escenario, con el resultado de compararlos.
+  if (S.spacePhase && content.figures.spacePhase?.length) {
+    heading('Diagrama espacio-fase')
+    for (const fig of content.figures.spacePhase) figure(fig, { caption: fig.name })
+    if (content.figures.spacePhaseResult) paragraph([{ text: content.figures.spacePhaseResult }], 10)
   }
   if (S.notes && content.notes?.length) {
     heading('Notas del lienzo')

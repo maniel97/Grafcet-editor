@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { AlertTriangle, CircleX, Wind, X } from 'lucide-react'
 import { buildPneumatic, parseSequence } from '../lib/pneumatic'
+import { theoreticalSpacePhase } from '../lib/sim/spacePhase'
+import SpacePhase from './SpacePhase'
 import { t } from '../lib/i18n'
 
 const EXAMPLES = ['A+ B+ B- A-', 'A+ B+ A- B-', 'A+ (B+ C+) B- (A- C-)', 'A+ B+ C+ C- B- A-']
@@ -82,6 +84,10 @@ export default function PneumaticDialog({ onCreate, onClose }) {
                 </li>
               ))}
             </ol>
+            <p className="mb-1 mt-3 text-xs font-medium uppercase tracking-wide text-slate-500">{t('Diagrama espacio-fase')}</p>
+            <div className="paper overflow-hidden rounded border border-slate-200">
+              <SpacePhase diagram={theoreticalSpacePhase(parsed.groups)} width={Math.max(320, 64 + parsed.groups.length * 60)} signals />
+            </div>
           </div>
         )}
         <label className="flex items-center gap-2">
