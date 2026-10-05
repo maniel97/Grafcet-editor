@@ -19,7 +19,8 @@ const when = (iso) =>
 // guarda solo como trabajo anterior (y también se puede deshacer con Ctrl+Z).
 // onOpenSolution(proyecto, título): abrir resuelta la práctica guiada de un guion (sale resuelta en
 // el propio guion: es el ejemplo de cómo se hace).
-export default function ProjectsDialog({ initialTab = 'examples', onOpenExample, onOpenExercise, onOpenSolution, onRestore, onClose }) {
+// education: modo educativo (la pestaña de ejercicios solo con él).
+export default function ProjectsDialog({ initialTab = 'examples', onOpenExample, onOpenExercise, onOpenSolution, onRestore, onClose, education = true }) {
   const dialogRef = useRef(null)
   const [tab, setTab] = useState(initialTab)
   const [recent, setRecent] = useState(() => listRecent())
@@ -46,7 +47,7 @@ export default function ProjectsDialog({ initialTab = 'examples', onOpenExample,
       </div>
 
       <div className="flex gap-1 border-b border-slate-200 px-5 pt-2" role="tablist">
-        {TABS.map((x) => (
+        {TABS.filter((x) => education || x.id !== 'exercises').map((x) => (
           <button
             key={x.id}
             type="button"

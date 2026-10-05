@@ -11,7 +11,7 @@ const receptivity = async (page, node, text) => {
 
 // El alumno: abre un ejercicio, comprueba, lo resuelve y ve todo en verde.
 test('ejercicio del alumno: enunciado, Comprobar, piezas bloqueadas y resuelto', async ({ page }) => {
-  const errors = await openEditor(page)
+  const errors = await openEditor(page, undefined, { education: true })
   await page.getByRole('button', { name: /^Abrir/ }).click()
   await page.getByRole('menuitem', { name: /Ejercicios/ }).click()
   await page.getByRole('button', { name: /Marcha y paro de un motor/ }).click()
@@ -89,7 +89,7 @@ test('ejercicio del alumno: enunciado, Comprobar, piezas bloqueadas y resuelto',
 
 // El profesor: prepara un ejemplo como ejercicio, lo prueba y descarga la versión del alumnado.
 test('ejercicio del profesor: preparar, probar con su solución y descargar sin solución', async ({ page }) => {
-  const errors = await openEditor(page)
+  const errors = await openEditor(page, undefined, { education: true })
   await openExample(page, /^Cilindros A\+ B\+/)
   await page.getByRole('button', { name: /Exportar/ }).click()
   await page.getByRole('menuitem', { name: /Ejercicio para el alumnado/ }).click()
@@ -118,7 +118,7 @@ test('ejercicio del profesor: preparar, probar con su solución y descargar sin 
 
 // Editor de formas de onda: dibujar un pulso de Marcha y ver lo que hace el grafcet.
 test('editor de escenarios: dibujar un pulso y ver la respuesta del grafcet', async ({ page }) => {
-  const errors = await openEditor(page)
+  const errors = await openEditor(page, undefined, { education: true })
   await openExample(page, /^Marcha y paro de un motor/)
   await page.locator('[data-tour="Simular"]').click()
   await page.getByRole('button', { name: 'Dibujar escenario' }).click()
@@ -144,7 +144,7 @@ test('editor de escenarios: dibujar un pulso y ver la respuesta del grafcet', as
 // Hoja de prácticas en PDF con el ejercicio dentro: se descarga y, al abrir el PDF, se carga el
 // ejercicio en modo alumno.
 test('hoja de prácticas en PDF: se imprime como una hoja y el editor abre el ejercicio de dentro', async ({ page }) => {
-  const errors = await openEditor(page)
+  const errors = await openEditor(page, undefined, { education: true })
   await openExample(page, /^Cilindros A\+ B\+/)
   await page.getByRole('button', { name: /Exportar/ }).click()
   await page.getByRole('menuitem', { name: /Ejercicio para el alumnado/ }).click()
@@ -174,7 +174,7 @@ test('hoja de prácticas en PDF: se imprime como una hoja y el editor abre el ej
 
 // Un PDF sin ejercicio dentro: aviso claro, sin romper nada.
 test('abrir un PDF sin ejercicio dentro avisa', async ({ page }) => {
-  const errors = await openEditor(page)
+  const errors = await openEditor(page, undefined, { education: true })
   const messages = []
   page.on('dialog', (d) => {
     messages.push(d.message())
@@ -189,7 +189,7 @@ test('abrir un PDF sin ejercicio dentro avisa', async ({ page }) => {
 // un único PDF; al abrirlo se elige la práctica.
 test('guion de prácticas: varias prácticas en un PDF y elegir cuál abrir', async ({ page }) => {
   test.setTimeout(90_000)
-  const errors = await openEditor(page)
+  const errors = await openEditor(page, undefined, { education: true })
   await page.getByRole('button', { name: /^Abrir/ }).click()
   await page.getByRole('menuitem', { name: /Ejercicios/ }).click()
   await page.getByRole('button', { name: /Abrir resuelta: Práctica 1/ }).click()
@@ -223,7 +223,7 @@ test('guion de prácticas: varias prácticas en un PDF y elegir cuál abrir', as
 
 // Fase 3: pistas de una en una (contadas; Ctrl+Z no las devuelve), requisitos y nota.
 test('pistas, requisitos y nota del ejercicio', async ({ page }) => {
-  const errors = await openEditor(page)
+  const errors = await openEditor(page, undefined, { education: true })
   await page.getByRole('button', { name: /^Abrir/ }).click()
   await page.getByRole('menuitem', { name: /Ejercicios/ }).click()
   await page.getByRole('button', { name: /Marcha y paro de un motor/ }).click()
@@ -248,7 +248,7 @@ test('pistas, requisitos y nota del ejercicio', async ({ page }) => {
 })
 
 test('el profesor quita las pistas y pide nota', async ({ page }) => {
-  const errors = await openEditor(page)
+  const errors = await openEditor(page, undefined, { education: true })
   await openExample(page, /^Marcha y paro de un motor/)
   await page.getByRole('button', { name: /Exportar/ }).click()
   await page.getByRole('menuitem', { name: /Ejercicio para el alumnado/ }).click()
@@ -273,7 +273,7 @@ test('el profesor quita las pistas y pide nota', async ({ page }) => {
 // corregir las entregas de una clase (con las comprobaciones del profesor, parecidos y CSV).
 test('datos del proceso y corregir las entregas de la clase', async ({ page }) => {
   test.setTimeout(120_000)
-  const errors = await openEditor(page)
+  const errors = await openEditor(page, undefined, { education: true })
   // El profesor prepara el ejercicio y guarda su proyecto (con la solución).
   await openExample(page, /^Marcha y paro de un motor/)
   await page.getByRole('button', { name: /Exportar/ }).click()

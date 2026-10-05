@@ -2,6 +2,8 @@
 
 Un **ejercicio** trae un enunciado y lo que el profesor da hecho (la planta, la tabla de variables, el esquema…). El grafcet lo dibujas tú, y el editor te dice si está bien.
 
+> **Modo educativo:** las herramientas de clase (Abrir > Ejercicios y Corregir entregas, Exportar > Ejercicio para el alumnado y Guion de prácticas) aparecen al activar **Opciones > Modo educativo**. Sin él, los menús quedan más sencillos; un ejercicio que te den se abre con Abrir > Abrir archivo y funciona igual.
+
 ## Para el alumnado
 
 1. Abre el ejercicio: Abrir > Ejercicios, o con Abrir > Abrir archivo el archivo que te haya dado el profesor (un .json o la hoja de prácticas en PDF: el ejercicio va dentro).

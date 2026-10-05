@@ -900,6 +900,7 @@ export default function GrafcetCanvas() {
           onExport={onExport}
           onOpenExercises={() => setProjectsTab('exercises')}
           onOpenClass={() => setClassOpen(true)}
+          education={Boolean(settings.education)}
           exerciseShown={Boolean(plc.exercise)}
           exerciseOpen={exerciseOpen}
           onToggleExercise={() => setExerciseOpen((o) => !o)}
@@ -998,6 +999,7 @@ export default function GrafcetCanvas() {
                 setProjectsTab(null)
               }}
               onRestore={restoreRecent}
+              education={Boolean(settings.education)}
               onClose={() => setProjectsTab(null)}
             />
           </Suspense>

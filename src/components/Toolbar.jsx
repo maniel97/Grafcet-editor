@@ -118,6 +118,7 @@ export default function Toolbar({
   onOpenRecent,
   onOpenExercises,
   onOpenClass,
+  education = false, // modo educativo (Ajustes): ejercicios y corregir entregas en el menú Abrir
   exerciseShown = false,
   exerciseOpen = false,
   onToggleExercise,
@@ -195,8 +196,8 @@ export default function Toolbar({
           { id: 'new', label: N_('Nuevo'), hint: N_('Proyecto en blanco: título, autómata y tabla de variables'), icon: FilePlus, onSelect: onNew },
           { id: 'file', label: N_('Abrir archivo'), hint: N_('Proyecto .json, o la hoja PDF de un ejercicio (Ctrl+O)'), icon: FileJson, onSelect: onOpen },
           { id: 'examples', label: N_('Ejemplos'), hint: N_('Grafcets típicos listos para usar'), icon: BookOpen, onSelect: onOpenExamples },
-          { id: 'exercises', label: N_('Ejercicios'), hint: N_('Ejercicios con autocorrección, por niveles'), icon: GraduationCap, onSelect: onOpenExercises },
-          { id: 'class', label: N_('Corregir entregas'), hint: N_('Las entregas de la clase (dossiers en PDF o .json), corregidas de nuevo en una tabla'), icon: ClipboardCheck, onSelect: onOpenClass },
+          ...(education ? [{ id: 'exercises', label: N_('Ejercicios'), hint: N_('Ejercicios con autocorrección, por niveles'), icon: GraduationCap, onSelect: onOpenExercises },
+          { id: 'class', label: N_('Corregir entregas'), hint: N_('Las entregas de la clase (dossiers en PDF o .json), corregidas de nuevo en una tabla'), icon: ClipboardCheck, onSelect: onOpenClass }] : []),
           { id: 'recent', label: N_('Trabajos anteriores'), hint: N_('Recuperar lo que había antes de abrir o limpiar'), icon: History, onSelect: onOpenRecent },
           { id: 'pneumatic', label: N_('Secuencia neumática'), hint: N_('Crear el grafcet y la planta de una secuencia como A+ B+ B− A−'), icon: Wind, onSelect: onOpenPneumatic },
         ]}
@@ -204,7 +205,7 @@ export default function Toolbar({
 
       <Separator />
 
-      <ExportMenu onExport={onExport} labelClass={labelClass(true)} />
+      <ExportMenu onExport={onExport} labelClass={labelClass(true)} education={education} />
 
       <Separator />
 

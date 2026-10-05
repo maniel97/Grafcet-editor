@@ -2,6 +2,8 @@
 
 Un **exercice** contient un énoncé et ce que le professeur fournit déjà fait (la partie opérative, la table des variables, le schéma…). C’est vous qui dessinez le grafcet, et l’éditeur vous dit s’il est correct.
 
+> **Mode éducatif :** les outils pour la classe (Ouvrir > Exercices et Corriger les rendus, Exporter > Exercice pour les élèves et Livret de TP) apparaissent en activant **Options > Mode éducatif**. Sans lui, les menus restent plus simples ; un exercice que l’on vous donne s’ouvre avec Ouvrir > Ouvrir un fichier et fonctionne pareil.
+
 ## Pour les élèves
 
 1. Ouvrez l’exercice : Ouvrir > Exercices, ou avec Ouvrir > Ouvrir un fichier le fichier que le professeur vous a donné (un .json ou la fiche de TP en PDF : l’exercice est à l’intérieur).

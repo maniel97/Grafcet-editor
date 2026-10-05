@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { expectNoErrors, openEditor, saveFromDialog } from './helpers'
+import { expectNoErrors, fixture, openEditor, saveFromDialog } from './helpers'
 
 // ¿Queda todo lo dibujado dentro del área visible del lienzo? Devuelve el peor desborde o null.
 const overflow = (page) =>
@@ -27,7 +27,7 @@ for (const width of [1500, 1280, 1100]) {
     const exportBtn = page.getByRole('button', { name: /Exportar/ })
     const menu = page.getByRole('menu', { name: 'Formatos de exportación' })
     await exportBtn.click()
-    await expect(menu.getByRole('menuitem')).toHaveCount(7) // PNG, SVG, PDF, dossier, ejercicio, guion y compartir
+    await expect(menu.getByRole('menuitem')).toHaveCount(5) // PNG, SVG, PDF, dossier y compartir (sin el modo educativo)
     await page.keyboard.press('Escape')
     await expect(menu).toHaveCount(0)
     await exportBtn.click()
@@ -109,5 +109,42 @@ test('bloqueo de edición: impide editar y se puede quitar', async ({ page }) =>
   await page.getByRole('button', { name: 'Desbloquear', exact: true }).click()
   await s1.click()
   await expect(page.locator('.react-flow__node-toolbar button').first()).toBeVisible()
+  expectNoErrors(errors)
+})
+
+// Modo educativo (Opciones): sin él, los menús Abrir y Exportar quedan sencillos; con él,
+// aparecen los ejercicios, el guion y corregir entregas. Un ejercicio se abre igual sin él.
+test('modo educativo: menús sencillos por defecto y herramientas de clase al activarlo', async ({ page }) => {
+  const errors = await openEditor(page)
+  const openMenu = async (name) => {
+    await page.getByRole('button', { name }).click()
+    return page.getByRole('menu')
+  }
+  let menu = await openMenu(/^Abrir un proyecto/)
+  await expect(menu.getByRole('menuitem', { name: /Ejercicios|Corregir entregas/ })).toHaveCount(0)
+  await page.keyboard.press('Escape')
+  menu = await openMenu(/^Exportar/)
+  await expect(menu.getByRole('menuitem', { name: /Ejercicio para el alumnado|Guion de prácticas/ })).toHaveCount(0)
+  await page.keyboard.press('Escape')
+
+  // Un ejercicio que te dan se abre y se hace igual (su panel depende del archivo).
+  await page.locator('input[type=file]').first().setInputFiles(fixture('ejercicio-alumno.json'))
+  await expect(page.getByRole('complementary', { name: 'Ejercicio' })).toContainText('Marcha y paro')
+
+  await page.getByTitle(/^Opciones/).click()
+  const options = page.getByRole('dialog', { name: 'Opciones' })
+  await options.getByLabel('Mostrar las herramientas para clase').check()
+  await options.getByRole('button', { name: 'Listo' }).click()
+  menu = await openMenu(/^Abrir un proyecto/)
+  await expect(menu.getByRole('menuitem', { name: /Ejercicios/ })).toHaveCount(1)
+  await expect(menu.getByRole('menuitem', { name: /Corregir entregas/ })).toHaveCount(1)
+  await page.keyboard.press('Escape')
+  menu = await openMenu(/^Exportar/)
+  await expect(menu.getByRole('menuitem')).toHaveCount(7)
+  // Se recuerda al volver a entrar.
+  await page.reload()
+  await page.waitForSelector('.react-flow__node')
+  menu = await openMenu(/^Exportar/)
+  await expect(menu.getByRole('menuitem', { name: /Guion de prácticas/ })).toHaveCount(1)
   expectNoErrors(errors)
 })

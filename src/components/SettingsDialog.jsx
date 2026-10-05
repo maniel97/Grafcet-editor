@@ -149,6 +149,17 @@ export default function SettingsDialog({ settings, onChange, onReset, onClose })
           </div>
           <p className="text-xs text-slate-500">Acciones y receptividades; también se aplica al exportar.</p>
         </fieldset>
+
+        <fieldset className="space-y-2">
+          <legend className={sectionTitle}>{t('Modo educativo')}</legend>
+          <label className="flex items-center gap-2">
+            <input type="checkbox" checked={Boolean(settings.education)} onChange={(e) => onChange({ education: e.target.checked })} className="accent-blue-600" />
+            {t('Mostrar las herramientas para clase')}
+          </label>
+          <p className="text-xs text-slate-500">
+            {t('Añade a los menús Abrir y Exportar los ejercicios con autocorrección, el guion de prácticas y la corrección de entregas. Sin él, los menús quedan más sencillos; un ejercicio que te den se abre y se hace igual.')}
+          </p>
+        </fieldset>
       </div>
 
       <div className="flex justify-between border-t border-slate-200 px-5 py-3">

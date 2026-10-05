@@ -36,7 +36,9 @@ export const THEMES = [
   { id: 'dark', label: N_('Oscuro') },
 ]
 
-export const DEFAULT_SETTINGS = { fontId: 'inter', uiScale: 100, diagramFontSize: 14, theme: 'auto', lang: 'es' }
+// education: modo educativo (menús de ejercicios, guiones y corregir entregas). Desactivado: menús
+// más sencillos; un ejercicio que se abre funciona igual (su panel depende del archivo).
+export const DEFAULT_SETTINGS = { fontId: 'inter', uiScale: 100, diagramFontSize: 14, theme: 'auto', lang: 'es', education: false }
 
 const darkQuery = () => globalThis.matchMedia?.('(prefers-color-scheme: dark)')
 const resolveTheme = (theme) => (theme === 'auto' ? (darkQuery()?.matches ? 'dark' : 'light') : theme)

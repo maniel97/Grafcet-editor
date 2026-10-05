@@ -1,0 +1,355 @@
+{
+ "format": "grafcet-editor",
+ "version": 1,
+ "name": "Marcha y paro de un motor",
+ "nodes": [
+  {
+   "id": "variables-table",
+   "type": "variables",
+   "position": {
+    "x": -480,
+    "y": 0
+   },
+   "data": {
+    "showComments": true
+   },
+   "deletable": false,
+   "selected": false
+  }
+ ],
+ "edges": [],
+ "plc": {
+  "scheme": "siemens",
+  "showAddresses": false,
+  "steps": {
+   "s0": {
+    "comment": "Reposo: motor parado",
+    "address": "M0.0"
+   },
+   "s1": {
+    "comment": "Motor en marcha",
+    "address": "M0.1"
+   }
+  },
+  "variables": {
+   "Marcha": {
+    "comment": "Pulsador verde NA: arranca el motor",
+    "type": "input",
+    "address": "I0.0"
+   },
+   "Paro": {
+    "comment": "Pulsador rojo NC: vale 1 sin pulsar",
+    "type": "input",
+    "address": "I0.1"
+   },
+   "Motor": {
+    "comment": "Contactor del motor",
+    "type": "output",
+    "address": "Q0.0"
+   },
+   "Piloto": {
+    "comment": "Luz verde: motor en marcha",
+    "type": "output",
+    "address": "Q0.1"
+   }
+  },
+  "scene": {
+   "elements": [
+    {
+     "id": "motor",
+     "type": "motor",
+     "x": 220,
+     "y": 120,
+     "rot": 0,
+     "variable": "Motor",
+     "reverse": "",
+     "pulses": "",
+     "text": "Motor"
+    },
+    {
+     "id": "marcha",
+     "type": "button",
+     "x": 0,
+     "y": 0,
+     "rot": 0,
+     "variable": "Marcha",
+     "contact": "NO",
+     "color": "green",
+     "text": "Marcha",
+     "place": "desk"
+    },
+    {
+     "id": "paro",
+     "type": "button",
+     "x": 0,
+     "y": 0,
+     "rot": 0,
+     "variable": "Paro",
+     "contact": "NC",
+     "color": "red",
+     "text": "Paro",
+     "place": "desk"
+    },
+    {
+     "id": "piloto",
+     "type": "lamp",
+     "x": 0,
+     "y": 0,
+     "rot": 0,
+     "variable": "Piloto",
+     "color": "green",
+     "text": "En marcha",
+     "place": "desk"
+    }
+   ]
+  },
+  "electrical": {
+   "enabled": true,
+   "components": [
+    {
+     "id": "plc-muv41lgk",
+     "type": "plc",
+     "inputs": 14,
+     "outputs": 10,
+     "x": 100,
+     "y": 220,
+     "tag": "A1",
+     "text": "Autómata"
+    },
+    {
+     "id": "rail-plc-muv41lgk-8",
+     "type": "rail",
+     "x": 40,
+     "y": 0,
+     "potential": "L+",
+     "length": 760
+    },
+    {
+     "id": "rail-plc-muv41lgk-9",
+     "type": "rail",
+     "x": 40,
+     "y": 20,
+     "potential": "M",
+     "length": 760,
+     "wires": "down"
+    },
+    {
+     "id": "rail-plc-muv41lgk-10",
+     "type": "rail",
+     "x": 40,
+     "y": 540,
+     "potential": "M",
+     "length": 760
+    },
+    {
+     "id": "in-plc-muv41lgk-1",
+     "type": "pushbutton",
+     "x": 220,
+     "y": 80,
+     "signal": "Marcha",
+     "text": "Pulsador verde NA: arranca el motor",
+     "contact": "NO",
+     "tag": "S1"
+    },
+    {
+     "id": "in-plc-muv41lgk-3",
+     "type": "pushbutton",
+     "x": 400,
+     "y": 80,
+     "signal": "Paro",
+     "text": "Pulsador rojo NC: vale 1 sin pulsar",
+     "contact": "NC",
+     "tag": "S2"
+    },
+    {
+     "id": "out-plc-muv41lgk-5",
+     "type": "coil",
+     "x": 140,
+     "y": 400,
+     "signal": "Motor",
+     "text": "Contactor del motor",
+     "kind": "contactor",
+     "tag": "KM1"
+    },
+    {
+     "id": "out-plc-muv41lgk-7",
+     "type": "lamp",
+     "x": 320,
+     "y": 400,
+     "signal": "Piloto",
+     "text": "Luz verde: motor en marcha",
+     "color": "green",
+     "tag": "H1"
+    }
+   ],
+   "wires": [
+    {
+     "id": "w-plc-muv41lgk-11",
+     "from": {
+      "c": "rail-plc-muv41lgk-8",
+      "t": "t4"
+     },
+     "to": {
+      "c": "plc-muv41lgk",
+      "t": "L+"
+     }
+    },
+    {
+     "id": "w-plc-muv41lgk-12",
+     "from": {
+      "c": "rail-plc-muv41lgk-9",
+      "t": "t6"
+     },
+     "to": {
+      "c": "plc-muv41lgk",
+      "t": "M"
+     }
+    },
+    {
+     "id": "w-plc-muv41lgk-13",
+     "from": {
+      "c": "rail-plc-muv41lgk-9",
+      "t": "t8"
+     },
+     "to": {
+      "c": "plc-muv41lgk",
+      "t": "1M"
+     }
+    },
+    {
+     "id": "w-plc-muv41lgk-14",
+     "from": {
+      "c": "plc-muv41lgk",
+      "t": "L+"
+     },
+     "to": {
+      "c": "plc-muv41lgk",
+      "t": "1L"
+     },
+     "bendX": -40
+    },
+    {
+     "id": "w-plc-muv41lgk-15",
+     "from": {
+      "c": "rail-plc-muv41lgk-8",
+      "t": "t10"
+     },
+     "to": {
+      "c": "in-plc-muv41lgk-1",
+      "t": "13"
+     }
+    },
+    {
+     "id": "w-plc-muv41lgk-16",
+     "from": {
+      "c": "in-plc-muv41lgk-1",
+      "t": "14"
+     },
+     "to": {
+      "c": "plc-muv41lgk",
+      "t": "I0.0"
+     },
+     "bend": 20
+    },
+    {
+     "id": "w-plc-muv41lgk-17",
+     "from": {
+      "c": "rail-plc-muv41lgk-8",
+      "t": "t19"
+     },
+     "to": {
+      "c": "in-plc-muv41lgk-3",
+      "t": "11"
+     }
+    },
+    {
+     "id": "w-plc-muv41lgk-18",
+     "from": {
+      "c": "in-plc-muv41lgk-3",
+      "t": "12"
+     },
+     "to": {
+      "c": "plc-muv41lgk",
+      "t": "I0.1"
+     },
+     "bend": 40
+    },
+    {
+     "id": "w-plc-muv41lgk-19",
+     "from": {
+      "c": "plc-muv41lgk",
+      "t": "Q0.0"
+     },
+     "to": {
+      "c": "out-plc-muv41lgk-5",
+      "t": "A1"
+     },
+     "bend": 40
+    },
+    {
+     "id": "w-plc-muv41lgk-20",
+     "from": {
+      "c": "out-plc-muv41lgk-5",
+      "t": "A2"
+     },
+     "to": {
+      "c": "rail-plc-muv41lgk-10",
+      "t": "t6"
+     }
+    },
+    {
+     "id": "w-plc-muv41lgk-21",
+     "from": {
+      "c": "plc-muv41lgk",
+      "t": "Q0.1"
+     },
+     "to": {
+      "c": "out-plc-muv41lgk-7",
+      "t": "X1"
+     },
+     "bend": 20
+    },
+    {
+     "id": "w-plc-muv41lgk-22",
+     "from": {
+      "c": "out-plc-muv41lgk-7",
+      "t": "X2"
+     },
+     "to": {
+      "c": "rail-plc-muv41lgk-10",
+      "t": "t15"
+     }
+    }
+   ]
+  },
+  "exercise": {
+   "student": true,
+   "title": "Marcha y paro de un motor",
+   "statement": "Un motor se pone en marcha al pulsar **Marcha** y se para al pulsar **Paro**.\n\n- Mientras está en marcha se enciende el **Piloto**.\n- **Paro** es un pulsador normalmente cerrado (NC): sin pulsar da 1.\n- Usa las variables de la tabla.",
+   "parts": {
+    "plant": "locked",
+    "variables": "locked",
+    "electrical": "given"
+   },
+   "hints": {
+    "enabled": true,
+    "count": 3
+   },
+   "hintsShown": 0,
+   "grade": {
+    "enabled": false,
+    "max": 10,
+    "hintPenalty": 0
+   },
+   "processData": false,
+   "sheet": {
+    "subject": "",
+    "course": "",
+    "cycle": "",
+    "center": "",
+    "teacher": ""
+   },
+   "sealed": "HFAWBxELHUMCGUdIBQgPGgpLUBIDEhARQwYPR0hBS09LHAQXDwcRDBsPXwQQHg9FQR0OBR4EKAIIEV5HUD5QLggRCgcGUE1EMwQGQkdGRz8MHQwbTUtQMQ8PCgBCRzdJUAEMCwgZDh0UFEFfL1ZHGQYXDQgRAABFSBpECgFWF0cHBAAAAQJEHwYADkRPRxpMCA9HSEEkAhsMDxNBH0M1FV8KSElQBxwRCBsOHQ9EWVBYDwAcABwXGkFTNBxQFURZVVoYSUgLEw4MQVNNKhMTBQsEVgFHHAQeFgxBU14aXhpEF0dOHElICxMODEFTTSoTEwULBFYBRxwEHhYMQVNfGl4aRBdHTh5JSAsTDgxBU003ExMJQUlWWwQGEBdBU1MUQxxQFURZVloYSUgLEw4MQVNNNxMTCUFJVlsEBhAXQVNSFDIaXkMSDAkRXwQEBhdBU1NHWktQBB4TABdZAA5HSBhLDBwbFwcVFUFfDw8oBREdEUtZEk0OHAgSCgQYD19aSVAXAA4MHEVIOlZNUEEBVkRVRz4UT0s/Dh4OEgxHTlZHAwsbFwACBU1dQk1EFwwZSBZIXylTR1ZcQ1RcUVM+GAkBRwkKBw0dEEtVHA9NRBAMGkYWSF8JHhQeNENFAAQXFgwGSAgPCwYQS1kyFEUbBURZRxlMHTkRFxMaQUVNERMNEwZHTh4YN0lQCwANHRxFSDpELQAXSBYDERMQSQcGHEcXFQcTBAcXRR8LE0MNBkkdAgIOFQxFXEEESgwcCgoKCANOUhhGDBEGTEUJChxDDA9JAggGDhRDABoNCAsXEQsITUtDRTcPRg8EVEgRCxUTQw0GSQIGAAIOAkUCTAtKAR0QSQIKDA4dDwMQRRdCCx4MHBYIEFNPBz8OEgwXFA0cSgUiCgUMHQAHXENKQU9efQQYClhJSQYaTykxW0YQDBoNFR8JAQIbQw0OR0NPRjMEBkxFGxAXQwUCSRsVEw8VCgYd7tYERQEGSQAcAhceAEYCCVRdEAYWExEFDEVPAgECFAoHEQ0FSzUTEQYDR006Dw=="
+  }
+ }
+}

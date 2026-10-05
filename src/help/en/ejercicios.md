@@ -2,6 +2,8 @@
 
 An **exercise** comes with a statement and what the teacher provides already done (the plant, the variables table, the wiring diagram…). You draw the grafcet, and the editor tells you whether it is right.
 
+> **Education mode:** the classroom tools (Open > Exercises and Mark submissions, Export > Exercise for students and Practice guide) appear when you turn on **Options > Education mode**. Without it the menus stay simpler; an exercise you are given opens with Open > Open file and works the same.
+
 ## For students
 
 1. Open the exercise: Open > Exercises, or with Open > Open file the file your teacher gave you (a .json or the PDF practice sheet: the exercise is inside).
