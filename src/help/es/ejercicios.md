@@ -7,7 +7,7 @@ Un **ejercicio** trae un enunciado y lo que el profesor da hecho (la planta, la 
 1. Abre el ejercicio: Abrir > Ejercicios, o con Abrir > Abrir archivo el archivo que te haya dado el profesor (un .json o la hoja de prácticas en PDF: el ejercicio va dentro).
 2. Lee el enunciado en el panel **Ejercicio** (a la derecha; el botón de la barra lo abre y lo cierra).
 3. Dibuja el grafcet. Puedes simularlo y verificarlo como siempre.
-4. Pulsa **Comprobar** cuantas veces quieras. Cada comprobación sale en verde o en rojo, con lo que falla.
+4. Pulsa **Comprobar** cuantas veces quieras. Cada comprobación sale en verde o en rojo, con lo que falla. Si te atascas, abre una **pista** (si el profesor las ofrece): salen de una en una y quedan contadas; si hay nota, cada una puede restar.
 5. Para entregar, Exportar > **Dossier de la práctica**: el PDF lleva tu proyecto dentro (se abre en el editor) y tiene apartados para el contenido teórico, las mejoras y los problemas encontrados.
 
 > **Ojo:** lo que el profesor da bloqueado (por ejemplo, la tabla de variables) no se puede cambiar: usa esos nombres en el grafcet. Si escribes uno que no está, la comprobación te lo señala como posible errata.
@@ -27,6 +27,7 @@ Un **ejercicio** trae un enunciado y lo que el profesor da hecho (la planta, la 
 3. Exportar > **Ejercicio para el alumnado**: escribe el enunciado, elige qué se da hecho (y si va bloqueado) y qué se comprueba. Pulsa **Probar**: con tu solución, todo debe salir en verde.
 4. **Guardar y descargar para el alumnado** crea el archivo que se reparte, sin tu grafcet.
 5. **Hoja de prácticas (PDF)** crea una hoja como las de siempre, para imprimir o repartir: cabecera para el nombre, enunciado, lo que se da (tabla, planta, esquema), los criterios de evaluación en palabras y los escenarios de prueba. El archivo del ejercicio va dentro del PDF como adjunto: al abrir el PDF en el editor se carga el ejercicio. Cualquiera puede evaluar el ejercicio con el papel, sin conocer el programa, y la **huella** del pie identifica el archivo de dentro.
+6. **Requisitos, pistas y nota** (en el mismo diálogo): marca lo que el grafcet tiene que usar (una temporización, un contador, un flanco, una divergencia en O o en Y, una acción condicionada o memorizada, un máximo de etapas). Escribe pistas, una por línea, de la más general a la más concreta, o desmarca **Ofrecer pistas** si prefieres darlas en persona. La **nota** es opcional y orientativa: la parte de criterios cumplidos, y cada pista vista puede restar.
 
 ## Guion de prácticas
 

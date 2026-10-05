@@ -3,6 +3,7 @@ import { CircleCheck, CircleX, FileText, GraduationCap, X } from 'lucide-react'
 import { N_, t } from '../lib/i18n'
 import { DEFAULT_EXERCISE, PART_MODES, exerciseConfig, runChecks } from '../lib/exercise'
 import { buildPlcModel } from '../lib/plcModel'
+import { REQUIREMENTS } from '../lib/requirements'
 
 const PARTS = [
   ['plant', N_('Planta virtual')],
@@ -38,6 +39,8 @@ export default function ExerciseDialog({ plc, getProject, onSave, onExportStuden
   })()
   const behaviour = draft.checks.behaviour ?? DEFAULT_EXERCISE.checks.behaviour
   const setBehaviour = (patch) => set({ checks: { ...draft.checks, behaviour: { ...behaviour, ...patch } } })
+  const requirements = draft.checks.requirements ?? []
+  const setRequirements = (list) => set({ checks: { ...draft.checks, requirements: list } })
   const toggle = (list, item) => (list.includes(item) ? list.filter((x) => x !== item) : [...list, item])
   const store = () => onSave({ ...draft, student: undefined })
   // Probar con la solución del profesor (el proyecto abierto) y lo que hay ahora en el diálogo.
@@ -211,6 +214,93 @@ export default function ExerciseDialog({ plc, getProject, onSave, onExportStuden
               </>
             )}
           </div>
+          {/* Requisitos: lo que el grafcet tiene que usar, además de funcionar. */}
+          <div className="space-y-1.5 rounded-md bg-slate-50 p-2" role="group" aria-label={t('Requisitos')}>
+            <p className="font-medium">{t('Requisitos')}</p>
+            <p className="text-xs text-slate-500">{t('Lo que el grafcet tiene que usar, además de funcionar. Se mira en el dibujo del alumno.')}</p>
+            <div className="grid gap-x-3 gap-y-1 sm:grid-cols-2">
+              {REQUIREMENTS.map((r) => {
+                const current = requirements.find((x) => x.id === r.id)
+                return (
+                  <label key={r.id} className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(current)}
+                      onChange={(e) => setRequirements(e.target.checked ? [...requirements, { id: r.id, ...(r.value ? { value: r.value } : {}) }] : requirements.filter((x) => x.id !== r.id))}
+                    />
+                    {r.value ? (
+                      <span className="flex items-center gap-1">
+                        {t(r.label, { n: '#' }).split('#')[0]}
+                        <input
+                          id={`requirement-${r.id}`}
+                          type="number"
+                          min="1"
+                          max="99"
+                          value={current?.value ?? r.value}
+                          aria-label={t('Número máximo de etapas')}
+                          onChange={(e) => {
+                            const value = Math.max(1, Number(e.target.value) || r.value)
+                            setRequirements(current ? requirements.map((x) => (x.id === r.id ? { ...x, value } : x)) : [...requirements, { id: r.id, value }])
+                          }}
+                          className="w-14 rounded border border-slate-300 px-1 py-0.5"
+                        />
+                        {t(r.label, { n: '#' }).split('#')[1]}
+                      </span>
+                    ) : (
+                      t(r.label)
+                    )}
+                  </label>
+                )
+              })}
+            </div>
+          </div>
+        </fieldset>
+
+        <fieldset className="space-y-1.5">
+          <legend className="text-xs font-medium text-slate-500">{t('Pistas')}</legend>
+          <label className="flex items-center gap-2">
+            <input type="checkbox" checked={draft.hints.enabled} onChange={(e) => set({ hints: { ...draft.hints, enabled: e.target.checked } })} />
+            {t('Ofrecer pistas al alumnado')}
+          </label>
+          {draft.hints.enabled ? (
+            <>
+              <textarea
+                id="exercise-hints"
+                rows={4}
+                value={(draft.hints.items ?? []).join('\n')}
+                onChange={(e) => set({ hints: { ...draft.hints, items: e.target.value.split('\n') } })}
+                placeholder={t('Una pista por línea, de la más general a la más concreta.\nP. ej.: Necesitas una etapa de reposo y otra con el motor en marcha.')}
+                className={field}
+                aria-label={t('Pistas, una por línea')}
+              />
+              <p className="text-xs text-slate-500">{t('Una por línea, de la más general a la más concreta. El alumno las abre de una en una y quedan contadas.')}</p>
+            </>
+          ) : (
+            <p className="text-xs text-slate-500">{t('Sin pistas: el alumno no verá ninguna (por ejemplo, si prefieres darlas en persona).')}</p>
+          )}
+        </fieldset>
+
+        <fieldset className="space-y-1.5">
+          <legend className="text-xs font-medium text-slate-500">{t('Nota')}</legend>
+          <label className="flex items-center gap-2">
+            <input type="checkbox" checked={draft.grade.enabled} onChange={(e) => set({ grade: { ...draft.grade, enabled: e.target.checked } })} />
+            {t('Mostrar una nota al comprobar')}
+          </label>
+          {draft.grade.enabled && (
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+              <label className="flex items-center gap-2">
+                {t('Sobre')}
+                <input id="exercise-grade-max" type="number" min="1" max="100" value={draft.grade.max} onChange={(e) => set({ grade: { ...draft.grade, max: Math.max(1, Number(e.target.value) || 10) } })} className="w-16 rounded-md border border-slate-300 px-2 py-0.5" />
+              </label>
+              {draft.hints.enabled && (
+                <label className="flex items-center gap-2">
+                  {t('Cada pista resta')}
+                  <input id="exercise-hint-penalty" type="number" min="0" max="10" step="0.25" value={draft.grade.hintPenalty} onChange={(e) => set({ grade: { ...draft.grade, hintPenalty: Math.max(0, Number(e.target.value) || 0) } })} className="w-16 rounded-md border border-slate-300 px-2 py-0.5" />
+                </label>
+              )}
+              <p className="w-full text-xs text-slate-500">{t('La parte de criterios cumplidos sobre la nota máxima. Es orientativa: la nota final la pones tú.')}</p>
+            </div>
+          )}
         </fieldset>
 
         <section aria-label={t('Prueba con tu solución')} className="space-y-2 rounded-md border border-slate-200 p-3">

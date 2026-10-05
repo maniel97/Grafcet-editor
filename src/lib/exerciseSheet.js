@@ -8,6 +8,7 @@
 // Puro: se prueba sin navegador. La medida del texto la da quien llama (como en lib/dossier.js).
 import { language, t } from './i18n'
 import { INK, M, MUTED, RULE, fit, pageWriter } from './pageWriter'
+import { requirementLabel } from './requirements'
 
 // Huella corta y estable de un texto (FNV-1a de 32 bits, dos semillas): «a1b2-c3d4-e5f6».
 export function fingerprint(text) {
@@ -50,6 +51,8 @@ export function sheetCriteria(checks) {
       }),
     )
   }
+  // Requisitos: lo que el grafcet tiene que usar.
+  for (const r of checks.requirements ?? []) list.push(t('Requisito: {requisito}.', { requisito: requirementLabel(r) }))
   return list
 }
 
@@ -170,6 +173,14 @@ function practiceBody(w, c, section) {
   paragraph([{ text: t('El ejercicio está bien cuando se cumple todo esto (el editor lo comprueba con el botón «Comprobar»):') }], 10)
   w.y += 1.5
   for (const line of sheetCriteria(c.checks)) bullet([{ text: line }], 10)
+  // Pistas y nota, si el profesor las ha puesto.
+  const hints = c.checks.hints?.length ?? 0
+  if (hints) paragraph([{ text: t('El editor ofrece {n} pistas, de una en una; queda anotado cuántas se han visto.', { n: hints }) }], 9.5)
+  if (c.grade?.enabled) {
+    const max = fmt(Number(c.grade.max) || 10)
+    const penalty = Number(c.grade.hintPenalty) || 0
+    paragraph([{ text: penalty && hints ? t('Nota orientativa: la parte de criterios cumplidos sobre {max}; cada pista vista resta {puntos}.', { max, puntos: fmt(penalty) }) : t('Nota orientativa: la parte de criterios cumplidos sobre {max}.', { max }) }], 9.5)
+  }
 
   const scenarios = sheetScenarios(c.checks)
   if (scenarios.length) {

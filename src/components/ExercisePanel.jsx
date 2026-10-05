@@ -1,7 +1,8 @@
 import { useState } from 'react'
-import { CircleCheck, CircleDashed, CircleX, Download, GraduationCap, Pencil, X } from 'lucide-react'
-import { t } from '../lib/i18n'
-import { exerciseConfig, isStudent, runChecks } from '../lib/exercise'
+import { CircleCheck, CircleDashed, CircleX, Download, GraduationCap, Lightbulb, Pencil, X } from 'lucide-react'
+import { language, t } from '../lib/i18n'
+import { exerciseConfig, hintsOf, isStudent, runChecks } from '../lib/exercise'
+import { gradeOf } from '../lib/requirements'
 import Markdown from '../help/Markdown'
 
 // Panel del ejercicio (lib/exercise.js): enunciado, «Comprobar» y el resultado de cada
@@ -9,12 +10,24 @@ import Markdown from '../help/Markdown'
 // proyecto (con la solución), lo usa para probar el ejercicio antes de repartirlo.
 // getProject() -> { nodes, edges, plc } en este momento.
 // onReplay(escenario): reproducirlo en la simulación (pruebas de comportamiento en rojo).
-export default function ExercisePanel({ plc, getProject, onEdit, onExportStudent, onReplay, onClose }) {
+// onHintShown(): el alumno ha abierto una pista más (se guarda en su proyecto: exercise.hintsShown).
+export default function ExercisePanel({ plc, getProject, onEdit, onExportStudent, onReplay, onHintShown, onClose }) {
   const config = exerciseConfig(plc)
   const student = isStudent(plc)
   const [results, setResults] = useState(null)
   const [checkedAt, setCheckedAt] = useState(null)
+  // El profesor prueba las pistas sin que cuenten (no se guarda en su proyecto).
+  const [teacherShown, setTeacherShown] = useState(0)
   if (!config) return null
+  const hints = hintsOf(plc)
+  const shown = Math.min(hints.length, student ? (plc.exercise.hintsShown ?? 0) : teacherShown)
+  const penalty = config.grade.enabled ? Number(config.grade.hintPenalty) || 0 : 0
+  const num = (v) => v.toLocaleString(language(), { maximumFractionDigits: 2 })
+  const showHint = () => {
+    if (penalty && !window.confirm(t('Cada pista resta {puntos} puntos de la nota. ¿Ver la siguiente?', { puntos: num(penalty) }))) return
+    if (student) onHintShown?.()
+    else setTeacherShown((n) => n + 1)
+  }
   const passed = results?.filter((r) => r.ok).length ?? 0
   const solved = results && results.length > 0 && passed === results.length
 
@@ -88,10 +101,41 @@ export default function ExercisePanel({ plc, getProject, onEdit, onExportStudent
                   {t('Arregla lo que sale en rojo, empezando por arriba, y vuelve a comprobar.')}
                 </p>
               )}
+              {config.grade.enabled && (
+                <p data-grade className="rounded-md border border-slate-200 px-3 py-2">
+                  <span className="font-semibold">{t('Nota: {nota} de {max}', { nota: num(gradeOf(results, config.grade, shown)), max: num(Number(config.grade.max) || 10) })}</span>
+                  {penalty > 0 && shown > 0 && <span className="block text-xs text-slate-500">{t('Incluye −{puntos} por {n} pistas vistas.', { puntos: num(penalty * shown), n: shown })}</span>}
+                </p>
+              )}
               {checkedAt && <p className="text-xs text-slate-400">{t('Comprobado a las {hora}.', { hora: checkedAt.toLocaleTimeString() })}</p>}
             </>
           )}
         </section>
+
+        {hints.length > 0 && (
+          <section aria-label={t('Pistas')} className="space-y-2 rounded-md border border-amber-200 bg-amber-50 p-3">
+            <h3 className="flex items-center gap-1.5 font-medium text-amber-950">
+              <Lightbulb size={15} className="shrink-0" /> {t('Pistas')}
+              <span className="ml-auto text-xs font-normal text-amber-900">{t('{n} de {total}', { n: shown, total: hints.length })}</span>
+            </h3>
+            {shown > 0 && (
+              <ol className="list-decimal space-y-1 pl-5 text-amber-950" data-hints-shown={shown}>
+                {hints.slice(0, shown).map((h, i) => (
+                  <li key={i}>
+                    <Markdown source={h} />
+                  </li>
+                ))}
+              </ol>
+            )}
+            {shown < hints.length && (
+              <button type="button" onClick={showHint} className="rounded-md border border-amber-300 bg-white px-2 py-1 text-xs text-amber-950 hover:bg-amber-100">
+                {shown === 0 ? t('Ver una pista') : t('Ver la siguiente pista')}
+                {penalty > 0 && ` (−${num(penalty)})`}
+              </button>
+            )}
+            <p className="text-xs text-amber-900">{t('Prueba antes por tu cuenta: cada pista ayuda un poco más que la anterior.')}</p>
+          </section>
+        )}
       </div>
     </aside>
   )

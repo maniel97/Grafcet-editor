@@ -36,6 +36,7 @@ async function practiceContent(project, { guided = false, grafcet = [], prefix =
     checks: unseal(exercise.sealed),
     attachment: `${base}.json`,
     print: printOf(student),
+    grade: exercise.grade,
   }
   const files = [{ name: content.attachment, data: json(student), mime: 'application/json', description: exercise.title || t('Ejercicio') }]
   // Guiada: la solución, en el papel y adjunta (sin la preparación del ejercicio: un proyecto normal).

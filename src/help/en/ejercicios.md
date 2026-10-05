@@ -7,7 +7,7 @@ An **exercise** comes with a statement and what the teacher provides already don
 1. Open the exercise: Open > Exercises, or with Open > Open file the file your teacher gave you (a .json or the PDF practice sheet: the exercise is inside).
 2. Read the statement in the **Exercise** panel (on the right; the toolbar button opens and closes it).
 3. Draw the grafcet. You can simulate and verify it as usual.
-4. Click **Check** as many times as you like. Each check shows in green or red, with what fails.
+4. Click **Check** as many times as you like. Each check shows in green or red, with what fails. If you get stuck, open a **hint** (if the teacher offers them): they appear one at a time and are counted; if there is a grade, each one can subtract.
 5. To hand it in, Export > **Exercise report**: the PDF carries your project inside (it opens in the editor) and has sections for the theory, the improvements and the problems found.
 
 > **Watch out:** what the teacher gives locked (for example, the variables table) cannot be changed: use those names in the grafcet. If you type one that is not there, the check points it out as a possible typo.
@@ -27,6 +27,7 @@ An **exercise** comes with a statement and what the teacher provides already don
 3. Export > **Exercise for students**: write the statement, choose what is given already done (and whether it is locked) and what is checked. Click **Test**: with your solution, everything must be green.
 4. **Save and download for students** creates the file to hand out, without your grafcet.
 5. **Practice sheet (PDF)** creates a sheet like the usual ones, to print or hand out: a header for the name, the statement, what is provided (table, plant, wiring diagram), the assessment criteria in words and the test scenarios. The exercise file travels inside the PDF as an attachment: opening the PDF in the editor loads the exercise. Anyone can assess the exercise from the paper without knowing the program, and the **fingerprint** in the footer identifies the file inside.
+6. **Requirements, hints and grade** (in the same dialog): tick what the grafcet must use (a timer, a counter, an edge, an OR or AND divergence, a conditional or stored action, a maximum number of steps). Write hints, one per line, from the most general to the most specific, or untick **Offer hints** if you prefer to give them in person. The **grade** is optional and only a guide: the share of criteria met, and each hint seen can subtract.
 
 ## Practice guide
 

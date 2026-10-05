@@ -117,7 +117,16 @@ export default function GrafcetCanvas() {
     document.title = projectName ? `${projectName} · Grafcet Editor` : 'Grafcet Editor'
   }, [projectName])
   useAutosave(nodes, edges, plc, projectName)
-  const { takeSnapshot, undo, redo, canUndo, canRedo } = useHistory({ get: () => plcRef.current, set: setPlc })
+  // Deshacer y rehacer no devuelven pistas ya vistas de un ejercicio (cuentan para la nota).
+  const restorePlc = useCallback(
+    (restored) =>
+      setPlc((current) => {
+        const seen = Math.max(current?.exercise?.hintsShown ?? 0, restored?.exercise?.hintsShown ?? 0)
+        return restored?.exercise?.student && seen ? { ...restored, exercise: { ...restored.exercise, hintsShown: seen } } : restored
+      }),
+    [],
+  )
+  const { takeSnapshot, undo, redo, canUndo, canRedo } = useHistory({ get: () => plcRef.current, set: restorePlc })
 
   // --- Estado de la interfaz -----------------------------------------------------------------
   const [editingId, setEditingId] = useState(null)
@@ -1374,6 +1383,7 @@ export default function GrafcetCanvas() {
                     getProject={getProject}
                     onEdit={() => setExportFormat('exercise')}
                     onExportStudent={() => exportStudent()}
+                    onHintShown={() => setPlc((p) => ({ ...p, exercise: { ...p.exercise, hintsShown: (p.exercise.hintsShown ?? 0) + 1 } }))}
                     onReplay={(scenario) => {
                       if (!simulating) startSimulation()
                       setPendingReplay(scenario)

@@ -119,3 +119,36 @@ describe('comportamiento en los ejercicios (fase 2)', async () => {
     expect(JSON.stringify(studentProject(marchaParo.teacher()))).not.toContain('"times"')
   })
 })
+
+describe('fase 3: requisitos, pistas y nota', async () => {
+  const { EXERCISES } = await import('../../src/lib/exercises')
+  const { hintsOf } = await import('../../src/lib/exercise')
+  const { PRACTICE_GUIDES } = await import('../../src/lib/practiceGuides')
+  const marchaParo = EXERCISES.find((e) => e.id === 'ej-marcha-paro')
+
+  it('las pistas viajan selladas: el alumno sabe cuántas hay, pero no las lee en el archivo', () => {
+    const student = studentProject(marchaParo.teacher())
+    expect(student.plc.exercise.hints).toEqual({ enabled: true, count: 3 })
+    expect(JSON.stringify(student)).not.toContain('Necesitas dos etapas')
+    expect(hintsOf(student.plc)[0]).toBe('Necesitas dos etapas: una de reposo (la inicial) y otra con el motor en marcha.')
+  })
+
+  it('el profesor puede no ofrecer pistas', () => {
+    const teacher = marchaParo.teacher()
+    teacher.plc.exercise.hints = { ...teacher.plc.exercise.hints, enabled: false }
+    const student = studentProject(teacher)
+    expect(student.plc.exercise.hints).toEqual({ enabled: false, count: 0 })
+    expect(hintsOf(student.plc)).toEqual([])
+  })
+
+  it('un requisito que el alumno no cumple sale en rojo aunque la máquina funcione', () => {
+    const p5 = PRACTICE_GUIDES[0].practices.find((p) => p.id === 'p5').teacher()
+    // Sin el flanco: «Pp» en vez de «↑Pp» (funciona, pero el enunciado pide un flanco).
+    const nodes = p5.nodes.map((n) => (n.data?.condition === '↑Pp' ? { ...n, data: { ...n.data, condition: 'Pp' } } : n))
+    const student = studentProject(p5)
+    const grafcet = nodes.filter((n) => n.type !== 'variables')
+    const results = runChecks({ ...student, nodes: [...student.nodes, ...grafcet], edges: p5.edges })
+    expect(results.find((r) => r.id === 'requisito-edge')).toMatchObject({ ok: false, title: 'Usa un flanco (↑ o ↓)' })
+    expect(results.find((r) => r.id === 'requisito-counter')).toMatchObject({ ok: true })
+  })
+})

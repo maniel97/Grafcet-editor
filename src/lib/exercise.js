@@ -13,6 +13,10 @@
 //   secuencia  con planta y escenario de prueba: los cilindros hacen la secuencia esperada
 //   comportamiento (fase 2) con cada escenario elegido: las salidas cambian cuando en la solución
 //              del profesor (con un margen de tiempo) y llegan las mismas piezas a cada recogida
+//   requisito-* (fase 3) lo que el enunciado pide usar (temporización, contador…: lib/requirements.js)
+//
+// Fase 3, además: pistas graduales (el profesor puede no ofrecerlas; sus textos van sellados y el
+// alumno las ve de una en una, contadas en exercise.hintsShown) y una nota opcional (gradeOf).
 import { N_, t } from './i18n'
 import { validateGrafcet } from './validation'
 import { buildPlcModel } from './plcModel'
@@ -21,6 +25,7 @@ import { parseSequence } from './pneumatic'
 import { compareSpacePhase, theoreticalSpacePhase } from './sim/spacePhase'
 import { runScenarioWorld, scenarioMotion } from './sim/scenarioMotion'
 import { DEFAULT_TOLERANCE, compareBehaviour, expectedFrom } from './behaviour'
+import { checkRequirements } from './requirements'
 
 const TABLE_ID = 'variables-table' // nodes/VARIABLES_TABLE_ID
 // Partes del proyecto del profesor que no viajan al alumnado: revelan la solución (la secuencia
@@ -39,14 +44,17 @@ export const DEFAULT_EXERCISE = {
   title: '',
   statement: '',
   parts: { plant: 'locked', variables: 'locked', electrical: 'given' },
-  checks: { warnings: false, sequence: '', scenario: '', behaviour: { scenarios: [], outputs: [], tolerance: DEFAULT_TOLERANCE, counts: true } },
+  checks: { warnings: false, sequence: '', scenario: '', behaviour: { scenarios: [], outputs: [], tolerance: DEFAULT_TOLERANCE, counts: true }, requirements: [] },
+  // Pistas: por defecto se ofrecen; hay profesores que prefieren darlas en persona (enabled: false).
   hints: { enabled: true, items: [] },
+  // Nota: solo si el profesor la quiere; hintPenalty: lo que resta cada pista vista.
+  grade: { enabled: false, max: 10, hintPenalty: 0 },
   processData: false,
   // Cabecera de la hoja de prácticas en PDF (lib/exerciseSheet.js).
   sheet: { subject: '', course: '', cycle: '', center: '', teacher: '' },
 }
 
-export const exerciseConfig = (plc) => (plc?.exercise ? { ...DEFAULT_EXERCISE, ...plc.exercise, parts: { ...DEFAULT_EXERCISE.parts, ...plc.exercise.parts }, checks: { ...DEFAULT_EXERCISE.checks, ...plc.exercise.checks, behaviour: { ...DEFAULT_EXERCISE.checks.behaviour, ...plc.exercise.checks?.behaviour } }, hints: { ...DEFAULT_EXERCISE.hints, ...plc.exercise.hints }, sheet: { ...DEFAULT_EXERCISE.sheet, ...plc.exercise.sheet } } : null)
+export const exerciseConfig = (plc) => (plc?.exercise ? { ...DEFAULT_EXERCISE, ...plc.exercise, parts: { ...DEFAULT_EXERCISE.parts, ...plc.exercise.parts }, checks: { ...DEFAULT_EXERCISE.checks, ...plc.exercise.checks, behaviour: { ...DEFAULT_EXERCISE.checks.behaviour, ...plc.exercise.checks?.behaviour } }, hints: { ...DEFAULT_EXERCISE.hints, ...plc.exercise.hints }, grade: { ...DEFAULT_EXERCISE.grade, ...plc.exercise.grade }, sheet: { ...DEFAULT_EXERCISE.sheet, ...plc.exercise.sheet } } : null)
 export const isStudent = (plc) => Boolean(plc?.exercise?.student)
 export const partMode = (plc, part) => plc?.exercise?.parts?.[part] ?? (plc?.exercise ? DEFAULT_EXERCISE.parts[part] : 'given')
 export const isLocked = (plc, part) => isStudent(plc) && partMode(plc, part) === 'locked'
@@ -93,6 +101,9 @@ function checksFrom(project, config) {
     // La tabla dada, para detectar variables que no están en ella.
     tableNames: config.parts.variables === 'none' ? null : Object.keys(project.plc.variables ?? {}),
     behaviour: behaviourFrom(project, config.checks.behaviour),
+    requirements: config.checks.requirements ?? [],
+    // Los textos de las pistas, sellados como lo demás (el alumno no los lee de una vez en el archivo).
+    hints: config.hints.enabled ? (config.hints.items ?? []).map((h) => h.trim()).filter(Boolean) : [],
   }
 }
 
@@ -114,7 +125,10 @@ export function studentProject(project) {
       title: config.title,
       statement: config.statement,
       parts: config.parts,
-      hints: config.hints,
+      // De las pistas solo se sabe si las hay y cuántas; los textos van sellados.
+      hints: { enabled: config.hints.enabled, count: config.hints.enabled ? (config.hints.items ?? []).filter((h) => h.trim()).length : 0 },
+      hintsShown: 0,
+      grade: config.grade,
       processData: config.processData,
       sheet: config.sheet,
       sealed: seal(checksFrom(project, config)),
@@ -224,5 +238,15 @@ export function runChecks(project) {
       })
     })
   }
+  // 6. Requisitos del enunciado.
+  results.push(...checkRequirements(nodes, edges, checks.requirements))
   return results
+}
+
+// Textos de las pistas del ejercicio (desselladas en el del alumnado; vacío si no se ofrecen).
+export function hintsOf(plc) {
+  const config = exerciseConfig(plc)
+  if (!config?.hints.enabled) return []
+  if (!isStudent(plc)) return (config.hints.items ?? []).map((h) => h.trim()).filter(Boolean)
+  return unseal(plc.exercise.sealed)?.hints ?? []
 }

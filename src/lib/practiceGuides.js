@@ -85,7 +85,8 @@ function boxPositioner() {
       statement:
         'Un dispositivo separa cajas de dos tamaños. Tiene una plataforma A por donde llegan las cajas, tres posicionadores de simple efecto (P1, P2 y P3), tres sensores ópticos de presencia (S1, S2 y S3), dos plataformas de evacuación (B y C) y una báscula bajo la plataforma A que indica si la caja es pequeña (CP) o grande (CG). Las cintas giran siempre: no las controla el autómata.\n\n- Cuando llega una caja al final de A se activa **S1** y la báscula la clasifica.\n- **Caja pequeña:** P1 la lleva al principio de la plataforma B (se activa **S2**). P1 retrocede; se considera que tarda **2 s** en volver. Después P2 empuja la caja a la cinta B y retrocede cuando la caja ha entrado (S2 desactivado).\n- **Caja grande:** igual, hacia la plataforma C (**S3**, **3 s**, P3).\n- Tras dejar la caja en su cinta, el sistema queda listo para la siguiente.',
       parts: { plant: 'given', variables: 'locked', electrical: 'given' },
-      checks: { warnings: false, sequence: '', scenario: '', behaviour: behaviour('cajas') },
+      checks: { warnings: false, sequence: '', scenario: '', behaviour: behaviour('cajas'), requirements: [{ id: 'timer' }, { id: 'or' }] },
+      hints: { enabled: true, items: ['Tras S1, elige por el tamaño: dos transiciones excluyentes que salen de la misma etapa (divergencia en O).', 'P1 es de simple efecto: vuelve en cuanto su etapa deja de estar activa. La espera es una etapa sin acción con la transición `2s/X4` (o `3s/X5`).', 'Cada rama vuelve a la etapa inicial cuando el sensor de su plataforma se desactiva: `!S2` o `!S3`.'] },
     },
   })
 }
@@ -107,7 +108,8 @@ function buttonLamp() {
       title: 'Práctica 2. Pulsador y bombilla',
       statement: `Al accionar un pulsador (**P**) se enciende una bombilla (**B**). Si el pulsador no está accionado, la bombilla está apagada.${TASK}`,
       parts: { plant: 'locked', variables: 'locked', electrical: 'given' },
-      checks: { warnings: false, sequence: '', scenario: '', behaviour: behaviour('pulsar') },
+      checks: { warnings: false, sequence: '', scenario: '', behaviour: behaviour('pulsar'), requirements: [{ id: 'maxSteps', value: 2 }] },
+      hints: { enabled: true, items: ['Dos etapas: bombilla apagada (la inicial) y bombilla encendida.', 'Se vuelve al reposo al soltar el pulsador: `!P`.'] },
     },
   })
 }
@@ -138,7 +140,8 @@ function singleCylinder() {
       title: 'Práctica 3. Cilindro de simple efecto',
       statement: `Al encender un interruptor (**I**), un cilindro de simple efecto gobernado por una válvula monoestable empieza a salir y entrar continuamente. Al apagar el interruptor, el cilindro termina el ciclo y se para en su posición inicial.${TASK}`,
       parts: { plant: 'locked', variables: 'locked', electrical: 'given' },
-      checks: { warnings: false, sequence: '', scenario: '', behaviour: behaviour('interruptor') },
+      checks: { warnings: false, sequence: '', scenario: '', behaviour: behaviour('interruptor'), requirements: [{ id: 'or' }] },
+      hints: { enabled: true, items: ['Simple efecto: la salida `A+` solo en la etapa en que sale; al desactivarla, el muelle lo devuelve.', 'Al llegar dentro (a0), elige: si I sigue encendido, otro ciclo; si no, reposo. Dos transiciones: `a0 · I` y `a0 · !I`.'] },
     },
   })
 }
@@ -181,7 +184,8 @@ function conveyorEmergency() {
       title: 'Práctica 4. Cinta transportadora con setas de emergencia',
       statement: `Una cinta transportadora se pone en marcha cuando un sensor capacitivo (**S1**) detecta una caja colocada a mano en un extremo. La cinta lleva la caja hasta el otro extremo, por donde cae, y se para cuando la detecta otro sensor capacitivo (**S2**).\n\n- En cada extremo hay una seta de emergencia normalmente cerrada (**Seta1**, **Seta2**). Si se pulsa cualquiera, la cinta se para al momento y no sigue hasta que la seta vuelve a su posición de reposo.${TASK}`,
       parts: { plant: 'locked', variables: 'locked', electrical: 'given' },
-      checks: { warnings: false, sequence: '', scenario: '', behaviour: behaviour('caja') },
+      checks: { warnings: false, sequence: '', scenario: '', behaviour: behaviour('caja'), requirements: [{ id: 'conditional' }] },
+      hints: { enabled: true, items: ['Una etapa de espera y otra con la cinta en marcha.', 'Para que las setas paren al momento sin cambiar de etapa, la cinta es una acción condicionada: `M` si `Seta1 · Seta2`.'] },
     },
   })
 }
@@ -229,7 +233,8 @@ function thirteenCycles() {
       title: 'Práctica 5. Trece ciclos de un cilindro',
       statement: `Al pulsar la marcha (**Pm**), un cilindro (**A**) gobernado por una electroválvula 3/2 monoestable sale y entra **13 veces**.\n\n- Si durante el funcionamiento se pulsa el paro (**Pp**), la secuencia termina cuando el cilindro llega a su posición inicial (**a0**).${TASK}`,
       parts: { plant: 'locked', variables: 'locked', electrical: 'given' },
-      checks: { warnings: false, sequence: '', scenario: '', behaviour: behaviour('trece', 'paro') },
+      checks: { warnings: false, sequence: '', scenario: '', behaviour: behaviour('trece', 'paro'), requirements: [{ id: 'counter' }, { id: 'edge' }] },
+      hints: { enabled: true, items: ['Cuenta los ciclos con una acción memorizada `C:=C+1` y ponlo a 0 en la etapa inicial con `C:=0`.', 'Para no perder una pulsación corta de Pp a mitad de ciclo, guárdala en un grafcet parcial de dos etapas: pasa a la segunda con `↑Pp` y vuelve con `X0`.', 'Al volver dentro (a0), sigue si `C < 13` y no se ha pedido el paro; si no, vuelve al reposo.'] },
     },
   })
 }
