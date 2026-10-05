@@ -26,7 +26,7 @@ const TABLE_ID = 'variables-table' // nodes/VARIABLES_TABLE_ID
 // Partes del proyecto del profesor que no viajan al alumnado: revelan la solución (la secuencia
 // esperada, el GEMMA, los escenarios grabados con su solución, un programa del autómata) o son
 // la propia preparación del ejercicio.
-const SOLUTION_KEYS = ['exercise', 'sequence', 'gemma', 'scenarios', 'cpu']
+const SOLUTION_KEYS = ['exercise', 'sequence', 'gemma', 'scenarios', 'cpu', 'guide']
 
 // Qué recibe hecho el alumnado: 'none' (no se da), 'given' (se da y puede cambiarlo) o 'locked'.
 export const PART_MODES = [
@@ -43,7 +43,7 @@ export const DEFAULT_EXERCISE = {
   hints: { enabled: true, items: [] },
   processData: false,
   // Cabecera de la hoja de prácticas en PDF (lib/exerciseSheet.js).
-  sheet: { subject: '', course: '', teacher: '' },
+  sheet: { subject: '', course: '', cycle: '', center: '', teacher: '' },
 }
 
 export const exerciseConfig = (plc) => (plc?.exercise ? { ...DEFAULT_EXERCISE, ...plc.exercise, parts: { ...DEFAULT_EXERCISE.parts, ...plc.exercise.parts }, checks: { ...DEFAULT_EXERCISE.checks, ...plc.exercise.checks, behaviour: { ...DEFAULT_EXERCISE.checks.behaviour, ...plc.exercise.checks?.behaviour } }, hints: { ...DEFAULT_EXERCISE.hints, ...plc.exercise.hints }, sheet: { ...DEFAULT_EXERCISE.sheet, ...plc.exercise.sheet } } : null)

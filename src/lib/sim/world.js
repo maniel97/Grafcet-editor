@@ -14,6 +14,10 @@ import { terminalAddress } from '../elec/catalog'
 // sensores no se salten (p. ej. un final de carrera que se pisa solo un instante).
 export const WORLD_DT = 0.05
 
+// Mandos de la planta: pulsado = 1, salvo los de contacto NC y las setas (pulsado = 0).
+const CONTROLS = ['button', 'switch', 'emergency']
+const isNC = (e) => e.type === 'emergency' || e.contact === 'NC'
+
 export function makeWorld(scene = null, analogRange = () => null, electrical = null, variables = []) {
   const elec = electrical?.components?.length ? electrical : null
   const linked = Boolean(elec?.enabled)
@@ -22,6 +26,7 @@ export function makeWorld(scene = null, analogRange = () => null, electrical = n
   const outVars = variables.filter((v) => v.type === 'output' && v.address)
   const inNames = new Set(variables.filter((v) => v.type === 'input').map((v) => v.name))
   const outNames = new Set(variables.filter((v) => v.type === 'output').map((v) => v.name))
+  const controls = (scene?.elements ?? []).filter((e) => CONTROLS.includes(e.type) && e.variable)
   // Analógicas: en el esquema van como mA o V (según la señal de cada variable); en la planta y en
   // el grafcet, en unidades físicas. pct: tanto por uno del rango físico.
   const analogIns = variables.filter((v) => v.type === 'analogIn')
@@ -80,6 +85,23 @@ export function makeWorld(scene = null, analogRange = () => null, electrical = n
       return inputs
     },
     inputNames: () => sceneInputNames(scene),
+    // Mandos de la planta: un escenario los acciona como lo haría una persona, y su señal llega al
+    // autómata como siempre (por los cables, si hay esquema). Sin esto, la planta volvía a escribir
+    // la entrada con el mando sin pulsar y el escenario solo daba un pulso de un instante.
+    // operate(estado, entrada, valor que debe leer el autómata) -> estado; null si no es de un mando.
+    operate: (state, name, value) => {
+      const own = controls.filter((e) => e.variable === name)
+      if (!own.length) return null
+      const pressed = { ...state.pressed }
+      for (const e of own) pressed[e.id] = isNC(e) ? !Number(value) : Boolean(Number(value))
+      return { ...state, pressed }
+    },
+    // Valor lógico que da el mando de una entrada (para grabar los clics en la planta); null si no hay.
+    controlValue: (state, name) => {
+      const e = controls.find((x) => x.variable === name)
+      return e ? (Boolean(state.pressed?.[e.id]) !== isNC(e) ? 1 : 0) : null
+    },
+    controlNames: () => [...new Set(controls.map((e) => e.variable))],
     // Acción sobre el esquema (pulsar, conmutar, disparar…), con el esquema recalculado al momento.
     elecDo: (state, id, action, values) => (elec ? step({ ...state, elec: elecAction(elec, state.elec, id, action) }, values, 0) : state),
   }
@@ -101,6 +123,10 @@ export function advanceWorld(compiled, { state, inputs, world: worldState }, unt
     const r = advanceWithEvents(compiled, state, inputs, to, scenario, next, options)
     state = r.state
     inputs = r.inputs
+    // Los eventos de entradas que vienen de un mando de la planta lo accionan (y así se mantienen).
+    if (active && world.operate) {
+      for (const e of (scenario?.events ?? []).slice(next, r.next)) worldState = world.operate(worldState, e.name, e.value) ?? worldState
+    }
     next = r.next
     events.push(...r.events)
     t = to

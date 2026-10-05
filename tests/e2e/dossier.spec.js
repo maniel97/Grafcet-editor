@@ -19,6 +19,8 @@ test('dossier de la práctica: vista previa paginada, secciones, enunciado y PDF
   await expect(pages.nth(1)).toContainText('Índice')
   await expect(pages.nth(1)).toContainText('Grafcet')
   await expect(pages.nth(1)).toContainText('Planta virtual')
+  // El esquema eléctrico sale (antes su casilla no sacaba nada).
+  await expect(pages.nth(1)).toContainText('Esquema eléctrico')
   // El cronograma necesita un escenario: desactivado y explicado.
   await expect(dialog.getByLabel('Opciones del dossier')).toContainText('graba un escenario en la simulación')
 
@@ -27,6 +29,9 @@ test('dossier de la práctica: vista previa paginada, secciones, enunciado y PDF
   await dialog.getByRole('textbox', { name: /Enunciado/ }).fill('# Objetivo\nTaladrar piezas con **Marcha**.\n- Bajar\n- Subir')
   await expect(pages.nth(0)).toContainText('Ana Pérez')
   await expect(preview).toContainText('Objetivo')
+  // Apartados de texto que piden los guiones de prácticas.
+  await dialog.getByRole('textbox', { name: 'Problemas encontrados y cómo se resolvieron' }).fill('El final de carrera estaba al revés.')
+  await expect(pages.nth(1)).toContainText('Problemas encontrados')
 
   // Quitar el ladder: menos páginas.
   await dialog.getByRole('checkbox', { name: 'Ladder' }).uncheck()
@@ -41,9 +46,15 @@ test('dossier de la práctica: vista previa paginada, secciones, enunciado y PDF
   expect(pdf.startsWith('%PDF')).toBe(true)
   expect((pdf.match(/\/Type \/Page\b/g) ?? []).length).toBe(total)
   expect(pdf).toContain('Ana P') // texto real, no imagen
-
-  // Se recuerda al volver a abrir.
+  // Con el proyecto dentro: al abrir el dossier en el editor, se recupera.
+  expect(pdf).toContain('/EmbeddedFiles')
   await dialog.getByRole('button', { name: 'Cerrar', exact: true }).last().click()
+  await openExample(page, /^Marcha y paro de un motor/)
+  await expect(page.locator('.react-flow__node-step')).toHaveCount(2)
+  await page.locator('input[type=file]').first().setInputFiles({ name: 'dossier.pdf', mimeType: 'application/pdf', buffer: readFileSync(await file.path()) })
+  await expect.poll(() => page.locator('.react-flow__node-step').count()).toBeGreaterThan(2) // la Taladradora, de vuelta
+
+  // Se recuerda al volver a abrir (viaja en el proyecto).
   await page.getByRole('button', { name: /Exportar/ }).click()
   await page.getByRole('menuitem', { name: /Dossier de la práctica/ }).click()
   await expect(dialog.getByRole('textbox', { name: 'Alumno/a' })).toHaveValue('Ana Pérez')

@@ -75,6 +75,8 @@ export default function ExerciseDialog({ plc, getProject, onSave, onExportStuden
           {[
             ['subject', N_('Asignatura')],
             ['course', N_('Curso')],
+            ['cycle', N_('Ciclo / estudios')],
+            ['center', N_('Centro')],
             ['teacher', N_('Profesor/a')],
           ].map(([key, label]) => (
             <label key={key} className="block">

@@ -17,7 +17,7 @@ import { useSimulation } from '../lib/sim/useSimulation'
 import { explainTransition } from '../lib/sim/explain'
 import { useSettings } from '../lib/settings'
 import { initialNodes, initialEdges, defaultEdgeOptions } from '../lib/initialDiagram'
-import { downloadFile, saveProject, loadProject, normalizeProject } from '../lib/projectFile'
+import { downloadFile, saveProject, loadProjects, normalizeProject } from '../lib/projectFile'
 import { pushRecent } from '../lib/recent'
 import { EMPTY_PLC } from '../lib/addressing'
 import { nextStepLabel, nextTransitionLabel, findFreePosition } from '../lib/layout'
@@ -77,6 +77,8 @@ const ProjectsDialog = lazy(() => import('./ProjectsDialog'))
 const ExercisePanel = lazy(() => import('./ExercisePanel'))
 const ExerciseDialog = lazy(() => import('./ExerciseDialog'))
 const ScenarioEditor = lazy(() => import('./ScenarioEditor'))
+const ProjectChooser = lazy(() => import('./ProjectChooser'))
+const GuideDialog = lazy(() => import('./GuideDialog'))
 
 // Mientras se descarga una parte diferida (normalmente un instante).
 function Loading({ panel }) {
@@ -649,17 +651,25 @@ export default function GrafcetCanvas() {
     [getNodes, getEdges, takeSnapshot, setNodes, setEdges, setViewport, fitWhenReady],
   )
 
+  // Un archivo con varios proyectos (un guion de prácticas en PDF): se elige cuál (ProjectChooser).
+  const [choosing, setChoosing] = useState(null) // { fileName, items }
+  const openLoaded = useCallback(
+    (project, fileName) =>
+      // Proyectos guardados sin nombre: el del archivo, sin la extensión.
+      replaceProject({ ...project, name: project.name ?? fileName.replace(/\.(json|pdf)$/i, '') }, t('Antes de abrir «{archivo}»', { archivo: fileName })),
+    [replaceProject],
+  )
   const load = useCallback(
     async (file) => {
       try {
-        const project = await loadProject(file)
-        // Proyectos guardados sin nombre: el del archivo, sin la extensión.
-        replaceProject({ ...project, name: project.name ?? file.name.replace(/\.json$/i, '') }, t('Antes de abrir «{archivo}»', { archivo: file.name }))
+        const items = await loadProjects(file)
+        if (items.length > 1) setChoosing({ fileName: file.name, items })
+        else openLoaded(items[0].project, file.name)
       } catch (err) {
         alert(err.message)
       }
     },
-    [replaceProject],
+    [openLoaded],
   )
 
   const [projectsTab, setProjectsTab] = useState(null) // 'examples' | 'recent' | null
@@ -705,6 +715,25 @@ export default function GrafcetCanvas() {
     setPendingReplay(null)
   }, [pendingReplay, simulating, simulation])
   // Hoja de prácticas en PDF con el ejercicio dentro (lib/exerciseSheetPdf.js, que se carga al usarla).
+  // Guion de prácticas en PDF: el proyecto abierto (con su grafcet capturado del lienzo si es la
+  // práctica guiada) y las prácticas añadidas.
+  const exportGuide = useCallback(
+    async (guide) => {
+      const { guidePdf } = await import('../lib/exerciseSheetPdf')
+      const current = getProject()
+      const practices = []
+      for (const p of guide.practices) {
+        if (p.id !== 'current') practices.push({ project: p.project })
+        else {
+          const shots = guide.currentGuided ? (exportSource.captureAll ? await exportSource.captureAll() : [await exportSource.capture()]) : []
+          practices.push({ project: current, guided: guide.currentGuided, grafcet: shots.filter(Boolean).map((s) => ({ ...s, name: s.sheetName })) })
+        }
+      }
+      const bytes = await guidePdf({ title: guide.title, sheet: guide.sheet, rules: guide.rules, practices })
+      downloadFile(bytes, fileName('pdf', 'guion'), 'application/pdf')
+    },
+    [getProject, exportSource],
+  )
   const exportSheet = useCallback(
     async (config = plcRef.current.exercise) => {
       const { exerciseSheetPdf } = await import('../lib/exerciseSheetPdf')
@@ -937,6 +966,10 @@ export default function GrafcetCanvas() {
               initialTab={projectsTab}
               onOpenExample={openExample}
               onOpenExercise={openExercise}
+              onOpenSolution={(project, title) => {
+                replaceProject({ ...normalizeProject(project), name: title }, t('Antes de abrir «{archivo}»', { archivo: title }))
+                setProjectsTab(null)
+              }}
               onRestore={restoreRecent}
               onClose={() => setProjectsTab(null)}
             />
@@ -965,9 +998,19 @@ export default function GrafcetCanvas() {
             />
           </Suspense>
         )}
+        {choosing && (
+          <Suspense fallback={<Loading />}>
+            <ProjectChooser fileName={choosing.fileName} items={choosing.items} onPick={(item) => openLoaded(item.project, choosing.fileName)} onClose={() => setChoosing(null)} />
+          </Suspense>
+        )}
         {editingScenario && (
           <Suspense fallback={<Loading />}>
             <ScenarioEditor getProject={getProject} scenario={editingScenario.scenario} onSave={saveScenario} onClose={() => setEditingScenario(null)} />
+          </Suspense>
+        )}
+        {exportFormat === 'guide' && (
+          <Suspense fallback={<Loading />}>
+            <GuideDialog plc={plc} onChange={(guide) => setPlc((p) => ({ ...p, guide }))} onGenerate={exportGuide} onClose={() => setExportFormat(null)} />
           </Suspense>
         )}
         {exportFormat === 'exercise' && (
@@ -985,7 +1028,7 @@ export default function GrafcetCanvas() {
             />
           </Suspense>
         )}
-        {exportFormat && exportFormat !== 'dossier' && exportFormat !== 'share' && exportFormat !== 'exercise' && (
+        {exportFormat && exportFormat !== 'dossier' && exportFormat !== 'share' && exportFormat !== 'exercise' && exportFormat !== 'guide' && (
           <Suspense fallback={<Loading />}>
             <ExportDialog
               source={exportSource}

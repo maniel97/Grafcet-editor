@@ -58,3 +58,41 @@ describe('hoja de prácticas del ejercicio', () => {
     }
   })
 })
+
+describe('guion de prácticas', async () => {
+  const { buildGuide } = await import('../../src/lib/exerciseSheet')
+  const { PRACTICE_GUIDES } = await import('../../src/lib/practiceGuides')
+  const guide = PRACTICE_GUIDES[0]
+  const practices = guide.practices.map((p, i) => {
+    const student = studentProject(p.teacher())
+    const ex = student.plc.exercise
+    return { title: ex.title, statement: ex.statement, parts: ex.parts, variables: [], figures: {}, checks: unseal(ex.sealed), attachment: `0${i + 1}.json`, print: 'abcd-ef01-2345' }
+  })
+
+  it('portada con normas e índice, una «PRÁCTICA Nº n» por práctica, cabecera y pie en cada página', () => {
+    const { pages, starts } = buildGuide({ title: guide.title, sheet: guide.sheet, rules: guide.rules, practices }, measure)
+    const textsOf = (p) => p.items.filter((i) => i.t === 'text').map((i) => i.text)
+    expect(textsOf(pages[0]).join(' ').replace(/\s+/g, ' ')).toContain('Cada práctica debe incluir')
+    expect(starts).toHaveLength(5)
+    starts.forEach((page, i) => {
+      expect(textsOf(pages[page - 1])).toContain(`PRÁCTICA Nº ${i + 1}`)
+      // El índice dice la página buena.
+      expect(textsOf(pages[0])).toContain(String(page))
+    })
+    // El título sin «Práctica n.» (el número ya lo pone el guion).
+    expect(textsOf(pages[starts[1] - 1])).toContain('Pulsador y bombilla')
+    for (const p of pages) {
+      const texts = textsOf(p)
+      expect(texts).toContain('Integración de Sistemas · Curso 2026-2027')
+      expect(texts).toContain('Mecatrónica Industrial')
+      expect(texts.some((x) => /^página \d+ de \d+$/.test(x))).toBe(true)
+      for (const i of p.items) {
+        if (i.t !== 'text') continue
+        expect(i.y).toBeLessThanOrEqual(p.h - 5)
+        if (i.align !== 'right') expect(i.x + measure(i.text, i.size)).toBeLessThanOrEqual(p.w - 17)
+      }
+    }
+    // Al final, qué archivos van dentro.
+    expect(textsOf(pages.at(-1))).toContain('Archivos adjuntos')
+  })
+})

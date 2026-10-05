@@ -8,6 +8,7 @@ An **exercise** comes with a statement and what the teacher provides already don
 2. Read the statement in the **Exercise** panel (on the right; the toolbar button opens and closes it).
 3. Draw the grafcet. You can simulate and verify it as usual.
 4. Click **Check** as many times as you like. Each check shows in green or red, with what fails.
+5. To hand it in, Export > **Exercise report**: the PDF carries your project inside (it opens in the editor) and has sections for the theory, the improvements and the problems found.
 
 > **Watch out:** what the teacher gives locked (for example, the variables table) cannot be changed: use those names in the grafcet. If you type one that is not there, the check points it out as a possible typo.
 
@@ -26,6 +27,17 @@ An **exercise** comes with a statement and what the teacher provides already don
 3. Export > **Exercise for students**: write the statement, choose what is given already done (and whether it is locked) and what is checked. Click **Test**: with your solution, everything must be green.
 4. **Save and download for students** creates the file to hand out, without your grafcet.
 5. **Practice sheet (PDF)** creates a sheet like the usual ones, to print or hand out: a header for the name, the statement, what is provided (table, plant, wiring diagram), the assessment criteria in words and the test scenarios. The exercise file travels inside the PDF as an attachment: opening the PDF in the editor loads the exercise. Anyone can assess the exercise from the paper without knowing the program, and the **fingerprint** in the footer identifies the file inside.
+
+## Practice guide
+
+Several practices in a single PDF, like a classic practice guide: Export > **Practice guide**.
+
+- Header and footer details (subject, course, programme, school, teacher) and the **general rules**: submission, assessment and what each practice must include.
+- The practices: the open project and the ones you add from files (exercise .json files or PDF sheets). Order them with the arrows.
+- **Guided**: the open project can be shown with its solution (grafcet, wiring, ladder and table), like the practice done in class as an example; the solved project is inside too.
+- When the guide is opened in the editor, you choose the practice.
+
+In Open > Exercises there is an example guide with five PLC practices: open practice 1 solved and use **Use the example guide**.
 
 > **Watch out:** the checks travel sealed in the file, but it is not a security system: the checker is based on behaviour, not on copying your grafcet.
 

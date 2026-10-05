@@ -5,7 +5,9 @@ import { COVER_FIELDS, DOSSIER_SECTIONS, LADDER_LISTINGS, buildDossier, dossierO
 import { dossierData, dossierFigures } from '../lib/dossierContent'
 import { loadPdf, makeMeasure, renderDossierPdf } from '../lib/dossierPdf'
 import { fileName } from '../lib/fileNames'
-import { t } from '../lib/i18n'
+import { N_, t } from '../lib/i18n'
+import { attachFile } from '../lib/pdfAttach'
+import { downloadFile, projectJson } from '../lib/projectFile'
 
 const ZOOMS = [0.5, 0.75, 1, 1.25, 1.5]
 
@@ -63,7 +65,12 @@ export default function DossierDialog({ nodes, edges, plc, issues, projectName, 
       today,
       cover: { ...options.cover, student: options.cover.student ?? plc.titleBlock?.author ?? '' },
       statement: options.statement,
-      figures: { grafcet, ladder: figures.ladder, plant: figures.plant, chronogram: figures.chronogram },
+      theory: options.theory,
+      improvements: options.improvements,
+      problems: options.problems,
+      // Todas las figuras (antes faltaban el esquema eléctrico y el diagrama espacio-fase: sus
+      // casillas no sacaban nada).
+      figures: { ...figures, grafcet },
       tables: data.tables,
       issues: data.issues,
       listing: data.listing,
@@ -76,14 +83,28 @@ export default function DossierDialog({ nodes, edges, plc, issues, projectName, 
     if (!dossier) return
     setSaving(true)
     try {
-      renderDossierPdf(jsPDF, dossier.pages).save(fileName('pdf', 'dossier'))
+      // El proyecto va dentro del PDF (adjunto): al abrir el dossier en el editor se recupera.
+      const pdf = renderDossierPdf(jsPDF, dossier.pages)
+      pdf.setProperties({ title: projectName.trim() || t('Práctica de automatización'), subject: t('Dossier de la práctica'), creator: 'Grafcet Editor' })
+      const project = { nodes, edges, plc, name: projectName }
+      const bytes = attachFile(new Uint8Array(pdf.output('arraybuffer')), {
+        name: fileName('json'),
+        data: new TextEncoder().encode(projectJson(project)),
+        mime: 'application/json',
+        description: t('Proyecto de la práctica (se abre en el editor de Grafcet)'),
+      })
+      downloadFile(bytes, fileName('pdf', 'dossier'), 'application/pdf')
     } finally {
       setSaving(false)
     }
   }
 
   const field = 'w-full rounded border border-slate-300 px-1.5 py-1 text-sm'
-  const disabledReason = { plant: !hasPlant && t('el proyecto no tiene planta'), chronogram: !scenarios.length && t('graba un escenario en la simulación') }
+  const disabledReason = {
+    plant: !hasPlant && t('el proyecto no tiene planta'),
+    electrical: !plc.electrical?.components?.length && t('el proyecto no tiene esquema'),
+    chronogram: !scenarios.length && t('graba un escenario en la simulación'),
+  }
 
   return (
     <dialog
@@ -135,6 +156,16 @@ export default function DossierDialog({ nodes, edges, plc, issues, projectName, 
               />
               <span className="text-[11px] text-slate-500">{t('Formato como en las notas: # título, - listas, **negrita**, `variable`.')}</span>
             </label>
+            {[
+              ['theory', N_('Contenido teórico'), N_('Breve explicación de lo que se usa en la práctica (si procede).')],
+              ['improvements', N_('Mejoras y aportaciones'), N_('Qué mejorarías o has añadido (si procede).')],
+              ['problems', N_('Problemas encontrados y cómo se resolvieron'), N_('Qué falló y cómo lo arreglaste (si procede).')],
+            ].map(([key, label, hint]) => (
+              <label key={key} className="block">
+                <span className="text-xs font-medium uppercase tracking-wide text-slate-500">{t(label)}</span>
+                <textarea id={`dossier-${key}`} value={options[key] ?? ''} onChange={(e) => set({ [key]: e.target.value })} rows={3} placeholder={t(hint)} className={`${field} font-mono text-xs`} />
+              </label>
+            ))}
             <fieldset className="space-y-1">
               <legend className="text-xs font-medium uppercase tracking-wide text-slate-500">{t('Secciones')}</legend>
               {DOSSIER_SECTIONS.map((s) => (

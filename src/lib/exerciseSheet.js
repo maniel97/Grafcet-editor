@@ -61,39 +61,48 @@ export function sheetScenarios(checks) {
 
 const PART_LABELS = { variables: () => t('Tabla de variables'), plant: () => t('Planta virtual'), electrical: () => t('Esquema eléctrico') }
 const MODE_LABELS = { none: () => t('no se da'), given: () => t('se da (se puede cambiar)'), locked: () => t('se da y no se puede cambiar') }
+const VARIABLE_COLUMNS = () => [
+  { label: t('Símbolo'), width: 0.22 },
+  { label: t('Tipo'), width: 0.2 },
+  { label: t('Dirección'), width: 0.14 },
+  { label: t('Comentario'), width: 0.44 },
+]
 
-// content: { title, sheet: { subject, course, teacher }, statement, parts, variables: [[...]],
-//   figures: { plant, electrical: [fig] }, checks (desselladas), attachment (nombre), print (huella) }
-export function buildExerciseSheet(content, measure) {
-  const w = pageWriter(measure)
-  const { text, paragraph, richText, bullet, subheading, table, figure } = w
-  let number = 0
-  const section = (title) => {
-    number++
-    w.ensure(30)
-    w.y += 4
-    text(`${number}. ${title}`, M.left, w.y + 5, 13.5, 'bold')
-    w.rule(w.y + 8, 0.35)
-    w.y += 13
+// Cabecera y pie en todas las páginas, como en un guion de prácticas de siempre: asignatura y
+// curso a la izquierda y ciclo a la derecha; abajo, centro y profesor/a, y el número de página.
+function decorate(w, sheet, footLeft, measure) {
+  const top = [sheet?.subject, sheet?.course].filter((v) => v?.trim()).join(' · ')
+  const cycle = sheet?.cycle?.trim() ?? ''
+  const total = w.pages.length
+  w.pages.forEach((p, i) => {
+    const room = p.w - M.left - M.right
+    if (top || cycle) {
+      if (top) p.items.push({ t: 'text', x: M.left, y: 10, text: fit(top, room * (cycle ? 0.6 : 1), 8, 'normal', measure), size: 8, style: 'normal', font: 'helvetica', color: MUTED })
+      if (cycle) p.items.push({ t: 'text', x: p.w - M.right, y: 10, text: fit(cycle, room * 0.38, 8, 'normal', measure), size: 8, style: 'normal', font: 'helvetica', color: MUTED, align: 'right' })
+      p.items.push({ t: 'line', x1: M.left, y1: 12, x2: p.w - M.right, y2: 12, width: 0.15, color: RULE })
+    }
+    p.items.push({ t: 'line', x1: M.left, y1: p.h - 13, x2: p.w - M.right, y2: p.h - 13, width: 0.15, color: RULE })
+    if (footLeft) p.items.push({ t: 'text', x: M.left, y: p.h - 9, text: fit(footLeft, room - 35, 8, 'normal', measure), size: 8, style: 'normal', font: 'helvetica', color: MUTED })
+    p.items.push({ t: 'text', x: p.w - M.right, y: p.h - 9, text: t('página {n} de {total}', { n: i + 1, total }), size: 8, style: 'normal', font: 'helvetica', color: MUTED, align: 'right' })
+  })
+}
+
+// Título grande (una o dos líneas), quién lo pone y el recuadro para rellenar a mano.
+function titleBlock(w, { kind, title, teacher }, measure) {
+  const { text } = w
+  if (kind) {
+    text(kind, M.left, w.y + 3, 8.5, 'bold', { color: MUTED })
+    w.y += 7
   }
-
-  // Cabecera: tipo de documento, asignatura y curso; título; datos para rellenar a mano.
-  w.newPage()
-  const right = w.size.w - M.right
-  text(t('HOJA DE PRÁCTICAS · GRAFCET (IEC 60848)'), M.left, w.y + 3, 8.5, 'bold', { color: MUTED })
-  const top = [content.sheet?.subject, content.sheet?.course].filter((v) => v?.trim()).join(' · ')
-  if (top) text(fit(top, w.width() * 0.5, 8.5, 'normal', measure), right, w.y + 3, 8.5, 'normal', { color: MUTED, align: 'right' })
-  w.y += 7
-  for (const line of wrapTitle(content.title || t('Ejercicio'), w.width(), measure)) {
+  for (const line of wrapTitle(title, w.width(), measure)) {
     text(line, M.left, w.y + 7, 19, 'bold')
     w.y += 9
   }
-  if (content.sheet?.teacher?.trim()) {
-    text(t('Profesor/a: {nombre}', { nombre: content.sheet.teacher.trim() }), M.left, w.y + 4, 10, 'normal', { color: MUTED })
+  if (teacher?.trim()) {
+    text(t('Profesor/a: {nombre}', { nombre: teacher.trim() }), M.left, w.y + 4, 10, 'normal', { color: MUTED })
     w.y += 6
   }
   w.y += 2
-  // Recuadro: Alumno/a, Grupo y Fecha, con líneas para escribir.
   const boxH = 17
   w.push({ t: 'rect', x: M.left, y: w.y, w: w.width(), h: boxH, stroke: RULE })
   const fields = [
@@ -108,49 +117,61 @@ export function buildExerciseSheet(content, measure) {
     w.push({ t: 'line', x1, y1: w.y + 13, x2, y2: w.y + 13, width: 0.2, color: INK })
   }
   w.y += boxH + 2
+}
 
-  if (content.statement?.trim()) {
+// Lo de una práctica: enunciado, material (o, si es guiada, la solución), criterios y escenarios.
+// section(título) abre cada apartado (numerado en la hoja suelta, con subtítulo en el guion).
+function practiceBody(w, c, section) {
+  const { paragraph, richText, bullet, subheading, table, figure } = w
+  if (c.statement?.trim()) {
     section(t('Enunciado'))
-    richText(content.statement)
+    richText(c.statement)
   }
-
-  section(t('Material que se da'))
-  for (const part of ['variables', 'plant', 'electrical']) {
-    const mode = content.parts?.[part] ?? 'given'
-    bullet([{ text: `${PART_LABELS[part]()}: `, bold: true }, { text: MODE_LABELS[mode]() }])
+  const plantFit = { maxHeight: 120, minScale: 0.3 }
+  const withTitle = (title, fig, opts) => {
+    subheading(title, 11, w.figureHeight(fig, opts))
+    figure(fig, opts)
   }
-  bullet([{ text: `${t('Grafcet')}: `, bold: true }, { text: t('lo haces tú.') }])
-  if (content.variables?.length) {
-    subheading(t('Tabla de variables'), 11)
-    table(
-      [
-        { label: t('Símbolo'), width: 0.22 },
-        { label: t('Tipo'), width: 0.2 },
-        { label: t('Dirección'), width: 0.14 },
-        { label: t('Comentario'), width: 0.44 },
-      ],
-      content.variables,
-      { mono: [0, 2] },
-    )
-  }
-  // Cada figura, con su título en la misma página.
-  const plant = { maxHeight: 120, minScale: 0.3 }
-  if (content.figures?.plant) {
-    subheading(t('Planta virtual'), 11, w.figureHeight(content.figures.plant, plant))
-    figure(content.figures.plant, plant)
-  }
-  const electrical = content.figures?.electrical ?? []
-  for (const [i, fig] of electrical.entries()) {
-    if (i === 0) subheading(t('Esquema eléctrico'), 11, w.figureHeight(fig, { minScale: 0.3 }) + (electrical.length > 1 ? 7 : 0))
-    figure(fig, { caption: electrical.length > 1 ? fig.name : undefined, minScale: 0.3 })
+  if (c.solution) {
+    // Práctica guiada: así se resuelve (como modelo de lo que hay que entregar).
+    section(t('Solución (práctica guiada)'))
+    paragraph([{ text: t('Esta práctica se hace en clase como ejemplo de cómo se resuelve y se presenta. El proyecto resuelto va dentro de este PDF.') }], 10)
+    // El grafcet, en lo que queda de página si cabe a una escala legible (si no, en la siguiente).
+    for (const [i, fig] of (c.solution.grafcet ?? []).entries()) withTitle(i === 0 ? t('Grafcet') : fig.name ?? t('Grafcet'), fig, { minScale: 0.3, maxHeight: Math.max(110, w.bottom() - w.y - 18) })
+    for (const [i, fig] of (c.figures?.electrical ?? []).entries()) withTitle(i === 0 ? t('Conexionado de los elementos') : fig.name, fig, { minScale: 0.3 })
+    // El programa, más pequeño que 1:1 (un ladder entero ocuparía muchas páginas).
+    if (c.solution.ladder) withTitle(t('Programa (ladder)'), c.solution.ladder, { minScale: 0.3, maxScale: 0.62 })
+    if (c.solution.variables?.length) {
+      subheading(t('Tabla de variables'), 11)
+      table(VARIABLE_COLUMNS(), c.solution.variables, { mono: [0, 2] })
+    }
+    if (c.figures?.plant) withTitle(t('Simulación (planta virtual)'), c.figures.plant, plantFit)
+  } else {
+    section(t('Material que se da'))
+    for (const part of ['variables', 'plant', 'electrical']) {
+      const mode = c.parts?.[part] ?? 'given'
+      bullet([{ text: `${PART_LABELS[part]()}: `, bold: true }, { text: MODE_LABELS[mode]() }])
+    }
+    bullet([{ text: `${t('Grafcet')}: `, bold: true }, { text: t('lo haces tú.') }])
+    if (c.variables?.length) {
+      subheading(t('Tabla de variables'), 11)
+      table(VARIABLE_COLUMNS(), c.variables, { mono: [0, 2] })
+    }
+    // Cada figura, con su título en la misma página.
+    if (c.figures?.plant) withTitle(t('Planta virtual'), c.figures.plant, plantFit)
+    const electrical = c.figures?.electrical ?? []
+    for (const [i, fig] of electrical.entries()) {
+      if (i === 0) subheading(t('Esquema eléctrico'), 11, w.figureHeight(fig, { minScale: 0.3 }) + (electrical.length > 1 ? 7 : 0))
+      figure(fig, { caption: electrical.length > 1 ? fig.name : undefined, minScale: 0.3 })
+    }
   }
 
   section(t('Criterios de evaluación'))
   paragraph([{ text: t('El ejercicio está bien cuando se cumple todo esto (el editor lo comprueba con el botón «Comprobar»):') }], 10)
   w.y += 1.5
-  for (const c of sheetCriteria(content.checks)) bullet([{ text: c }], 10)
+  for (const line of sheetCriteria(c.checks)) bullet([{ text: line }], 10)
 
-  const scenarios = sheetScenarios(content.checks)
+  const scenarios = sheetScenarios(c.checks)
   if (scenarios.length) {
     w.y += 2
     paragraph([{ text: t('Escenarios de prueba: qué entradas cambian y cuándo, desde la situación inicial. Las demás conservan su valor de reposo (un pulsador NC vale 1 sin pulsar).') }], 9.5)
@@ -168,31 +189,120 @@ export function buildExerciseSheet(content, measure) {
       )
     }
   }
+}
 
+// --- Hoja de un ejercicio ---------------------------------------------------------------------
+
+// content: { title, sheet: { subject, course, cycle, center, teacher }, statement, parts,
+//   variables: [[...]], figures: { plant, electrical: [fig] }, checks (desselladas), attachment
+//   (nombre del adjunto), print (huella) }
+export function buildExerciseSheet(content, measure) {
+  const w = pageWriter(measure)
+  let number = 0
+  const section = (title) => {
+    number++
+    w.ensure(30)
+    w.y += 4
+    w.text(`${number}. ${title}`, M.left, w.y + 5, 13.5, 'bold')
+    w.rule(w.y + 8, 0.35)
+    w.y += 13
+  }
+  w.newPage()
+  titleBlock(w, { kind: t('HOJA DE PRÁCTICAS · GRAFCET (IEC 60848)'), title: content.title || t('Ejercicio'), teacher: content.sheet?.teacher }, measure)
+  practiceBody(w, content, section)
   section(t('Cómo se hace'))
   for (const line of [
     t('Abre este PDF en el editor de Grafcet (Abrir > Abrir archivo): el ejercicio va dentro, como archivo adjunto «{archivo}».', { archivo: content.attachment }),
     t('Dibuja el grafcet; pruébalo en la simulación.'),
     t('Pulsa «Comprobar» cuantas veces quieras: cada criterio sale en verde o en rojo, con lo que falla.'),
   ]) {
-    bullet([{ text: line }], 10)
+    w.bullet([{ text: line }], 10)
   }
-
-  w.footer(
-    `${content.title || t('Ejercicio')} · ${t('Huella del ejercicio: {huella}', { huella: content.print })}`,
-    (i, total) => t('página {n} de {total}', { n: i, total }),
-  )
+  const foot = [content.sheet?.center, content.title || t('Ejercicio'), t('Huella del ejercicio: {huella}', { huella: content.print })]
+  decorate(w, content.sheet, foot.filter((v) => v?.trim()).join(' · '), measure)
   return { pages: w.pages }
 }
 
+// --- Guion de prácticas -----------------------------------------------------------------------
+
+// content: { title, sheet: { subject, course, cycle, center, teacher }, rules (texto con formato),
+//   practices: [contenido de buildExerciseSheet + { solution?: { grafcet: [fig], ladder, variables } }] }
+// Una portada con las normas generales y, después, cada práctica en su página («PRÁCTICA Nº n»).
+export function buildGuide(content, measure) {
+  const w = pageWriter(measure)
+  w.newPage()
+  titleBlock(w, { kind: t('GUION DE PRÁCTICAS · GRAFCET (IEC 60848)'), title: content.title || t('Guion de prácticas'), teacher: content.sheet?.teacher }, measure)
+  if (content.rules?.trim()) {
+    w.y += 3
+    w.richText(content.rules)
+  }
+  // Índice de prácticas, con la página de cada una (se rellena al final).
+  w.subheading(t('Prácticas'), 12)
+  const index = content.practices.map((p, i) => {
+    w.ensure(6)
+    const at = { page: w.page, y: w.y + 4.2 }
+    w.text(fit(t('Práctica nº {n}. {titulo}', { n: i + 1, titulo: practiceTitle(p) }), w.width() - 25, 10, 'normal', measure), M.left, at.y, 10)
+    w.y += 6
+    return at
+  })
+  const starts = []
+  content.practices.forEach((p, i) => {
+    w.newPage()
+    starts.push(w.pages.length)
+    w.text(t('PRÁCTICA Nº {n}', { n: i + 1 }), M.left, w.y + 5, 14, 'bold')
+    if (p.solution) w.text(t('Práctica guiada'), w.size.w - M.right, w.y + 5, 9, 'bold', { color: [29, 78, 216], align: 'right' })
+    w.y += 8
+    for (const line of wrapTitle(practiceTitle(p), w.width(), measure, 14)) {
+      w.text(line, M.left, w.y + 5, 14, 'bold')
+      w.y += 6.5
+    }
+    w.text(t('Archivo adjunto: {archivo} · Huella: {huella}', { archivo: p.attachment, huella: p.print }), M.left, w.y + 3.5, 8.5, 'normal', { color: MUTED })
+    w.rule(w.y + 6, 0.35)
+    w.y += 11
+    practiceBody(w, p, (title) => w.subheading(title, 12))
+  })
+  index.forEach((at, i) => at.page.items.push({ t: 'text', x: w.size.w - M.right, y: at.y, text: String(starts[i]), size: 10, style: 'normal', font: 'helvetica', color: INK, align: 'right' }))
+
+  // Cómo se hace y qué hay dentro del PDF (para quien revise el guion sin el programa).
+  w.newPage()
+  w.subheading(t('Cómo se hace'), 12)
+  for (const line of [
+    t('Abre este PDF en el editor de Grafcet (Abrir > Abrir archivo) y elige la práctica: cada una va dentro, como archivo adjunto.'),
+    t('Dibuja el grafcet; pruébalo en la simulación.'),
+    t('Pulsa «Comprobar» cuantas veces quieras: cada criterio sale en verde o en rojo, con lo que falla.'),
+  ]) {
+    w.bullet([{ text: line }], 10)
+  }
+  w.subheading(t('Archivos adjuntos'), 12)
+  w.paragraph([{ text: t('Cada práctica va dentro de este PDF; la huella identifica el archivo (la misma versión da siempre la misma huella).') }], 9.5)
+  w.y += 1
+  w.table(
+    [
+      { label: t('Práctica'), width: 0.42 },
+      { label: t('Archivo'), width: 0.38 },
+      { label: t('Huella'), width: 0.2 },
+    ],
+    content.practices.flatMap((p, i) => [
+      [`${i + 1}. ${practiceTitle(p)}`, p.attachment, p.print],
+      ...(p.solutionAttachment ? [[`${i + 1}. ${t('(solución)')}`, p.solutionAttachment, p.solutionPrint]] : []),
+    ]),
+    { mono: [1, 2] },
+  )
+  decorate(w, content.sheet, [content.sheet?.center, content.sheet?.teacher].filter((v) => v?.trim()).join(' · ') || content.title, measure)
+  return { pages: w.pages, starts }
+}
+
+// «Práctica 4. Cinta…» -> «Cinta…»: el número ya lo pone el guion.
+export const practiceTitle = (p) => (p.title || t('Ejercicio')).replace(/^(Práctica|Practice|Pratique|Prática)\s*(nº\s*)?\d+\s*(\([^)]*\))?\s*[.:-]\s*/i, '')
+
 // Título en una o dos líneas (si no cabe en dos, la segunda se recorta).
-function wrapTitle(title, width, measure) {
+function wrapTitle(title, width, measure, size = 19) {
   const words = title.split(/\s+/)
   const lines = ['']
   for (const word of words) {
     const next = lines.at(-1) ? `${lines.at(-1)} ${word}` : word
-    if (measure(next, 19, 'bold') > width && lines.at(-1) && lines.length < 2) lines.push(word)
+    if (measure(next, size, 'bold') > width && lines.at(-1) && lines.length < 2) lines.push(word)
     else lines[lines.length - 1] = next
   }
-  return lines.map((l) => fit(l, width, 19, 'bold', measure))
+  return lines.map((l) => fit(l, width, size, 'bold', measure))
 }

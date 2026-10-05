@@ -1438,10 +1438,13 @@ export function SceneStatic({ scene, variables = [] }) {
     machine.map((e, i) => ({ e, b: withRelief(boxes[i], scene?.relief), text: labelOf(e), lines: io(e).length })),
     scene?.gravity,
   )
-  const minX = Math.min(0, ...boxes.map((b) => b.x)) - 20
-  const minY = Math.min(0, ...boxes.map((b) => b.y)) - 20
-  const maxX = Math.max(200, ...boxes.map((b) => b.x + b.w)) + 40
-  const machineBottom = Math.max(100, ...boxes.map((b) => b.y + b.h + 34 + 11 * Math.max(0, io(machine[boxes.indexOf(b)]).length - 1))) + 10
+  // Recortada a lo que hay (antes incluía siempre el origen y un mínimo: en el PDF, mucho blanco
+  // sobre una máquina dibujada lejos del origen o sobre un pupitre sin máquina).
+  const any = boxes.length > 0
+  const minX = (any ? Math.min(...boxes.map((b) => b.x)) : 0) - 20
+  const minY = (any ? Math.min(...boxes.map((b) => b.y)) : 0) - 20
+  const maxX = (any ? Math.max(...boxes.map((b) => b.x + b.w)) : 200) + 40
+  const machineBottom = any ? Math.max(...boxes.map((b) => b.y + b.h + 34 + 11 * Math.max(0, io(machine[boxes.indexOf(b)]).length - 1))) + 10 : -20
   // Ancho: también el de las líneas de variables (≈ 5,5 px por carácter a 9 px).
   const textRight = Math.max(0, ...machine.map((e, i) => boxes[i].x + boxes[i].w / 2 + Math.max(0, ...io(e).map((l) => l.length)) * 2.8))
   const deskY = machineBottom + 30

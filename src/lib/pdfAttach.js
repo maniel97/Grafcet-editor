@@ -60,13 +60,15 @@ function objectDict(text, id) {
 }
 
 // PDF (bytes) + archivo -> PDF con el archivo adjunto. name: nombre del adjunto (ASCII).
-export function attachFile(pdf, { name, data, mime = 'application/octet-stream', description = '' }) {
+export const attachFile = (pdf, file) => attachFiles(pdf, [file])
+
+// PDF (bytes) + archivos [{ name, data, mime, description }] -> PDF con los archivos adjuntos (en
+// el panel de adjuntos salen por orden de nombre, como pide el árbol de nombres del PDF).
+export function attachFiles(pdf, files) {
   const text = latin1(pdf)
   const trailer = lastTrailer(text)
   const catalog = trailer && objectDict(text, trailer.root)
   if (!catalog || /\/Names\b/.test(catalog)) throw new Error('PDF sin catálogo reconocible')
-  const file = trailer.size
-  const spec = file + 1
   const eol = pdf[pdf.length - 1] === 0x0a ? '' : '\n'
   const offsets = {}
   const parts = [pdf, ascii(eol)]
@@ -78,10 +80,20 @@ export function attachFile(pdf, { name, data, mime = 'application/octet-stream',
       at += c.length
     }
   }
-  const subtype = `/${mime.replace(/[^A-Za-z0-9.+-]/g, (c) => `#${c.charCodeAt(0).toString(16).padStart(2, '0')}`)}`
-  add(file, [ascii(`${file} 0 obj\n<< /Type /EmbeddedFile /Subtype ${subtype} /Length ${data.length} /Params << /Size ${data.length} >> >>\nstream\n`), data, ascii('\nendstream\nendobj\n')])
-  add(spec, [ascii(`${spec} 0 obj\n<< /Type /Filespec /F ${pdfString(name)} /UF ${pdfString(name)} /Desc ${pdfString(description)} /AFRelationship /Source /EF << /F ${file} 0 R /UF ${file} 0 R >> >>\nendobj\n`)])
-  add(trailer.root, [ascii(`${trailer.root} 0 obj\n<<${catalog} /Names << /EmbeddedFiles << /Names [${pdfString(name)} ${spec} 0 R] >> >> /AF [${spec} 0 R] >>\nendobj\n`)])
+  let next = trailer.size
+  const specs = []
+  for (const { name, data, mime = 'application/octet-stream', description = '' } of files) {
+    const file = next++
+    const spec = next++
+    const subtype = `/${mime.replace(/[^A-Za-z0-9.+-]/g, (c) => `#${c.charCodeAt(0).toString(16).padStart(2, '0')}`)}`
+    add(file, [ascii(`${file} 0 obj\n<< /Type /EmbeddedFile /Subtype ${subtype} /Length ${data.length} /Params << /Size ${data.length} >> >>\nstream\n`), data, ascii('\nendstream\nendobj\n')])
+    add(spec, [ascii(`${spec} 0 obj\n<< /Type /Filespec /F ${pdfString(name)} /UF ${pdfString(name)} /Desc ${pdfString(description)} /AFRelationship /Source /EF << /F ${file} 0 R /UF ${file} 0 R >> >>\nendobj\n`)])
+    specs.push({ key: pdfString(name), spec })
+  }
+  specs.sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0))
+  const names = specs.map((s) => `${s.key} ${s.spec} 0 R`).join(' ')
+  const af = specs.map((s) => `${s.spec} 0 R`).join(' ')
+  add(trailer.root, [ascii(`${trailer.root} 0 obj\n<<${catalog} /Names << /EmbeddedFiles << /Names [${names}] >> >> /AF [${af}] >>\nendobj\n`)])
   // Tabla xref de la actualización: una subsección por cada grupo de números seguidos.
   const ids = Object.keys(offsets).map(Number).sort((a, b) => a - b)
   // Con la entrada 0 (libre), como en una tabla completa: algunos lectores la esperan.
@@ -93,7 +105,7 @@ export function attachFile(pdf, { name, data, mime = 'application/octet-stream',
     for (let k = i; k <= j; k++) xref += `${String(offsets[ids[k]]).padStart(10, '0')} 00000 n\r\n`
     i = j + 1
   }
-  xref += `trailer\n<< /Size ${spec + 1} /Root ${trailer.root} 0 R ${trailer.info} /Prev ${trailer.prev} >>\nstartxref\n${at}\n%%EOF\n`
+  xref += `trailer\n<< /Size ${next} /Root ${trailer.root} 0 R ${trailer.info} /Prev ${trailer.prev} >>\nstartxref\n${at}\n%%EOF\n`
   parts.push(ascii(xref))
   return concat(parts)
 }
@@ -124,13 +136,16 @@ function streamOf(pdf, text, id) {
   let last = null
   while ((match = re.exec(text))) last = match
   if (!last) return null
-  const head = text.slice(last.index, text.indexOf('stream', last.index))
+  // La palabra clave «stream» tras el diccionario (no la de un /Subtype como «octet-stream»).
+  const keyword = /(?:>>|\s)stream(\r\n|\n|\r)/g
+  keyword.lastIndex = last.index
+  const found = keyword.exec(text)
+  if (!found) return null
+  const head = text.slice(last.index, found.index)
   if (/\/Filter/.test(head)) return null // comprimido por otro programa: no lo leemos
   const length = Number(head.match(/\/Length\s+(\d+)(?!\s+0\s+R)/)?.[1])
   if (!Number.isFinite(length)) return null
-  let start = text.indexOf('stream', last.index) + 6
-  if (text[start] === '\r') start++
-  if (text[start] === '\n') start++
+  const start = found.index + found[0].length
   return pdf.slice(start, start + length)
 }
 

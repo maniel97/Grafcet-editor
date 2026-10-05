@@ -184,3 +184,39 @@ test('abrir un PDF sin ejercicio dentro avisa', async ({ page }) => {
   await expect.poll(async () => messages.join(' ') + (await page.locator('body').innerText())).toContain('no lleva dentro ningún proyecto')
   expectNoErrors(errors)
 })
+
+// Guion de prácticas: la práctica 1 abierta resuelta (guiada) y las demás del guion de ejemplo, en
+// un único PDF; al abrirlo se elige la práctica.
+test('guion de prácticas: varias prácticas en un PDF y elegir cuál abrir', async ({ page }) => {
+  test.setTimeout(90_000)
+  const errors = await openEditor(page)
+  await page.getByRole('button', { name: /^Abrir/ }).click()
+  await page.getByRole('menuitem', { name: /Ejercicios/ }).click()
+  await page.getByRole('button', { name: /Abrir resuelta: Práctica 1/ }).click()
+  await expect(page.locator('.react-flow__node-step')).toHaveCount(8) // la solución, en el lienzo
+  await page.getByRole('button', { name: /Exportar/ }).click()
+  await page.getByRole('menuitem', { name: /^Guion de prácticas/ }).click()
+  const dialog = page.getByRole('dialog', { name: 'Guion de prácticas' })
+  await dialog.getByRole('button', { name: 'Usar el guion de ejemplo' }).click()
+  await expect(dialog.locator('[data-practice]')).toHaveCount(5)
+  await expect(dialog.locator('[data-practice="1"]')).toContainText('El proyecto abierto')
+  await expect(dialog.getByLabel('Guiada')).toBeChecked()
+  if (process.env.GUIDE_SHOT) await page.screenshot({ path: process.env.GUIDE_SHOT })
+  const file = await download(page, () => dialog.getByRole('button', { name: 'Descargar el guion (PDF)' }).click())
+  const pdf = readFileSync(await file.path())
+  if (process.env.GUIDE_OUT) (await import('fs')).writeFileSync(process.env.GUIDE_OUT, pdf)
+  const text = pdf.toString('latin1')
+  // Cinco ejercicios y la solución de la guiada, adjuntos.
+  expect(text.match(/\/Type \/Filespec/g)).toHaveLength(6)
+  await dialog.getByRole('button', { name: 'Cerrar' }).last().click()
+
+  // Abrir el guion: se elige la práctica.
+  await page.locator('input[type=file]').first().setInputFiles({ name: 'guion.pdf', mimeType: 'application/pdf', buffer: pdf })
+  const chooser = page.getByRole('dialog', { name: '¿Qué práctica abres?' })
+  await expect(chooser.getByRole('button')).toHaveCount(7) // 6 archivos + cerrar
+  await chooser.getByRole('button', { name: /Cinta transportadora/ }).click()
+  const panel = page.getByRole('complementary', { name: 'Ejercicio' })
+  await expect(panel).toContainText('setas de emergencia')
+  await expect(page.locator('.react-flow__node-step')).toHaveCount(0)
+  expectNoErrors(errors)
+})

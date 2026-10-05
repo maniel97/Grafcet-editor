@@ -4,10 +4,11 @@ import { evolve } from './engine'
 //   { id, name, duration, events: [{ t, name, value }] }
 // Se graban desde el panel de simulación y se guardan en el proyecto (plc.scenarios).
 
-// Añade un cambio de entrada a una grabación (sin repetir el valor que ya tenía).
-export function recordEvent(events, t, name, value) {
+// Añade un cambio de entrada a una grabación (sin repetir el valor que ya tenía). previous: el
+// valor antes de grabar nada de esa entrada (1 en un pulsador NC o una seta sin pulsar).
+export function recordEvent(events, t, name, value, previous = 0) {
   const last = events.findLast((e) => e.name === name)
-  if ((last?.value ?? 0) === value) return events
+  if ((last?.value ?? previous) === value) return events
   return [...events, { t: Math.round(t * 1000) / 1000, name, value }]
 }
 

@@ -27,23 +27,37 @@ export function saveProject(project, filename = fileName('json')) {
 }
 
 // Un .json, o un PDF que lleve un proyecto adjunto (la hoja de un ejercicio: lib/exerciseSheet.js).
+// Si el archivo trae varios (un guion de prácticas), el primero; para elegir, loadProjects.
 export async function loadProject(file) {
-  let project
+  return (await loadProjects(file))[0].project
+}
+
+// Todos los proyectos de un archivo: [{ file (nombre del adjunto), project }] (un .json da uno).
+export async function loadProjects(file) {
   const bytes = new Uint8Array(await file.arrayBuffer())
+  let raw
   if (isPdf(bytes)) {
-    const attached = attachmentsOf(bytes).find((a) => a.name.toLowerCase().endsWith('.json'))
-    if (!attached) throw new Error(t('Este PDF no lleva dentro ningún proyecto ni ejercicio de Grafcet.'))
-    project = JSON.parse(new TextDecoder().decode(attached.data))
+    raw = attachmentsOf(bytes)
+      .filter((a) => a.name.toLowerCase().endsWith('.json'))
+      .map((a) => {
+        try {
+          return { file: a.name, project: JSON.parse(new TextDecoder().decode(a.data)) }
+        } catch {
+          return null
+        }
+      })
+      .filter(Boolean)
+    if (!raw.length) throw new Error(t('Este PDF no lleva dentro ningún proyecto ni ejercicio de Grafcet.'))
   } else {
     try {
-      project = JSON.parse(new TextDecoder().decode(bytes))
+      raw = [{ file: file.name, project: JSON.parse(new TextDecoder().decode(bytes)) }]
     } catch {
       throw new Error('El archivo no es un JSON válido.')
     }
   }
-  const normalized = normalizeProject(project)
-  if (!normalized) throw new Error('El archivo no contiene un proyecto Grafcet.')
-  return normalized
+  const found = raw.map((r) => ({ file: r.file, project: normalizeProject(r.project) })).filter((r) => r.project)
+  if (!found.length) throw new Error('El archivo no contiene un proyecto Grafcet.')
+  return found.sort((a, b) => a.file.localeCompare(b.file))
 }
 
 // Valida y adapta al formato actual un proyecto leído (de archivo o del autoguardado).

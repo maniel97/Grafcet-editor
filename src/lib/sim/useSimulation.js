@@ -193,7 +193,7 @@ export function useSimulation(nodes, edges, plc, enabled) {
       if (!current) return
       // Analógicas: el valor (en unidades físicas); digitales: 0 / 1.
       const v = typeof value === 'number' ? value : value ? 1 : 0
-      const recording = current.recording && recordEvent(current.recording, current.state.time, name, v)
+      const recording = current.recording && recordEvent(current.recording, current.state.time, name, v, current.inputs[name] ?? 0)
       // Tocar una entrada durante una reproducción la interrumpe: a partir de ahí manda el usuario.
       const next = { ...current, inputs: { ...current.inputs, [name]: v }, recording, playback: null }
       simRef.current = next
@@ -241,7 +241,17 @@ export function useSimulation(nodes, edges, plc, enabled) {
       const current = simRef.current
       if (!current) return
       const worldState = update(world.init(current.world))
-      const next = { ...current, world: worldState, inputs: { ...current.inputs, ...world.inputs(worldState) } }
+      // Grabando: los mandos de la planta que cambian (pulsar, soltar, girar una seta) quedan en el
+      // escenario, con el valor que lee el autómata; al reproducirlo se vuelven a accionar.
+      let recording = current.recording
+      if (recording) {
+        for (const name of world.controlNames()) {
+          const before = world.controlValue(current.world, name)
+          const after = world.controlValue(worldState, name)
+          if (after !== before) recording = recordEvent(recording, current.state.time, name, after, before)
+        }
+      }
+      const next = { ...current, world: worldState, recording, inputs: { ...current.inputs, ...world.inputs(worldState) } }
       simRef.current = next
       setSim(next)
     },

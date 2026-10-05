@@ -12,11 +12,11 @@ import { pneumaticCircuit } from './elec/pneumaticCircuit'
 import { powerPart } from './elec/templates'
 import { terminalAddress } from './elec/catalog'
 
-const step = (id, label, x, y, actions = [], extra = {}) => ({ id, type: 'step', position: { x, y }, data: { label, actions, ...extra } })
-const trans = (id, condition, x, y) => ({ id, type: 'transition', position: { x, y }, data: { condition } })
+export const step = (id, label, x, y, actions = [], extra = {}) => ({ id, type: 'step', position: { x, y }, data: { label, actions, ...extra } })
+export const trans = (id, condition, x, y) => ({ id, type: 'transition', position: { x, y }, data: { condition } })
 const note = (id, x, y, text, size = {}) => ({ id, type: 'note', position: { x, y }, data: { text, color: 'yellow' }, ...NOTE_SIZE, height: 150, ...size })
 const frame = (id, name, kind, x, y, width, height) => ({ id, type: 'frame', position: { x, y }, width, height, zIndex: -1, data: { name, kind } })
-const links = (pairs) => pairs.map(([source, target]) => ({ id: `${source}-${target}`, source, target, type: 'grafcet' }))
+export const links = (pairs) => pairs.map(([source, target]) => ({ id: `${source}-${target}`, source, target, type: 'grafcet' }))
 
 // Secuencia lineal en columna que vuelve al principio: [etapa, transición, etapa, transición...].
 function cycle(items, x = 200) {
@@ -1909,7 +1909,7 @@ for (const example of EXAMPLES) {
 // Todos los ejemplos traen su esquema eléctrico: el cableado del autómata con sus direcciones
 // (como «Conexiones del autómata»). Conectado si hay planta (los mandos y detectores llegan por
 // los cables); sin planta, sin conectar, para seguir accionando las entradas desde el panel.
-function withSchematic(project) {
+export function withSchematic(project) {
   if (project.plc.electrical?.components?.length) return project
   const wiring = generatePlcWiring(buildPlcModel(project.nodes, project.edges, project.plc).variables, project.plc.scene)
   if (!wiring.devices) return project

@@ -8,6 +8,7 @@ Un **ejercicio** trae un enunciado y lo que el profesor da hecho (la planta, la 
 2. Lee el enunciado en el panel **Ejercicio** (a la derecha; el botón de la barra lo abre y lo cierra).
 3. Dibuja el grafcet. Puedes simularlo y verificarlo como siempre.
 4. Pulsa **Comprobar** cuantas veces quieras. Cada comprobación sale en verde o en rojo, con lo que falla.
+5. Para entregar, Exportar > **Dossier de la práctica**: el PDF lleva tu proyecto dentro (se abre en el editor) y tiene apartados para el contenido teórico, las mejoras y los problemas encontrados.
 
 > **Ojo:** lo que el profesor da bloqueado (por ejemplo, la tabla de variables) no se puede cambiar: usa esos nombres en el grafcet. Si escribes uno que no está, la comprobación te lo señala como posible errata.
 
@@ -26,6 +27,17 @@ Un **ejercicio** trae un enunciado y lo que el profesor da hecho (la planta, la 
 3. Exportar > **Ejercicio para el alumnado**: escribe el enunciado, elige qué se da hecho (y si va bloqueado) y qué se comprueba. Pulsa **Probar**: con tu solución, todo debe salir en verde.
 4. **Guardar y descargar para el alumnado** crea el archivo que se reparte, sin tu grafcet.
 5. **Hoja de prácticas (PDF)** crea una hoja como las de siempre, para imprimir o repartir: cabecera para el nombre, enunciado, lo que se da (tabla, planta, esquema), los criterios de evaluación en palabras y los escenarios de prueba. El archivo del ejercicio va dentro del PDF como adjunto: al abrir el PDF en el editor se carga el ejercicio. Cualquiera puede evaluar el ejercicio con el papel, sin conocer el programa, y la **huella** del pie identifica el archivo de dentro.
+
+## Guion de prácticas
+
+Varias prácticas en un solo PDF, como un guion de los de siempre: Exportar > **Guion de prácticas**.
+
+- Datos de la cabecera y el pie (asignatura, curso, ciclo, centro, profesor/a) y las **normas generales**: entrega, evaluación y qué debe incluir cada práctica.
+- Las prácticas: el proyecto abierto y las que añadas desde archivos (.json de ejercicios u hojas en PDF). Ordénalas con las flechas.
+- **Guiada**: el proyecto abierto puede salir con su solución (grafcet, conexionado, ladder y tabla), como la práctica que se hace en clase de ejemplo; el proyecto resuelto va también dentro.
+- Al abrir el guion en el editor se elige la práctica.
+
+En Abrir > Ejercicios hay un guion de ejemplo con cinco prácticas de autómatas: abre resuelta la práctica 1 y usa **Usar el guion de ejemplo**.
 
 > **Ojo:** las comprobaciones viajan selladas en el archivo, pero no es un sistema de seguridad: el corrector se basa en el comportamiento, no en copiar tu grafcet.
 

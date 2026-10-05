@@ -50,3 +50,20 @@ describe('adjuntos en un PDF', () => {
     expect(isPdf(new TextEncoder().encode('{"nodes":[]}'))).toBe(false)
   })
 })
+
+describe('varios adjuntos', () => {
+  it('se leen todos, con su contenido, y el árbol de nombres va en orden', async () => {
+    const { attachFiles } = await import('../../src/lib/pdfAttach')
+    const enc = (s) => new TextEncoder().encode(s)
+    const out = attachFiles(pdfBytes(), [
+      { name: '2-b.json', data: enc('{"b":2}') },
+      { name: '1-a.json', data: enc('{"a":1}') },
+    ])
+    const found = attachmentsOf(out)
+    expect(found.map((f) => [f.name, new TextDecoder().decode(f.data)]).sort()).toEqual([
+      ['1-a.json', '{"a":1}'],
+      ['2-b.json', '{"b":2}'],
+    ])
+    expect(new TextDecoder('latin1').decode(out)).toMatch(/\/Names \[\(1-a\.json\) \d+ 0 R \(2-b\.json\) \d+ 0 R\]/)
+  })
+})

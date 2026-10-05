@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { BookOpen, GraduationCap, History, RotateCcw, Trash2, X } from 'lucide-react'
 import { EXAMPLES, LEVELS } from '../lib/examples'
 import { EXERCISES } from '../lib/exercises'
+import { PRACTICE_GUIDES } from '../lib/practiceGuides'
 import { listRecent, removeRecent } from '../lib/recent'
 import { t, N_ } from '../lib/i18n'
 
@@ -16,7 +17,9 @@ const when = (iso) =>
 
 // Abrir un ejemplo o recuperar un trabajo anterior. Lo que hay en el lienzo antes de abrir se
 // guarda solo como trabajo anterior (y también se puede deshacer con Ctrl+Z).
-export default function ProjectsDialog({ initialTab = 'examples', onOpenExample, onOpenExercise, onRestore, onClose }) {
+// onOpenSolution(proyecto, título): abrir resuelta la práctica guiada de un guion (sale resuelta en
+// el propio guion: es el ejemplo de cómo se hace).
+export default function ProjectsDialog({ initialTab = 'examples', onOpenExample, onOpenExercise, onOpenSolution, onRestore, onClose }) {
   const dialogRef = useRef(null)
   const [tab, setTab] = useState(initialTab)
   const [recent, setRecent] = useState(() => listRecent())
@@ -111,6 +114,42 @@ export default function ProjectsDialog({ initialTab = 'examples', onOpenExample,
                 </li>
               ))}
             </ul>
+            {PRACTICE_GUIDES.map((guide) => (
+              <section key={guide.id} data-guide={guide.id} className="space-y-2 border-t border-slate-200 pt-3">
+                <h3 className="font-medium">{t('Guion: {titulo}', { titulo: guide.title })}</h3>
+                <p className="text-sm text-slate-600">{guide.description}</p>
+                <ul className="grid gap-2 sm:grid-cols-2">
+                  {guide.practices.map((p, i) => {
+                    const exercise = p.teacher().plc.exercise
+                    return (
+                      <li key={p.id} className="flex flex-col gap-1 rounded-lg border border-slate-200 p-2.5">
+                        <span className="text-sm font-medium">{exercise.title}</span>
+                        <span className="flex flex-wrap gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => onOpenExercise({ id: `${guide.id}-${p.id}`, title: exercise.title, teacher: p.teacher })}
+                            className="rounded-md border border-slate-300 px-2 py-0.5 text-xs hover:border-blue-400 hover:bg-blue-50"
+                          >
+                            {t('Hacer la práctica')}
+                          </button>
+                          {p.guided && onOpenSolution && (
+                            <button
+                              type="button"
+                              onClick={() => onOpenSolution(p.teacher(), exercise.title)}
+                              className="rounded-md border border-green-300 px-2 py-0.5 text-xs text-green-800 hover:bg-green-50"
+                              aria-label={t('Abrir resuelta: {titulo}', { titulo: exercise.title })}
+                            >
+                              {t('Abrir resuelta (guiada)')}
+                            </button>
+                          )}
+                        </span>
+                        {i === 0 && p.guided && <span className="text-xs text-slate-500">{t('Ábrela resuelta y usa Exportar > Guion de prácticas > «Usar el guion de ejemplo» para sacar el guion completo en PDF.')}</span>}
+                      </li>
+                    )
+                  })}
+                </ul>
+              </section>
+            ))}
           </div>
         ) : (
           <>

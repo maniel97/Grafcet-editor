@@ -128,12 +128,17 @@ export async function partFigures(plc, model) {
   return figures
 }
 
+// Figura del ladder (con símbolos y direcciones).
+export async function ladderFigure(nodes, edges, plc) {
+  const { renderToStaticMarkup } = await import('react-dom/server')
+  return figureFromMarkup(renderToStaticMarkup(createElement(LadderDiagram, { ladder: generateLadder(nodes, edges, plc), mode: 'both' })))
+}
+
 // Figuras SVG: ladder, planta y cronograma (el del escenario elegido).
 export async function dossierFigures({ nodes, edges, plc, scenarioId, model }) {
   const { renderToStaticMarkup } = await import('react-dom/server')
   const figures = {}
-  const ladder = generateLadder(nodes, edges, plc)
-  figures.ladder = await figureFromMarkup(renderToStaticMarkup(createElement(LadderDiagram, { ladder, mode: 'both' })))
+  figures.ladder = await ladderFigure(nodes, edges, plc)
   Object.assign(figures, await partFigures(plc, model))
   const scenarios = plc.scenarios ?? []
   const scenario = scenarios.find((s) => s.id === scenarioId) ?? scenarios[0]

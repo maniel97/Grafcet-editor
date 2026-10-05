@@ -17,6 +17,7 @@ export const DOSSIER_SECTIONS = [
   { id: 'cover', label: 'Portada' },
   { id: 'toc', label: 'Índice' },
   { id: 'statement', label: 'Enunciado / memoria' },
+  { id: 'theory', label: 'Contenido teórico' },
   { id: 'grafcet', label: 'Grafcet' },
   { id: 'variables', label: 'Tabla de variables' },
   { id: 'verification', label: 'Verificación IEC 60848' },
@@ -25,6 +26,8 @@ export const DOSSIER_SECTIONS = [
   { id: 'electrical', label: 'Esquema eléctrico' },
   { id: 'chronogram', label: 'Cronograma' },
   { id: 'spacePhase', label: 'Diagrama espacio-fase' },
+  { id: 'improvements', label: 'Mejoras y aportaciones' },
+  { id: 'problems', label: 'Problemas encontrados y cómo se resolvieron' },
   { id: 'notes', label: 'Notas del lienzo' },
 ]
 
@@ -46,9 +49,13 @@ export const LADDER_LISTINGS = [
 
 export const DEFAULT_DOSSIER = {
   page: 'a4',
-  sections: { cover: true, toc: true, statement: true, grafcet: true, variables: true, verification: true, ladder: true, plant: true, electrical: true, chronogram: true, spacePhase: true, notes: false },
+  sections: { cover: true, toc: true, statement: true, theory: true, improvements: true, problems: true, grafcet: true, variables: true, verification: true, ladder: true, plant: true, electrical: true, chronogram: true, spacePhase: true, notes: false },
   cover: {},
   statement: '',
+  // Apartados de texto que suelen pedir los guiones de prácticas (salen si tienen algo escrito).
+  theory: '',
+  improvements: '',
+  problems: '',
   ladderListing: '',
   scenario: '',
 }
@@ -104,6 +111,10 @@ export function buildDossier(content, options, measure) {
   if (S.statement && content.statement?.trim()) {
     heading('Enunciado')
     richText(content.statement)
+  }
+  if (S.theory && content.theory?.trim()) {
+    heading('Contenido teórico')
+    richText(content.theory)
   }
   if (S.grafcet && content.figures.grafcet?.length) {
     const sheets = content.figures.grafcet
@@ -204,6 +215,14 @@ export function buildDossier(content, options, measure) {
     heading('Diagrama espacio-fase')
     for (const fig of content.figures.spacePhase) figure(fig, { caption: fig.name })
     if (content.figures.spacePhaseResult) paragraph([{ text: content.figures.spacePhaseResult }], 10)
+  }
+  if (S.improvements && content.improvements?.trim()) {
+    heading('Mejoras y aportaciones')
+    richText(content.improvements)
+  }
+  if (S.problems && content.problems?.trim()) {
+    heading('Problemas encontrados y cómo se resolvieron')
+    richText(content.problems)
   }
   if (S.notes && content.notes?.length) {
     heading('Notas del lienzo')

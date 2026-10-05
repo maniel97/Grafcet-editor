@@ -124,10 +124,11 @@ export function pageWriter(measure, [PW, PH] = PAGES.a4) {
     w.rule(w.y + 7.5, 0.25, RULE)
     w.y += 11
   }
-  const figureScale = (fig, { minScale = 0.45, maxHeight } = {}) => {
+  // maxScale: tope de escala (p. ej. un ladder largo, más pequeño que 1:1 para que ocupe menos páginas).
+  const figureScale = (fig, { minScale = 0.45, maxHeight, maxScale = 1 } = {}) => {
     const hmm = fig.height * PX_TO_MM
     const room = Math.min(w.bottom() - M.top - 15, maxHeight ?? Infinity)
-    let scale = Math.min(1, w.width() / (fig.width * PX_TO_MM))
+    let scale = Math.min(maxScale, w.width() / (fig.width * PX_TO_MM))
     if (hmm * scale > room && room / hmm >= minScale) scale = room / hmm
     return scale
   }
@@ -135,7 +136,7 @@ export function pageWriter(measure, [PW, PH] = PAGES.a4) {
   w.figureHeight = (fig, options) => fig.height * PX_TO_MM * figureScale(fig, options)
   // Figura: a la escala que quepa a lo ancho (máx. 1:1), troceada entre páginas si es alta. Los
   // cortes, entre bloques (segmentos del ladder) si la figura los tiene.
-  w.figure = (fig, { minScale = 0.45, caption, maxHeight } = {}) => {
+  w.figure = (fig, { minScale = 0.45, caption, maxHeight, maxScale } = {}) => {
     if (!fig) return
     if (caption) {
       w.ensure(8)
@@ -144,7 +145,7 @@ export function pageWriter(measure, [PW, PH] = PAGES.a4) {
     }
     // Escala: 1:1 como máximo y a lo ancho de la página; si así no cabe en una página (o en
     // maxHeight), se reduce hasta caber (sin bajar de minScale: más pequeño no se lee y se trocea).
-    const scale = figureScale(fig, { minScale, maxHeight })
+    const scale = figureScale(fig, { minScale, maxHeight, maxScale })
     const kk = scale * PX_TO_MM
     // Si cabe entera en una página pero no en lo que queda de esta, a la siguiente.
     if (fig.height * kk <= w.bottom() - M.top - 15 && w.y + fig.height * kk > w.bottom()) w.newPage()
