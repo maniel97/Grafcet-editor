@@ -18,7 +18,7 @@ export const EXAMPLE_COMMENTS = {
       P: 'Pulsador que se cuenta (por flanco)',
       Reset: 'Pulsador: vuelve a empezar',
       Luz: 'Se enciende a la 3.ª pulsación',
-      C: 'Contador de pulsaciones (palabra)',
+      C: 'Contador de pulsaciones',
     },
     steps: { 0: 'Reposo: pone C a 0 al entrar', 1: 'Esperando pulsaciones', 2: 'Suma 1 a C (dura un instante)', 3: 'Tercera pulsación: luz encendida' },
   },

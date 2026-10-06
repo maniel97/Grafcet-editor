@@ -1990,6 +1990,12 @@ export function documented(project, comments = {}) {
   for (const [name, comment] of Object.entries(comments.variables ?? {})) variables[name] = { ...variables[name], comment }
   const steps = { ...plc.steps }
   const stepNodes = project.nodes.filter((n) => n.type === 'step')
+  // Lo que se cuenta de uno en uno (C:=C+1, C:=C-1) va declarado como contador (C0…), no como una
+  // palabra de marcas: es lo que espera quien hace el ejercicio en un autómata.
+  for (const n of stepNodes)
+    for (const a of n.data.actions ?? [])
+      for (const [, name] of String(typeof a === 'string' ? a : a.text).matchAll(/(\w+)\s*:=\s*\1\s*[+-]\s*1\b/g))
+        if (!variables[name]?.type) variables[name] = { ...variables[name], type: 'counter' }
   for (const n of stepNodes) {
     const comment = comments.steps?.[n.data.label]
     if (comment) steps[n.id] = { ...steps[n.id], comment }
