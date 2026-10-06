@@ -148,6 +148,10 @@ function About() {
           <a href={LICENSE_URL} className={link} target="_blank" rel="noreferrer">
             {t('Texto de la licencia')}
           </a>
+          {' · '}
+          <a href="./THIRD-PARTY-LICENSES.txt" className={link} target="_blank" rel="noreferrer">
+            {t('Licencias de las librerías de terceros')}
+          </a>
         </p>
       </div>
       <div>
@@ -167,7 +171,7 @@ function About() {
       <div>
         <h4 className="font-semibold">{t('Marcas y normas')}</h4>
         <p className="text-slate-600">
-          {t('Siemens, SIMATIC, STEP 7-Micro/WIN y TIA Portal son marcas de Siemens AG; este proyecto no tiene relación con Siemens. Las normas IEC 60848, IEC 60617, IEC 61131-3 e ISO 1219 se citan como referencia; los símbolos están dibujados para este proyecto.')}
+          {t('Los nombres de productos y empresas citados (Siemens, SIMATIC, STEP 7-Micro/WIN, TIA Portal, CODESYS, Schneider Electric, Omron…) son marcas de sus respectivos propietarios; este proyecto no tiene relación con ellos ni cuenta con su respaldo. Las normas IEC 60848, IEC 60617, IEC 61131-3 e ISO 1219 se citan como referencia; los símbolos están dibujados para este proyecto.')}
         </p>
       </div>
     </section>

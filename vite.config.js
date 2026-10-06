@@ -1,10 +1,12 @@
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { defineConfig } from 'vite'
+import { thirdPartyLicensesPlugin } from './scripts/thirdPartyLicenses.mjs'
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react(), tailwindcss()],
+  // THIRD-PARTY-LICENSES.txt: licencias de las librerías incluidas (scripts/thirdPartyLicenses.mjs).
+  plugins: [react(), tailwindcss(), thirdPartyLicensesPlugin()],
   // Dependencias: solo desde la aplicación (no desde dist-portable/grafcet-editor.html, que lleva
   // todo el código incrustado y el analizador de Vite no lo admite).
   optimizeDeps: { entries: ['index.html'] },

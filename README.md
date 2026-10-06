@@ -45,9 +45,14 @@ siempre el programa antes de cargarlo en un autómata.
 ([LICENSE](LICENSE)): puedes usarlo, copiarlo, estudiarlo y modificarlo gratis; las versiones
 modificadas que se publiquen deben seguir siendo libres y con su código.
 
-Siemens, SIMATIC, STEP 7-Micro/WIN y TIA Portal son marcas de Siemens AG; este proyecto no tiene
-relación con Siemens. Las normas IEC 60848, IEC 60617, IEC 61131-3 e ISO 1219 se citan como
+Los nombres de productos y empresas citados (Siemens, SIMATIC, STEP 7-Micro/WIN, TIA Portal,
+CODESYS, Schneider Electric, Omron…) son marcas de sus respectivos propietarios; este proyecto no
+tiene relación con ellos ni cuenta con su respaldo. Las normas IEC 60848, IEC 60617, IEC 61131-3 e ISO 1219 se citan como
 referencia; los símbolos están dibujados para este proyecto.
+
+Las librerías de terceros que incluye la aplicación (React, React Flow, jsPDF…) tienen sus propias
+licencias (MIT, ISC, BSD, OFL…): la compilación las reúne en `THIRD-PARTY-LICENSES.txt`, enlazado
+desde Ayuda > «Acerca de».
 
 ---
 
