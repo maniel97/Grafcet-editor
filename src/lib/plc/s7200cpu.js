@@ -110,6 +110,13 @@ export function createCpu(program) {
     if (!WORD.test(a) && !BYTE.test(a) && !DWORD.test(a)) throw new PlcError(`«${a}» no es una palabra.`, line)
     return words.get(a) ?? 0
   }
+  // Escribir en C0 o T37 (MOVW, +I…) cambia su valor actual, como en el S7-200 (su bit, al
+  // ejecutarse la caja); no es una palabra aparte.
+  const setWord = (a, value) => {
+    if (/^C\d+$/.test(a)) counters.set(a, { cv: 0, q: false, prevUp: false, prevDown: false, ...counters.get(a), cv: value })
+    else if (/^T\d+$/.test(a)) timers.set(a, { acc: 0, q: false, ...timers.get(a), acc: value * timerBase(Number(a.slice(1))) })
+    else words.set(a, value)
+  }
   const setBits = (a, value, n = 1, line) => {
     const m = BIT.exec(a)
     if (!m) throw new PlcError(`«${a}» no es un bit.`, line)
@@ -245,7 +252,7 @@ export function createCpu(program) {
         }
         case 'MOVW':
         case 'MOVB':
-          if (top()) words.set(args[1], getWord(args[0], line))
+          if (top()) setWord(args[1], getWord(args[0], line))
           break
         case '+I':
         case '-I':
@@ -255,28 +262,28 @@ export function createCpu(program) {
             const a = getWord(args[1], line)
             const b = getWord(args[0], line)
             if (op === '/I' && b === 0) throw new PlcError('división por cero.', line)
-            words.set(args[1], clamp16(op === '+I' ? a + b : op === '-I' ? a - b : op === '*I' ? a * b : a / b))
+            setWord(args[1], clamp16(op === '+I' ? a + b : op === '-I' ? a - b : op === '*I' ? a * b : a / b))
           }
           break
         case 'MOVR':
         case 'MOVD':
-          if (top()) words.set(args[1], getWord(args[0], line))
+          if (top()) setWord(args[1], getWord(args[0], line))
           break
         case 'ITD':
         case 'DTR':
-          if (top()) words.set(args[1], getWord(args[0], line))
+          if (top()) setWord(args[1], getWord(args[0], line))
           break
         case 'DTI': {
           // Fuera del rango de un entero (desbordamiento), la salida no cambia.
           const v = getWord(args[0], line)
-          if (top() && v >= -32768 && v <= 32767) words.set(args[1], Math.trunc(v))
+          if (top() && v >= -32768 && v <= 32767) setWord(args[1], Math.trunc(v))
           break
         }
         case 'ROUND':
         case 'TRUNC':
           if (top()) {
             const v = getWord(args[0], line)
-            words.set(args[1], op === 'TRUNC' ? Math.trunc(v) : Math.sign(v) * Math.round(Math.abs(v)))
+            setWord(args[1], op === 'TRUNC' ? Math.trunc(v) : Math.sign(v) * Math.round(Math.abs(v)))
           }
           break
         case '+R':
@@ -287,12 +294,12 @@ export function createCpu(program) {
             const a = getWord(args[1], line)
             const b = getWord(args[0], line)
             if (op === '/R' && b === 0) throw new PlcError('división por cero.', line)
-            words.set(args[1], Math.fround(op === '+R' ? a + b : op === '-R' ? a - b : op === '*R' ? a * b : a / b))
+            setWord(args[1], Math.fround(op === '+R' ? a + b : op === '-R' ? a - b : op === '*R' ? a * b : a / b))
           }
           break
         case 'INCW':
         case 'DECW':
-          if (top()) words.set(args[0], clamp16(getWord(args[0], line) + (op === 'INCW' ? 1 : -1)))
+          if (top()) setWord(args[0], clamp16(getWord(args[0], line) + (op === 'INCW' ? 1 : -1)))
           break
         case 'CALL':
           if (top()) run(args[0].replace(/^SBR_?/, 'SBR'), dt, depth + 1)

@@ -94,6 +94,28 @@ LD C0
   })
 })
 
+describe('CPU S7-200: escribir en un contador', () => {
+  it('C:=C+1 del grafcet (MOVW C0 / +I / MOVW a C0) cambia el valor del contador', () => {
+    const cpu = run(`ORGANIZATION_BLOCK MAIN:OB1
+BEGIN
+Network 1
+LD     I0.0
+EU
+MOVW   C0, VW900
++I     1, VW900
+MOVW   VW900, C0
+Network 2
+LDW>=  C0, 2
+=      Q0.0
+END_ORGANIZATION_BLOCK`)
+    for (const on of [true, false, true, false]) {
+      cpu.bits.set('I0.0', on)
+      cpu.scan(0.01)
+    }
+    expect(cpu.bits.get('Q0.0')).toBe(true)
+  })
+})
+
 describe('el programa del autómata mueve la planta', () => {
   // A+ con Marcha y a0; A− con a1 (cilindro de doble efecto), escrito a mano con direcciones.
   const program = `Network 1
