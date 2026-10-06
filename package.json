@@ -1,7 +1,7 @@
 {
   "name": "grafcet-editor",
   "private": true,
-  "version": "0.1.0-alpha.2",
+  "version": "0.1.0-alpha.3",
   "description": "Editor y simulador de grafcet (IEC 60848) para la enseñanza de automatismos",
   "author": "Maniel Montes",
   "license": "GPL-3.0-or-later",
