@@ -1,0 +1,28 @@
+name: Idea o mejora / Feature request
+description: Algo que te gustaría que hiciera · Something you'd like it to do
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Mira antes la [hoja de ruta](https://github.com/maniel97/Grafcet-editor/blob/main/ROADMAP.md) por si ya está prevista. Check the roadmap first.
+  - type: textarea
+    id: para
+    attributes:
+      label: Para qué lo necesitas / What for
+      description: La situación de clase o de trabajo en la que lo echas en falta.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: Cómo te lo imaginas / How you imagine it
+  - type: dropdown
+    id: quien
+    attributes:
+      label: Lo usarías como / You'd use it as
+      options:
+        - Profesorado / Teacher
+        - Alumnado / Student
+        - Profesional / Professional
+        - Otro / Other

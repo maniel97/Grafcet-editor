@@ -1,0 +1,45 @@
+name: Fallo / Bug
+description: Algo no funciona como debería · Something doesn't work
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Gracias por avisar. Cuanto más concreto, antes se arregla. You can write in English.
+  - type: textarea
+    id: que
+    attributes:
+      label: Qué pasa / What happens
+      placeholder: Al simular el ejemplo «Taladradora», la etapa 3 no se activa aunque…
+    validations:
+      required: true
+  - type: textarea
+    id: esperado
+    attributes:
+      label: Qué esperabas / What you expected
+    validations:
+      required: true
+  - type: textarea
+    id: pasos
+    attributes:
+      label: Pasos para reproducirlo / Steps to reproduce
+      placeholder: |
+        1. Abrir > Ejemplos > …
+        2. Pulsar Simular
+        3. …
+  - type: textarea
+    id: proyecto
+    attributes:
+      label: Proyecto o captura / Project or screenshot
+      description: Arrastra aquí el archivo .json del proyecto (Guardar) o una captura. También vale el enlace de Exportar > Compartir por enlace.
+  - type: input
+    id: version
+    attributes:
+      label: Versión / Version
+      description: Ayuda > Acerca de
+      placeholder: 0.1.0-alpha.5
+  - type: input
+    id: navegador
+    attributes:
+      label: Navegador y sistema / Browser and OS
+      placeholder: Chrome 130, Windows 11 · Safari, iPad
