@@ -17,12 +17,9 @@ const TEMP_WORD = 900
 const TEMP_REAL = 940
 const CMP_REAL = 960
 
-// Base de tiempo de los temporizadores TON/TOF del S7-200 según su número (s).
-export function timerBase(number) {
-  if (number === 32 || number === 96) return 0.001
-  if ((number >= 33 && number <= 36) || (number >= 97 && number <= 100)) return 0.01
-  return 0.1
-}
+// Base de tiempo de cada temporizador según su número (s): la misma tabla que la CPU simulada.
+export { timerBase } from '../plc/s7200cpu'
+import { isRetentiveTimer, timerBase } from '../plc/s7200cpu'
 
 const constant = (n) => (n < 0 ? String(n) : `+${n}`)
 const pad = (op, args = '') => (args ? `${op.padEnd(6)} ${args}` : op)
@@ -61,14 +58,16 @@ export function symbolName(name) {
 // ¿Existe esta dirección en un S7-200 (hasta la CPU 226)? I/Q 0.0–15.7, M 0.0–31.7, V hasta
 // VB10239, AIW/AQW 0–62 (pares), IW/QW 0–14, MW 0–30, T/C 0–255, SM. Las de otros esquemas (IW64
 // o MW102 de S7-300, %IX0.0 de IEC) no: Micro/WIN da «ERROR 37: rango de direccionamiento».
-export function validS7200(address) {
+// `ton`: el temporizador se usa con TON, que solo admite T32–T63 y T96–T255 (T0–T31 y T64–T95 son
+// de TONR).
+export function validS7200(address, { ton = false } = {}) {
   const text = String(address ?? '').trim().toUpperCase()
   if (text.startsWith('%')) return false
   const a = parseAddress(text)
   if (!a) return false
   if (a.index !== undefined) return { I: 128, Q: 128, M: 256, V: 10240 * 8, SM: 550 * 8 }[a.area] > a.index
   if (a.word !== undefined) return a.word % 2 === 0 && { AI: 62, AQ: 62, I: 14, Q: 14, M: 30, V: 10238 }[a.area] >= a.word
-  return a.number <= 255
+  return a.number <= 255 && !(ton && a.area === 'T' && isRetentiveTimer(a.number))
 }
 
 // Direcciones de todo lo que usa el programa. Lo que no tiene dirección en la tabla de variables
@@ -132,7 +131,7 @@ function makeAddresses(ladder, plc) {
         return address
       }
       const known = resolver.address(op)
-      if (known && validS7200(known)) return known.toUpperCase()
+      if (known && validS7200(known, { ton: op.kind === 'timer' })) return known.toUpperCase()
       if (known) {
         const address = fresh(op)
         cache.set(key, address)

@@ -1,0 +1,96 @@
+ORGANIZATION_BLOCK MAIN:OB1
+TITLE=Pruebas para comparar la CPU simulada de Grafcet Editor con un S7-200 real
+BEGIN
+Network 1 // P1 SCR: = dentro de un segmento inactivo. Pasar a RUN; luego poner I0.0 a 1 (pasa de S0.0 a S0.1).
+// Mirar M10.0 (simulada: 0, se apaga) y M10.1 (simulada: 1, la S se mantiene).
+LD     SM0.1
+S      S0.0, 1
+Network 2
+LSCR   S0.0
+Network 3
+LD     SM0.0
+=      M10.0
+S      M10.1, 1
+Network 4
+LD     I0.0
+SCRT   S0.1
+Network 5
+SCRE
+Network 6
+LSCR   S0.1
+Network 7
+LD     SM0.0
+=      M10.2
+Network 8
+SCRE
+Network 9 // P2 +I que desborda: VW500 (simulada: 32767, no cambia)
+LD     SM0.1
+MOVW   +32767, VW500
++I     +1, VW500
+Network 10 // P2: M11.0 = SM1.1 justo despues (simulada: 1)
+LD     SM0.1
+A      SM1.1
+S      M11.0, 1
+Network 11 // P3 INCB de 255: VB502 (simulada: 255, no cambia)
+LD     SM0.1
+MOVB   255, VB502
+INCB   VB502
+Network 12 // P3: M11.1 = SM1.1 (simulada: 1) y M11.2 = SM1.0 (simulada: 0)
+LD     SM0.1
+A      SM1.1
+S      M11.1, 1
+LD     SM0.1
+A      SM1.0
+S      M11.2, 1
+Network 13 // P4 CTU con CU a 1 desde el primer ciclo: C10 (simulada: 1)
+LD     SM0.0
+LD     M0.7
+CTU    C10, +100
+Network 14 // P5 pila despues de CTU (CU=1, R=0, bit=0): M11.3 (simulada: 0)
+LD     SM0.0
+LD     M0.7
+CTU    C11, +100
+=      M11.3
+Network 15 // P5 pila despues de CTU (CU=1, R=0, bit=1): M11.4 (simulada: 0)
+LD     SM0.0
+LD     M0.7
+CTU    C12, +1
+=      M11.4
+Network 16 // P6 ROUND de -2.5: VD510 (simulada: -3)
+LD     SM0.1
+MOVR   -2.5, VD506
+ROUND  VD506, VD510
+Network 17 // P7 MOVW sobre AC1 con la parte alta ocupada: VD520 (simulada: 16#12340000)
+LD     SM0.1
+MOVD   16#12345678, AC1
+MOVW   +0, AC1
+MOVD   AC1, VD520
+Network 18 // P8 TON de 100 ms ejecutado dos veces por ciclo (T40) frente a una (T41):
+// mirar T40 y T41 a la vez en la tabla de estado (simulada: iguales)
+LD     SM0.0
+TON    T40, +32000
+Network 19
+LD     SM0.0
+TON    T40, +32000
+Network 20
+LD     SM0.0
+TON    T41, +32000
+Network 21 // P9 CTD con carga y cuenta en el mismo ciclo: C20 (simulada: 5, manda la carga)
+LD     SM0.1
+LD     SM0.1
+CTD    C20, +5
+Network 22 // P10 EU de un bit que ya esta a 1 en el primer ciclo: M11.5 (simulada: 0, sin flanco)
+LD     SM0.0
+EU
+S      M11.5, 1
+END_ORGANIZATION_BLOCK
+SUBROUTINE_BLOCK SBR_0:SBR0
+TITLE=
+BEGIN
+Network 1 //
+END_SUBROUTINE_BLOCK
+INTERRUPT_BLOCK INT_0:INT0
+TITLE=
+BEGIN
+Network 1 //
+END_INTERRUPT_BLOCK

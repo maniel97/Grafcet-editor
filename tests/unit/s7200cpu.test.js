@@ -108,7 +108,7 @@ Network 2
 LDW>=  C0, 2
 =      Q0.0
 END_ORGANIZATION_BLOCK`)
-    for (const on of [true, false, true, false]) {
+    for (const on of [false, true, false, true]) { // en el primer ciclo EU no da flanco
       cpu.bits.set('I0.0', on)
       cpu.scan(0.01)
     }
