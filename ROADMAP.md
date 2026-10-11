@@ -30,7 +30,7 @@ novedades. Lo que llega a `main` se publica en <https://grafcet-editor.com>.
 
 Que todo lo que ya existe funcione bien antes de añadir nada.
 
-- [ ] [#1](https://github.com/maniel97/Grafcet-editor/issues/1) Emulador S7-200: auditoría instrucción por instrucción
+- [x] [#1](https://github.com/maniel97/Grafcet-editor/issues/1) Emulador S7-200: auditoría instrucción por instrucción
 - [ ] [#2](https://github.com/maniel97/Grafcet-editor/issues/2) Electroneumática: a0/a1 leen 0 en el primer ciclo del autómata
 - [ ] [#3](https://github.com/maniel97/Grafcet-editor/issues/3) Generador de cableado: cilindro solo en el esquema sale como pulsadores y relé
 - [ ] [#4](https://github.com/maniel97/Grafcet-editor/issues/4) Verificar: avisos para contadores y acciones memorizadas
