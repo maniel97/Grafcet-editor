@@ -78,7 +78,7 @@ export default function PneumaticDialog({ onCreate, onClose }) {
             <ol className="space-y-0.5 font-mono text-xs">
               {steps.map((s, i) => (
                 <li key={s.id}>
-                  <span className="font-semibold">Etapa {t(s.data.label)}</span>
+                  <span className="font-semibold">{t('Etapa {n}', { n: t(s.data.label) })}</span>
                   {s.data.actions.length ? ` [${s.data.actions.join(', ')}]` : ' (reposo)'}
                   <span className="text-slate-500"> → «{transitions[i]?.data.condition}»</span>
                 </li>

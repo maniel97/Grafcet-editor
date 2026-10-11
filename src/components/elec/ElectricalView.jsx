@@ -119,7 +119,7 @@ const PALETTE = [
       { key: 'hthrottle', type: 'hthrottle', label: N_('Regulador de caudal con antirretorno'), preset: {} },
     ],
   },
-  ...['Mando', 'Potencia', N_('Autómata')].map((group) => ({
+  ...[N_('Mando'), N_('Potencia'), N_('Autómata')].map((group) => ({
     group,
     items: Object.entries(ELEC_TYPES)
       .filter(([type, t]) => t.group === group && !['mainswitch', 'psu', 'phasemonitor', 'terminal'].includes(type))
@@ -1260,7 +1260,7 @@ function FaultMenu({ menu, component, current, onPick, onClose }) {
   const loads = ['coil', 'valve', 'lamp', 'buzzer', 'brake', 'motor3', 'motor6', 'motor1', 'dahlander', 'motor2w']
   const contacts = ['pushbutton', 'switch', 'limit', 'litbutton', 'contact', 'emergency', 'doorswitch', 'maincontacts']
   const options = menu.wire
-    ? [['cut', 'Cable cortado']]
+    ? [['cut', tr('Cable cortado')]]
     : loads.includes(component?.type)
       ? [['open', component?.type === 'lamp' ? tr('Lámpara fundida') : component?.type?.startsWith('motor') ? tr('Motor quemado (devanado cortado)') : tr('Bobina cortada')]]
       : contacts.includes(component?.type)
@@ -1300,7 +1300,7 @@ function WireProperties({ wire, number, onChange, onDelete }) {
   if (!wire) return null
   return (
     <aside className="w-48 shrink-0 space-y-2 overflow-y-auto border-l border-slate-200 p-2 text-xs" aria-label={tr('Propiedades del cable')}>
-      <p className="font-semibold">Cable {number ? `nº ${number}` : ''}</p>
+      <p className="font-semibold">{number ? tr('Cable nº {n}', { n: number }) : tr('Cable')}</p>
       <label className="block">
         <span className="text-slate-500">{tr('Color')}</span>
         <select value={wire.color ?? 'auto'} onChange={(e) => onChange({ color: e.target.value === 'auto' ? undefined : e.target.value })} className={field}>
@@ -1385,7 +1385,7 @@ function Properties({ c, components, variables, onChange, onDelete }) {
       {c.type === 'terminal' && (
         <>
           {text('n', tr('Número de borna'), { type: 'number', min: 1, step: 1 })}
-          {select('kind', 'Tipo', [
+          {select('kind', tr('Tipo'), [
             ['normal', tr('De paso')],
             ['pe', tr('De tierra (PE)')],
           ])}
@@ -1393,45 +1393,45 @@ function Properties({ c, components, variables, onChange, onDelete }) {
       )}
       {c.type === 'rail' && (
         <>
-          {select('potential', 'Potencial', Object.entries(POTENTIALS).map(([k, v]) => [k, v.label]))}
-          {text('length', 'Largo (px)', { type: 'number', min: 40, step: 20 })}
+          {select('potential', tr('Potencial'), Object.entries(POTENTIALS).map(([k, v]) => [k, v.label]))}
+          {text('length', tr('Largo (px)'), { type: 'number', min: 40, step: 20 })}
           {select('wires', tr('Los cables salen'), [
             ['', LOWER_RAILS.has(c.potential) ? tr('Hacia arriba (embarrado de abajo)') : tr('Hacia abajo (embarrado de arriba)')],
-            ['down', 'Hacia abajo'],
-            ['up', 'Hacia arriba'],
+            ['down', tr('Hacia abajo')],
+            ['up', tr('Hacia arriba')],
           ])}
         </>
       )}
       {c.type === 'limit' &&
-        select('kind', 'Tipo', [
+        select('kind', tr('Tipo'), [
           ['limit', tr('Final de carrera')],
-          ['float', 'Flotador (nivel)'],
-          ['pressure', 'Presostato'],
-          ['thermostat', 'Termostato'],
+          ['float', tr('Flotador (nivel)')],
+          ['pressure', tr('Presostato')],
+          ['thermostat', tr('Termostato')],
         ])}
       {c.type === 'sensor3' && (
         <>
-          {select('output', 'Salida', [
+          {select('output', tr('Salida'), [
             ['PNP', tr('PNP (da + a la entrada)')],
             ['NPN', tr('NPN (da − a la entrada)')],
           ])}
-          {select('kind', 'Detecta', [
-            ['inductive', 'Inductivo (metal)'],
-            ['capacitive', 'Capacitivo'],
+          {select('kind', tr('Detecta'), [
+            ['inductive', tr('Inductivo (metal)')],
+            ['capacitive', tr('Capacitivo')],
             ['optical', tr('Óptico')],
           ])}
         </>
       )}
       {c.type === 'counter' && text('preset', tr('Preselección (impulsos)'), { type: 'number', min: 1, step: 1 })}
       {c.type === 'emergency' &&
-        select('channels', 'Canales', [
-          ['1', 'Uno (11-12)'],
-          ['2', 'Doble canal (11-12 y 21-22)'],
+        select('channels', tr('Canales'), [
+          ['1', tr('Uno (11-12)')],
+          ['2', tr('Doble canal (11-12 y 21-22)')],
         ])}
       {c.type === 'transmitter' &&
         select('output', tr('Señal'), [
-          ['4-20mA', '4-20 mA (2 hilos)'],
-          ['0-10V', '0-10 V (3 hilos)'],
+          ['4-20mA', tr('4-20 mA (2 hilos)')],
+          ['0-10V', tr('0-10 V (3 hilos)')],
         ])}
       {c.type === 'pvalve' && (
         <>
@@ -1442,18 +1442,18 @@ function Properties({ c, components, variables, onChange, onDelete }) {
           ])}
           {c.ways === '3/2' &&
             select('normally', tr('En reposo'), [
-              ['NC', 'Cerrada (NC)'],
-              ['NO', 'Abierta (NA)'],
+              ['NC', tr('Cerrada (NC)')],
+              ['NO', tr('Abierta (NA)')],
             ])}
           {c.ways === '5/3' &&
             select('center', tr('Posición central'), [
-              ['closed', 'Cerrada'],
-              ['exhaust', 'A escape'],
+              ['closed', tr('Cerrada')],
+              ['exhaust', tr('A escape')],
               ['pressure', tr('A presión')],
             ])}
-          {select('manual', 'Accionamiento manual', [
-            ['none', '(ninguno)'],
-            ['button', 'Pulsador'],
+          {select('manual', tr('Accionamiento manual'), [
+            ['none', tr('(ninguno)')],
+            ['button', tr('Pulsador')],
             ['lever', tr('Palanca (se queda)')],
           ])}
           {solenoidSelect('sol14', tr('Bobina 14 (electroválvula)'), tr('(sin bobina)'))}
@@ -1462,19 +1462,19 @@ function Properties({ c, components, variables, onChange, onDelete }) {
       )}
       {c.type === 'pcylinder' && (
         <>
-          {select('acting', 'Tipo', [
-            ['double', 'Doble efecto'],
-            ['single', 'Simple efecto (muelle)'],
+          {select('acting', tr('Tipo'), [
+            ['double', tr('Doble efecto')],
+            ['single', tr('Simple efecto (muelle)')],
           ])}
           {text('time', tr('Tiempo de carrera (s)'), { type: 'number', min: 0.1, step: 0.1 })}
           {select('initial', tr('Al empezar'), [
-            ['0', 'Dentro'],
-            ['1', 'Fuera'],
+            ['0', tr('Dentro')],
+            ['1', tr('Fuera')],
           ])}
-          <p className="text-slate-500">{`Detectores: ${cylinderSignals(c.tag).join(' (dentro) y ')} (fuera)`}</p>
+          <p className="text-slate-500">{tr('Detectores: {dentro} (dentro) y {fuera} (fuera)', { dentro: cylinderSignals(c.tag)[0], fuera: cylinderSignals(c.tag)[1] })}</p>
         </>
       )}
-      {c.type === 'throttle' && text('setting', 'Apertura (0,05 a 1)', { type: 'number', min: 0.05, max: 1, step: 0.05 })}
+      {c.type === 'throttle' && text('setting', tr('Apertura (0,05 a 1)'), { type: 'number', min: 0.05, max: 1, step: 0.05 })}
       {c.type === 'hvalve' && (
         <>
           {select('ways', tr('Vías / posiciones'), [
@@ -1488,9 +1488,9 @@ function Properties({ c, components, variables, onChange, onDelete }) {
               ['open', tr('Abierta (todas unidas)')],
               ['float', tr('Flotante (A y B a depósito)')],
             ])}
-          {select('manual', 'Accionamiento manual', [
-            ['none', '(ninguno)'],
-            ['button', 'Pulsador'],
+          {select('manual', tr('Accionamiento manual'), [
+            ['none', tr('(ninguno)')],
+            ['button', tr('Pulsador')],
             ['lever', tr('Palanca (se queda)')],
           ])}
           {solenoidSelect('sol14', tr('Bobina 14 (electroválvula)'), tr('(sin bobina)'))}
@@ -1501,13 +1501,13 @@ function Properties({ c, components, variables, onChange, onDelete }) {
         <>
           {text('time', tr('Tiempo de carrera (s)'), { type: 'number', min: 0.1, step: 0.1 })}
           {select('initial', tr('Al empezar'), [
-            ['0', 'Dentro'],
-            ['1', 'Fuera'],
+            ['0', tr('Dentro')],
+            ['1', tr('Fuera')],
           ])}
-          <p className="text-slate-500">{`Detectores: ${cylinderSignals(c.tag).join(' (dentro) y ')} (fuera)`}</p>
+          <p className="text-slate-500">{tr('Detectores: {dentro} (dentro) y {fuera} (fuera)', { dentro: cylinderSignals(c.tag)[0], fuera: cylinderSignals(c.tag)[1] })}</p>
         </>
       )}
-      {c.type === 'hthrottle' && text('setting', 'Apertura (0,05 a 1)', { type: 'number', min: 0.05, max: 1, step: 0.05 })}
+      {c.type === 'hthrottle' && text('setting', tr('Apertura (0,05 a 1)'), { type: 'number', min: 0.05, max: 1, step: 0.05 })}
       {c.type === 'hrelief' && text('setting', tr('Tarado (bar)'), { type: 'number', min: 10, max: 400, step: 10 })}
       {c.type === 'hpump' &&
         select('motor', tr('Motor que la mueve'), [
@@ -1515,12 +1515,12 @@ function Properties({ c, components, variables, onChange, onDelete }) {
           ...components.filter((x) => isMotor(x.type) && x.tag).map((x) => [x.tag, showTag(x.tag)]),
         ])}
       {c.type === 'potentiometer' && text('initial', tr('Posición al empezar (0 a 1)'), { type: 'number', min: 0, max: 1, step: 0.05 })}
-      {c.type === 'vfd' && text('speed2', '2ª velocidad (Hz)', { type: 'number', min: 1, max: 50, step: 1 })}
-      {c.type === 'softstarter' && text('ramp', 'Rampa (s)', { type: 'number', min: 0.5, step: 0.5 })}
+      {c.type === 'vfd' && text('speed2', tr('2ª velocidad (Hz)'), { type: 'number', min: 1, max: 50, step: 1 })}
+      {c.type === 'softstarter' && text('ramp', tr('Rampa (s)'), { type: 'number', min: 0.5, step: 0.5 })}
       {c.type === 'coil' &&
         (c.kind ?? 'contactor') === 'contactor' &&
         select('interlock', tr('Enclavamiento mecánico con'), [
-          ['', '(ninguno)'],
+          ['', tr('(ninguno)')],
           ...components.filter((x) => x.type === 'coil' && x.tag && x.tag !== c.tag && (x.kind ?? 'contactor') === 'contactor').map((x) => [x.tag, showTag(x.tag)]),
         ])}
       {c.type === 'beacon' &&
@@ -1539,54 +1539,54 @@ function Properties({ c, components, variables, onChange, onDelete }) {
       {c.type === 'litbutton' &&
         select('light', tr('Su piloto mueve en la planta'), [['', tr('(sin enlazar)')], ...outputs.map((v) => [v.name, v.name])])}
       {c.type === 'buzzer' &&
-        select('kind', 'Tipo', [
-          ['bell', 'Timbre'],
-          ['buzzer', 'Zumbador'],
+        select('kind', tr('Tipo'), [
+          ['bell', tr('Timbre')],
+          ['buzzer', tr('Zumbador')],
         ])}
       {c.type === 'fuse' &&
-        select('poles', 'Polos', [
-          ['1', 'Unipolar'],
-          ['3', 'Tripolar'],
+        select('poles', tr('Polos'), [
+          ['1', tr('Unipolar')],
+          ['3', tr('Tripolar')],
         ])}
       {(isContact && !['emergency', 'sensor3', 'doorswitch', 'lightcurtain', 'transmitter', 'litbutton'].includes(c.type)) || c.type === 'contact'
-        ? select('contact', 'Contacto', [
-            ['NO', 'NA (normalmente abierto)'],
-            ['NC', 'NC (normalmente cerrado)'],
+        ? select('contact', tr('Contacto'), [
+            ['NO', tr('NA (normalmente abierto)')],
+            ['NC', tr('NC (normalmente cerrado)')],
           ])
         : null}
       {(c.type === 'contact' || c.type === 'maincontacts') &&
         select('ref', tr('Del aparato'), [...refs.map((x) => [x.tag, showTag(x.tag)]), ...(refs.some((x) => x.tag === c.ref) ? [] : [[c.ref ?? '', showTag(c.ref) || '—']])])}
       {c.type === 'coil' && (
         <>
-          {select('kind', 'Tipo', [
-            ['contactor', 'Contactor'],
+          {select('kind', tr('Tipo'), [
+            ['contactor', tr('Contactor')],
             ['relay', tr('Relé auxiliar')],
             ['ton', tr('Temporizador a la conexión')],
             ['tof', tr('Temporizador a la desconexión (o minutero)')],
             ['flash', tr('Relé intermitente')],
-            ['impulse', 'Telerruptor'],
+            ['impulse', tr('Telerruptor')],
           ])}
-          {(c.kind === 'ton' || c.kind === 'tof') && text('preset', 'Tiempo (s)', { type: 'number', min: 0, step: 0.5 })}
-          {c.kind === 'flash' && text('preset', 'Semiperiodo (s)', { type: 'number', min: 0.1, step: 0.1 })}
+          {(c.kind === 'ton' || c.kind === 'tof') && text('preset', tr('Tiempo (s)'), { type: 'number', min: 0, step: 0.5 })}
+          {c.kind === 'flash' && text('preset', tr('Semiperiodo (s)'), { type: 'number', min: 0.1, step: 0.1 })}
         </>
       )}
       {c.type === 'lamp' &&
-        select('color', 'Color', [
-          ['green', 'Verde'],
-          ['red', 'Rojo'],
+        select('color', tr('Color'), [
+          ['green', tr('Verde')],
+          ['red', tr('Rojo')],
           ['amber', tr('Ámbar')],
-          ['white', 'Blanco'],
-          ['blue', 'Azul'],
+          ['white', tr('Blanco')],
+          ['blue', tr('Azul')],
         ])}
       {c.type === 'breaker' &&
-        select('poles', 'Polos', [
-          ['3', 'Tripolar'],
-          ['1', 'Unipolar'],
+        select('poles', tr('Polos'), [
+          ['3', tr('Tripolar')],
+          ['1', tr('Unipolar')],
         ])}
       {c.type === 'plc' && (
         <>
-          {text('inputs', 'Entradas', { type: 'number', min: 1, max: 24 })}
-          {text('outputs', 'Salidas', { type: 'number', min: 1, max: 16 })}
+          {text('inputs', tr('Entradas'), { type: 'number', min: 1, max: 24 })}
+          {text('outputs', tr('Salidas'), { type: 'number', min: 1, max: 16 })}
           {text('analogIn', tr('Entradas analógicas (AIW)'), { type: 'number', min: 0, max: 8 })}
           {text('analogOut', tr('Salidas analógicas (AQW)'), { type: 'number', min: 0, max: 4 })}
         </>
@@ -1595,8 +1595,8 @@ function Properties({ c, components, variables, onChange, onDelete }) {
         signalSelect('signal', c.type === 'transmitter' ? tr('Mide en la planta (analógica)') : c.type === 'pcylinder' || c.type === 'hcylinder' ? tr('Al salir, mueve en la planta') : isLoad ? tr('Mueve en la planta') : c.type === 'doorswitch' ? tr('Puerta abierta en la planta') : tr('Lo acciona en la planta'))}
       {isMotor(c.type) && signalSelect('reverse', tr('Giro inverso en la planta'))}
       {c.type === 'motor1' &&
-        select('capacitor', 'Condensador', [
-          ['permanent', 'Permanente'],
+        select('capacitor', tr('Condensador'), [
+          ['permanent', tr('Permanente')],
           ['start', tr('De arranque (con interruptor centrífugo)')],
         ])}
       {((c.type === 'pcylinder' && c.acting !== 'single') || c.type === 'hcylinder') && signalSelect('reverse', tr('Al entrar, mueve en la planta'))}

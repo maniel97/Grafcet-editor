@@ -142,20 +142,20 @@ export default function ElecNode({ data }) {
           {view?.tripped?.[c.id] && <div className="font-semibold text-red-700">{c.type === 'fuse' ? tr('Fundido') : tr('Disparado')}</div>}
           {fault && <div className="font-semibold text-red-700">{fault === 'welded' ? tr('Avería: soldado') : ['coil', 'valve', 'lamp', 'buzzer', 'brake'].includes(c.type) || isMotor(c.type) ? tr('Avería: cortado') : c.type === 'terminal' ? tr('Avería: borna floja') : tr('Avería: quemado')}</div>}
           {c.type === 'counter' && <div className="text-slate-600">{tr('Preselección {n}', { n: c.preset ?? 1 })}</div>}
-          {c.type === 'coil' && c.kind === 'flash' && <div className="text-slate-600">{`Intermitente ${c.preset ?? 1} s`}</div>}
+          {c.type === 'coil' && c.kind === 'flash' && <div className="text-slate-600">{tr('Intermitente {n} s', { n: c.preset ?? 1 })}</div>}
           {c.type === 'coil' && c.kind === 'impulse' && <div className="text-slate-600">{tr('Telerruptor')}</div>}
           {c.type === 'coil' && c.interlock && <div className="text-slate-600">{tr('Enclavamiento mecánico con {aparato}', { aparato: `-${c.interlock}` })}</div>}
           {c.type === 'emergency' && Number(c.channels) === 2 && <div className="text-slate-600">{tr('Doble canal')}</div>}
           {c.type === 'transmitter' && <div className="text-slate-600">{c.output === '0-10V' ? '0-10 V (3 hilos)' : '4-20 mA (2 hilos)'}</div>}
           {c.type === 'vfd' && <div className="text-slate-600">{`2ª velocidad ${c.speed2 ?? 25} Hz`}</div>}
-          {c.type === 'softstarter' && <div className="text-slate-600">{`Rampa ${c.ramp ?? 3} s`}</div>}
+          {c.type === 'softstarter' && <div className="text-slate-600">{tr('Rampa {n} s', { n: c.ramp ?? 3 })}</div>}
           {c.type === 'safetyrelay' && view?.safety?.[c.id]?.discrepancy && <div className="font-semibold text-amber-700">{tr('Discrepancia entre canales')}</div>}
           {c.type === 'brake' && view && <div className={view.loads?.[c.id] ? 'text-green-700' : 'text-red-700'}>{view.loads?.[c.id] ? tr('Suelto') : tr('Frenado')}</div>}
           {c.type === 'pcylinder' && <div className="text-slate-600">{c.acting === 'single' ? tr('Simple efecto') : tr('Doble efecto')}</div>}
           {cyl?.note && <div className="text-amber-700">{cyl.note}</div>}
           {c.type === 'pvalve' && <div className="text-slate-600">{`${c.ways ?? '5/2'} ${c.ways === '5/3' ? ({ closed: tr('centro cerrado'), exhaust: tr('centro a escape'), pressure: tr('centro a presión') }[c.center] ?? tr('centro cerrado')) : c.sol12 ? tr('biestable') : c.ways === '3/2' && c.normally === 'NO' ? tr('NA') : tr('monoestable')}`}</div>}
-          {c.type === 'throttle' && <div className="text-slate-600">{`Abierto ${Math.round((view?.knob?.[c.id] ?? Number(c.setting ?? 0.5)) * 100)} %`}</div>}
-          {c.type === 'hthrottle' && <div className="text-slate-600">{`Abierto ${Math.round((view?.knob?.[c.id] ?? Number(c.setting ?? 0.5)) * 100)} %`}</div>}
+          {c.type === 'throttle' && <div className="text-slate-600">{tr('Abierto {n} %', { n: Math.round((view?.knob?.[c.id] ?? Number(c.setting ?? 0.5)) * 100) })}</div>}
+          {c.type === 'hthrottle' && <div className="text-slate-600">{tr('Abierto {n} %', { n: Math.round((view?.knob?.[c.id] ?? Number(c.setting ?? 0.5)) * 100) })}</div>}
           {c.type === 'hvalve' && <div className="text-slate-600">{c.ways === '4/2' ? `4/2 ${c.sol12 ? tr('biestable') : tr('monoestable')}` : `4/3 ${{ closed: tr('centro cerrado'), tandem: tr('centro en tándem'), open: tr('centro abierto'), float: tr('centro flotante') }[c.center] ?? tr('centro cerrado')}`}</div>}
           {c.type === 'hrelief' && <div className={oil?.relief?.[c.id] ? 'font-semibold text-red-700' : 'text-slate-600'}>{oil?.relief?.[c.id] ? tr('Abierta: {n} bar', { n: c.setting ?? 100 }) : `${c.setting ?? 100} bar`}</div>}
           {c.type === 'hgauge' && view && <div className="font-mono font-semibold text-red-700">{`${oil?.gauges?.[c.id] ?? 0} bar`}</div>}
@@ -173,7 +173,7 @@ export default function ElecNode({ data }) {
         <button
           type="button"
           title={tr('Botón de prueba del diferencial')}
-          aria-label={`Probar ${showTag(c.tag)}`}
+          aria-label={tr('Probar {aparato}', { aparato: showTag(c.tag) })}
           onClick={(e) => {
             e.stopPropagation()
             onAction(c.id, 'test')

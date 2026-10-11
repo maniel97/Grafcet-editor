@@ -68,7 +68,7 @@ export default function ProjectsDialog({ initialTab = 'examples', onOpenExample,
         {tab === 'examples' ? (
           <div className="space-y-4">
             {LEVELS.filter((level) => EXAMPLES.some((ex) => ex.level === level.id)).map((level) => (
-              <section key={level.id} aria-label={`Nivel ${level.id}: ${level.title}`}>
+              <section key={level.id} aria-label={t('Nivel {n}: {titulo}', { n: level.id, titulo: t(level.title) })}>
                 <h3 className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-500">
                   Nivel {level.id} · {level.title}
                 </h3>

@@ -140,7 +140,7 @@ export default function LadderView({ nodes, edges, plc, grafcetErrors, exportPro
     <div className="fixed inset-0 z-40 flex flex-col bg-slate-50" role="dialog" aria-label={t('Ladder generado')}>
       <header className="flex flex-wrap items-center gap-3 border-b border-slate-200 bg-white px-4 py-2">
         <h2 className="text-base font-semibold">{t('Paso a ladder')}</h2>
-        <span className="text-xs text-slate-500">{rungCount} segmentos · método SET/RESET por etapas</span>
+        <span className="text-xs text-slate-500">{t('{n} segmentos · método SET/RESET por etapas', { n: rungCount })}</span>
         <div className="flex gap-1" role="tablist">
           {TABS.map((x) => (
             <button
@@ -215,7 +215,7 @@ export default function LadderView({ nodes, edges, plc, grafcetErrors, exportPro
           <span className="flex items-center gap-1.5 font-medium">
             <span className="h-2 w-2 rounded-full bg-green-600" />{' '}{t('En vivo')}
           </span>
-          <span className="text-green-800">contactos cerrados y salidas activas en verde · t = {simState.time.toFixed(1)} s</span>
+          <span className="text-green-800">{t('contactos cerrados y salidas activas en verde · t = {s} s', { s: simState.time.toFixed(1) })}</span>
           <button
             type="button"
             onClick={() => simulation.setPlaying(!simulation.playing)}

@@ -70,7 +70,7 @@ export default function S7200Config({ plc, symbols, onChange }) {
             {moduleById(id)?.label ?? id}
             <button
               type="button"
-              aria-label={`Quitar ${moduleById(id)?.label ?? id}`}
+              aria-label={t('Quitar {modulo}', { modulo: moduleById(id)?.label ?? id })}
               onClick={() => set({ ...config, modules: config.modules.filter((_, j) => j !== i) })}
               className="rounded p-0.5 text-slate-400 hover:text-red-600"
             >

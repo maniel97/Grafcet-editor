@@ -351,7 +351,7 @@ export default function VariablesDialog({
                                 onChange={(e) => setVariable(name, { max: e.target.value }, 'max')}
                               />
                               <input
-                                aria-label={`Unidad de ${name}`}
+                                aria-label={t('Unidad de {variable}', { variable: name })}
                                 placeholder={t('ud.')}
                                 className={`${cellInput} w-12`}
                                 value={entry.unit ?? ''}

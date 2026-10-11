@@ -1046,13 +1046,13 @@ function Properties({ element, variables, onChange, onDelete, onRotate, onCreate
             <input type="checkbox" checked={Number(element.initial) === 1} onChange={(ev) => set({ initial: ev.target.checked ? 1 : 0 })} />
             {tr('Empieza con el vástago fuera')}
           </label>
-          {number('stroke', 'Carrera (px)', 20, 10)}
+          {number('stroke', tr('Carrera (px)'), 20, 10)}
           {number('time', tr('Tiempo de carrera (s)'), 0.1, 0.1)}
         </>
       )}
       {element.type === 'conveyor' && (
         <>
-          {number('length', 'Largo (px)', 60, 10)}
+          {number('length', tr('Largo (px)'), 60, 10)}
           {number('time', tr('Tiempo de recorrido (s)'), 0.2, 0.1)}
         </>
       )}
@@ -1084,7 +1084,7 @@ function Properties({ element, variables, onChange, onDelete, onRotate, onCreate
               </select>
             </label>
           )}
-          {number('range', 'Alcance (px)', 10, 10)}
+          {number('range', tr('Alcance (px)'), 10, 10)}
         </>
       )}
       {element.type === 'distance' && number('range', tr('Alcance (px) = valor máximo'), 20, 10)}
@@ -1094,7 +1094,7 @@ function Properties({ element, variables, onChange, onDelete, onRotate, onCreate
           {tr('Con sonido (al simular)')}
         </label>
       )}
-      {element.type === 'pipe' && number('length', 'Largo (px)', 20, 10)}
+      {element.type === 'pipe' && number('length', tr('Largo (px)'), 20, 10)}
       {element.type === 'barrier' && (
         <>
           {number('length', tr('Largo del brazo (px)'), 40, 10)}
@@ -1120,14 +1120,14 @@ function Properties({ element, variables, onChange, onDelete, onRotate, onCreate
               className="block w-full text-[11px]"
             />
           </label>
-          {number('width', 'Ancho (px)', 20, 10)}
-          {number('height', 'Alto (px)', 20, 10)}
+          {number('width', tr('Ancho (px)'), 20, 10)}
+          {number('height', tr('Alto (px)'), 20, 10)}
         </>
       )}
-      {element.type === 'platform' && number('length', 'Largo (px)', 30, 10)}
+      {element.type === 'platform' && number('length', tr('Largo (px)'), 30, 10)}
       {(element.type === 'diverter' || element.type === 'ramp') && (
         <>
-          {number('length', 'Largo (px)', 30, 10)}
+          {number('length', tr('Largo (px)'), 30, 10)}
           {number('time', tr('Tiempo en recorrerla (s)'), 0.1, 0.1)}
         </>
       )}
@@ -1147,8 +1147,8 @@ function Properties({ element, variables, onChange, onDelete, onRotate, onCreate
       )}
       {element.type === 'heater' && (
         <>
-          {number('setpoint', 'Termostato: salta a (°C)', 0, 1)}
-          {number('ambient', 'Temperatura ambiente (°C)', -20, 1)}
+          {number('setpoint', tr('Termostato: salta a (°C)'), 0, 1)}
+          {number('ambient', tr('Temperatura ambiente (°C)'), -20, 1)}
           {number('maxTemp', tr('Temperatura máxima (°C)'), 30, 5)}
           {number('tau', tr('Inercia: constante de tiempo (s)'), 1, 1)}
         </>
@@ -2599,7 +2599,7 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
                   try {
                     const list = importGroups(await file.text(), groups)
                     changeGroups(list)
-                    setGroupMessage(`Importados ${list.length - groups.length} grupos.`)
+                    setGroupMessage(tr('Importados {n} grupos.', { n: list.length - groups.length }))
                   } catch (err) {
                     setGroupMessage(err.message)
                   }
@@ -2953,7 +2953,7 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
         </div>
         {mode === 'edit' && selection.length > 1 && (
           <aside className="w-48 shrink-0 space-y-2 overflow-y-auto border-l border-slate-200 p-2 text-xs" aria-label={tr('Selección')}>
-            <p className="font-semibold">{selection.length} elementos seleccionados</p>
+            <p className="font-semibold">{tr('{n} elementos seleccionados', { n: selection.length })}</p>
             <div className="flex flex-wrap gap-1">
               <button type="button" onClick={rotateSelected} className="flex items-center gap-1 rounded border border-slate-300 px-2 py-0.5 hover:bg-slate-100">
                 <RotateCw size={12} />{' '}{tr('Girar')}

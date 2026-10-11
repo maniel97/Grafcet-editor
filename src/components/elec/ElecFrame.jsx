@@ -40,12 +40,12 @@ export default function ElecFrame({ cols, info = {} }) {
         </g>
       ))}
       {/* Cajetín */}
-      {cell(tb.x, tb.y - strip, 240, 'Proyecto', info.project || tr('Sin título'), true)}
-      {cell(tb.x + 240, tb.y - strip, 180, 'Centro / empresa', info.company ?? '')}
-      {cell(tb.x, tb.y - strip + TITLE_BLOCK.h / 2, 120, 'Autor', info.author ?? '')}
-      {cell(tb.x + 120, tb.y - strip + TITLE_BLOCK.h / 2, 90, 'Fecha', info.date ?? '')}
-      {cell(tb.x + 210, tb.y - strip + TITLE_BLOCK.h / 2, 130, 'Esquema', info.sheet ?? '')}
-      {cell(tb.x + 340, tb.y - strip + TITLE_BLOCK.h / 2, 80, 'Hoja', `${info.index ?? 1} de ${info.count ?? 1}`)}
+      {cell(tb.x, tb.y - strip, 240, tr('Proyecto'), info.project || tr('Sin título'), true)}
+      {cell(tb.x + 240, tb.y - strip, 180, tr('Centro / empresa'), info.company ?? '')}
+      {cell(tb.x, tb.y - strip + TITLE_BLOCK.h / 2, 120, tr('Autor'), info.author ?? '')}
+      {cell(tb.x + 120, tb.y - strip + TITLE_BLOCK.h / 2, 90, tr('Fecha'), info.date ?? '')}
+      {cell(tb.x + 210, tb.y - strip + TITLE_BLOCK.h / 2, 130, tr('Esquema'), info.sheet ?? '')}
+      {cell(tb.x + 340, tb.y - strip + TITLE_BLOCK.h / 2, 80, tr('Hoja'), tr('{n} de {total}', { n: info.index ?? 1, total: info.count ?? 1 }))}
     </g>
   )
 }

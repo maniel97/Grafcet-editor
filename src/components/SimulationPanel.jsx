@@ -448,7 +448,7 @@ export default function SimulationPanel({ floating, simulation, scenarios = [], 
                     max={max}
                     step={(max - min) / 200 || 1}
                     value={value}
-                    aria-label={`Valor de ${v.name}`}
+                    aria-label={t('Valor de {variable}', { variable: v.name })}
                     disabled={plantDriven.has(v.name)}
                     title={plantDriven.has(v.name) ? t('La da la planta virtual') : undefined}
                     onChange={(e) => setInput(v.name, Number(e.target.value))}

@@ -50,3 +50,13 @@ describe('marcadores', () => {
   // Antes solo se sustituían los de letras sin tilde: «© {año}» se veía tal cual.
   it('admiten tildes y ñ', () => expect(t('© {año} {autor}.', { año: 2026, autor: 'Ana' })).toBe('© 2026 Ana.'))
 })
+
+describe('interfaz sin textos fijos en español (#5)', () => {
+  it('scripts/i18n-pending.mjs no encuentra nada en src/components', async () => {
+    const { readdirSync } = await import('node:fs')
+    const { join } = await import('node:path')
+    const { pending } = await import('../../scripts/i18n-pending.mjs')
+    const files = (dir) => readdirSync(dir, { withFileTypes: true }).flatMap((d) => (d.isDirectory() ? files(join(dir, d.name)) : d.name.endsWith('.jsx') ? [join(dir, d.name)] : []))
+    expect(files('src/components').flatMap(pending)).toEqual([])
+  })
+})

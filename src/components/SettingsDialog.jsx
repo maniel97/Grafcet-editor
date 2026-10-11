@@ -67,7 +67,7 @@ export default function SettingsDialog({ settings, onChange, onReset, onClose })
           <legend className={sectionTitle}>{t('Idioma')}</legend>
           <select
             // Fijo en español: el selector de idioma se reconoce en cualquier idioma (y lo usan las pruebas).
-            aria-label={'Idioma'}
+            aria-label={'Idioma'} // sin traducir
             className="rounded-md border border-slate-300 px-2 py-1 text-sm"
             value={settings.lang ?? 'es'}
             onChange={(e) => onChange({ lang: e.target.value })}
