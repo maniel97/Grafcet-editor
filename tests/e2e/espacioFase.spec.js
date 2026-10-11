@@ -1,9 +1,9 @@
 import { expect, test } from '@playwright/test'
-import { expectNoErrors, openEditor, openExample } from './helpers'
+import { expectNoErrors, openEditor, openExample, stableBox } from './helpers'
 
 // Pulsar un mando de la planta (pulsador: se mantiene un momento, como un dedo).
 const hold = async (page, label) => {
-  const b = await page.locator(`[data-tour="planta"] [aria-label="${label}"]`).first().boundingBox()
+  const b = await stableBox(page.locator(`[data-tour="planta"] [aria-label="${label}"]`).first())
   await page.mouse.move(b.x + b.width / 2, b.y + b.height / 3)
   await page.mouse.down()
   await page.waitForTimeout(150)

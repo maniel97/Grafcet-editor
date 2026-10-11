@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useLayoutEffect, useRef, useState } from 'react'
 import { closest, currentWord, replaceWord, suggest, typos } from '../lib/autocomplete'
 import { parseExpression } from '../lib/symbols'
 import { N_, t } from '../lib/i18n'
@@ -16,6 +16,16 @@ export default function AutocompleteInput({ value, onChange: report, vocabulary 
   const [open, setOpen] = useState(false)
   const [active, setActive] = useState(0)
   const [caret, setCaret] = useState(null)
+  // Cursor tras aceptar una sugerencia: se coloca justo después de pintar el texto nuevo, antes de
+  // cualquier otra tecla (en un fotograma posterior pisaba lo que se hubiera seleccionado entretanto).
+  const pendingCaret = useRef(null)
+  useLayoutEffect(() => {
+    const at = pendingCaret.current
+    if (at === null || !ref.current) return
+    pendingCaret.current = null
+    ref.current.focus()
+    ref.current.setSelectionRange(at, at)
+  })
 
   // Mientras se escribe, el borrador (el cursor no salta al final): useDraft.
   const draft = useDraft(value)
@@ -40,13 +50,10 @@ export default function AutocompleteInput({ value, onChange: report, vocabulary 
 
   const accept = (option) => {
     const next = replaceWord(text, at, option.name)
+    pendingCaret.current = next.caret
     onChange(next.text)
     setOpen(false)
-    requestAnimationFrame(() => {
-      ref.current?.focus()
-      ref.current?.setSelectionRange(next.caret, next.caret)
-      setCaret(next.caret)
-    })
+    setCaret(next.caret)
   }
 
   return (

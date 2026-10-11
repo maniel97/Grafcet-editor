@@ -21,19 +21,24 @@ export default defineConfig({
   testDir: 'tests/e2e',
   timeout: 60_000,
   fullyParallel: true,
-  workers: 3,
+  // Navegadores a la vez: la mitad de los hilos del equipo (12 en un Ryzen 9 5900X, 2 en GitHub);
+  // PW_WORKERS para probar otro número.
+  workers: Number(process.env.PW_WORKERS) || process.env.PW_WORKERS || '50%',
   reporter: [['list']],
   use: {
     baseURL: `http://localhost:${PORT}`,
     viewport: { width: 1500, height: 950 },
     acceptDownloads: true,
+    // Sin service worker (la versión compilada lo registra): cada prueba, con la página recién servida.
+    serviceWorkers: 'block',
     launchOptions: executablePath ? { executablePath } : {},
   },
-  // Servidor propio para las pruebas: se arranca limpio y se cierra al terminar.
+  // Servidor propio para las pruebas: la versión compilada (lo mismo que se publica, y mucho más
+  // rápida de servir a varios navegadores que el servidor de desarrollo); se cierra al terminar.
   webServer: {
     // Vite directamente con node (sin npm/npx): así no se imprime el aviso «npm warn ... allow-scripts»
     // de la configuración global de npm en cada arranque.
-    command: `node node_modules/vite/bin/vite.js --port ${PORT} --strictPort --force`,
+    command: `node node_modules/vite/bin/vite.js build && node node_modules/vite/bin/vite.js preview --port ${PORT} --strictPort`,
     url: `http://localhost:${PORT}`,
     reuseExistingServer: false,
     timeout: 60_000,

@@ -97,3 +97,17 @@ export async function loadProject(page, project) {
   })
   await page.waitForTimeout(400)
 }
+
+// Caja de un elemento cuando deja de moverse (tras un encuadre o una animación): dos medidas
+// seguidas iguales. Con muchos navegadores a la vez, medir antes de que se asiente hace fallar clics.
+export async function stableBox(locator, { timeout = 5000 } = {}) {
+  let last = null
+  const end = Date.now() + timeout
+  for (;;) {
+    const box = await locator.boundingBox()
+    if (box && last && ['x', 'y', 'width', 'height'].every((k) => Math.abs(box[k] - last[k]) < 0.5)) return box
+    if (Date.now() > end) return box
+    last = box
+    await locator.page().waitForTimeout(100)
+  }
+}

@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { activeSteps, download, expectNoErrors, openEditor, openExample, openVariables, saveFromDialog } from './helpers'
+import { activeSteps, download, expectNoErrors, openEditor, openExample, openVariables, saveFromDialog, stableBox } from './helpers'
 
 test('simulación del ejemplo: entradas, salidas, pausa y paso a paso', async ({ page }) => {
   const errors = await openEditor(page)
@@ -265,7 +265,8 @@ test('escena: potenciómetro, calentador con termostato y detectores por tipo', 
     await page.mouse.up()
     await expect(pot).toContainText('100 %', { timeout: 1000 })
   }).toPass({ timeout: 15000 })
-  await expect.poll(() => activeSteps(page)).toBe('s1')
+  // s1 dura poco: con carga puede haber pasado ya a s2 al mirarlo.
+  await expect.poll(() => activeSteps(page)).toMatch(/^s[12]$/)
   await expect.poll(() => activeSteps(page), { timeout: 5000 }).toBe('s2') // TS: 40 °C alcanzados
   await expect(view.locator('[aria-label="Calentador Horno"]')).toContainText('°C')
 
@@ -652,7 +653,7 @@ test('ejemplos de nivel 1 y 2: marcha/paro NC, contador y puerta de garaje', asy
   const errors = await openEditor(page)
   const desk = () => page.getByRole('region', { name: 'Panel de control' })
   const press = async (label) => {
-    const b = await desk().locator(`[aria-label="${label}"]`).boundingBox()
+    const b = await stableBox(desk().locator(`[aria-label="${label}"]`))
     await page.mouse.move(b.x + b.width / 2, b.y + b.height / 3)
     await page.mouse.down()
     await page.waitForTimeout(120)
@@ -701,7 +702,7 @@ test('ejemplos de nivel 3: ascensor, doble puesto y clasificadora por tamaño', 
   const errors = await openEditor(page)
   const desk = () => page.getByRole('region', { name: 'Panel de control' })
   const press = async (label) => {
-    const b = await desk().locator(`[aria-label="${label}"]`).boundingBox()
+    const b = await stableBox(desk().locator(`[aria-label="${label}"]`))
     await page.mouse.move(b.x + b.width / 2, b.y + b.height / 3)
     await page.mouse.down()
     await page.waitForTimeout(150)
@@ -750,7 +751,7 @@ test('ejemplos de nivel 4: manual/automático y línea con GEMMA', async ({ page
   const errors = await openEditor(page)
   const desk = () => page.getByRole('region', { name: 'Panel de control' })
   const hold = async (label, ms = 150) => {
-    const b = await desk().locator(`[aria-label="${label}"]`).boundingBox()
+    const b = await stableBox(desk().locator(`[aria-label="${label}"]`))
     await page.mouse.move(b.x + b.width / 2, b.y + b.height / 3)
     await page.mouse.down()
     await page.waitForTimeout(ms)
@@ -893,7 +894,7 @@ test('esquema eléctrico: inversión de giro (plantilla), con su enclavamiento',
   await view.getByRole('button', { name: 'Pantalla completa' }).click()
   await page.getByRole('button', { name: /Simular/ }).click()
   const hold = async (tag) => {
-    const b = await view.locator(`[data-elec="pushbutton"][data-tag="${tag}"]`).boundingBox()
+    const b = await stableBox(view.locator(`[data-elec="pushbutton"][data-tag="${tag}"]`))
     await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2)
     await page.mouse.down()
     await page.waitForTimeout(250)
@@ -1091,7 +1092,7 @@ test('esquema eléctrico: parada de emergencia con relé de seguridad (rearme, s
   await page.getByRole('button', { name: /Simular/ }).click()
   const km1 = view.locator('[data-elec="coil"][data-tag="KM1"]')
   const hold = async (tag) => {
-    const b = await view.locator(`[data-elec="pushbutton"][data-tag="${tag}"]`).boundingBox()
+    const b = await stableBox(view.locator(`[data-elec="pushbutton"][data-tag="${tag}"]`))
     await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2)
     await page.mouse.down()
     await page.waitForTimeout(200)
@@ -1143,7 +1144,7 @@ test('esquema eléctrico: polímetro y averías (contacto quemado; avería ocult
   await page.getByRole('button', { name: /Simular/ }).click()
   const km1 = view.locator('[data-elec="coil"][data-tag="KM1"]')
   const hold = async (tag) => {
-    const b = await view.locator(`[data-elec="pushbutton"][data-tag="${tag}"]`).boundingBox()
+    const b = await stableBox(view.locator(`[data-elec="pushbutton"][data-tag="${tag}"]`))
     await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2)
     await page.mouse.down()
     await page.waitForTimeout(200)

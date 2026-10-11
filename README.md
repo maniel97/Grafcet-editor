@@ -77,7 +77,8 @@ npm run lint       # oxlint
 ```
 
 Las pruebas de navegador usan un Chromium ya instalado (Brave, Chrome o Edge; o
-`PW_BROWSER_PATH`) y arrancan su propio servidor.
+`PW_BROWSER_PATH`) y arrancan su propio servidor con la versión compilada (lo mismo que se publica).
+Van en paralelo con la mitad de los hilos del equipo; `PW_WORKERS=4 npm run test:e2e` usa otro número.
 
 ### Publicación
 

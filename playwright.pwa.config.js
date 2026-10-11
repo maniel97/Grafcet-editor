@@ -9,7 +9,7 @@ export default defineConfig({
   workers: 1,
   fullyParallel: false,
   timeout: 120_000,
-  use: { ...base.use, baseURL: 'http://localhost:5198' },
+  use: { ...base.use, serviceWorkers: 'allow', baseURL: 'http://localhost:5198' }, // aquí sí: es lo que se prueba
   webServer: {
     ...base.webServer,
     command: 'node node_modules/vite/bin/vite.js build && node node_modules/vite/bin/vite.js preview --port 5198 --strictPort',

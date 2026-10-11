@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { expectNoErrors, openEditor } from './helpers'
+import { expectNoErrors, openEditor, stableBox } from './helpers'
 import { readFileSync } from 'node:fs'
 
 const VERSION = JSON.parse(readFileSync(new URL('../../package.json', import.meta.url), 'utf8')).version
@@ -96,7 +96,7 @@ test('tutorial «Tu primer grafcet» de principio a fin', async ({ page }) => {
 // Utilidades de los robots de los tutoriales.
 // Pulsar un mando de la planta (pulsador: se mantiene un momento, como un dedo).
 const hold = async (page, label) => {
-  const b = await page.locator(`[data-tour="planta"] [aria-label="${label}"]`).first().boundingBox()
+  const b = await stableBox(page.locator(`[data-tour="planta"] [aria-label="${label}"]`).first())
   await page.mouse.move(b.x + b.width / 2, b.y + b.height / 3)
   await page.mouse.down()
   await page.waitForTimeout(150)
