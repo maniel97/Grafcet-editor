@@ -7,7 +7,7 @@
 //    cintas…) o relé (lo demás).
 // Cada aparato queda enlazado con su señal de la planta (pulsarlo en la planta acciona su
 // contacto; la bobina mueve la planta). Entradas en sumidero (1M a M), salidas por relé (1L a L+).
-import { GRID, nextTag, plcTerminals, sizeOf, terminalAddress } from './catalog'
+import { GRID, cylinderSignals, nextTag, plcTerminals, sizeOf, terminalAddress } from './catalog'
 import { t as tr } from '../i18n'
 
 const PLC_X = 100
@@ -18,8 +18,55 @@ const slot = (c) => Math.ceil((sizeOf(c).w + 2 + LABEL + GAP) / GRID) * GRID
 // Separación entre los tramos horizontales de los cables de entrada (o de salida).
 const LANE = 20
 
+// Cilindros neumáticos e hidráulicos que ya están en el esquema (aunque no estén en la planta):
+// sus detectores (a0, a1…) y la bobina que los saca o los mete. La bobina sale de la válvula unida
+// a la cámara A del cilindro (directamente o a través de reguladores): si es su vía 4 (5/2, 5/3),
+// la 2 de una 3/2 o la A hidráulica, la saca la bobina del lado 14; si no, la del 12.
+function schematicCylinders(existing) {
+  const list = existing?.components ?? []
+  const byId = new Map(list.map((c) => [c.id, c]))
+  const links = new Map()
+  const link = (a, b) => {
+    links.set(a, [...(links.get(a) ?? []), b])
+    links.set(b, [...(links.get(b) ?? []), a])
+  }
+  for (const w of existing?.wires ?? []) link(`${w.from.c}:${w.from.t}`, `${w.to.c}:${w.to.t}`)
+  for (const c of list) if (c.type === 'throttle' || c.type === 'hthrottle') link(`${c.id}:1`, `${c.id}:2`)
+  const valveAt = (start) => {
+    const seen = new Set([start])
+    const queue = [start]
+    while (queue.length) {
+      const node = queue.shift()
+      const [cid, port] = node.split(':')
+      const c = byId.get(cid)
+      if (c && (c.type === 'pvalve' || c.type === 'hvalve') && node !== start) return { valve: c, port }
+      for (const next of links.get(node) ?? []) {
+        if (seen.has(next)) continue
+        seen.add(next)
+        queue.push(next)
+      }
+    }
+    return null
+  }
+  const signals = new Set()
+  const solenoids = new Map() // «A+» -> «Y1»
+  for (const c of list.filter((x) => (x.type === 'pcylinder' || x.type === 'hcylinder') && x.tag)) {
+    for (const s of cylinderSignals(c.tag)) signals.add(s)
+    const found = valveAt(`${c.id}:A`)
+    if (!found) continue
+    const { valve, port } = found
+    const extends14 = valve.type === 'hvalve' ? port === 'A' : port === (valve.ways === '3/2' ? '2' : '4')
+    const [out, back] = extends14 ? [valve.sol14, valve.sol12] : [valve.sol12, valve.sol14]
+    if (out) solenoids.set(`${c.tag.toUpperCase()}+`, out)
+    if (back) solenoids.set(`${c.tag.toUpperCase()}-`, back)
+  }
+  return { signals, solenoids }
+}
+// «A+», «a −», «A-»… -> «A+» / «A-»; el nombre de una bobina (Y1) se queda igual.
+const movement = (name) => String(name).trim().replace(/\s+/g, '').replace('−', '-').toUpperCase()
+
 // Aparato de una entrada según el elemento de la planta que da esa señal.
-function inputDevice(name, scene) {
+function inputDevice(name, scene, cylinders) {
   for (const e of scene?.elements ?? []) {
     if (e.variable !== name) continue
     if (e.type === 'emergency') return { type: 'emergency', prefix: 'S' }
@@ -32,12 +79,16 @@ function inputDevice(name, scene) {
     if (e.type === 'tank' && [e.low, e.high, e.empty].includes(name)) return { type: 'limit', prefix: 'B', contact: 'NO', kind: 'float' }
     if (e.type === 'heater' && e.thermostat === name) return { type: 'limit', prefix: 'B', contact: 'NO', kind: 'thermostat' }
   }
-  const sensor = (scene?.elements ?? []).some((e) => ['retracted', 'extended', 'opened', 'closed', 'holding'].some((k) => e[k] === name))
+  const sensor =
+    (scene?.elements ?? []).some((e) => ['retracted', 'extended', 'opened', 'closed', 'holding'].some((k) => e[k] === name)) ||
+    cylinders.signals.has(String(name).toLowerCase())
   return sensor ? { type: 'limit', prefix: 'B', contact: 'NO', kind: 'limit' } : { type: 'pushbutton', prefix: 'S', contact: 'NO' }
 }
 
-// Aparato de una salida.
-function outputDevice(name, scene) {
+// Aparato de una salida. tag: el de la bobina que ya mueve una válvula del esquema.
+function outputDevice(name, scene, cylinders) {
+  const solenoid = cylinders.solenoids.get(movement(name)) ?? [...cylinders.solenoids.values()].find((tag) => tag.toUpperCase() === movement(name))
+  if (solenoid) return { type: 'valve', prefix: 'Y', tag: solenoid }
   for (const e of scene?.elements ?? []) {
     if (e.type === 'cylinder' && (e.extend === name || e.retract === name || e.vacuum === name)) return { type: 'valve', prefix: 'Y' }
     if (e.type === 'valve' && e.variable === name) return { type: 'valve', prefix: 'Y' }
@@ -60,6 +111,7 @@ function outputDevice(name, scene) {
 //    no se crucen entre ellos.
 export function generatePlcWiring(variables, scene, existing = { components: [], wires: [] }) {
   const all = [...(existing.components ?? [])]
+  const cylinders = schematicCylinders(existing)
   const offset = all.length ? Math.ceil((Math.max(...all.map((c) => c.y)) + 300) / GRID) * GRID : 0
   // Analógicas con dirección: el autómata lleva sus bornes AIW / AQW (con esas direcciones).
   const analogAddr = (type, area) =>
@@ -113,7 +165,7 @@ export function generatePlcWiring(variables, scene, existing = { components: [],
       const volts = v.analog?.signal === '0-10V'
       return { id: id('ain'), type: 'transmitter', x, y: inY, signal: v.name, text: v.comment || v.name, output: volts ? '0-10V' : '4-20mA', col: 40 }
     }
-    const d = inputDevice(v.name, scene)
+    const d = inputDevice(v.name, scene, cylinders)
     return {
       id: id('in'),
       type: d.type,
@@ -129,8 +181,8 @@ export function generatePlcWiring(variables, scene, existing = { components: [],
     }
   })
   const outputs = place(outs, (v, x) => {
-    const d = outputDevice(v.name, scene)
-    return { id: id('out'), type: d.type, x, y: outY, signal: v.name, text: v.comment || v.name, ...(d.kind ? { kind: d.kind } : {}), ...(d.color ? { color: d.color } : {}), prefix: d.prefix, col: 20 }
+    const d = outputDevice(v.name, scene, cylinders)
+    return { id: id('out'), type: d.type, x, y: outY, signal: v.name, text: v.comment || v.name, ...(d.kind ? { kind: d.kind } : {}), ...(d.color ? { color: d.color } : {}), ...(d.tag ? { fixedTag: d.tag } : {}), prefix: d.prefix, col: 20 }
   })
   const right = Math.max(PLC_X + Math.max(...terms.map((t) => t.x)) + 40, ...[...inputs, ...outputs].map(({ c }) => c.x + slot(c)))
   const left = PLC_X - 60
@@ -176,8 +228,8 @@ export function generatePlcWiring(variables, scene, existing = { components: [],
   }
   // Salidas: el tramo de cada una, más arriba cuanto más a la derecha.
   for (const { t, c, i } of outputs) {
-    const { col, prefix, ...device } = c
-    device.tag = nextTag(all, prefix)
+    const { col, prefix, fixedTag, ...device } = c
+    device.tag = fixedTag ?? nextTag(all, prefix)
     all.push(device)
     components.push(device)
     const [a, b] = device.type === 'lamp' ? ['X1', 'X2'] : ['A1', 'A2']

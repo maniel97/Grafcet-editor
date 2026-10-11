@@ -58,8 +58,19 @@ export function makeWorld(scene = null, analogRange = () => null, electrical = n
     init: (current) => {
       const blank = { ...sceneInit(scene), ...(elec ? { elec: elecInit() } : {}) }
       // Con esquema, se calcula ya (sin tiempo ni salidas): el primer ciclo del autómata lee sus
-      // entradas como están (un contacto NC, a 1), no todas a 0.
-      const fresh = elec ? { ...blank, elec: step(blank, {}, 0).elec } : blank
+      // entradas como están (un contacto NC, a 1), no todas a 0. Varias pasadas hasta que se asiente:
+      // los detectores de los cilindros neumáticos (a0, a1…) salen de la neumática, que se calcula
+      // después de los contactos; con una sola, a0 llegaba a 0 aunque el cilindro estuviera dentro.
+      let fresh = blank
+      if (elec) {
+        let before = null
+        for (let i = 0; i < 5; i++) {
+          fresh = { ...blank, elec: step(fresh, {}, 0).elec }
+          const now = JSON.stringify([fresh.elec.view?.plcIn, fresh.elec.view?.loads, fresh.elec.pneuSignals])
+          if (now === before) break
+          before = now
+        }
+      }
       if (!current) return fresh
       return { ...fresh, ...current, pos: { ...fresh.pos, ...current.pos }, level: { ...fresh.level, ...current.level } }
     },

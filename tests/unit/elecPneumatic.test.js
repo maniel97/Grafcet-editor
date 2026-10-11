@@ -223,3 +223,67 @@ describe('neumática: montajes con dos bobinas', () => {
     expect(seen).toEqual(['A0B0', 'A1B0', 'A1B1', 'A0B1', 'A0B0'])
   })
 })
+
+describe('neumática: primer ciclo del autómata (#2)', () => {
+  it('cilindro solo en el esquema: su detector a0 ya acciona el contacto al arrancar', async () => {
+    const { makeWorld } = await import('../../src/lib/sim/world')
+    const s = insertTemplate(ELEC_TEMPLATES.find((t) => t.id === 'electroneumatica'))
+    const b1 = s.components.find((x) => x.tag === 'B1')
+    b1.signal = 'a0' // A empieza dentro
+    const world = makeWorld(null, () => null, { ...s, enabled: true }, [])
+    const h1 = s.components.find((x) => x.tag === 'H1').id
+    expect(world.init().elec.view.loads[h1]).toBe(true)
+  })
+
+  it('a0 y b0 ya llegan a 1 al arrancar si los cilindros están dentro', async () => {
+    const { EXAMPLES } = await import('../../src/lib/examples')
+    const { normalizeProject } = await import('../../src/lib/projectFile')
+    const { buildPlcModel } = await import('../../src/lib/plcModel')
+    const { makeWorld } = await import('../../src/lib/sim/world')
+    const project = normalizeProject(EXAMPLES.find((e) => e.id === 'electroneumatica').build())
+    const model = buildPlcModel(project.nodes, project.edges, project.plc)
+    const world = makeWorld(project.plc.scene, () => null, project.plc.electrical, model.variables)
+    const inputs = world.inputs(world.init())
+    expect([inputs.a0, inputs.a1, inputs.b0, inputs.b1]).toEqual([1, 0, 1, 0])
+  })
+})
+
+describe('cableado del autómata con cilindros que solo están en el esquema (#3)', () => {
+  const vars = [
+    { name: 'a0', type: 'input', address: 'I0.0' },
+    { name: 'a1', type: 'input', address: 'I0.1' },
+    { name: 'A+', type: 'output', address: 'Q0.0' },
+  ]
+  it('a0/a1 salen como finales de carrera y A+ como la bobina de su válvula (Y1)', async () => {
+    const { generatePlcWiring } = await import('../../src/lib/elec/generate')
+    const s = insertTemplate(ELEC_TEMPLATES.find((t) => t.id === 'electroneumatica'))
+    const r = generatePlcWiring(vars, null, s)
+    const of = (signal) => r.components.find((c) => c.signal === signal)
+    expect([of('a0').type, of('a1').type]).toEqual(['limit', 'limit'])
+    expect([of('A+').type, of('A+').tag]).toEqual(['valve', 'Y1'])
+  })
+  it('y funciona: con A+ del autómata el cilindro sale y a1 llega a su entrada', async () => {
+    const { generatePlcWiring } = await import('../../src/lib/elec/generate')
+    const { makeWorld } = await import('../../src/lib/sim/world')
+    const s = insertTemplate(ELEC_TEMPLATES.find((t) => t.id === 'electroneumatica'))
+    const r = generatePlcWiring(vars, null, s)
+    const elec = { components: [...s.components, ...r.components], wires: [...s.wires, ...r.wires], enabled: true }
+    const world = makeWorld(null, () => null, elec, vars)
+    let w = world.init()
+    expect(world.inputs(w)).toMatchObject({ a0: 1, a1: 0 })
+    for (let t = 0; t < 2.5; t += 0.05) w = world.step(w, { 'A+': 1 }, 0.05)
+    expect(world.inputs(w)).toMatchObject({ a0: 0, a1: 1 })
+  })
+  it('5/2 biestable al revés (A en la vía 2): A+ es la bobina del lado 12', async () => {
+    const { generatePlcWiring } = await import('../../src/lib/elec/generate')
+    const s = insertTemplate(ELEC_TEMPLATES.find((t) => t.id === 'electroneumatica-biestable'))
+    const valve = s.components.find((c) => c.type === 'pvalve')
+    const cyl = s.components.find((c) => c.type === 'pcylinder')
+    // Cambia los tubos: la vía 4 a la cámara B y la 2 a la A (a través de lo que haya).
+    for (const w of s.wires) for (const end of [w.from, w.to]) if (end.c === valve.id && (end.t === '4' || end.t === '2')) end.t = end.t === '4' ? '2' : '4'
+    const r = generatePlcWiring([...vars, { name: 'A-', type: 'output', address: 'Q0.1' }], null, s)
+    const tag = (n) => r.components.find((c) => c.signal === n).tag
+    expect([tag('A+'), tag('A-')]).toEqual([valve.sol12, valve.sol14])
+    expect(cyl.tag).toBe('A')
+  })
+})

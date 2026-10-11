@@ -11,7 +11,8 @@ falta. No hay fechas: el orden importa más que el calendario.
 
 > **English summary.** Grafcet Editor follows [SemVer](https://semver.org) pre-releases:
 > **0.1 alpha** fixes what already exists (S7-200 emulator audit, known bugs, missing checks and
-> translations); **0.2 alpha** makes counters and timers easy to use and watch; **0.x beta** is
+> translations); **0.2 alpha** makes counters and timers easy to use and watch; **0.3 alpha** shows several
+> editors at once with a live ladder view; **0.x beta** is
 > the classroom trial (full CI, contribution guide); **1.0** comes after a school term of real use
 > without serious bugs, with a documented, frozen project format. Parked ideas (real PLC bridge,
 > assembly view, touch schematic) have no milestone. Every item below is a GitHub issue; feel free
@@ -31,8 +32,8 @@ novedades. Lo que llega a `main` se publica en <https://grafcet-editor.com>.
 Que todo lo que ya existe funcione bien antes de añadir nada.
 
 - [x] [#1](https://github.com/maniel97/Grafcet-editor/issues/1) Emulador S7-200: auditoría instrucción por instrucción
-- [ ] [#2](https://github.com/maniel97/Grafcet-editor/issues/2) Electroneumática: a0/a1 leen 0 en el primer ciclo del autómata
-- [ ] [#3](https://github.com/maniel97/Grafcet-editor/issues/3) Generador de cableado: cilindro solo en el esquema sale como pulsadores y relé
+- [x] [#2](https://github.com/maniel97/Grafcet-editor/issues/2) Electroneumática: a0/a1 leen 0 en el primer ciclo del autómata
+- [x] [#3](https://github.com/maniel97/Grafcet-editor/issues/3) Generador de cableado: cilindro solo en el esquema sale como pulsadores y relé
 - [ ] [#4](https://github.com/maniel97/Grafcet-editor/issues/4) Verificar: avisos para contadores y acciones memorizadas
 - [ ] [#5](https://github.com/maniel97/Grafcet-editor/issues/5) Textos sin traducir en las propiedades del esquema eléctrico
 - [ ] [#6](https://github.com/maniel97/Grafcet-editor/issues/6) Tabla de variables: la columna «Presel.» se puede editar pero no se usa
@@ -46,6 +47,12 @@ Que contar y temporizar sea cómodo de escribir y fácil de ver al simular.
 - [ ] [#9](https://github.com/maniel97/Grafcet-editor/issues/9) Valores en vivo sobre el lienzo: cuenta atrás y contadores
 - [ ] [#10](https://github.com/maniel97/Grafcet-editor/issues/10) Asistente de temporizaciones en el panel de la transición
 - [ ] [#11](https://github.com/maniel97/Grafcet-editor/issues/11) Tutorial guiado de contadores
+
+## 0.3 alpha — vistas
+
+Ver a la vez el grafcet, la planta, el esquema y el ladder, y seguir el ladder durante la simulación.
+
+- [ ] [#18](https://github.com/maniel97/Grafcet-editor/issues/18) Vistas: varios editores a la vez y ladder en vivo durante la simulación
 
 ## 0.x beta — en el aula
 
