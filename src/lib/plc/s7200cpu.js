@@ -447,8 +447,10 @@ export function createCpu(program) {
             // Reset de un temporizador o contador: bit a 0 y valor actual a 0 (S solo pone el bit).
             for (let k = 0; k < n; k++) {
               const id = `${o.k}${o.n + k}`
-              if (o.k === 'T') op === 'R' ? resetTimer(timer(id)) : (timer(id).q = true)
-              else op === 'R' ? Object.assign(counter(id), { cv: 0, q: false }) : (counter(id).q = true)
+              const item = o.k === 'T' ? timer(id) : counter(id)
+              if (op === 'S') item.q = true
+              else if (o.k === 'T') resetTimer(item)
+              else Object.assign(item, { cv: 0, q: false })
             }
           } else if (o.k === 'bit') {
             let index = o.byte * 8 + o.bit
