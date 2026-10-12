@@ -22,7 +22,7 @@ test('instalable, sin conexión y con aviso de versión nueva', async ({ page, c
   await page.keyboard.press('Escape')
   // El diálogo de exportación tiene su propio «Cerrar (Esc)»: esperar a que se cierre.
   await expect(page.getByLabel('Vista previa de la página')).toHaveCount(0)
-  await page.getByRole('dialog', { name: 'Ladder generado' }).getByTitle('Cerrar (Esc)').click()
+  await page.getByRole('button', { name: 'Cerrar el ladder' }).click()
   await page.getByTitle('Abrir un proyecto, un ejemplo o un trabajo anterior').click()
   await page.getByRole('menuitem', { name: /Ejemplos/ }).click()
   await page.getByRole('button', { name: /Mezcladora/ }).click()

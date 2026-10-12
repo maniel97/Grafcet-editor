@@ -138,6 +138,7 @@ export default function Toolbar({
   readOnly,
   onToggleSimulation,
   onOpenLadder,
+  ladderOpen,
   onOpenGemma,
 }) {
   // En solo lectura (simulando o con la edición bloqueada) se desactiva lo que modifica el diagrama.
@@ -229,6 +230,7 @@ export default function Toolbar({
         label={N_('Ladder')}
         title={N_('Paso a ladder (LD), texto estructurado y AWL')}
         onClick={onOpenLadder}
+        active={ladderOpen}
         primary
       />
       <ToolButton

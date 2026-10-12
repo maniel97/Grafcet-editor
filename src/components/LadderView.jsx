@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { AlertTriangle, Check, Copy, Download, FileCode, FileText, Image, Pause, Play, Table2, X } from 'lucide-react'
+import { AlertTriangle, Check, Copy, Download, FileCode, FileText, Image, Maximize2, Minimize2, Pause, Play, Table2, X } from 'lucide-react'
 import LadderDiagram from './LadderDiagram'
 import LadderZoom from './LadderZoom'
 import { generateLadder } from '../lib/ladder/generate'
@@ -9,17 +9,23 @@ import { encodeAnsi, s7200Symbols, toS7200 } from '../lib/ladder/exportS7200'
 import { projectVariables } from '../lib/symbols'
 import { svgSource } from '../lib/svgExport'
 import ExportDialog from './ExportDialog'
+import PanelSeparator from './PanelSeparator'
+import { usePanelWidth } from './panelWidth'
 import { downloadFile } from '../lib/projectFile'
 import { fileName, getProjectName } from '../lib/fileNames'
 import { t, N_ } from '../lib/i18n'
 
+// short: en un panel estrecho (el nombre completo sigue en el título y para los lectores de pantalla).
 const TABS = [
-  { id: 'ladder', label: N_('Ladder (LD)') },
-  { id: 'st', label: N_('Texto estructurado (ST)') },
-  { id: 'scl', label: N_('SCL (TIA Portal)') },
-  { id: 'awl', label: N_('AWL / STL (S7)') },
-  { id: 's7200', label: N_('STL S7-200 (Micro/WIN)') },
+  { id: 'ladder', label: N_('Ladder (LD)'), short: 'LD' },
+  { id: 'st', label: N_('Texto estructurado (ST)'), short: 'ST' },
+  { id: 'scl', label: N_('SCL (TIA Portal)'), short: 'SCL' },
+  { id: 'awl', label: N_('AWL / STL (S7)'), short: 'AWL' },
+  { id: 's7200', label: N_('STL S7-200 (Micro/WIN)'), short: 'S7-200' },
 ]
+// Ancho del panel junto al grafcet (como la planta y el esquema eléctrico).
+const WIDTH_KEY = 'grafcet-editor:ladder-width'
+const MIN_WIDTH = 360
 // Texto de cada pestaña: extensión del archivo descargado.
 const EXT = { st: 'st', scl: 'scl', awl: 'awl', s7200: 'awl' }
 const MODES = [
@@ -60,11 +66,14 @@ function ActionButton({ icon: Icon, children, onClick, title }) {
   )
 }
 
-// Traducción del grafcet a ladder, con su texto equivalente en ST y AWL. Se regenera al abrirla,
-// así que siempre corresponde al diagrama y a la tabla de variables actuales.
+// Traducción del grafcet a ladder, con su texto equivalente en ST y AWL. Es un panel junto al grafcet
+// (o a pantalla completa) que se regenera con cada cambio: siempre corresponde al diagrama y a la
+// tabla de variables actuales, y mientras se simula se ve en vivo a la vez que el grafcet y la planta.
 // simulation: la de useSimulation mientras se simula (ladder en vivo), o null. highlightNodeId:
 // segmentos de ese elemento del grafcet resaltados. onShowInGrafcet(id): clic en un segmento.
-export default function LadderView({ nodes, edges, plc, grafcetErrors, exportProps, onClose, simulation = null, highlightNodeId = null, onShowInGrafcet }) {
+export default function LadderView({ nodes, edges, plc, grafcetErrors, exportProps, onClose, simulation = null, highlightNodeId = null, onShowInGrafcet, maximized = false, onToggleMaximize, defaultWidth = '50%' }) {
+  const sectionRef = useRef(null)
+  const [width, separator] = usePanelWidth(WIDTH_KEY, MIN_WIDTH)
   const [tab, setTab] = useState('ladder')
   const [mode, setMode] = useState('both')
   const [mnemonic, setMnemonic] = useState('de')
@@ -99,9 +108,10 @@ export default function LadderView({ nodes, edges, plc, grafcetErrors, exportPro
   useLayoutEffect(() => {
     setNaturalWidth(Number(svgRef.current?.getAttribute('width')) || 0)
   }, [ladder, mode, tab])
-  const st = useMemo(() => toStructuredText(ladder, plc), [ladder, plc])
-  const scl = useMemo(() => toStructuredText(ladder, plc, { dialect: 'tia' }), [ladder, plc])
-  const awl = useMemo(() => toAWL(ladder, { mnemonic, useAddresses: mode !== 'symbol' }), [ladder, mnemonic, mode])
+  // Solo el texto de la pestaña visible: el panel se regenera con cada cambio del grafcet.
+  const st = useMemo(() => (tab === 'st' ? toStructuredText(ladder, plc) : ''), [tab, ladder, plc])
+  const scl = useMemo(() => (tab === 'scl' ? toStructuredText(ladder, plc, { dialect: 'tia' }) : ''), [tab, ladder, plc])
+  const awl = useMemo(() => (tab === 'awl' ? toAWL(ladder, { mnemonic, useAddresses: mode !== 'symbol' }) : ''), [tab, ladder, mnemonic, mode])
   // STEP 7-Micro/WIN (S7-200): programa STL importable y tabla de símbolos para pegar.
   const s7200 = useMemo(() => (tab === 's7200' ? toS7200(ladder, plc, { title: getProjectName().trim() }) : null), [tab, ladder, plc])
   const s7200Table = useMemo(() => {
@@ -115,13 +125,6 @@ export default function LadderView({ nodes, edges, plc, grafcetErrors, exportPro
     setTableCopied(true)
     setTimeout(() => setTableCopied(false), 1500)
   }
-
-  useEffect(() => {
-    // Con el diálogo de exportación abierto, Esc solo cierra el diálogo.
-    const onKeyDown = (e) => e.key === 'Escape' && !document.querySelector('dialog[open]') && onClose()
-    window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
-  }, [onClose])
 
   const rungCount = ladder.sections.reduce((n, s) => n + s.rungs.length, 0)
   const missingAddresses = [...ladder.sections.flatMap((s) => s.rungs.flatMap((r) => r.outputs.map((o) => o.operand)))].some(
@@ -137,10 +140,42 @@ export default function LadderView({ nodes, edges, plc, grafcetErrors, exportPro
   }
 
   return (
-    <div className="fixed inset-0 z-40 flex flex-col bg-slate-50" role="dialog" aria-label={t('Ladder generado')}>
-      <header className="flex flex-wrap items-center gap-3 border-b border-slate-200 bg-white px-4 py-2">
-        <h2 className="text-base font-semibold">{t('Paso a ladder')}</h2>
+    <section
+      ref={sectionRef}
+      role="region"
+      aria-label={t('Ladder generado')}
+      // relative y absolute no pueden ir juntas (en el CSS generado ganaría relative).
+      className={`side-panel @container flex min-w-0 flex-col border-l border-slate-200 bg-slate-50 ${
+        maximized ? `absolute inset-y-0 left-0 z-20 ${simulation ? 'right-80' : 'right-0'}` : 'relative'
+      }`}
+      style={maximized ? undefined : { width: width ?? defaultWidth, flexShrink: 1, minWidth: MIN_WIDTH }}
+    >
+      {!maximized && (
+        <PanelSeparator
+          sectionRef={sectionRef}
+          {...separator}
+          label={t('Ancho del ladder')}
+          title={t('Arrastra para cambiar el ancho del ladder (doble clic: mitad y mitad)')}
+        />
+      )}
+      <header className="flex flex-wrap items-center gap-x-3 gap-y-1.5 border-b border-slate-200 bg-white px-3 py-1.5">
+        <h2 className="text-sm font-semibold">{t('Paso a ladder')}</h2>
         <span className="text-xs text-slate-500">{t('{n} segmentos · método SET/RESET por etapas', { n: rungCount })}</span>
+        <div className="ml-auto flex items-center gap-0.5 @5xl:order-last">
+          <button
+            type="button"
+            onClick={onToggleMaximize}
+            title={maximized ? t('Vista dividida con el grafcet') : t('Pantalla completa')}
+            aria-label={maximized ? t('Vista dividida con el grafcet') : t('Pantalla completa')}
+            className="rounded-md p-1.5 text-slate-500 hover:bg-slate-100"
+          >
+            {maximized ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+          </button>
+          <button type="button" onClick={onClose} title={t('Cerrar el ladder')} aria-label={t('Cerrar el ladder')} className="rounded-md p-1.5 text-slate-500 hover:bg-slate-100">
+            <X size={18} />
+          </button>
+        </div>
+        <div className="flex w-full flex-wrap items-center gap-2 @5xl:w-auto @5xl:flex-1">
         <div className="flex gap-1" role="tablist">
           {TABS.map((x) => (
             <button
@@ -148,14 +183,17 @@ export default function LadderView({ nodes, edges, plc, grafcetErrors, exportPro
               type="button"
               role="tab"
               aria-selected={tab === x.id}
+              aria-label={t(x.label)}
+              title={t(x.label)}
               onClick={() => setTab(x.id)}
-              className={`rounded-md px-3 py-1.5 text-sm ${tab === x.id ? 'bg-blue-600 font-medium text-white' : 'text-slate-600 hover:bg-slate-100'}`}
+              className={`rounded-md px-2.5 py-1 text-sm ${tab === x.id ? 'bg-blue-600 font-medium text-white' : 'text-slate-600 hover:bg-slate-100'}`}
             >
-              {t(x.label)}
+              <span className="@5xl:hidden">{x.short}</span>
+              <span className="hidden @5xl:inline">{t(x.label)}</span>
             </button>
           ))}
         </div>
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ml-auto flex flex-wrap items-center gap-2">
           {(tab === 'ladder' || tab === 'awl') && <Segmented value={mode} options={MODES} onChange={setMode} label={t('Etiquetas')} />}
           {tab === 'awl' && (
             <Segmented
@@ -204,9 +242,7 @@ export default function LadderView({ nodes, edges, plc, grafcetErrors, exportPro
               )}
             </>
           )}
-          <button type="button" onClick={onClose} title={t('Cerrar (Esc)')} className="rounded-md p-1.5 text-slate-500 hover:bg-slate-100">
-            <X size={18} />
-          </button>
+        </div>
         </div>
       </header>
 
@@ -310,6 +346,6 @@ export default function LadderView({ nodes, edges, plc, grafcetErrors, exportPro
           onClose={() => setExportFormat(null)}
         />
       )}
-    </div>
+    </section>
   )
 }

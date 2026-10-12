@@ -33,7 +33,8 @@ import { ISO_MATRIX, isoBoxes, isoKey, isoPrism, isoProject, isoScreenBox, lift,
 import { exportGroups, importGroups, loadGroups, makeGroup, placeGroup, storeGroups } from '../lib/sim/sceneLibrary'
 import { downloadFile } from '../lib/projectFile'
 import { N_, t as tr } from '../lib/i18n'
-import { maxPanelWidth } from './panelWidth'
+import PanelSeparator from './PanelSeparator'
+import { usePanelWidth } from './panelWidth'
 import { applyResize, resizeHandles, resizeMeasure } from '../lib/sim/sceneHandles'
 import { collides, freeSpot, stampRow } from '../lib/sim/sceneStamp'
 
@@ -1255,21 +1256,6 @@ function Faults({ element, fault, onAction }) {
 // Ancho de la planta en la vista dividida (se recuerda en este navegador).
 const WIDTH_KEY = 'grafcet-editor:scene-width'
 const MIN_WIDTH = 320
-const loadWidth = () => {
-  try {
-    const w = Number(localStorage.getItem(WIDTH_KEY))
-    return w >= MIN_WIDTH ? w : null
-  } catch {
-    return null
-  }
-}
-const saveWidth = (w) => {
-  try {
-    localStorage.setItem(WIDTH_KEY, String(Math.round(w)))
-  } catch {
-    /* sin almacenamiento */
-  }
-}
 const ZOOM_MIN = 0.3
 const ZOOM_MAX = 2
 const FIT_MARGIN = 30
@@ -1611,7 +1597,7 @@ const PALETTE_BY_KEY = Object.fromEntries(PALETTE_ITEMS.map((i) => [i.key, i]))
 // actúan sobre la escena, con su propio historial.
 // onCreateVariable(name, type): añade una variable nueva a la tabla (escrita en un elemento).
 // editLocked: ejercicio con la planta bloqueada (solo se usa: no se edita).
-export default function SceneView({ scene, onChange, worldState, values, time, variables, onAction, onHistory, onCreateVariable, maximized, onToggleMaximize, onClose, editLocked = false }) {
+export default function SceneView({ scene, onChange, worldState, values, time, variables, onAction, onHistory, onCreateVariable, maximized, onToggleMaximize, onClose, editLocked = false, defaultWidth = '50%' }) {
   const elements = scene?.elements ?? []
   const [modeState, setMode] = useState('use')
   const mode = editLocked ? 'use' : modeState
@@ -1649,8 +1635,7 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
   const floorRef = useRef(null) // el suelo de la escena (con la matriz de la isométrica)
   const scrollRef = useRef(null)
   const sectionRef = useRef(null)
-  const [width, setWidth] = useState(loadWidth)
-  const resizing = useRef(null)
+  const [width, separator] = usePanelWidth(WIDTH_KEY, MIN_WIDTH)
   const [fitTick, setFitTick] = useState(0) // se reajusta al terminar de arrastrar el separador
   // Vista previa flotante de un módulo de la paleta (junto al ratón, tras un momento encima).
   const [preview, setPreview] = useState(null)
@@ -2342,48 +2327,16 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
       tabIndex={-1}
       onKeyDown={onKeyDown}
       className={`scene-touch side-panel @container flex outline-none min-w-0 flex-col border-l border-slate-200 bg-white ${maximized ? 'absolute inset-y-0 left-0 right-80 z-20' : 'relative'}`}
-      style={maximized ? undefined : { width: width ?? '50%', flexShrink: 1, minWidth: MIN_WIDTH }}
+      style={maximized ? undefined : { width: width ?? defaultWidth, flexShrink: 1, minWidth: MIN_WIDTH }}
     >
       {/* Separador: arrastrar para repartir el espacio entre el grafcet y la planta. */}
       {!maximized && (
-        <div
-          role="separator"
-          aria-orientation="vertical"
-          aria-label={tr('Ancho de la planta')}
+        <PanelSeparator
+          sectionRef={sectionRef}
+          {...separator}
+          label={tr('Ancho de la planta')}
           title={tr('Arrastra para cambiar el ancho de la planta (doble clic: mitad y mitad)')}
-          className="absolute inset-y-0 -left-1 z-10 w-2 cursor-col-resize hover:bg-blue-400/40"
-          onPointerDown={(ev) => {
-            ev.preventDefault() // sin seleccionar el texto de alrededor al arrastrar
-            const right = sectionRef.current.getBoundingClientRect().right
-            resizing.current = { right, max: maxPanelWidth(sectionRef.current), frame: 0, width: null }
-            ev.currentTarget.setPointerCapture(ev.pointerId)
-          }}
-          onPointerMove={(ev) => {
-            const r = resizing.current
-            if (!r) return
-            r.width = Math.round(Math.min(Math.max(MIN_WIDTH, r.right - ev.clientX), Math.max(MIN_WIDTH, r.max)))
-            // Un cambio por fotograma (el lienzo del grafcet se redimensiona con él).
-            if (!r.frame) {
-              r.frame = requestAnimationFrame(() => {
-                r.frame = 0
-                setWidth(r.width)
-              })
-            }
-          }}
-          onPointerUp={() => {
-            const r = resizing.current
-            resizing.current = null
-            if (!r?.width) return
-            cancelAnimationFrame(r.frame)
-            setWidth(r.width)
-            saveWidth(r.width)
-            setFitTick((t) => t + 1)
-          }}
-          onDoubleClick={() => {
-            setWidth(null)
-            saveWidth(0)
-            setFitTick((t) => t + 1)
-          }}
+          onEnd={() => setFitTick((t) => t + 1)}
         />
       )}
       <header className="flex flex-wrap items-center gap-1 border-b border-slate-200 px-2 py-1.5 text-xs">

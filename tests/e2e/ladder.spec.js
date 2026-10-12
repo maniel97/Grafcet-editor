@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { expect, test } from '@playwright/test'
-import { download, expectNoErrors, openEditor, openVariables, saveFromDialog } from './helpers'
+import { download, expectNoErrors, openEditor, openExample, openVariables, saveFromDialog, stableBox } from './helpers'
 
 test('paso a ladder: esquema, exportaciones, ST y AWL', async ({ page }) => {
   const errors = await openEditor(page, 'ladder-completo.json')
@@ -36,7 +36,7 @@ test('paso a ladder: esquema, exportaciones, ST y AWL', async ({ page }) => {
   expect(bytes).toMatch(/\/Count 3\b/)
   expect(bytes).not.toContain('/Subtype /Image')
   expect(bytes).toContain('desactiva las demás)')
-  await expect(page.getByRole('dialog', { name: 'Ladder generado' })).toBeVisible() // Esc/guardar no cierra el ladder
+  await expect(page.getByRole('region', { name: 'Ladder generado' })).toBeVisible() // guardar no cierra el ladder
 
   await page.getByRole('tab', { name: /Texto estructurado/ }).click()
   await expect(page.locator('pre')).toContainText('Tr1 := X0 AND RT_Marcha.Q AND NOT Paro AND NOT Emergencia;')
@@ -51,7 +51,10 @@ test('paso a ladder: esquema, exportaciones, ST y AWL', async ({ page }) => {
   await page.getByRole('radio', { name: /^Símbolos$/ }).click()
   await expect(page.locator('pre')).toContainText('A "X0"')
 
+  // Es un panel más: se cierra con su botón (Esc es del lienzo).
   await page.keyboard.press('Escape')
+  await expect(view).toBeVisible()
+  await view.getByRole('button', { name: 'Cerrar el ladder' }).click()
   await expect(view).toHaveCount(0)
   expectNoErrors(errors)
 })
@@ -60,6 +63,7 @@ test('visor del ladder: centrado y ajustado al ancho en pantallas grandes, con z
   await page.setViewportSize({ width: 2560, height: 1300 })
   const errors = await openEditor(page, 'ladder-completo.json')
   await page.getByTitle(/Paso a ladder/).click()
+  await page.getByRole('region', { name: 'Ladder generado' }).getByRole('button', { name: 'Pantalla completa' }).click()
   const svg = page.locator('[data-ladder-svg]')
   const fit = page.getByRole('button', { name: 'Ajustar al ancho', exact: true })
   await expect(fit).toHaveText('150 %') // ajustado (con tope) en vez de diminuto
@@ -137,8 +141,9 @@ test('ladder en vivo durante la simulación y navegación entre grafcet y ladder
   await expect(view.locator('[data-live]:not([data-live="resaltado"])')).toHaveCount(0) // sin simular: sin estado
 
   // Clic en un segmento: vuelve al grafcet con el elemento resaltado.
+  // El ladder sigue abierto al lado.
   await view.locator('[data-highlighted]').first().click()
-  await expect(view).toHaveCount(0)
+  await expect(view).toBeVisible()
   await expect(page.locator('.react-flow__node-transition').filter({ hasText: 'Marcha' }).locator('.outline-amber-400')).toHaveCount(1)
 
   // Simulando: contactos y salidas en vivo, con las entradas en la propia vista.
@@ -156,5 +161,44 @@ test('ladder en vivo durante la simulación y navegación entre grafcet y ladder
   // El esquema exportado no lleva las capas del modo en vivo.
   await view.getByRole('button', { name: 'SVG' }).click()
   await expect(view.locator('[data-ladder-svg] [data-live]')).toHaveCount(0)
+  expectNoErrors(errors)
+})
+
+// #18 (fase 1): el ladder es un panel más. Simulando, grafcet, planta y ladder a la vez, sin taparse.
+test('ladder como panel: junto al grafcet y la planta durante la simulación', async ({ page }) => {
+  await page.setViewportSize({ width: 1800, height: 1000 })
+  const errors = await openEditor(page)
+  await openExample(page, /^Marcha y paro/)
+  await page.getByRole('button', { name: /Simular/ }).click()
+  const plant = page.locator('[data-tour="planta"]')
+  await expect(plant).toBeVisible()
+  await page.getByTitle(/Paso a ladder/).click()
+  const view = page.getByRole('region', { name: 'Ladder generado' })
+  await expect(view).toBeVisible()
+  // Grafcet | planta | ladder, uno al lado del otro.
+  const canvas = await stableBox(page.locator('.react-flow').first())
+  const plantBox = await stableBox(plant)
+  const ladderBox = await stableBox(view)
+  expect(canvas.width).toBeGreaterThan(150)
+  expect(canvas.x + canvas.width).toBeLessThanOrEqual(plantBox.x + 1)
+  expect(plantBox.x + plantBox.width).toBeLessThanOrEqual(ladderBox.x + 1)
+  // En panel estrecho las pestañas se abrevian, pero conservan su nombre completo.
+  await expect(view.getByRole('tab', { name: 'Texto estructurado (ST)' })).toHaveText('ST', { useInnerText: true })
+
+  // La planta mueve el ladder en vivo.
+  const active = view.locator('[data-live="activa"]')
+  const before = await active.count()
+  const b = await stableBox(plant.locator('[aria-label="Pulsador Marcha"]').first())
+  await page.mouse.move(b.x + b.width / 2, b.y + b.height / 3)
+  await page.mouse.down()
+  await page.waitForTimeout(150)
+  await page.mouse.up()
+  await expect.poll(() => active.count()).toBeGreaterThan(before)
+
+  // A pantalla completa y, al ir a un segmento en el grafcet, de vuelta a la vista dividida.
+  await view.getByRole('button', { name: 'Pantalla completa' }).click()
+  await expect(view.getByRole('button', { name: 'Vista dividida con el grafcet' })).toBeVisible()
+  await view.locator('[data-ladder-svg] [data-rung][style*="cursor"] text').first().click()
+  await expect(view.getByRole('button', { name: 'Pantalla completa' })).toBeVisible()
   expectNoErrors(errors)
 })

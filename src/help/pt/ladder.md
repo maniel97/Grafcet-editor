@@ -28,6 +28,8 @@ Calcular primeiro todas as transições e depois ativar e desativar faz com que 
 
 Clique direito numa etapa ou transição > «Ver no ladder» leva aos segmentos que gera.
 
+O ladder abre-se num **painel junto ao grafcet**, como a planta e o esquema elétrico: arraste o seu bordo esquerdo para mudar a largura (duplo clique: divisão igual) ou passe-o a ecrã inteiro com o seu botão. Enquanto simula, vê-se **em direto** (contactos fechados e saídas ativas a verde) ao mesmo tempo que o grafcet e a planta. Clique num segmento: fica realçado no grafcet, sem fechar o ladder.
+
 ```ejemplo taladradora
 Abra-o e clique em Ladder.
 ```

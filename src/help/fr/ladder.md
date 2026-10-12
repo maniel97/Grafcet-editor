@@ -28,6 +28,8 @@ Calculer d’abord toutes les transitions, puis activer et désactiver, fait que
 
 Clic droit sur une étape ou une transition > « Voir dans le ladder » mène aux réseaux qu’elle génère.
 
+Le ladder s’ouvre dans un **panneau à côté du grafcet**, comme la partie opérative et le schéma électrique : faites glisser son bord gauche pour changer sa largeur (double-clic : partage égal) ou passez-le en plein écran avec son bouton. Pendant la simulation, il s’affiche **en direct** (contacts fermés et sorties actives en vert) en même temps que le grafcet et la partie opérative. Clic sur un réseau : il est mis en évidence dans le grafcet, sans fermer le ladder.
+
 ```ejemplo taladradora
 Ouvrez-le et cliquez sur Ladder.
 ```

@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { Maximize2, Minus, Plus } from "lucide-react";
+import { MoveHorizontal, Minus, Plus } from "lucide-react";
 import { t } from '../lib/i18n'
 
 // Niveles de zoom de los botones − / +.
@@ -99,7 +99,7 @@ export default function LadderZoom({ naturalWidth, children }) {
             aria-label={t('Ajustar el esquema al ancho')}
             title={t('Ajustar al ancho')}
           >
-            <Maximize2 size={14} />
+            <MoveHorizontal size={14} />
           </button>
         </div>
       </div>

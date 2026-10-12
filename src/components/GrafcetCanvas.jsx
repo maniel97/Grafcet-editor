@@ -156,7 +156,12 @@ export default function GrafcetCanvas() {
   const [tour, setTour] = useState(null)
   const [offerTour, setOfferTour] = useState(() => !tourSeen())
   const [verifyOpen, setVerifyOpen] = useState(false)
-  const [ladderOpen, setLadderOpen] = useState(false)
+  // Ladder: un panel más junto al grafcet, como la planta y el esquema. null | 'split' | 'full'.
+  const [ladderView, setLadderView] = useState(null)
+  const showInLadder = (id) => {
+    setLadderFocus(id)
+    setLadderView((v) => v ?? 'split')
+  }
   // Escena de la planta durante la simulación: null | 'split' (junto al grafcet) | 'full'.
   const [sceneView, setSceneView] = useState(null)
   // Historial de la escena en modo Editar: entonces deshacer / rehacer (botones y atajos) van a ella.
@@ -906,7 +911,12 @@ export default function GrafcetCanvas() {
 
   const loopSource = loopSourceId ? nodes.find((n) => n.id === loopSourceId) : null
   const initialSteps = nodes.filter((n) => n.type === 'step' && n.data.initial)
-  const modalOpen = settingsOpen || helpOpen || variablesOpen || ladderOpen || gemmaOpen || pneumaticOpen || newOpen || !!exportFormat || !!projectsTab || !!menu
+  // Paneles junto al grafcet (los de pantalla completa van encima y no cuentan): por defecto, cada
+  // uno ocupa lo mismo que el grafcet (la mitad con uno, un tercio con dos…), sin contar el panel de
+  // la simulación (w-80).
+  const splitPanels = [elecView, simulating && simulation.sim && sceneView, ladderView].filter((v) => v === 'split').length
+  const panelWidth = `calc((100% - ${simulating ? '20rem' : '0px'}) / ${splitPanels + 1})`
+  const modalOpen = settingsOpen || helpOpen || variablesOpen || gemmaOpen || pneumaticOpen || newOpen || !!exportFormat || !!projectsTab || !!menu
   // En solo lectura el clic derecho no abre menús de edición (ni el del navegador).
   const blockMenu = (handler) => (readOnly ? (e) => e.preventDefault() : handler)
   // En solo lectura (simulando), el clic derecho en una etapa o transición permite ver su ladder.
@@ -955,31 +965,13 @@ export default function GrafcetCanvas() {
           simulating={simulating}
           readOnly={readOnly}
           onToggleSimulation={() => (simulating ? setSimulating(false) : startSimulation())}
+          ladderOpen={Boolean(ladderView)}
           onOpenLadder={() => {
             setLadderFocus(null)
-            setLadderOpen(true)
+            setLadderView((v) => (v ? null : 'split'))
           }}
           onOpenGemma={() => setGemmaOpen(true)}
         />
-        {ladderOpen && (
-          <Suspense fallback={<Loading />}>
-            <LadderView
-              nodes={nodes}
-              edges={edges}
-              plc={plc}
-              grafcetErrors={issueCounts.errors}
-              exportProps={titleBlockProps}
-              onClose={() => setLadderOpen(false)}
-              simulation={simulating ? simulation : null}
-              highlightNodeId={ladderFocus}
-              onShowInGrafcet={(id) => {
-                setLadderOpen(false)
-                setHighlight(new Set([id]))
-                focusNode(id)
-              }}
-            />
-          </Suspense>
-        )}
         {variablesOpen && (
           <Suspense fallback={<Loading />}>
             <VariablesDialog
@@ -1344,10 +1336,7 @@ export default function GrafcetCanvas() {
                 onFrameAround={frameAroundNodes}
                 sheets={sheets.length > 1 ? sheets.filter((s) => s.id !== currentSheet) : []}
                 onMoveToSheet={moveToSheet}
-                onShowInLadder={(id) => {
-                  setLadderFocus(id)
-                  setLadderOpen(true)
-                }}
+                onShowInLadder={showInLadder}
               />
             )}
           </div>
@@ -1368,6 +1357,7 @@ export default function GrafcetCanvas() {
                 onHistory={setElecHistory}
                 onActivate={() => setLastPanel('elec')}
                 maximized={elecView === 'full'}
+                defaultWidth={panelWidth}
                 onToggleMaximize={() => setElecView((v) => (v === 'full' ? 'split' : 'full'))}
                 onClose={() => {
                   setElecView(null)
@@ -1394,10 +1384,34 @@ export default function GrafcetCanvas() {
                   setPlc((p) => ({ ...p, variables: { ...p.variables, [name]: { ...(p.variables?.[name] ?? {}), type } } }))
                 }
                 maximized={sceneView === 'full'}
+                defaultWidth={panelWidth}
                 onToggleMaximize={() => setSceneView((v) => (v === 'full' ? 'split' : 'full'))}
                 onClose={() => setSceneView(null)}
               />
               </div>
+            </Suspense>
+          )}
+          {ladderView && (
+            <Suspense fallback={<Loading panel />}>
+              <LadderView
+                nodes={nodes}
+                edges={edges}
+                plc={plc}
+                grafcetErrors={issueCounts.errors}
+                exportProps={titleBlockProps}
+                simulation={simulating ? simulation : null}
+                highlightNodeId={ladderFocus}
+                maximized={ladderView === 'full'}
+                defaultWidth={panelWidth}
+                onToggleMaximize={() => setLadderView((v) => (v === 'full' ? 'split' : 'full'))}
+                onClose={() => setLadderView(null)}
+                // El grafcet queda a la vista: a pantalla completa, el ladder pasa a la vista dividida.
+                onShowInGrafcet={(id) => {
+                  setLadderView((v) => (v === 'full' ? 'split' : v))
+                  setHighlight(new Set([id]))
+                  focusNode(id)
+                }}
+              />
             </Suspense>
           )}
           {simulating ? (

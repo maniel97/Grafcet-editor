@@ -93,7 +93,8 @@ test('planta: pantalla completa ocupa el ancho', async ({ page }) => {
 // La isométrica solo cambia el dibujo: en Editar, un elemento se arrastra y sigue al ratón (la
 // escena deshace la matriz al convertir el ratón).
 test('planta isométrica: con volumen y se edita igual (arrastrar sigue al ratón)', async ({ page }) => {
-  await page.setViewportSize({ width: 1500, height: 950 })
+  // Planta de 750 px de ancho (la mitad del sitio que deja el panel de simulación).
+  await page.setViewportSize({ width: 1820, height: 950 })
   await openEditor(page)
   await openExample(page, /^Clasificadora por material/)
   await page.getByTitle(/^Simular el grafcet/).click()

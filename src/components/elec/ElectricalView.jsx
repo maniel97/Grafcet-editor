@@ -18,7 +18,8 @@ import { voltageBetween } from '../../lib/elec/solve'
 import { ELEC_TEMPLATES, insertTemplate } from '../../lib/elec/templates'
 import { WIRE_COLORS, WIRE_SECTIONS, junctions as findJunctions, nextTerminalNumber, sectionWidth, wireNumbers } from '../../lib/elec/wiring'
 import { N_, t as tr } from '../../lib/i18n'
-import { maxPanelWidth } from '../panelWidth'
+import PanelSeparator from '../PanelSeparator'
+import { usePanelWidth } from '../panelWidth'
 
 const nodeTypes = { elec: ElecNode, elecframe: ElecFrameNode }
 const edgeTypes = { wire: WireEdge }
@@ -32,21 +33,6 @@ const GHOST_ID = '__tampon'
 // Ancho del panel (arrastrando el separador), recordado entre sesiones.
 const WIDTH_KEY = 'grafcet-editor:elec-width'
 const MIN_WIDTH = 360
-const loadWidth = () => {
-  try {
-    const w = Number(localStorage.getItem(WIDTH_KEY))
-    return w >= MIN_WIDTH ? w : null
-  } catch {
-    return null
-  }
-}
-const saveWidth = (w) => {
-  try {
-    localStorage.setItem(WIDTH_KEY, String(Math.round(w)))
-  } catch {
-    /* sin almacenamiento */
-  }
-}
 const newId = (p) => `${p}${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`
 
 // Paleta: embarrados de cada potencial y el resto de aparatos por grupos.
@@ -319,7 +305,7 @@ export default function ElectricalView(props) {
 }
 
 // editLocked: ejercicio con el esquema bloqueado (solo se usa: no se edita).
-function Inner({ schematic, onChange, elecState, onAction, variables = [], buildVariables, scene, simulating, onHistory, onActivate, maximized, onToggleMaximize, onClose, titleInfo = {}, exportProps = {}, editLocked = false }) {
+function Inner({ schematic, onChange, elecState, onAction, variables = [], buildVariables, scene, simulating, onHistory, onActivate, maximized, onToggleMaximize, onClose, titleInfo = {}, exportProps = {}, editLocked = false, defaultWidth = '50%' }) {
   const sch = schematic ?? EMPTY
   const allComponents = useMemo(() => sch.components ?? [], [sch.components])
   const allWires = useMemo(() => sch.wires ?? [], [sch.wires])
@@ -361,8 +347,7 @@ function Inner({ schematic, onChange, elecState, onAction, variables = [], build
     setTool(null)
     setProbes([])
   }
-  const [width, setWidth] = useState(loadWidth)
-  const resizing = useRef(null)
+  const [width, separator] = usePanelWidth(WIDTH_KEY, MIN_WIDTH)
   const [preview, setPreview] = useState(null) // { item, x, y }
   // Tampón (como en la planta): un clic en la paleta lo carga, cada clic en el esquema pone uno
   // (con su vista previa fantasma bajo el ratón) y Esc, «Terminar» o el botón derecho lo sueltan.
@@ -783,46 +768,15 @@ function Inner({ schematic, onChange, elecState, onAction, variables = [], build
       className={`elec-touch side-panel @container flex min-w-0 flex-col border-l border-slate-200 bg-white outline-none ${
         maximized ? `absolute inset-y-0 left-0 z-20 ${simulating ? 'right-80' : 'right-0'}` : 'relative'
       }`}
-      style={maximized ? undefined : { width: width ?? '50%', flexShrink: 1, minWidth: MIN_WIDTH }}
+      style={maximized ? undefined : { width: width ?? defaultWidth, flexShrink: 1, minWidth: MIN_WIDTH }}
     >
       {/* Separador: arrastrar para repartir el espacio con el grafcet (doble clic: mitad y mitad). */}
       {!maximized && (
-        <div
-          role="separator"
-          aria-orientation="vertical"
-          aria-label={tr('Ancho del esquema')}
+        <PanelSeparator
+          sectionRef={sectionRef}
+          {...separator}
+          label={tr('Ancho del esquema')}
           title={tr('Arrastra para cambiar el ancho del esquema (doble clic: mitad y mitad)')}
-          className="absolute inset-y-0 -left-1 z-10 w-2 cursor-col-resize hover:bg-blue-400/40"
-          onPointerDown={(ev) => {
-            ev.preventDefault() // sin seleccionar el texto de alrededor al arrastrar
-            const right = sectionRef.current.getBoundingClientRect().right
-            resizing.current = { right, max: maxPanelWidth(sectionRef.current), frame: 0, width: null }
-            ev.currentTarget.setPointerCapture(ev.pointerId)
-          }}
-          onPointerMove={(ev) => {
-            const r = resizing.current
-            if (!r) return
-            r.width = Math.round(Math.min(Math.max(MIN_WIDTH, r.right - ev.clientX), Math.max(MIN_WIDTH, r.max)))
-            // Un cambio por fotograma (el lienzo del grafcet se redimensiona con él).
-            if (!r.frame) {
-              r.frame = requestAnimationFrame(() => {
-                r.frame = 0
-                setWidth(r.width)
-              })
-            }
-          }}
-          onPointerUp={() => {
-            const r = resizing.current
-            resizing.current = null
-            if (!r?.width) return
-            cancelAnimationFrame(r.frame)
-            setWidth(r.width)
-            saveWidth(r.width)
-          }}
-          onDoubleClick={() => {
-            setWidth(null)
-            saveWidth(0)
-          }}
         />
       )}
       <header className="flex flex-wrap items-center gap-1 border-b border-slate-200 px-2 py-1.5 text-xs">

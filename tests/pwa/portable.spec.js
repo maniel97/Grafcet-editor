@@ -20,7 +20,7 @@ test('versión portable: un solo HTML que funciona abierto como archivo, sin ser
   await expect(page.getByLabel('Vista previa de la página')).toBeVisible()
   const [download] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Guardar PDF' }).click()])
   expect(download.suggestedFilename()).toMatch(/\.pdf$/)
-  await page.getByRole('dialog', { name: 'Ladder generado' }).getByTitle('Cerrar (Esc)').click()
+  await page.getByRole('button', { name: 'Cerrar el ladder' }).click()
   await page.getByTitle('Abrir un proyecto, un ejemplo o un trabajo anterior').click()
   await page.getByRole('menuitem', { name: /Ejemplos/ }).click()
   await page.getByRole('button', { name: /Mezcladora/ }).click()
