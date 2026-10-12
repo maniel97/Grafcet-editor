@@ -1,7 +1,7 @@
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ReactFlow, Background, BackgroundVariant, MiniMap, addEdge, useNodesInitialized, useNodesState, useEdgesState, useReactFlow } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
-import { AlertTriangle, Compass, Lock, X } from 'lucide-react'
+import { Lock } from 'lucide-react'
 
 import Toolbar from './Toolbar'
 import PropertiesPanel from './PropertiesPanel'
@@ -46,11 +46,13 @@ import SheetTabs from './SheetTabs'
 import SheetRefs from './SheetRefs'
 import { crossSheetRefs, sheetOf, sheetsOf, visibleEdges, visibleNodes } from '../lib/sheets'
 import { EMPTY_GEMMA, generateConduction } from '../lib/gemma'
-import { clearSharedHash, decodeProject, sharedData } from '../lib/share'
+import { useSharedProject } from '../hooks/useSharedProject'
 import { applySymbols } from '../lib/plc/symbolTable'
 import { buildPlcModel } from '../lib/plcModel'
 import { t } from '../lib/i18n'
 import { PanelStack, PanelTabs } from './PanelDock'
+import { ErrorNotice, FirstVisitOffer, SharedProjectBanner } from './CanvasNotices'
+import { ExportDialogs, ProjectDialogs } from './CanvasDialogs'
 import { useDockLayout } from '../hooks/useDockLayout'
 import { FIRST_TOUR, markTourSeen, tourSeen } from '../lib/tours'
 import { tutorialById } from '../lib/tutorials'
@@ -66,24 +68,14 @@ const SceneView = lazy(() => import('./SceneView'))
 const ElectricalView = lazy(() => import('./elec/ElectricalView'))
 const LadderView = lazy(() => import('./LadderView'))
 const VariablesDialog = lazy(() => import('./VariablesDialog'))
-const ExportDialog = lazy(() => import('./ExportDialog'))
 const GemmaDialog = lazy(() => import('./GemmaDialog'))
-const PneumaticDialog = lazy(() => import('./PneumaticDialog'))
-const NewProjectDialog = lazy(() => import('./NewProjectDialog'))
-const DossierDialog = lazy(() => import('./DossierDialog'))
-const ShareDialog = lazy(() => import('./ShareDialog'))
 // Lo que va en el enlace: sin la selección ni el estado de arrastre.
 const stripForShare = ({ nodes, edges }) => ({
   nodes: nodes.map(({ selected: _s, dragging: _d, measured: _m, ...n }) => n),
   edges: edges.map(({ selected: _s, ...e }) => e),
 })
-const ProjectsDialog = lazy(() => import('./ProjectsDialog'))
 const ExercisePanel = lazy(() => import('./ExercisePanel'))
-const ExerciseDialog = lazy(() => import('./ExerciseDialog'))
 const ScenarioEditor = lazy(() => import('./ScenarioEditor'))
-const ProjectChooser = lazy(() => import('./ProjectChooser'))
-const GuideDialog = lazy(() => import('./GuideDialog'))
-const ClassDialog = lazy(() => import('./ClassDialog'))
 
 // Mientras se descarga una parte diferida (normalmente un instante).
 function Loading({ panel }) {
@@ -658,29 +650,11 @@ export default function GrafcetCanvas() {
   // --- Archivos ----------------------------------------------------------------------------------
   const save = useCallback(() => saveProject({ ...toObject(), plc, name: projectName }), [toObject, plc, projectName])
 
-  // Proyecto que llega en el enlace (lib/share.js): se ofrece abrirlo (lo de ahora va a «Trabajos
-  // anteriores»).
-  const [incoming, setIncoming] = useState(null) // { project } | { error }
+  // Proyecto que llega en un enlace compartido (hooks/useSharedProject).
+  const { incoming, close: closeIncoming } = useSharedProject()
   // Aviso de error (abrir un archivo que no es un proyecto, de un formato más nuevo…), en vez de un
   // alert() del navegador: se queda hasta cerrarlo o abrir otra cosa.
   const [notice, setNotice] = useState(null)
-  useEffect(() => {
-    const check = () => {
-      const data = sharedData()
-      if (!data) return
-      decodeProject(data)
-        .then((project) => setIncoming({ project }))
-        .catch((error) => setIncoming({ error: error.message }))
-    }
-    check()
-    // También al pegar un enlace compartido en la pestaña del editor ya abierto (solo cambia el «#»).
-    window.addEventListener('hashchange', check)
-    return () => window.removeEventListener('hashchange', check)
-  }, [])
-  const closeIncoming = () => {
-    setIncoming(null)
-    clearSharedHash()
-  }
 
   // Sustituye el diagrama (abrir archivo, ejemplo o trabajo anterior). Lo que había se guarda
   // antes como trabajo anterior (lib/recent.js) y además se puede deshacer con Ctrl+Z.
@@ -1023,150 +997,61 @@ export default function GrafcetCanvas() {
             />
           </Suspense>
         )}
-        {projectsTab && (
-          <Suspense fallback={<Loading />}>
-            <ProjectsDialog
-              initialTab={projectsTab}
-              onOpenExample={openExample}
-              onOpenExercise={openExercise}
-              onOpenSolution={(project, title) => {
-                replaceProject({ ...normalizeProject(project), name: title }, t('Antes de abrir «{archivo}»', { archivo: title }))
-                setProjectsTab(null)
-              }}
-              onRestore={restoreRecent}
-              education={Boolean(settings.education)}
-              onClose={() => setProjectsTab(null)}
-            />
-          </Suspense>
-        )}
-        {exportFormat === 'dossier' && (
-          <Suspense fallback={<Loading />}>
-            <DossierDialog
-              nodes={nodes}
-              edges={edges}
-              plc={plc}
-              issues={issues}
-              projectName={projectName}
-              source={exportSource}
-              onChange={(dossier) => setPlc((p) => ({ ...p, dossier }))}
-              onClose={() => setExportFormat(null)}
-            />
-          </Suspense>
-        )}
-        {exportFormat === 'share' && (
-          <Suspense fallback={<Loading />}>
-            <ShareDialog
-              project={{ name: projectName, ...stripForShare(toObject()), plc }}
-              onDownload={save}
-              onClose={() => setExportFormat(null)}
-            />
-          </Suspense>
-        )}
-        {classOpen && (
-          <Suspense fallback={<Loading />}>
-            <ClassDialog getProject={getProject} onOpen={(project, name) => openLoaded(project, `${name}.json`)} onClose={() => setClassOpen(false)} />
-          </Suspense>
-        )}
-        {choosing && (
-          <Suspense fallback={<Loading />}>
-            <ProjectChooser fileName={choosing.fileName} items={choosing.items} onPick={(item) => openLoaded(item.project, choosing.fileName)} onClose={() => setChoosing(null)} />
-          </Suspense>
-        )}
+        <ProjectDialogs
+          projects={projectsTab}
+          onProjectsClose={() => setProjectsTab(null)}
+          onOpenExample={openExample}
+          onOpenExercise={openExercise}
+          onRestore={restoreRecent}
+          education={Boolean(settings.education)}
+          choosing={choosing}
+          onChoosingClose={() => setChoosing(null)}
+          classOpen={classOpen}
+          onClassClose={() => setClassOpen(false)}
+          newOpen={newOpen}
+          onNewClose={() => setNewOpen(false)}
+          pneumaticOpen={pneumaticOpen}
+          onPneumaticClose={() => setPneumaticOpen(false)}
+          getProject={getProject}
+          openLoaded={openLoaded}
+          replaceProject={replaceProject}
+        />
+        <ExportDialogs
+          format={exportFormat}
+          onClose={() => setExportFormat(null)}
+          nodes={nodes}
+          edges={edges}
+          plc={plc}
+          setPlc={setPlc}
+          issues={issues}
+          projectName={projectName}
+          source={exportSource}
+          shareProject={exportFormat === 'share' ? { name: projectName, ...stripForShare(toObject()), plc } : null}
+          onDownload={save}
+          getProject={getProject}
+          onGenerateGuide={exportGuide}
+          onSaveExercise={(config) => {
+            saveExercise(config)
+            setExerciseOpen(true)
+          }}
+          onExportStudent={exportStudent}
+          onExportSheet={exportSheet}
+          titleBlockProps={titleBlockProps}
+        />
         {editingScenario && (
           <Suspense fallback={<Loading />}>
             <ScenarioEditor getProject={getProject} scenario={editingScenario.scenario} onSave={saveScenario} onClose={() => setEditingScenario(null)} />
           </Suspense>
         )}
-        {exportFormat === 'guide' && (
-          <Suspense fallback={<Loading />}>
-            <GuideDialog plc={plc} onChange={(guide) => setPlc((p) => ({ ...p, guide }))} onGenerate={exportGuide} onClose={() => setExportFormat(null)} />
-          </Suspense>
-        )}
-        {exportFormat === 'exercise' && (
-          <Suspense fallback={<Loading />}>
-            <ExerciseDialog
-              plc={plc}
-              getProject={getProject}
-              onSave={(config) => {
-                saveExercise(config)
-                setExerciseOpen(true)
-              }}
-              onExportStudent={exportStudent}
-              onExportSheet={exportSheet}
-              onClose={() => setExportFormat(null)}
-            />
-          </Suspense>
-        )}
-        {exportFormat && exportFormat !== 'dossier' && exportFormat !== 'share' && exportFormat !== 'exercise' && exportFormat !== 'guide' && (
-          <Suspense fallback={<Loading />}>
-            <ExportDialog
-              source={exportSource}
-              initialFormat={exportFormat}
-              fileName={(ext) => fileName(ext)}
-              {...titleBlockProps}
-              onClose={() => setExportFormat(null)}
-            />
-          </Suspense>
-        )}
-        {notice && (
-          <div role="alert" className="fixed left-1/2 top-16 z-50 flex max-w-[min(40rem,calc(100vw-2rem))] -translate-x-1/2 items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-800 shadow-xl">
-            <AlertTriangle size={16} className="mt-0.5 shrink-0" />
-            <span className="flex-1">{notice}</span>
-            <button type="button" onClick={() => setNotice(null)} title={t('Cerrar el aviso')} aria-label={t('Cerrar el aviso')} className="rounded p-0.5 hover:bg-red-100">
-              <X size={14} />
-            </button>
-          </div>
-        )}
-        {incoming && (
-          <div role="alertdialog" aria-label={t('Proyecto compartido')} className="fixed left-1/2 top-16 z-50 flex -translate-x-1/2 items-center gap-3 rounded-lg bg-slate-900 px-4 py-2 text-sm text-white shadow-xl">
-            {incoming.error ? (
-              <span>{incoming.error}</span>
-            ) : (
-              <>
-                <span>
-                  {t('Proyecto compartido:')}{' '}<strong>«{incoming.project.name || t('sin nombre')}»</strong>
-                </span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const project = normalizeProject(incoming.project)
-                    if (project) replaceProject({ ...project, name: incoming.project.name ?? '' }, t('Antes de abrir un proyecto compartido'))
-                    closeIncoming()
-                  }}
-                  className="rounded-md bg-blue-600 px-2.5 py-1 font-medium hover:bg-blue-700"
-                >
-                  {t('Abrir')}
-                </button>
-                <span className="text-xs text-slate-300">{t('(lo de ahora queda en «Trabajos anteriores»)')}</span>
-              </>
-            )}
-            <button type="button" onClick={closeIncoming} className="rounded-md px-2 py-1 text-slate-300 hover:text-white">
-              {incoming.error ? t('Cerrar') : t('Descartar')}
-            </button>
-          </div>
-        )}
-        {newOpen && (
-          <Suspense fallback={<Loading />}>
-            <NewProjectDialog
-              onCreate={(project) => {
-                setNewOpen(false)
-                replaceProject(normalizeProject(project), t('Antes de crear un proyecto nuevo'))
-              }}
-              onClose={() => setNewOpen(false)}
-            />
-          </Suspense>
-        )}
-        {pneumaticOpen && (
-          <Suspense fallback={<Loading />}>
-            <PneumaticDialog
-              onCreate={(project) => {
-                setPneumaticOpen(false)
-                replaceProject({ ...normalizeProject(project), name: project.name }, t('Antes de generar una secuencia neumática'))
-              }}
-              onClose={() => setPneumaticOpen(false)}
-            />
-          </Suspense>
-        )}
+        <ErrorNotice message={notice} onClose={() => setNotice(null)} />
+        <SharedProjectBanner
+          incoming={incoming}
+          onOpen={(raw) => {
+            const project = normalizeProject(raw)
+            if (project) replaceProject({ ...project, name: raw.name ?? '' }, t('Antes de abrir un proyecto compartido'))
+          }}
+          onClose={closeIncoming}
+        />
         {gemmaOpen && (
           <Suspense fallback={<Loading />}>
             <GemmaDialog
@@ -1212,30 +1097,16 @@ export default function GrafcetCanvas() {
         )}
         {/* No a la vez que otro aviso (p. ej. un proyecto compartido por abrir). */}
         {offerTour && !tour && !incoming && (
-          <div role="status" className="fixed top-16 left-1/2 z-[60] flex -translate-x-1/2 items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-xl">
-            <Compass size={18} className="shrink-0 text-blue-600" />
-            <span>{t('¿Es la primera vez? Una visita guiada te enseña lo principal en un par de minutos.')}</span>
-            <button
-              type="button"
-              onClick={() => {
-                setOfferTour(false)
-                setTour(FIRST_TOUR)
-              }}
-              className="rounded-md bg-blue-600 px-3 py-1 font-medium text-white hover:bg-blue-700"
-            >
-              {t('Empezar')}
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                markTourSeen()
-                setOfferTour(false)
-              }}
-              className="rounded-md px-2 py-1 text-slate-600 hover:bg-slate-100"
-            >
-              {t('Ahora no')}
-            </button>
-          </div>
+          <FirstVisitOffer
+            onStart={() => {
+              setOfferTour(false)
+              setTour(FIRST_TOUR)
+            }}
+            onDismiss={() => {
+              markTourSeen()
+              setOfferTour(false)
+            }}
+          />
         )}
         <PanelTabs tabs={dock.tabs} />
         <div ref={rowRef} className="relative flex min-h-0 flex-1" {...floatDrop}>
