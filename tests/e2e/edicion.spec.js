@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { expectNoErrors, openEditor, openExample } from './helpers'
+import { expectNoErrors, openEditor, openExample, openVariables } from './helpers'
 
 // Editar en mitad de un texto ya escrito: el cursor se queda donde está (antes saltaba al final
 // después de cada tecla).
@@ -182,5 +182,32 @@ test('escribir C:=C+1 en una acción nueva la pasa a memorizada al activar', asy
   await panel.getByRole('button', { name: 'Añadir acción', exact: true }).click()
   await panel.getByLabel('Texto de la acción').last().fill('Piloto')
   await expect(panel.getByLabel('Tipo de acción').last()).toHaveValue('continuous')
+  expectNoErrors(errors)
+})
+
+test('atajos de contador: acciones y receptividades, y el contador queda declarado (#7)', async ({ page }) => {
+  const errors = await openEditor(page)
+  await openExample(page, /^Taladradora\s*Secuencia/)
+  const panel = page.locator('[data-tour="propiedades"]')
+  await page.locator('.react-flow__node-step').filter({ hasText: 'Motor_broca' }).first().dblclick()
+  await panel.getByLabel('Nombre del contador').fill('Piezas')
+  await panel.getByRole('button', { name: '↑ Piezas:=Piezas+1' }).click()
+  await expect(panel.getByLabel('Texto de la acción').last()).toHaveValue('Piezas:=Piezas+1')
+  await expect(panel.getByLabel('Tipo de acción').last()).toHaveValue('stored-on')
+  // En la receptividad se inserta donde está el cursor y el contador ya se propone por su nombre.
+  await page.locator('.react-flow__node-transition').filter({ hasText: 'Fc_abajo' }).first().dblclick()
+  await expect(panel.getByLabel('Nombre del contador')).toHaveValue('Piezas')
+  const condition = panel.getByRole('combobox').first()
+  await condition.press('End')
+  await condition.pressSequentially(' · ')
+  await panel.getByLabel('Valor que se compara').fill('5')
+  await panel.getByRole('button', { name: '[Piezas >= 5]' }).click()
+  await expect(condition).toHaveValue('Fc_abajo · [Piezas >= 5]')
+  await panel.screenshot({ path: 'C:/Users/Maniel/AppData/Local/Temp/claude/C--Users-Maniel-Claudio/e1487d6b-f880-4f60-9eca-73c36a6e2943/scratchpad/panel7.png' })
+  // Declarado como contador en la tabla de variables.
+  await openVariables(page)
+  const dialog = page.getByRole('dialog', { name: 'Tabla de variables' })
+  await dialog.getByRole('tab', { name: /^Variables/ }).click()
+  await expect(dialog.locator('tbody tr').filter({ hasText: 'Piezas' }).locator('select').first()).toHaveValue('counter')
   expectNoErrors(errors)
 })

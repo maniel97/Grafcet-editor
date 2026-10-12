@@ -12,7 +12,7 @@ In grafcet a **counter** is a variable that holds a number (`C`, `Piezas`, `Plaz
 
 Accepted comparisons: `=`, `<>` (not equal), `<`, `<=`, `>`, `>=`. Square brackets are the standard's form; it also works without them (`C >= 3`) and combined: `↑P · [C < 3]`.
 
-When you type `C:=…` in a new action, the editor turns it into **stored on activation** by itself: an assignment as a continuous action would do nothing (Verify marks it as an error).
+When you type `C:=…` in a new action, the editor turns it into **stored on activation** by itself: an assignment as a continuous action would do nothing (Verify marks it as an error). Without typing: in the step panel, **Counter** adds `C:=0`, `C:=C+1` or `C:=C-1` with the name you choose; in the transition panel, `[C >= n]` or `[C < n]` where the cursor is. The counter is also declared in the variables table.
 
 ## Counting with a loop (the clearest way)
 

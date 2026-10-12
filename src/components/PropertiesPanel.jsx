@@ -1,8 +1,9 @@
-import { useRef } from 'react'
+import { useRef, useState } from 'react'
 import { CircleHelp, Plus, Trash2, X } from 'lucide-react'
 import { ACTION_KINDS, ACTION_PRESETS, actionKind, isAssignment, normalizeAction } from '../lib/actions'
 import AutocompleteInput from './AutocompleteInput'
 import { useDraft } from './useDraft'
+import { counterActions, counterConditions, isVariableName } from '../lib/counters'
 import { t, N_ } from '../lib/i18n'
 
 const inputClass =
@@ -45,6 +46,63 @@ function Field({ label, children }) {
       <span className={sectionTitle}>{label}</span>
       {children}
     </label>
+  )
+}
+
+// Atajos de contador (#7): nombre del contador (los que ya hay, o C) y, en una receptividad, el
+// valor con el que se compara. Cada botón muestra el texto exacto que añade.
+const COUNTER_TITLES = {
+  reset: N_('Poner el contador a 0 (memorizada al activar la etapa)'),
+  up: N_('Sumar uno al contador (memorizada al activar la etapa)'),
+  down: N_('Restar uno al contador (memorizada al activar la etapa)'),
+  reached: N_('El contador ha llegado a ese valor'),
+  below: N_('El contador aún no ha llegado a ese valor'),
+}
+function CounterTools({ counters, withValue, items, onPick }) {
+  const [name, setName] = useState(counters[0] ?? 'C')
+  const [n, setN] = useState('3')
+  const valid = isVariableName(name) && (!withValue || /^\d+$/.test(n))
+  return (
+    <div className="space-y-1">
+      <span className="text-xs text-slate-400">{t('Contador')}</span>
+      <div className="flex items-center gap-1">
+        <input
+          aria-label={t('Nombre del contador')}
+          list="counter-names"
+          className="w-20 rounded-md border border-slate-300 px-2 py-0.5 font-mono text-xs focus:border-blue-500 focus:outline-none"
+          value={name}
+          onChange={(e) => setName(e.target.value.trim())}
+        />
+        <datalist id="counter-names">
+          {counters.map((c) => (
+            <option key={c} value={c} />
+          ))}
+        </datalist>
+        {withValue && (
+          <input
+            aria-label={t('Valor que se compara')}
+            inputMode="numeric"
+            className="w-12 rounded-md border border-slate-300 px-2 py-0.5 text-right font-mono text-xs focus:border-blue-500 focus:outline-none"
+            value={n}
+            onChange={(e) => setN(e.target.value.trim())}
+          />
+        )}
+      </div>
+      <div className="flex flex-wrap gap-1">
+        {items(name, n).map((item) => (
+          <button
+            key={item.title}
+            type="button"
+            disabled={!valid}
+            title={t(COUNTER_TITLES[item.title])}
+            onClick={() => onPick(item, name)}
+            className="rounded-full border border-slate-300 bg-slate-50 px-2.5 py-0.5 font-mono text-xs text-slate-700 hover:border-blue-400 hover:bg-blue-50 hover:text-blue-700 disabled:opacity-40"
+          >
+            {item.kind ? `${kindMarker[item.kind]}${item.text}` : item.text}
+          </button>
+        ))}
+      </div>
+    </div>
   )
 }
 
@@ -106,7 +164,7 @@ function ActionRow({ action, onChange, onRemove, vocabulary, otherTexts }) {
   )
 }
 
-function StepFields({ data, onChange, onCommitLabel, vocabulary }) {
+function StepFields({ data, onChange, onCommitLabel, vocabulary, counters, onDeclareCounter }) {
   const label = useDraft(data.label)
   const actions = (data.actions ?? []).map(normalizeAction)
   const setActions = (next) => onChange({ actions: next })
@@ -193,12 +251,20 @@ function StepFields({ data, onChange, onCommitLabel, vocabulary }) {
           render={(a) => `${kindMarker[a.kind] ?? ''}${a.text}`}
           onPick={(a) => setActions([...actions, normalizeAction(a)])}
         />
+        <CounterTools
+          counters={counters}
+          items={counterActions}
+          onPick={({ text, kind }, name) => {
+            setActions([...actions, normalizeAction({ text, kind })])
+            onDeclareCounter?.(name)
+          }}
+        />
       </div>
     </>
   )
 }
 
-function TransitionFields({ data, onChange, previousSteps, vocabulary }) {
+function TransitionFields({ data, onChange, previousSteps, vocabulary, counters, onDeclareCounter }) {
   const inputRef = useRef(null)
   const condition = data.condition ?? ''
 
@@ -245,15 +311,35 @@ function TransitionFields({ data, onChange, previousSteps, vocabulary }) {
         ))}
       </div>
       <p className="text-xs text-slate-400">
-        <code className="font-mono">!a</code> o <code className="font-mono">!(a + b)</code> se dibujan con raya encima.{' '}
+        {t('{a} o {b} se dibujan con raya encima.')
+          .split(/(\{a\}|\{b\})/)
+          .map((part, i) =>
+            part === '{a}' || part === '{b}' ? (
+              <code key={i} className="font-mono">
+                {part === '{a}' ? '!a' : '!(a + b)'}
+              </code>
+            ) : (
+              part
+            ),
+          )}{' '}
         <code className="font-mono">5s/X2</code>{t(': verdadera 5 s después de activarse la etapa 2.')}
       </p>
       <Presets title={t('Receptividades frecuentes')} values={presets} onPick={(v) => onChange({ condition: v })} />
+      {/* Se inserta donde está el cursor, para combinarla (↑P · [C < 3]). */}
+      <CounterTools
+        counters={counters}
+        withValue
+        items={counterConditions}
+        onPick={({ text }, name) => {
+          insert(text)
+          onDeclareCounter?.(name)
+        }}
+      />
     </>
   )
 }
 
-export default function PropertiesPanel({ node, onChange, onCommitLabel, onClose, onHelp, previousSteps = [], vocabulary = [] }) {
+export default function PropertiesPanel({ node, onChange, onCommitLabel, onClose, onHelp, previousSteps = [], vocabulary = [], counters = [], onDeclareCounter }) {
   if (!node) return null
   const isStep = node.type === 'step'
 
@@ -279,9 +365,17 @@ export default function PropertiesPanel({ node, onChange, onCommitLabel, onClose
       </div>
       <div className="space-y-4 overflow-y-auto p-4">
         {isStep ? (
-          <StepFields key={node.id} data={node.data} onChange={onChange} onCommitLabel={onCommitLabel} vocabulary={vocabulary} />
+          <StepFields key={node.id} data={node.data} onChange={onChange} onCommitLabel={onCommitLabel} vocabulary={vocabulary} counters={counters} onDeclareCounter={onDeclareCounter} />
         ) : (
-          <TransitionFields key={node.id} data={node.data} onChange={onChange} previousSteps={previousSteps} vocabulary={vocabulary} />
+          <TransitionFields
+            key={node.id}
+            data={node.data}
+            onChange={onChange}
+            previousSteps={previousSteps}
+            vocabulary={vocabulary}
+            counters={counters}
+            onDeclareCounter={onDeclareCounter}
+          />
         )}
       </div>
     </aside>

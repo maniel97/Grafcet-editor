@@ -12,7 +12,7 @@ En grafcet, un **compteur** est une variable qui garde un nombre (`C`, `Piezas`,
 
 Comparaisons admises : `=`, `<>` (différent), `<`, `<=`, `>`, `>=`. Les crochets sont la forme de la norme ; ça marche aussi sans eux (`C >= 3`) et combiné : `↑P · [C < 3]`.
 
-Quand tu écris `C:=…` dans une nouvelle action, l’éditeur la passe tout seul en **mémorisée à l’activation** : une affectation en action continue ne ferait rien (Vérifier la signale comme erreur).
+Quand tu écris `C:=…` dans une nouvelle action, l’éditeur la passe tout seul en **mémorisée à l’activation** : une affectation en action continue ne ferait rien (Vérifier la signale comme erreur). Sans taper : dans le panneau de l’étape, **Compteur** ajoute `C:=0`, `C:=C+1` ou `C:=C-1` avec le nom que tu choisis ; dans celui de la transition, `[C >= n]` ou `[C < n]` là où se trouve le curseur. En plus, le compteur est déclaré dans la table des variables.
 
 ## Compter avec une boucle (le plus clair)
 

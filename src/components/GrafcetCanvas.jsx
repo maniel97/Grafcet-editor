@@ -23,6 +23,7 @@ import { pushRecent } from '../lib/recent'
 import { EMPTY_PLC } from '../lib/addressing'
 import { nextStepLabel, nextTransitionLabel, findFreePosition } from '../lib/layout'
 import { useHistory } from '../lib/history'
+import { counterNames, declareCounter } from '../lib/counters'
 import { EditorProvider } from '../lib/editorContext'
 import { isValidGrafcetConnection } from '../lib/grafcetRules'
 import { loadAutosave, useAutosave } from '../lib/autosave'
@@ -352,6 +353,10 @@ export default function GrafcetCanvas() {
     const steps = nodes.filter((n) => n.type === 'step' && n.data.label).map((n) => ({ name: `X${t(n.data.label)}`, type: 'step' }))
     return [...vars, ...steps]
   }, [editingId, symbols, plc.variables, nodes])
+
+  // Atajos de contador del panel de propiedades (#7): los que ya hay y declarar el que se use.
+  const counters = useMemo(() => (editingId ? counterNames(symbols, plc.variables) : []), [editingId, symbols, plc.variables])
+  const declareCounterVar = useCallback((name) => changePlc((p) => declareCounter(p, name)), [changePlc])
 
   // Etapas inmediatamente anteriores a la transición en edición (para sugerir "5s/Xn").
   const previousSteps = useMemo(() => {
@@ -1430,6 +1435,8 @@ export default function GrafcetCanvas() {
                 onClose={() => setEditingId(null)}
                 onHelp={openArticle}
                 previousSteps={previousSteps}
+                counters={counters}
+                onDeclareCounter={declareCounterVar}
               />
               {verifyOpen && <VerifyPanel issues={issues} onFocus={focusIssue} onHelp={openArticle} onClose={() => setVerifyOpen(false)} />}
               {exerciseOpen && plc.exercise && (

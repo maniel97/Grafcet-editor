@@ -12,7 +12,7 @@ En grafcet un **contador** es una variable que guarda un número (`C`, `Piezas`,
 
 Comparaciones admitidas: `=`, `<>` (distinto), `<`, `<=`, `>`, `>=`. Los corchetes son la forma de la norma; también funciona sin ellos (`C >= 3`) y combinado: `↑P · [C < 3]`.
 
-Cuando escribes `C:=…` en una acción nueva, el editor la pasa solo a **memorizada al activar**: una asignación como acción continua no haría nada (Verificar lo marca como error).
+Cuando escribes `C:=…` en una acción nueva, el editor la pasa solo a **memorizada al activar**: una asignación como acción continua no haría nada (Verificar lo marca como error). Sin teclear: en el panel de la etapa, **Contador** añade `C:=0`, `C:=C+1` o `C:=C-1` con el nombre que elijas; en el de la transición, `[C >= n]` o `[C < n]` donde está el cursor. Además, el contador queda declarado en la tabla de variables.
 
 ## Contar con un bucle (lo más claro)
 
