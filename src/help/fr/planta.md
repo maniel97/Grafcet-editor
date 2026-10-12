@@ -4,7 +4,7 @@ La **partie opérative virtuelle** est une maquette animée de la machine : bout
 
 ## L’ouvrir
 
-En simulation, elle s’ouvre à côté du grafcet si le projet en a une ; dans le panneau de simulation, **« Partie opérative virtuelle »** la ferme et la rouvre. Faites glisser la séparation pour partager la largeur (double-clic : moitié-moitié).
+En simulation, elle s’ouvre à côté du grafcet si le projet en a une ; dans le panneau de simulation, **« Partie opérative virtuelle »** la ferme et la rouvre. Faites glisser la séparation pour partager la largeur (double-clic : moitié-moitié). Avec d’autres panneaux ouverts (schéma électrique, ladder), le bouton **Empiler** de l’en-tête les met dans une colonne, l’un au-dessus de l’autre, et leur bord répartit la hauteur. Double-clic sur l’en-tête : plein écran ou retour.
 
 ## Utiliser et Éditer
 

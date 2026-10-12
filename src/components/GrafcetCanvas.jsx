@@ -50,6 +50,9 @@ import { clearSharedHash, decodeProject, sharedData } from '../lib/share'
 import { applySymbols } from '../lib/plc/symbolTable'
 import { buildPlcModel } from '../lib/plcModel'
 import { t } from '../lib/i18n'
+import PanelSeparator from './PanelSeparator'
+import { StackButton, StackSeparator } from './PanelDock'
+import { usePanelWidth } from './panelWidth'
 import { FIRST_TOUR, markTourSeen, tourSeen } from '../lib/tours'
 import { tutorialById } from '../lib/tutorials'
 import { bumpProcess, freezeChecks, isLocked, isStudent, keepProgress, studentProject } from '../lib/exercise'
@@ -97,6 +100,31 @@ const defaultData = {
   transition: (nodes) => ({ condition: nextTransitionLabel(nodes) }),
   note: () => ({ text: '', color: 'yellow' }),
   frame: () => ({ kind: 'grafcet' }),
+}
+
+// Preferencias de la disposición de los paneles (en este navegador; sin almacenamiento, por defecto).
+const STACK_KEY = 'grafcet-editor:panels-stacked'
+const GROW_KEY = 'grafcet-editor:panels-grow'
+const readPref = (key) => {
+  try {
+    return localStorage.getItem(key)
+  } catch {
+    return null
+  }
+}
+const writePref = (key, value) => {
+  try {
+    localStorage.setItem(key, value)
+  } catch {
+    /* sin almacenamiento */
+  }
+}
+const readGrow = () => {
+  try {
+    return JSON.parse(readPref(GROW_KEY)) ?? {}
+  } catch {
+    return {}
+  }
 }
 
 export default function GrafcetCanvas() {
@@ -158,6 +186,11 @@ export default function GrafcetCanvas() {
   const [verifyOpen, setVerifyOpen] = useState(false)
   // Ladder: un panel más junto al grafcet, como la planta y el esquema. null | 'split' | 'full'.
   const [ladderView, setLadderView] = useState(null)
+  // Paneles apilados en una columna junto al grafcet (#18), su ancho y el reparto del alto.
+  const [stacked, setStacked] = useState(() => readPref(STACK_KEY) === '1')
+  const [stackGrow, setStackGrow] = useState(readGrow)
+  const [stackWidth, stackSeparator] = usePanelWidth('grafcet-editor:stack-width', 360)
+  const stackRef = useRef(null)
   const showInLadder = (id) => {
     setLadderFocus(id)
     setLadderView((v) => v ?? 'split')
@@ -916,6 +949,25 @@ export default function GrafcetCanvas() {
   // la simulación (w-80).
   const splitPanels = [elecView, simulating && simulation.sim && sceneView, ladderView].filter((v) => v === 'split').length
   const panelWidth = `calc((100% - ${simulating ? '20rem' : '0px'}) / ${splitPanels + 1})`
+  // Apilados: con dos o más en vista dividida (si uno está a pantalla completa, cada uno a su sitio).
+  const sceneShown = Boolean(simulating && simulation.sim && sceneView)
+  const stackOrder = [elecView === 'split' && 'elec', sceneShown && sceneView === 'split' && 'scene', ladderView === 'split' && 'ladder'].filter(Boolean)
+  const anyFull = elecView === 'full' || (sceneShown && sceneView === 'full') || ladderView === 'full'
+  const stackActive = stacked && stackOrder.length >= 2 && !anyFull
+  const toggleStack = () =>
+    setStacked((v) => {
+      writePref(STACK_KEY, v ? '0' : '1')
+      return !v
+    })
+  const commitGrow = (grow) => {
+    setStackGrow(grow ?? {})
+    writePref(GROW_KEY, JSON.stringify(grow ?? {}))
+  }
+  const dockFor = (id) => {
+    const button = stackOrder.length >= 2 && stackOrder.includes(id) && !anyFull ? <StackButton stacked={stackActive} onToggle={toggleStack} /> : null
+    if (!stackActive) return { button }
+    return { stacked: true, grow: stackGrow[id] ?? 1, button, top: stackOrder[0] === id ? null : <StackSeparator onGrow={setStackGrow} onCommit={commitGrow} /> }
+  }
   const modalOpen = settingsOpen || helpOpen || variablesOpen || gemmaOpen || pneumaticOpen || newOpen || !!exportFormat || !!projectsTab || !!menu
   // En solo lectura el clic derecho no abre menús de edición (ni el del navegador).
   const blockMenu = (handler) => (readOnly ? (e) => e.preventDefault() : handler)
@@ -1340,6 +1392,20 @@ export default function GrafcetCanvas() {
               />
             )}
           </div>
+          <div
+            data-stack=""
+            ref={stackRef}
+            className={stackActive ? 'relative flex min-h-0 min-w-0 flex-col' : 'contents'}
+            style={stackActive ? { width: stackWidth ?? `calc((100% - ${simulating ? '20rem' : '0px'}) / 2)`, flexShrink: 1, minWidth: 360 } : undefined}
+          >
+          {stackActive && (
+            <PanelSeparator
+              sectionRef={stackRef}
+              {...stackSeparator}
+              label={t('Ancho de los paneles apilados')}
+              title={t('Arrastra para cambiar el ancho de la columna de paneles (doble clic: mitad y mitad)')}
+            />
+          )}
           {elecView && (
             <Suspense fallback={<Loading panel />}>
               <ElectricalView
@@ -1358,6 +1424,7 @@ export default function GrafcetCanvas() {
                 onActivate={() => setLastPanel('elec')}
                 maximized={elecView === 'full'}
                 defaultWidth={panelWidth}
+                dock={dockFor('elec')}
                 onToggleMaximize={() => setElecView((v) => (v === 'full' ? 'split' : 'full'))}
                 onClose={() => {
                   setElecView(null)
@@ -1385,6 +1452,7 @@ export default function GrafcetCanvas() {
                 }
                 maximized={sceneView === 'full'}
                 defaultWidth={panelWidth}
+                dock={dockFor('scene')}
                 onToggleMaximize={() => setSceneView((v) => (v === 'full' ? 'split' : 'full'))}
                 onClose={() => setSceneView(null)}
               />
@@ -1403,6 +1471,7 @@ export default function GrafcetCanvas() {
                 highlightNodeId={ladderFocus}
                 maximized={ladderView === 'full'}
                 defaultWidth={panelWidth}
+                dock={dockFor('ladder')}
                 onToggleMaximize={() => setLadderView((v) => (v === 'full' ? 'split' : 'full'))}
                 onClose={() => setLadderView(null)}
                 // El grafcet queda a la vista: a pantalla completa, el ladder pasa a la vista dividida.
@@ -1414,6 +1483,7 @@ export default function GrafcetCanvas() {
               />
             </Suspense>
           )}
+          </div>
           {simulating ? (
             <Suspense fallback={<Loading panel />}>
               <SimulationPanel

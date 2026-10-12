@@ -202,3 +202,59 @@ test('ladder como panel: junto al grafcet y la planta durante la simulación', a
   await expect(view.getByRole('button', { name: 'Pantalla completa' })).toBeVisible()
   expectNoErrors(errors)
 })
+
+// #18 (fase 2): apilar los paneles en una columna, repartir el alto y doble clic para maximizar.
+test('paneles apilados: planta y ladder en una columna junto al grafcet', async ({ page }) => {
+  await page.setViewportSize({ width: 1600, height: 1000 })
+  const errors = await openEditor(page)
+  await openExample(page, /^Marcha y paro/)
+  await page.getByRole('button', { name: /Simular/ }).click()
+  const plant = page.locator('[data-tour="planta"]')
+  await expect(plant).toBeVisible()
+  const view = page.getByRole('region', { name: 'Ladder generado' })
+  // Con un solo panel no hay botón de apilar.
+  await expect(plant.getByRole('button', { name: 'Apilar los paneles en una columna' })).toHaveCount(0)
+  await page.getByTitle(/Paso a ladder/).click()
+  await view.getByRole('button', { name: 'Apilar los paneles en una columna' }).click()
+
+  // Planta arriba, ladder abajo, misma columna, y el grafcet a la izquierda.
+  const top = await stableBox(plant)
+  const bottom = await stableBox(view)
+  const canvas = await stableBox(page.locator('.react-flow').first())
+  expect(Math.abs(top.x - bottom.x)).toBeLessThan(2)
+  expect(Math.abs(top.width - bottom.width)).toBeLessThan(2)
+  expect(top.y + top.height).toBeLessThanOrEqual(bottom.y + 1)
+  expect(canvas.x + canvas.width).toBeLessThanOrEqual(top.x + 1)
+  expect(Math.abs(top.height - bottom.height)).toBeLessThan(4) // a partes iguales
+
+  // El borde entre los dos reparte el alto, y se recuerda.
+  const edge = view.getByRole('separator', { name: 'Alto de los paneles apilados' })
+  const e = await edge.boundingBox()
+  await page.mouse.move(e.x + e.width / 2, e.y + e.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(e.x + e.width / 2, e.y + e.height / 2 - 150, { steps: 5 })
+  await page.mouse.up()
+  await expect.poll(async () => (await view.boundingBox()).height - (await plant.boundingBox()).height).toBeGreaterThan(250)
+  await page.reload()
+  await page.waitForSelector('.react-flow__node')
+  expect(await page.evaluate(() => localStorage.getItem('grafcet-editor:panels-stacked'))).toBe('1')
+  expect(JSON.parse(await page.evaluate(() => localStorage.getItem('grafcet-editor:panels-grow')))).toHaveProperty('ladder')
+
+  // Doble clic en la cabecera: pantalla completa y vuelta (no en sus botones).
+  await page.getByRole('button', { name: /Simular/ }).click()
+  await page.getByTitle(/Paso a ladder/).click()
+  await view.getByRole('heading', { name: 'Paso a ladder' }).dblclick()
+  await expect(view.getByRole('button', { name: 'Vista dividida con el grafcet' })).toBeVisible()
+  await view.getByRole('heading', { name: 'Paso a ladder' }).dblclick()
+  await expect(view.getByRole('button', { name: 'Pantalla completa' })).toBeVisible()
+  await plant.getByText('Planta', { exact: true }).dblclick()
+  await expect(plant.getByRole('button', { name: 'Vista dividida con el grafcet' })).toBeVisible()
+  await plant.getByText('Planta', { exact: true }).dblclick()
+
+  // Uno al lado de otro otra vez.
+  await view.getByRole('button', { name: 'Paneles uno al lado de otro' }).click()
+  const a = await stableBox(plant)
+  const b = await stableBox(view)
+  expect(a.x + a.width).toBeLessThanOrEqual(b.x + 1)
+  expectNoErrors(errors)
+})

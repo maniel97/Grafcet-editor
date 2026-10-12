@@ -13,11 +13,30 @@ export function maxPanelWidth(section, canvasMin = CANVAS_MIN) {
   if (!row) return Infinity
   const self = section.getBoundingClientRect()
   const canvas = row.firstElementChild
-  const boxes = [...row.querySelectorAll(':scope > *, :scope > .contents > *')]
-    .filter((el) => el !== section && el !== canvas && getComputedStyle(el).display !== 'contents')
+  const boxes = boxChildren(row)
+    .filter((el) => el !== section && el !== canvas)
     .map((el) => el.getBoundingClientRect())
   const others = boxes.filter((r) => r.width > 0 && r.right <= self.left + 1).reduce((sum, r) => sum + r.width, 0)
   return self.right - row.getBoundingClientRect().left - canvasMin - others
+}
+
+// Hijos con caja de un elemento: los de dentro de los envoltorios con display: contents, también.
+export const boxChildren = (el) =>
+  [...el.children].flatMap((c) => (getComputedStyle(c).display === 'contents' ? boxChildren(c) : [c]))
+
+// Tamaño y posición de un panel lateral: a pantalla completa (encima de todo, menos el panel de la
+// simulación), en la fila junto al grafcet con su ancho, o apilado en una columna con otros (dock:
+// { stacked, grow }), donde reparte el alto según grow.
+export function dockLayout({ maximized, simulating = true, dock, width, defaultWidth, min }) {
+  if (maximized) return { position: `absolute inset-y-0 left-0 z-20 ${simulating ? 'right-80' : 'right-0'}`, style: undefined }
+  if (dock?.stacked) return { position: 'relative', style: { flex: `${dock.grow ?? 1} 1 0px`, minHeight: 140, width: '100%' } }
+  return { position: 'relative', style: { width: width ?? defaultWidth, flexShrink: 1, minWidth: min } }
+}
+
+// Doble clic en la cabecera de un panel (no en sus botones ni campos): pantalla completa o vuelta.
+export const headerDoubleClick = (toggle) => (e) => {
+  if (e.target.closest('button, input, select, textarea, label, a, [role="radio"], [role="tab"], [role="radiogroup"]')) return
+  toggle?.()
 }
 
 // Ancho recordado de un panel lateral (ver PanelSeparator).

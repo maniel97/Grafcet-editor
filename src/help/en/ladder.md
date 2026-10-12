@@ -28,7 +28,7 @@ Computing all the transitions first and then activating and deactivating makes t
 
 Right-click a step or transition > “Show in the ladder” takes you to the networks it generates.
 
-The ladder opens in a **panel next to the grafcet**, like the plant and the electrical diagram: drag its left edge to change its width (double-click: equal split) or switch it to full screen with its button. While simulating it is shown **live** (closed contacts and active outputs in green) at the same time as the grafcet and the plant. Click a network: it is highlighted in the grafcet, without closing the ladder.
+The ladder opens in a **panel next to the grafcet**, like the plant and the electrical diagram: drag its left edge to change its width (double-click: equal split) or switch it to full screen with its button. While simulating it is shown **live** (closed contacts and active outputs in green) at the same time as the grafcet and the plant. Click a network: it is highlighted in the grafcet, without closing the ladder. With two or more panels open, the **Stack** button in their header puts them in a column, one above the other (for example, the plant on top and the ladder below, with the grafcet on the left); drag the edge between them to share the height. Double-click a panel header: full screen or back.
 
 ```ejemplo taladradora
 Open it and click Ladder.

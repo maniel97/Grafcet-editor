@@ -4,7 +4,7 @@ The **virtual plant** is an animated model of the machine: push buttons, cylinde
 
 ## Opening it
 
-When simulating, it opens next to the grafcet if the project has a plant; in the simulation panel, **“Virtual plant”** closes and reopens it. Drag the divider to share the width (double-click: half and half).
+When simulating, it opens next to the grafcet if the project has a plant; in the simulation panel, **“Virtual plant”** closes and reopens it. Drag the divider to share the width (double-click: half and half). With other panels open (electrical diagram, ladder), the **Stack** button in the header puts them in a column, one above the other, and the edge between them shares the height. Double-click the header: full screen or back.
 
 ## Use and Edit
 

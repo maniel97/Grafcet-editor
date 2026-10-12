@@ -4,7 +4,7 @@ A **planta virtual** é uma maqueta animada da máquina: botões, cilindros, tap
 
 ## Abri-la
 
-Ao simular abre-se junto ao grafcet, se o projeto tiver planta; no painel de simulação, **«Planta virtual»** fecha-a e volta a abri-la. Arraste a separação para repartir a largura (duplo clique: metade e metade).
+Ao simular abre-se junto ao grafcet, se o projeto tiver planta; no painel de simulação, **«Planta virtual»** fecha-a e volta a abri-la. Arraste a separação para repartir a largura (duplo clique: metade e metade). Com outros painéis abertos (esquema elétrico, ladder), o botão **Empilhar** do cabeçalho põe-nos numa coluna, um por cima do outro, e o seu bordo reparte a altura. Duplo clique no cabeçalho: ecrã inteiro ou voltar.
 
 ## Usar e Editar
 

@@ -34,7 +34,7 @@ import { exportGroups, importGroups, loadGroups, makeGroup, placeGroup, storeGro
 import { downloadFile } from '../lib/projectFile'
 import { N_, t as tr } from '../lib/i18n'
 import PanelSeparator from './PanelSeparator'
-import { usePanelWidth } from './panelWidth'
+import { dockLayout, headerDoubleClick, usePanelWidth } from './panelWidth'
 import { applyResize, resizeHandles, resizeMeasure } from '../lib/sim/sceneHandles'
 import { collides, freeSpot, stampRow } from '../lib/sim/sceneStamp'
 
@@ -1597,7 +1597,7 @@ const PALETTE_BY_KEY = Object.fromEntries(PALETTE_ITEMS.map((i) => [i.key, i]))
 // actúan sobre la escena, con su propio historial.
 // onCreateVariable(name, type): añade una variable nueva a la tabla (escrita en un elemento).
 // editLocked: ejercicio con la planta bloqueada (solo se usa: no se edita).
-export default function SceneView({ scene, onChange, worldState, values, time, variables, onAction, onHistory, onCreateVariable, maximized, onToggleMaximize, onClose, editLocked = false, defaultWidth = '50%' }) {
+export default function SceneView({ scene, onChange, worldState, values, time, variables, onAction, onHistory, onCreateVariable, maximized, onToggleMaximize, onClose, editLocked = false, defaultWidth = '50%', dock = null }) {
   const elements = scene?.elements ?? []
   const [modeState, setMode] = useState('use')
   const mode = editLocked ? 'use' : modeState
@@ -1636,6 +1636,7 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
   const scrollRef = useRef(null)
   const sectionRef = useRef(null)
   const [width, separator] = usePanelWidth(WIDTH_KEY, MIN_WIDTH)
+  const layout = dockLayout({ maximized, dock, width, defaultWidth, min: MIN_WIDTH })
   const [fitTick, setFitTick] = useState(0) // se reajusta al terminar de arrastrar el separador
   // Vista previa flotante de un módulo de la paleta (junto al ratón, tras un momento encima).
   const [preview, setPreview] = useState(null)
@@ -1744,7 +1745,7 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
   useEffect(() => {
     const id = requestAnimationFrame(() => fitRef.current())
     return () => cancelAnimationFrame(id)
-  }, [maximized, fitTick])
+  }, [maximized, fitTick, dock?.stacked, dock?.grow])
   const state = worldState ?? { pos: {}, pressed: {}, pieces: [], counts: {} }
   // Potenciómetros: valor actual y ajuste relativo (rueda, flechas del teclado, arrastre táctil).
   const knobOf = (id) => state.knob?.[id] ?? Number(elements.find((x) => x.id === id)?.initial ?? 0.5)
@@ -2326,11 +2327,13 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
       ref={sectionRef}
       tabIndex={-1}
       onKeyDown={onKeyDown}
-      className={`scene-touch side-panel @container flex outline-none min-w-0 flex-col border-l border-slate-200 bg-white ${maximized ? 'absolute inset-y-0 left-0 right-80 z-20' : 'relative'}`}
-      style={maximized ? undefined : { width: width ?? defaultWidth, flexShrink: 1, minWidth: MIN_WIDTH }}
+      data-panel="scene"
+      className={`scene-touch side-panel @container flex outline-none min-h-0 min-w-0 flex-col border-l border-slate-200 bg-white ${layout.position}`}
+      style={layout.style}
     >
       {/* Separador: arrastrar para repartir el espacio entre el grafcet y la planta. */}
-      {!maximized && (
+      {dock?.top}
+      {!maximized && !dock?.stacked && (
         <PanelSeparator
           sectionRef={sectionRef}
           {...separator}
@@ -2339,7 +2342,7 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
           onEnd={() => setFitTick((t) => t + 1)}
         />
       )}
-      <header className="flex flex-wrap items-center gap-1 border-b border-slate-200 px-2 py-1.5 text-xs">
+      <header onDoubleClick={headerDoubleClick(onToggleMaximize)} className="flex flex-wrap items-center gap-1 border-b border-slate-200 px-2 py-1.5 text-xs">
         <span className="mr-1 text-sm font-semibold">{tr('Planta')}</span>
         <div className="flex rounded-md border border-slate-300 p-0.5" role="radiogroup" aria-label={tr('Modo de la escena')}>
           {[
@@ -2435,6 +2438,7 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
         <button type="button" onClick={fit} title={tr('Ajustar: ver todos los mandos y el mecanismo')} aria-label={tr('Ajustar la vista')} className="rounded p-1 hover:bg-slate-100">
           <Scan size={14} />
         </button>
+        {dock?.button}
         <button type="button" onClick={onToggleMaximize} title={maximized ? tr('Vista dividida con el grafcet') : tr('Pantalla completa')} className="rounded p-1 hover:bg-slate-100">
           {maximized ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
         </button>

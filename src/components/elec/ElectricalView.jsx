@@ -19,7 +19,7 @@ import { ELEC_TEMPLATES, insertTemplate } from '../../lib/elec/templates'
 import { WIRE_COLORS, WIRE_SECTIONS, junctions as findJunctions, nextTerminalNumber, sectionWidth, wireNumbers } from '../../lib/elec/wiring'
 import { N_, t as tr } from '../../lib/i18n'
 import PanelSeparator from '../PanelSeparator'
-import { usePanelWidth } from '../panelWidth'
+import { dockLayout, headerDoubleClick, usePanelWidth } from '../panelWidth'
 
 const nodeTypes = { elec: ElecNode, elecframe: ElecFrameNode }
 const edgeTypes = { wire: WireEdge }
@@ -305,7 +305,7 @@ export default function ElectricalView(props) {
 }
 
 // editLocked: ejercicio con el esquema bloqueado (solo se usa: no se edita).
-function Inner({ schematic, onChange, elecState, onAction, variables = [], buildVariables, scene, simulating, onHistory, onActivate, maximized, onToggleMaximize, onClose, titleInfo = {}, exportProps = {}, editLocked = false, defaultWidth = '50%' }) {
+function Inner({ schematic, onChange, elecState, onAction, variables = [], buildVariables, scene, simulating, onHistory, onActivate, maximized, onToggleMaximize, onClose, titleInfo = {}, exportProps = {}, editLocked = false, defaultWidth = '50%', dock = null }) {
   const sch = schematic ?? EMPTY
   const allComponents = useMemo(() => sch.components ?? [], [sch.components])
   const allWires = useMemo(() => sch.wires ?? [], [sch.wires])
@@ -348,6 +348,7 @@ function Inner({ schematic, onChange, elecState, onAction, variables = [], build
     setProbes([])
   }
   const [width, separator] = usePanelWidth(WIDTH_KEY, MIN_WIDTH)
+  const layout = dockLayout({ maximized, simulating, dock, width, defaultWidth, min: MIN_WIDTH })
   const [preview, setPreview] = useState(null) // { item, x, y }
   // Tampón (como en la planta): un clic en la paleta lo carga, cada clic en el esquema pone uno
   // (con su vista previa fantasma bajo el ratón) y Esc, «Terminar» o el botón derecho lo sueltan.
@@ -764,14 +765,14 @@ function Inner({ schematic, onChange, elecState, onAction, variables = [], build
           removeSelected()
         }
       }}
+      data-panel="elec"
       // relative y absolute no pueden ir juntas (en el CSS generado ganaría relative).
-      className={`elec-touch side-panel @container flex min-w-0 flex-col border-l border-slate-200 bg-white outline-none ${
-        maximized ? `absolute inset-y-0 left-0 z-20 ${simulating ? 'right-80' : 'right-0'}` : 'relative'
-      }`}
-      style={maximized ? undefined : { width: width ?? defaultWidth, flexShrink: 1, minWidth: MIN_WIDTH }}
+      className={`elec-touch side-panel @container flex min-h-0 min-w-0 flex-col border-l border-slate-200 bg-white outline-none ${layout.position}`}
+      style={layout.style}
     >
       {/* Separador: arrastrar para repartir el espacio con el grafcet (doble clic: mitad y mitad). */}
-      {!maximized && (
+      {dock?.top}
+      {!maximized && !dock?.stacked && (
         <PanelSeparator
           sectionRef={sectionRef}
           {...separator}
@@ -779,7 +780,7 @@ function Inner({ schematic, onChange, elecState, onAction, variables = [], build
           title={tr('Arrastra para cambiar el ancho del esquema (doble clic: mitad y mitad)')}
         />
       )}
-      <header className="flex flex-wrap items-center gap-1 border-b border-slate-200 px-2 py-1.5 text-xs">
+      <header onDoubleClick={headerDoubleClick(onToggleMaximize)} className="flex flex-wrap items-center gap-1 border-b border-slate-200 px-2 py-1.5 text-xs">
         <span className="mr-1 flex items-center gap-1 text-sm font-semibold">
           <Zap size={14} />{' '}{tr('Esquema eléctrico')}
         </span>
@@ -906,6 +907,7 @@ function Inner({ schematic, onChange, elecState, onAction, variables = [], build
         <button type="button" onClick={() => fitView({ padding: 0.15 })} title={tr('Ajustar la vista')} aria-label={tr('Ajustar la vista')} className="rounded p-1 hover:bg-slate-100">
           <Scan size={14} />
         </button>
+        {dock?.button}
         <button type="button" onClick={onToggleMaximize} title={maximized ? tr('Vista dividida') : tr('Pantalla completa')} className="rounded p-1 hover:bg-slate-100">
           {maximized ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
         </button>

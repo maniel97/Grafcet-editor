@@ -10,7 +10,7 @@ import { projectVariables } from '../lib/symbols'
 import { svgSource } from '../lib/svgExport'
 import ExportDialog from './ExportDialog'
 import PanelSeparator from './PanelSeparator'
-import { usePanelWidth } from './panelWidth'
+import { dockLayout, headerDoubleClick, usePanelWidth } from './panelWidth'
 import { downloadFile } from '../lib/projectFile'
 import { fileName, getProjectName } from '../lib/fileNames'
 import { t, N_ } from '../lib/i18n'
@@ -71,9 +71,10 @@ function ActionButton({ icon: Icon, children, onClick, title }) {
 // tabla de variables actuales, y mientras se simula se ve en vivo a la vez que el grafcet y la planta.
 // simulation: la de useSimulation mientras se simula (ladder en vivo), o null. highlightNodeId:
 // segmentos de ese elemento del grafcet resaltados. onShowInGrafcet(id): clic en un segmento.
-export default function LadderView({ nodes, edges, plc, grafcetErrors, exportProps, onClose, simulation = null, highlightNodeId = null, onShowInGrafcet, maximized = false, onToggleMaximize, defaultWidth = '50%' }) {
+export default function LadderView({ nodes, edges, plc, grafcetErrors, exportProps, onClose, simulation = null, highlightNodeId = null, onShowInGrafcet, maximized = false, onToggleMaximize, defaultWidth = '50%', dock = null }) {
   const sectionRef = useRef(null)
   const [width, separator] = usePanelWidth(WIDTH_KEY, MIN_WIDTH)
+  const layout = dockLayout({ maximized, simulating: Boolean(simulation), dock, width, defaultWidth, min: MIN_WIDTH })
   const [tab, setTab] = useState('ladder')
   const [mode, setMode] = useState('both')
   const [mnemonic, setMnemonic] = useState('de')
@@ -144,13 +145,13 @@ export default function LadderView({ nodes, edges, plc, grafcetErrors, exportPro
       ref={sectionRef}
       role="region"
       aria-label={t('Ladder generado')}
+      data-panel="ladder"
       // relative y absolute no pueden ir juntas (en el CSS generado ganaría relative).
-      className={`side-panel @container flex min-w-0 flex-col border-l border-slate-200 bg-slate-50 ${
-        maximized ? `absolute inset-y-0 left-0 z-20 ${simulation ? 'right-80' : 'right-0'}` : 'relative'
-      }`}
-      style={maximized ? undefined : { width: width ?? defaultWidth, flexShrink: 1, minWidth: MIN_WIDTH }}
+      className={`side-panel @container flex min-h-0 min-w-0 flex-col border-l border-slate-200 bg-slate-50 ${layout.position}`}
+      style={layout.style}
     >
-      {!maximized && (
+      {dock?.top}
+      {!maximized && !dock?.stacked && (
         <PanelSeparator
           sectionRef={sectionRef}
           {...separator}
@@ -158,10 +159,11 @@ export default function LadderView({ nodes, edges, plc, grafcetErrors, exportPro
           title={t('Arrastra para cambiar el ancho del ladder (doble clic: mitad y mitad)')}
         />
       )}
-      <header className="flex flex-wrap items-center gap-x-3 gap-y-1.5 border-b border-slate-200 bg-white px-3 py-1.5">
+      <header onDoubleClick={headerDoubleClick(onToggleMaximize)} className="flex flex-wrap items-center gap-x-3 gap-y-1.5 border-b border-slate-200 bg-white px-3 py-1.5">
         <h2 className="text-sm font-semibold">{t('Paso a ladder')}</h2>
         <span className="text-xs text-slate-500">{t('{n} segmentos · método SET/RESET por etapas', { n: rungCount })}</span>
         <div className="ml-auto flex items-center gap-0.5 @5xl:order-last">
+          {dock?.button}
           <button
             type="button"
             onClick={onToggleMaximize}
