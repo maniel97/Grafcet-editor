@@ -7,6 +7,7 @@
 - **Active step**: green, with a dot.
 - **Enabled transition**: amber. **Clearable**: green.
 - **Emitted action**: green.
+- **Timings and counters**: next to the transition, what is left for its timing to be met (⏱ 1.6 s); in the action that counts (`C:=C+1`), the value of the counter (C = 2).
 - In the panel on the right, the **inputs** (switch or push button), the **outputs** and the internal variables, counters and timers.
 
 ## How to use it

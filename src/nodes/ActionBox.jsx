@@ -26,6 +26,9 @@ export default function ActionBox({ action, borderClass, color, first, stepActiv
   const symbol = actionSymbol(action)?.symbol
   const address = plcView && symbol && plcView.lookup.symbol(symbol)
   // Simulación: acción continua o condicionada que se está emitiendo ahora mismo.
+  // Simulación: un contador (C:=C+1) muestra su valor en la acción que lo cambia.
+  const counter = actionSymbol(action)?.numeric ? symbol : null
+  const live = sim && counter ? Number(sim.values[counter] ?? 0) : null
   const emitting =
     !!sim && stepActive && (kind === 'continuous' || kind === 'conditional') && !!symbol && Number(sim.values[symbol]) !== 0
 
@@ -48,7 +51,17 @@ export default function ActionBox({ action, borderClass, color, first, stepActiv
       )}
       <span className="flex flex-col items-center leading-tight">
         {text || ' '}
-        {address && <span className="plc-address">{address}</span>}
+        {/* Dirección y valor en vivo en la misma fila: tres filas no caben en la caja. */}
+        {(address || live !== null) && (
+          <span className="flex items-baseline gap-[6px]">
+            {address && <span className="plc-address">{address}</span>}
+            {live !== null && (
+              <span className="live-value editor-only rounded bg-blue-100 px-[4px] text-[0.8em] text-blue-800">
+                {counter} = {live}
+              </span>
+            )}
+          </span>
+        )}
       </span>
     </div>
   )

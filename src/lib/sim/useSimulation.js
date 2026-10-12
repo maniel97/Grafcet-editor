@@ -8,6 +8,7 @@ import { cylindersOf, motionSample, pushMotion } from './spacePhase'
 import { SCAN, advanceCpu, makeCpuRunner } from '../plc/cpuRun'
 import { generateLadder } from '../ladder/generate'
 import { toS7200 } from '../ladder/exportS7200'
+import { createCountdownStore, timerCountdowns } from './countdowns'
 
 const TICK_MS = 50
 const MAX_LOG = 200
@@ -212,6 +213,10 @@ export function useSimulation(nodes, edges, plc, enabled) {
     [],
   )
 
+  // Cuenta atrás de las temporizaciones, para el lienzo (lib/sim/countdowns.js).
+  const [countdowns] = useState(createCountdownStore)
+  useEffect(() => countdowns.set(timerCountdowns(compiled, sim?.state)), [countdowns, compiled, sim])
+
   // Fija a mano el valor de una marca o un contador (para probar sin contar hasta ahí), como se
   // fuerza una entrada; las acciones lo siguen cambiando como siempre. Solo con el grafcet: en modo
   // Autómata los valores son los de la CPU.
@@ -322,6 +327,7 @@ export function useSimulation(nodes, edges, plc, enabled) {
     setSpeed,
     setInput,
     setValue,
+    countdowns,
     step,
     advance,
     reset,

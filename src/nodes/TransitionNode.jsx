@@ -8,6 +8,7 @@ import WhyCard from '../components/WhyCard'
 import { transitionOutput } from '../lib/grafcetRules'
 import { addressExpression } from '../lib/symbols'
 import { useEditor } from '../lib/editorContext'
+import { useCountdown } from '../lib/sim/countdowns'
 import { useHighlightClass } from './useHighlighted'
 import { t, N_ } from '../lib/i18n'
 
@@ -15,7 +16,9 @@ const ALTERNATIVE_HINT = N_('Para «volver O seguir»: clic derecho en la transi
 
 // Transición Grafcet: barra horizontal con su receptividad a la derecha.
 export default function TransitionNode({ id, data, selected }) {
-  const { plcView, sim, explainTransition } = useEditor()
+  const { plcView, sim, explainTransition, countdowns } = useEditor()
+  // Simulación: lo que le falta a su temporización (5s/X2), si la etapa está activa.
+  const countdown = useCountdown(countdowns, id)
   // Simulación: al pasar el ratón (o con la transición seleccionada), «¿por qué no avanza?».
   const [hovered, setHovered] = useState(false)
   const anchorRef = useRef(null)
@@ -86,7 +89,14 @@ export default function TransitionNode({ id, data, selected }) {
           }`}
         >
           {/* Un solo bloque en línea: si no, cada trozo de la receptividad ocuparía su propia fila. */}
-          <ConditionText className="whitespace-nowrap" text={data.condition} />
+          <span className="flex items-baseline gap-[6px] whitespace-nowrap">
+            <ConditionText className="whitespace-nowrap" text={data.condition} />
+            {countdown && (
+              <span className="live-value editor-only rounded bg-amber-100 px-[4px] text-[0.8em] font-normal text-amber-800" title={t('Lo que falta para que se cumpla la temporización')}>
+                ⏱ {countdown}
+              </span>
+            )}
+          </span>
           {/* Con "Mostrar direcciones": la receptividad con cada símbolo sustituido por su dirección. */}
           {plcView && <ConditionText className="plc-address" text={addressExpression(data.condition, plcView.lookup)} />}
         </span>

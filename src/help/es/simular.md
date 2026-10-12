@@ -7,6 +7,7 @@
 - **Etapa activa**: verde, con un punto.
 - **Transición validada**: ámbar. **Franqueable**: verde.
 - **Acción emitida**: verde.
+- **Temporizaciones y contadores**: junto a la transición, lo que falta para que se cumpla su temporización (⏱ 1.6 s); en la acción que cuenta (`C:=C+1`), el valor del contador (C = 2).
 - En el panel de la derecha, las **entradas** (interruptor o pulsador), las **salidas** y las variables internas, contadores y temporizadores.
 
 ## Cómo se maneja

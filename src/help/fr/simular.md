@@ -7,6 +7,7 @@
 - **Étape active** : verte, avec un point.
 - **Transition validée** : orange. **Franchissable** : verte.
 - **Action émise** : verte.
+- **Temporisations et compteurs** : à côté de la transition, ce qui manque pour que sa temporisation soit atteinte (⏱ 1.6 s) ; dans l’action qui compte (`C:=C+1`), la valeur du compteur (C = 2).
 - Dans le panneau de droite, les **entrées** (interrupteur ou bouton-poussoir), les **sorties** et les variables internes, compteurs et temporisations.
 
 ## Comment s’en servir

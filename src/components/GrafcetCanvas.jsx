@@ -419,9 +419,10 @@ export default function GrafcetCanvas() {
       editingNoteId,
       setEditingNoteId,
       sim: simulating ? simulation.view : null,
+      countdowns: simulating ? simulation.countdowns : null,
       explainTransition: simulating ? explainNow : null,
     }),
-    [takeSnapshot, renameEverywhere, markedIssues, plcView, plcTable, highlight, setHighlight, toggleTable, simulating, readOnly, connecting, editingNoteId, simulation.view, explainNow, tableLocked],
+    [takeSnapshot, renameEverywhere, markedIssues, plcView, plcTable, highlight, setHighlight, toggleTable, simulating, readOnly, connecting, editingNoteId, simulation.view, simulation.countdowns, explainNow, tableLocked],
   )
 
   // --- Edición -----------------------------------------------------------------------------------

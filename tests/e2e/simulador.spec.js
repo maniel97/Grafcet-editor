@@ -45,6 +45,9 @@ test('simulación: flanco con pulsador, memorizada, temporización y Y', async (
   await expect.poll(() => activeSteps(page)).toBe('s1')
   await expect(page.getByRole('textbox', { name: 'Valor de N' })).toHaveValue('1')
   await expect(page.getByText('3s/X1').last().locator('..')).toContainText(/\d\.\d \/ 3 s/)
+  // Sobre el lienzo (#9): el valor del contador en su acción y la cuenta atrás junto a la transición.
+  await expect(page.locator('.react-flow__node .live-value').filter({ hasText: 'N = 1' })).toBeVisible()
+  await expect(page.locator('.react-flow__node-transition .live-value')).toHaveText(/⏱ [0-3]\.\d s/)
 
   await page.getByLabel('Velocidad').selectOption('10')
   await expect.poll(() => activeSteps(page), { timeout: 5000 }).toBe('s2,s3')

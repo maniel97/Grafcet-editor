@@ -7,6 +7,7 @@
 - **Etapa ativa**: verde, com um ponto.
 - **Transição validada**: âmbar. **Transponível**: verde.
 - **Ação emitida**: verde.
+- **Temporizações e contadores**: junto à transição, o que falta para que a sua temporização se cumpra (⏱ 1.6 s); na ação que conta (`C:=C+1`), o valor do contador (C = 2).
 - No painel da direita, as **entradas** (interruptor ou botão de pressão), as **saídas** e as variáveis internas, contadores e temporizadores.
 
 ## Como se usa
