@@ -5,6 +5,7 @@ import { VARIABLE_TYPES, duplicatedAddresses } from '../lib/addressing'
 import { resolveStepPrefix, stepVar } from '../lib/stepNames'
 import { describeRange, isAnalog } from '../lib/analog'
 import { t, N_ } from '../lib/i18n'
+import { presetText } from '../lib/symbols'
 
 const DRAG_MIME = 'application/x-grafcet-variable'
 
@@ -135,7 +136,7 @@ export default function VariablesTableNode({ id, data, selected }) {
         return {
           key: name,
           name,
-          extra: isAnalog(typeId) ? describeRange(entry) : (entry.preset ?? found.preset),
+          extra: isAnalog(typeId) ? describeRange(entry) : presetText(typeId, found),
           address: entry.address,
           comment: entry.comment,
           uses: [...found.uses],

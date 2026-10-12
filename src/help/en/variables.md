@@ -6,6 +6,7 @@
 
 - **Variables** button on the toolbar: the full table. It can also be placed on the canvas (right-click > “Variable table here”), so that it is printed.
 - Each variable has a PLC **address** (`I0.0`, `Q0.1`, `M0.0`…) and a **comment**.
+- The **Preset** column fills in by itself from the grafcet: the time of each timer (`5s/X2` → 5s) and, for counters, the values they are compared with (`[C >= 3]` → 3). To change them, change the grafcet.
 - “Fill empty” (in the full table; in the canvas one, right-click > “Fill empty addresses”) assigns addresses to those without one, in the chosen format: **S7-200**, **S7-300/1200** or **IEC 61131-3** (`%I0.0`).
 - Drag a variable to another section to change its type.
 

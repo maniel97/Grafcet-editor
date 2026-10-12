@@ -1,5 +1,5 @@
 import { normalizeAction } from './actions'
-import { actionSymbol, parseExpression, projectVariables } from './symbols'
+import { actionSymbol, parseExpression, presetText, projectVariables } from './symbols'
 import { typeInfo } from './addressing'
 import { resolveStepPrefix, stepVar } from './stepNames'
 import { frameOf, macroName, membersOf } from './frames'
@@ -139,7 +139,7 @@ export function buildPlcModel(nodes, edges, plc) {
       type,
       typeLabel: typeInfo(type).label,
       address: entry.address ?? '',
-      preset: entry.preset ?? found.preset ?? '',
+      preset: presetText(type, found) ?? '',
       comment: entry.comment ?? '',
       uses: [...found.uses],
       // Analógicas: señal y rango físico (lib/analog.js).

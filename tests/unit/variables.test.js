@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { addressExpression, extractSymbols, parseExpression, projectVariables } from '../../src/lib/symbols'
+import { addressExpression, extractSymbols, parseExpression, presetText, projectVariables } from '../../src/lib/symbols'
 import {
   EMPTY_PLC,
   addVariable,
@@ -141,5 +141,38 @@ describe('prefijo de las variables de etapa', () => {
     expect(issues.some((i) => i.severity === 'error' && /«E1» se llama igual que la variable de la etapa 1/.test(i.message))).toBe(true)
     // Con X no hay choque.
     expect(validatePlc({ ...plc, stepPrefix: 'X' }, steps, extractSymbols(withE1)).some((i) => /se llama igual/.test(i.message))).toBe(false)
+  })
+})
+
+describe('columna Presel. (#6): sale del grafcet, no se edita', () => {
+  const nodes = [
+    step('s0', '0', 0, { initial: true, actions: [{ text: 'C:=0', kind: 'stored-on' }] }),
+    transition('t1', '↑P · [C < 3] · 5s/X0', 80),
+    step('s1', '1', 120, { actions: [{ text: 'C:=C+1', kind: 'stored-on' }, { text: 'N:=N+2', kind: 'stored-on' }] }),
+    transition('t2', '[C >= 3] + 10 <= N + [Nivel > 60]', 200),
+  ]
+  const symbols = extractSymbols(nodes)
+  it('temporizador: su tiempo; contador o palabra que cuenta: con qué se compara', () => {
+    expect(presetText('timer', symbols.get('5s/X0'))).toBe('5s')
+    expect(presetText('memory', symbols.get('C'))).toBe('3')
+    expect(presetText('counter', symbols.get('C'))).toBe('3')
+    expect(presetText('memory', symbols.get('N'))).toBe('10')
+    // Una entrada (aunque sea analógica con su comparación) no tiene preselección.
+    expect(presetText('analogIn', symbols.get('Nivel'))).toBeNull()
+    expect(presetText('input', symbols.get('P'))).toBeNull()
+    // Un contador declarado a mano y sin comparar: vacío.
+    expect(presetText('counter', undefined)).toBe('')
+  })
+  it('varios objetivos, ordenados', () => {
+    const more = [...nodes, transition('t3', '[C = 7] · [C <> 1]', 300)]
+    expect(presetText('memory', extractSymbols(more).get('C'))).toBe('1, 3, 7')
+  })
+  it('el CSV y el modelo usan lo mismo (no una preselección guardada a mano)', () => {
+    const plc = { ...EMPTY_PLC, variables: { C: { type: 'counter', preset: '99' } } }
+    expect(plcToCsv(plc, [], symbols).split('\r\n')).toContain('C;Contador;;3;')
+    expect(buildPlcModel(nodes, links([]), plc).variables.find((v) => v.name === 'C').preset).toBe('3')
+    // Añadir un temporizador o contador a mano ya no guarda una preselección inventada.
+    const { plc: added, name } = addVariable(EMPTY_PLC, 'counter', [], symbols)
+    expect(added.variables[name].preset).toBeUndefined()
   })
 })

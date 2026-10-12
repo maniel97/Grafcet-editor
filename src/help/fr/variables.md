@@ -6,6 +6,7 @@ Les **variables** sont les noms utilisés dans les réceptivités et les actions
 
 - Bouton **Variables** de la barre : la table complète. On peut aussi la poser sur le canevas (clic droit > « Table des variables ici »), pour qu’elle soit imprimée.
 - Chaque variable a une **adresse** automate (`I0.0`, `Q0.1`, `M0.0`…) et un **commentaire**.
+- La colonne **Présél.** se remplit toute seule à partir du grafcet : le temps de chaque temporisateur (`5s/X2` → 5s) et, pour les compteurs, les valeurs auxquelles ils sont comparés (`[C >= 3]` → 3). Pour les changer, modifiez le grafcet.
 - « Remplir les vides » (dans la table complète ; dans celle du canevas, clic droit > « Remplir les adresses vides ») attribue des adresses à celles qui n’en ont pas, selon le format choisi : **S7-200**, **S7-300/1200** ou **IEC 61131-3** (`%I0.0`).
 - Faites glisser une variable vers une autre section pour changer son type.
 

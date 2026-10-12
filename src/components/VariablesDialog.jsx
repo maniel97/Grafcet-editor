@@ -5,6 +5,7 @@ import { STEP_PREFIXES, resolveStepPrefix, setPreferredStepPrefix, stepVar } fro
 import S7200Config from './S7200Config'
 import { DEFAULT_ANALOG, SIGNALS, analogConfig, isAnalog } from '../lib/analog'
 import { t } from '../lib/i18n'
+import { presetText } from '../lib/symbols'
 
 const cellInput =
   'w-full rounded border border-transparent bg-transparent px-1.5 py-1 text-sm hover:border-slate-300 focus:border-blue-500 focus:bg-white focus:outline-none'
@@ -287,7 +288,7 @@ export default function VariablesDialog({
                     <th className={th}>{t('Símbolo')}</th>
                     <th className={`${th} w-36`}>{t('Tipo')}</th>
                     <th className={`${th} w-32`}>{t('Dirección')}</th>
-                    <th className={th} title={t('Preselección (temporizadores y contadores) o señal y rango (analógicas)')}>{t('Presel. / rango')}</th>
+                    <th className={th} title={t('Tiempo de los temporizadores u objetivo de los contadores (salen del grafcet), o señal y rango de las analógicas')}>{t('Presel. / rango')}</th>
                     <th className={th}>{t('Comentario')}</th>
                     <th className={`${th} w-12 text-right`}>{t('Usos')}</th>
                   </tr>
@@ -358,13 +359,18 @@ export default function VariablesDialog({
                                 onChange={(e) => setVariable(name, { unit: e.target.value }, 'unit')}
                               />
                             </span>
-                          ) : type === 'timer' || type === 'counter' ? (
-                            <input
-                              className={`${cellInput} font-mono`}
-                              value={entry.preset ?? found.preset ?? ''}
-                              placeholder={type === 'timer' ? '5s' : '10'}
-                              onChange={(e) => setVariable(name, { preset: e.target.value }, 'preset')}
-                            />
+                          ) : presetText(type, found) ? (
+                            // Solo lectura: sale del grafcet (el tiempo de 5s/X2, o con qué se compara el contador).
+                            <span
+                              className="px-1.5 font-mono text-sm text-slate-600"
+                              title={
+                                type === 'timer'
+                                  ? t('Sale de la temporización del grafcet: cámbiala en la receptividad.')
+                                  : t('Valores con los que se compara en el grafcet (p. ej. [C >= 3]).')
+                              }
+                            >
+                              {presetText(type, found)}
+                            </span>
                           ) : (
                             <span className="px-1.5 text-slate-300">—</span>
                           )}

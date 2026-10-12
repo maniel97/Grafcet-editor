@@ -6,6 +6,7 @@ Las **variables** son los nombres que usas en receptividades y acciones: `Marcha
 
 - Botón **Variables** de la barra: la tabla completa. También se puede poner en el lienzo (clic derecho > «Tabla de variables aquí»), para que salga en la impresión.
 - Cada variable tiene **dirección** del autómata (`I0.0`, `Q0.1`, `M0.0`…) y **comentario**.
+- La columna **Presel.** se rellena sola a partir del grafcet: el tiempo de cada temporizador (`5s/X2` → 5s) y, en los contadores, los valores con los que se comparan (`[C >= 3]` → 3). Para cambiarlos, cambia el grafcet.
 - «Rellenar vacías» (en la tabla completa; en la del lienzo, clic derecho > «Rellenar direcciones vacías») asigna direcciones a las que no tienen, según el formato elegido: **S7-200**, **S7-300/1200** o **IEC 61131-3** (`%I0.0`).
 - Arrastra una variable a otra sección para cambiar su tipo.
 

@@ -28,6 +28,12 @@ export const timerKey = (value, unit, step) => `${value.replace(',', '.')}${unit
 const COMPARED =
   /(?<![\p{L}\p{N}_.])([\p{L}_][\p{L}\p{N}_.]*)\s*(?:>=|<=|<>|!=|==|=|>|<)|(?:>=|<=|<>|!=|==|=|>|<)\s*([\p{L}_][\p{L}\p{N}_.]*)/gu
 
+// Variable comparada con un número ("C >= 3", "3 <= C"): el número es el objetivo del contador.
+const OP = String.raw`(?:>=|<=|<>|!=|==|=|>|<)`
+const NUMBER = String.raw`(-?\d+(?:[.,]\d+)?)(?![\p{L}\p{N}_.])`
+const NAME = String.raw`([\p{L}_][\p{L}\p{N}_.]*)`
+const TARGET = new RegExp(String.raw`(?<![\p{L}\p{N}_.])${NAME}\s*${OP}\s*${NUMBER}|(?<![\p{L}\p{N}_.])${NUMBER}\s*${OP}\s*${NAME}`, 'gu')
+
 // Símbolos de una expresión booleana (receptividad o condición de acción).
 export function parseExpression(text) {
   const timers = []
@@ -46,7 +52,8 @@ export function parseExpression(text) {
   })
   const inputs = (rest.match(IDENTIFIER) ?? []).filter((id) => !KEYWORDS.has(id.toUpperCase()) && !STEP_VARIABLE.test(id))
   const numeric = new Set([...rest.matchAll(COMPARED)].map((m) => m[1] ?? m[2]).filter((id) => !STEP_VARIABLE.test(id)))
-  return { inputs: [...new Set(inputs)], timers, numeric }
+  const targets = [...rest.matchAll(TARGET)].map((m) => ({ name: m[1] ?? m[4], value: Number((m[2] ?? m[3]).replace(',', '.')) }))
+  return { inputs: [...new Set(inputs)], timers, numeric, targets }
 }
 
 // La misma expresión con cada símbolo sustituido por su dirección (lo que no tiene dirección
@@ -74,7 +81,8 @@ export function actionSymbol(action) {
   return { symbol: assignment[1], type: 'memory', numeric: !/^[01]$/.test(assignment[2].trim()) }
 }
 
-// Recorre el diagrama y devuelve Map símbolo -> { type, uses: Set<nodeId>, numeric?, preset?, step? }
+// Recorre el diagrama y devuelve Map símbolo -> { type, uses: Set<nodeId>, numeric?, preset?, step?, targets? }
+// (targets: números con los que se compara, el objetivo de un contador).
 // El orden del Map es el de aparición (de arriba abajo), útil para asignar direcciones.
 export function extractSymbols(nodes) {
   const found = new Map()
@@ -87,9 +95,10 @@ export function extractSymbols(nodes) {
     found.set(symbol, entry)
   }
   const addExpression = (text, nodeId) => {
-    const { inputs, timers, numeric } = parseExpression(text)
+    const { inputs, timers, numeric, targets } = parseExpression(text)
     for (const t of timers) add(t.key, 'timer', nodeId, { preset: t.preset, step: t.step })
     for (const id of inputs) add(id, 'input', nodeId, numeric.has(id) ? { numeric: true } : {})
+    for (const { name, value } of targets) if (found.has(name)) found.set(name, { ...found.get(name), targets: [...new Set([...(found.get(name).targets ?? []), value])] })
   }
 
   const ordered = [...nodes].sort((a, b) => a.position.y - b.position.y || a.position.x - b.position.x)
@@ -108,13 +117,23 @@ export function extractSymbols(nodes) {
   return found
 }
 
+// Columna «Presel.» de la tabla de variables (solo lectura, sale del grafcet): el tiempo de un
+// temporizador (5s/X2 -> 5s) o el objetivo de un contador (con qué se compara: [C >= 3] -> 3).
+// null si no es ni temporizador ni contador.
+export function presetText(type, found) {
+  if (type === 'timer') return found?.preset ?? ''
+  const counting = type === 'counter' || (type === 'memory' && found?.numeric)
+  if (!counting) return null
+  return [...(found?.targets ?? [])].sort((a, b) => a - b).join(', ')
+}
+
 // Variables del proyecto: las detectadas en el diagrama más las añadidas a mano en la tabla
 // que aún no se usan (van al final, con `uses` vacío). Es lo que muestran y gestionan la tabla,
 // la asignación automática, las comprobaciones y el modelo para PLC.
 export function projectVariables(nodes, plcVariables = {}) {
   const found = extractSymbols(nodes)
   for (const [name, entry] of Object.entries(plcVariables)) {
-    if (!found.has(name)) found.set(name, { type: entry.type ?? 'input', uses: new Set(), preset: entry.preset })
+    if (!found.has(name)) found.set(name, { type: entry.type ?? 'input', uses: new Set() })
   }
   return found
 }

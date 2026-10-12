@@ -31,6 +31,7 @@ export const SCHEMES = [
 
 import { ioMap } from './s7200Catalog'
 import { N_, t } from './i18n'
+import { presetText } from './symbols'
 
 // S7-200: solo 32 bytes de marcas (M0.0–M31.7), así que las etapas van en memoria V (V0.0…), las
 // marcas internas del ladder detrás (lib/ladder/generate.js) y las palabras en VW100…; los
@@ -149,7 +150,7 @@ export function autoAssign(plc, stepNodes, symbols, { overwrite = false } = {}) 
   for (const [name, found] of symbols) {
     const current = variables[name] ?? {}
     const type = current.type ?? found.type
-    const entry = { ...current, type, ...(found.preset && !current.preset ? { preset: found.preset } : {}) }
+    const entry = { ...current, type }
     if (!keep(current)) entry.address = allocator.next(typeInfo(type).area, found.numeric)
     variables[name] = entry
   }
@@ -193,7 +194,6 @@ export function changeVariableType(plc, name, type, stepNodes, symbols) {
 }
 
 const NEW_NAME = { input: 'Entrada', output: 'Salida', memory: 'Marca', timer: 'Temporizador', counter: 'Contador' }
-const DEFAULT_PRESET = { timer: '5s', counter: '10' }
 
 // Añade a mano una variable aún no usada en el diagrama (p. ej. una seta de emergencia que se
 // usará más adelante), con nombre provisional único y la primera dirección libre de su área.
@@ -204,7 +204,7 @@ export function addVariable(plc, type, stepNodes, symbols) {
   const name = `${NEW_NAME[type]}${n}`
   const withEntry = {
     ...plc,
-    variables: { ...plc.variables, [name]: { type, address: '', ...(DEFAULT_PRESET[type] ? { preset: DEFAULT_PRESET[type] } : {}) } },
+    variables: { ...plc.variables, [name]: { type, address: '' } },
   }
   return { plc: changeVariableType(withEntry, name, type, stepNodes, symbols), name }
 }
@@ -326,7 +326,8 @@ export function plcToCsv(plc, stepNodes, symbols) {
   }
   for (const [name, found] of symbols) {
     const entry = plc.variables[name] ?? {}
-    rows.push([name, typeInfo(entry.type ?? found.type).label, entry.address ?? '', entry.preset ?? found.preset ?? '', entry.comment ?? ''])
+    const type = entry.type ?? found.type
+    rows.push([name, typeInfo(type).label, entry.address ?? '', presetText(type, found) ?? '', entry.comment ?? ''])
   }
   const cell = (v) => (/[;"\n]/.test(String(v)) ? `"${String(v).replaceAll('"', '""')}"` : String(v))
   return rows.map((r) => r.map(cell).join(';')).join('\r\n')
