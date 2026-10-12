@@ -4,7 +4,8 @@
 import { useRef } from 'react'
 import { Columns2, Rows2 } from 'lucide-react'
 import { boxChildren } from './panelWidth'
-import { t } from '../lib/i18n'
+import PanelSeparator from './PanelSeparator'
+import { N_, t } from '../lib/i18n'
 
 const MIN_HEIGHT = 140
 
@@ -65,5 +66,50 @@ export function StackButton({ stacked, onToggle }) {
     <button type="button" onClick={onToggle} title={label} aria-label={label} aria-pressed={stacked} className="rounded p-1 text-slate-500 hover:bg-slate-100">
       {stacked ? <Columns2 size={14} /> : <Rows2 size={14} />}
     </button>
+  )
+}
+
+// Pestañas de las vistas cuando no caben uno al lado del otro (tabs: de useDockLayout).
+const TAB_LABELS = { grafcet: N_('Grafcet'), elec: N_('Esquema eléctrico'), scene: N_('Planta'), ladder: N_('Ladder') }
+export function PanelTabs({ tabs }) {
+  if (!tabs.show) return null
+  return (
+    <div role="tablist" aria-label={t('Vistas')} className="flex shrink-0 gap-1 overflow-x-auto border-b border-slate-200 bg-white px-2 py-1">
+      {tabs.items.map((id) => (
+        <button
+          key={id}
+          type="button"
+          role="tab"
+          aria-selected={tabs.active === id}
+          onClick={() => tabs.select(id)}
+          className={`shrink-0 rounded-md px-3 py-1 text-sm ${tabs.active === id ? 'bg-blue-600 font-medium text-white' : 'text-slate-600 hover:bg-slate-100'}`}
+        >
+          {t(TAB_LABELS[id])}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+// Columna de los paneles apilados, con su separador de ancho (stack y stackRef: de useDockLayout). Sin apilar,
+// no tiene caja (display: contents) y los paneles quedan en la fila, junto al grafcet.
+export function PanelStack({ stack, stackRef, children }) {
+  return (
+    <div
+      data-stack=""
+      ref={stackRef}
+      className={stack.active ? 'relative flex min-h-0 min-w-0 flex-col' : 'contents'}
+      style={stack.active ? { width: stack.width, flexShrink: 1, minWidth: 360 } : undefined}
+    >
+      {stack.active && (
+        <PanelSeparator
+          sectionRef={stackRef}
+          {...stack.separator}
+          label={t('Ancho de los paneles apilados')}
+          title={t('Arrastra para cambiar el ancho de la columna de paneles (doble clic: mitad y mitad)')}
+        />
+      )}
+      {children}
+    </div>
   )
 }

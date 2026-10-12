@@ -50,9 +50,8 @@ import { clearSharedHash, decodeProject, sharedData } from '../lib/share'
 import { applySymbols } from '../lib/plc/symbolTable'
 import { buildPlcModel } from '../lib/plcModel'
 import { t } from '../lib/i18n'
-import PanelSeparator from './PanelSeparator'
-import { StackButton, StackSeparator } from './PanelDock'
-import { usePanelWidth } from './panelWidth'
+import { PanelStack, PanelTabs } from './PanelDock'
+import { useDockLayout } from '../hooks/useDockLayout'
 import { FIRST_TOUR, markTourSeen, tourSeen } from '../lib/tours'
 import { tutorialById } from '../lib/tutorials'
 import { bumpProcess, freezeChecks, isLocked, isStudent, keepProgress, studentProject } from '../lib/exercise'
@@ -100,31 +99,6 @@ const defaultData = {
   transition: (nodes) => ({ condition: nextTransitionLabel(nodes) }),
   note: () => ({ text: '', color: 'yellow' }),
   frame: () => ({ kind: 'grafcet' }),
-}
-
-// Preferencias de la disposición de los paneles (en este navegador; sin almacenamiento, por defecto).
-const STACK_KEY = 'grafcet-editor:panels-stacked'
-const GROW_KEY = 'grafcet-editor:panels-grow'
-const readPref = (key) => {
-  try {
-    return localStorage.getItem(key)
-  } catch {
-    return null
-  }
-}
-const writePref = (key, value) => {
-  try {
-    localStorage.setItem(key, value)
-  } catch {
-    /* sin almacenamiento */
-  }
-}
-const readGrow = () => {
-  try {
-    return JSON.parse(readPref(GROW_KEY)) ?? {}
-  } catch {
-    return {}
-  }
 }
 
 export default function GrafcetCanvas() {
@@ -186,11 +160,6 @@ export default function GrafcetCanvas() {
   const [verifyOpen, setVerifyOpen] = useState(false)
   // Ladder: un panel más junto al grafcet, como la planta y el esquema. null | 'split' | 'full'.
   const [ladderView, setLadderView] = useState(null)
-  // Paneles apilados en una columna junto al grafcet (#18), su ancho y el reparto del alto.
-  const [stacked, setStacked] = useState(() => readPref(STACK_KEY) === '1')
-  const [stackGrow, setStackGrow] = useState(readGrow)
-  const [stackWidth, stackSeparator] = usePanelWidth('grafcet-editor:stack-width', 360)
-  const stackRef = useRef(null)
   const showInLadder = (id) => {
     setLadderFocus(id)
     setLadderView((v) => v ?? 'split')
@@ -260,17 +229,6 @@ export default function GrafcetCanvas() {
   // Con el lienzo estrecho (p. ej. el panel del ejercicio y el de propiedades abiertos a la vez),
   // el minimapa tapaba lo que se acaba de añadir abajo a la derecha (su botón +): se oculta.
   const [roomy, setRoomy] = useState(true)
-  // Zona de trabajo (grafcet + paneles): con poco ancho, los paneles van en pestañas (#18).
-  const rowRef = useRef(null)
-  const [rowWidth, setRowWidth] = useState(Infinity)
-  useEffect(() => {
-    const el = rowRef.current
-    if (!el || typeof ResizeObserver === 'undefined') return
-    const observer = new ResizeObserver(([entry]) => setRowWidth(entry.contentRect.width))
-    observer.observe(el)
-    return () => observer.disconnect()
-  }, [])
-  const [panelTab, setPanelTab] = useState('grafcet')
   useEffect(() => {
     const el = wrapperRef.current
     if (!el || typeof ResizeObserver === 'undefined') return
@@ -962,53 +920,13 @@ export default function GrafcetCanvas() {
 
   const loopSource = loopSourceId ? nodes.find((n) => n.id === loopSourceId) : null
   const initialSteps = nodes.filter((n) => n.type === 'step' && n.data.initial)
-  // Paneles junto al grafcet (los de pantalla completa van encima y no cuentan): por defecto, cada
-  // uno ocupa lo mismo que el grafcet (la mitad con uno, un tercio con dos…), sin contar el panel de
-  // la simulación (w-80).
-  const splitPanels = [elecView, simulating && simulation.sim && sceneView, ladderView].filter((v) => v === 'split').length
-  const panelWidth = `calc((100% - ${simulating ? '20rem' : '0px'}) / ${splitPanels + 1})`
-  // Apilados: con dos o más en vista dividida (si uno está a pantalla completa, cada uno a su sitio).
+  // Disposición de los paneles junto al grafcet: reparto, apilados, pestañas (hooks/useDockLayout).
   const sceneShown = Boolean(simulating && simulation.sim && sceneView)
-  const stackOrder = [elecView === 'split' && 'elec', sceneShown && sceneView === 'split' && 'scene', ladderView === 'split' && 'ladder'].filter(Boolean)
-  const anyFull = elecView === 'full' || (sceneShown && sceneView === 'full') || ladderView === 'full'
-  const stackActive = stacked && stackOrder.length >= 2 && !anyFull
-  const toggleStack = () =>
-    setStacked((v) => {
-      writePref(STACK_KEY, v ? '0' : '1')
-      return !v
-    })
-  const commitGrow = (grow) => {
-    setStackGrow(grow ?? {})
-    writePref(GROW_KEY, JSON.stringify(grow ?? {}))
-  }
-  // Pestañas: si no caben el grafcet y un panel de 380 px uno al lado del otro (sin contar el panel
-  // de la simulación, que en un móvil va abajo). Al abrir un panel, su pestaña pasa a ser la elegida.
-  const openPanels = [elecView && 'elec', sceneShown && 'scene', ladderView && 'ladder'].filter(Boolean)
-  const tabbed = openPanels.length > 0 && rowWidth - (simulating && rowWidth >= 768 ? 320 : 0) < 760
-  const openKey = openPanels.join(',')
-  const [prevOpenKey, setPrevOpenKey] = useState(openKey)
-  if (openKey !== prevOpenKey) {
-    setPrevOpenKey(openKey)
-    const added = openPanels.find((id) => !prevOpenKey.split(',').includes(id))
-    if (added) setPanelTab(added)
-  }
-  const activeTab = openPanels.includes(panelTab) ? panelTab : 'grafcet'
-  const PANEL_TABS = { grafcet: t('Grafcet'), elec: t('Esquema eléctrico'), scene: t('Planta'), ladder: t('Ladder') }
-  // El grafcet se reencuadra cuando cambia el sitio que le dejan los paneles.
-  const layoutKey = tabbed ? `tabs:${activeTab}` : `${stackOrder.length}|${stackActive}|${anyFull}`
-  const layoutKeyRef = useRef(layoutKey)
-  useEffect(() => {
-    if (layoutKeyRef.current === layoutKey) return
-    layoutKeyRef.current = layoutKey
-    const id = requestAnimationFrame(() => fitDrawn(0))
-    return () => cancelAnimationFrame(id)
-  }, [layoutKey, fitDrawn])
-  const dockFor = (id) => {
-    if (tabbed) return { tab: activeTab === id ? 'active' : 'hidden' }
-    const button = stackOrder.length >= 2 && stackOrder.includes(id) && !anyFull ? <StackButton stacked={stackActive} onToggle={toggleStack} /> : null
-    if (!stackActive) return { button }
-    return { stacked: true, grow: stackGrow[id] ?? 1, button, top: stackOrder[0] === id ? null : <StackSeparator onGrow={setStackGrow} onCommit={commitGrow} /> }
-  }
+  const { rowRef, stackRef, ...dock } = useDockLayout({
+    views: { elec: elecView, scene: sceneShown ? sceneView : null, ladder: ladderView },
+    simulating,
+    onLayoutChange: () => fitDrawn(0), // el grafcet se reencuadra en el sitio que le queda
+  })
   const modalOpen = settingsOpen || helpOpen || variablesOpen || gemmaOpen || pneumaticOpen || newOpen || !!exportFormat || !!projectsTab || !!menu
   // En solo lectura el clic derecho no abre menús de edición (ni el del navegador).
   const blockMenu = (handler) => (readOnly ? (e) => e.preventDefault() : handler)
@@ -1319,22 +1237,7 @@ export default function GrafcetCanvas() {
             </button>
           </div>
         )}
-        {tabbed && (
-          <div role="tablist" aria-label={t('Vistas')} className="flex shrink-0 gap-1 overflow-x-auto border-b border-slate-200 bg-white px-2 py-1">
-            {['grafcet', ...openPanels].map((id) => (
-              <button
-                key={id}
-                type="button"
-                role="tab"
-                aria-selected={activeTab === id}
-                onClick={() => setPanelTab(id)}
-                className={`shrink-0 rounded-md px-3 py-1 text-sm ${activeTab === id ? 'bg-blue-600 font-medium text-white' : 'text-slate-600 hover:bg-slate-100'}`}
-              >
-                {PANEL_TABS[id]}
-              </button>
-            ))}
-          </div>
-        )}
+        <PanelTabs tabs={dock.tabs} />
         <div ref={rowRef} className="relative flex min-h-0 flex-1" {...floatDrop}>
           {/* Capa de los paneles flotantes del simulador: sobre toda la zona de trabajo (grafcet,
               planta, esquema); solo los paneles reciben los clics. */}
@@ -1458,20 +1361,7 @@ export default function GrafcetCanvas() {
               />
             )}
           </div>
-          <div
-            data-stack=""
-            ref={stackRef}
-            className={stackActive ? 'relative flex min-h-0 min-w-0 flex-col' : 'contents'}
-            style={stackActive ? { width: stackWidth ?? `calc((100% - ${simulating ? '20rem' : '0px'}) / 2)`, flexShrink: 1, minWidth: 360 } : undefined}
-          >
-          {stackActive && (
-            <PanelSeparator
-              sectionRef={stackRef}
-              {...stackSeparator}
-              label={t('Ancho de los paneles apilados')}
-              title={t('Arrastra para cambiar el ancho de la columna de paneles (doble clic: mitad y mitad)')}
-            />
-          )}
+          <PanelStack stack={dock.stack} stackRef={stackRef}>
           {elecView && (
             <Suspense fallback={<Loading panel />}>
               <ElectricalView
@@ -1489,8 +1379,8 @@ export default function GrafcetCanvas() {
                 onHistory={setElecHistory}
                 onActivate={() => setLastPanel('elec')}
                 maximized={elecView === 'full'}
-                defaultWidth={panelWidth}
-                dock={dockFor('elec')}
+                defaultWidth={dock.panelWidth}
+                dock={dock.dockFor('elec')}
                 onToggleMaximize={() => setElecView((v) => (v === 'full' ? 'split' : 'full'))}
                 onClose={() => {
                   setElecView(null)
@@ -1517,8 +1407,8 @@ export default function GrafcetCanvas() {
                   setPlc((p) => ({ ...p, variables: { ...p.variables, [name]: { ...(p.variables?.[name] ?? {}), type } } }))
                 }
                 maximized={sceneView === 'full'}
-                defaultWidth={panelWidth}
-                dock={dockFor('scene')}
+                defaultWidth={dock.panelWidth}
+                dock={dock.dockFor('scene')}
                 onToggleMaximize={() => setSceneView((v) => (v === 'full' ? 'split' : 'full'))}
                 onClose={() => setSceneView(null)}
               />
@@ -1536,8 +1426,8 @@ export default function GrafcetCanvas() {
                 simulation={simulating ? simulation : null}
                 highlightNodeId={ladderFocus}
                 maximized={ladderView === 'full'}
-                defaultWidth={panelWidth}
-                dock={dockFor('ladder')}
+                defaultWidth={dock.panelWidth}
+                dock={dock.dockFor('ladder')}
                 onToggleMaximize={() => setLadderView((v) => (v === 'full' ? 'split' : 'full'))}
                 onClose={() => setLadderView(null)}
                 // El grafcet queda a la vista: a pantalla completa, el ladder pasa a la vista dividida.
@@ -1549,7 +1439,7 @@ export default function GrafcetCanvas() {
               />
             </Suspense>
           )}
-          </div>
+          </PanelStack>
           {simulating ? (
             <Suspense fallback={<Loading panel />}>
               <SimulationPanel
