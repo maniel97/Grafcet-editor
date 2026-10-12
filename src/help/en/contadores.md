@@ -40,7 +40,7 @@ This very grafcet, ready to simulate.
 If the machine has to stay in the same step while it counts, use an **on-event** action: it runs at the instant of the event, while the step is active.
 
 1. Double-click the step, **Add action**, type «On event».
-2. Text: `C:=C+1`. In its condition (the event): `↑P`.
+2. Text: `C:=C+1`. In its condition (the event): `↑P`. The ↑ and ↓ buttons on its right write the edge.
 
 Each rising edge of P adds one while the step is active. The exit of the step can be `[C >= 10]`.
 
@@ -72,3 +72,8 @@ Other operations work too: `N:=N+5`, `D:=A*2`, `M:=(A+B)/2`.
 The editor does not use the PLC's counter blocks (CTU, CTD): a counter is a **word** (`MW100` in S7-300/1200, `VW` in S7-200) and `C:=C+1` becomes an addition (`+I` in S7-200). Comparisons use word comparators. This way any operation is translated just as in the grafcet (`+5`, `-1`, `*2`), not only counting one by one.
 
 See also: [Actions](acciones) (stored and on-event) · [Loops and jumps](bucles) · [Transitions and receptivities](transiciones).
+
+To practise it step by step:
+
+```tutorial contador
+```

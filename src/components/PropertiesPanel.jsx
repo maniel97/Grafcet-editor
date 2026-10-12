@@ -20,6 +20,31 @@ const CONDITION_SYMBOLS = [
   { symbol: '!', title: N_('Negación: se dibuja con raya encima') },
 ]
 
+// Inserta texto en la posición del cursor de `el` y lo deja colocado detrás.
+function insertAtCursor(el, value, text, onChange) {
+  const start = el?.selectionStart ?? value.length
+  const end = el?.selectionEnd ?? value.length
+  onChange(value.slice(0, start) + text + value.slice(end))
+  requestAnimationFrame(() => {
+    el?.focus()
+    el?.setSelectionRange(start + text.length, start + text.length)
+  })
+}
+
+function SymbolButtons({ symbols, onInsert, small }) {
+  return symbols.map((s) => (
+    <button
+      key={s.symbol}
+      type="button"
+      title={t(s.title)}
+      onClick={() => onInsert(s.symbol)}
+      className={`${small ? 'h-8 w-7 shrink-0' : 'h-8 w-8'} rounded-md border border-slate-300 font-mono text-sm text-slate-700 hover:border-blue-400 hover:bg-blue-50`}
+    >
+      {s.label ?? s.symbol}
+    </button>
+  ))
+}
+
 // Etiquetas de un clic para rellenar valores habituales.
 function Presets({ values, onPick, title, render = (v) => v }) {
   return (
@@ -171,6 +196,7 @@ const kindMarker = { 'stored-on': '↑ ', 'stored-off': '↓ ', event: '⚡ ', c
 
 function ActionRow({ action, onChange, onRemove, vocabulary, otherTexts }) {
   const kind = actionKind(action.kind)
+  const conditionRef = useRef(null)
   return (
     <div className="space-y-1 rounded-md border border-slate-200 p-2">
       <div className="flex gap-1">
@@ -209,16 +235,27 @@ function ActionRow({ action, onChange, onRemove, vocabulary, otherTexts }) {
           </option>
         ))}
       </select>
+      {/* Con ↑ y ↓ a mano: el evento suele ser un flanco (↑b). */}
       {kind.needsCondition && (
-        <AutocompleteInput
-          vocabulary={vocabulary}
-          otherTexts={[...otherTexts, action.text]}
-          className={inputClass}
-          value={action.condition}
-          placeholder={t(kind.placeholder)}
-          onChange={(condition) => onChange({ condition })}
-          aria-label={t('Condición de la acción')}
-        />
+        <div className="flex gap-1">
+          <div className="min-w-0 flex-1">
+            <AutocompleteInput
+              inputRef={conditionRef}
+              vocabulary={vocabulary}
+              otherTexts={[...otherTexts, action.text]}
+              className={inputClass}
+              value={action.condition}
+              placeholder={t(kind.placeholder)}
+              onChange={(condition) => onChange({ condition })}
+              aria-label={t('Condición de la acción')}
+            />
+          </div>
+          <SymbolButtons
+            small
+            symbols={CONDITION_SYMBOLS.slice(0, 2)}
+            onInsert={(text) => insertAtCursor(conditionRef.current, action.condition ?? '', text, (condition) => onChange({ condition }))}
+          />
+        </div>
       )}
       <p className="text-xs text-slate-400">{t(kind.help)}</p>
     </div>
@@ -329,17 +366,7 @@ function TransitionFields({ data, onChange, previousSteps, vocabulary, counters,
   const inputRef = useRef(null)
   const condition = data.condition ?? ''
 
-  // Inserta texto en la posición del cursor y lo deja colocado detrás.
-  const insert = (text) => {
-    const el = inputRef.current
-    const start = el?.selectionStart ?? condition.length
-    const end = el?.selectionEnd ?? condition.length
-    onChange({ condition: condition.slice(0, start) + text + condition.slice(end) })
-    requestAnimationFrame(() => {
-      el?.focus()
-      el?.setSelectionRange(start + text.length, start + text.length)
-    })
-  }
+  const insert = (text) => insertAtCursor(inputRef.current, condition, text, (c) => onChange({ condition: c }))
 
   // Temporización normalizada referida a la etapa anterior: "5s/X2" (5 s desde que se activó X2).
   const timePresets = previousSteps.length ? previousSteps.map((label) => `5s/X${label}`) : ['5s/X1']
@@ -361,17 +388,7 @@ function TransitionFields({ data, onChange, previousSteps, vocabulary, counters,
         />
       </Field>
       <div className="flex gap-1">
-        {CONDITION_SYMBOLS.map((s) => (
-          <button
-            key={s.symbol}
-            type="button"
-            title={t(s.title)}
-            onClick={() => insert(s.symbol)}
-            className="h-8 w-8 rounded-md border border-slate-300 font-mono text-sm text-slate-700 hover:border-blue-400 hover:bg-blue-50"
-          >
-            {s.label ?? s.symbol}
-          </button>
-        ))}
+        <SymbolButtons symbols={CONDITION_SYMBOLS} onInsert={insert} />
       </div>
       <p className="text-xs text-slate-400">
         {t('{a} o {b} se dibujan con raya encima.')

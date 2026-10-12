@@ -157,9 +157,12 @@ export default function VariablesTableNode({ id, data, selected }) {
   // Columnas comunes a todas las filas (si cada fila calculara las suyas, un nombre largo
   // desplazaría su dirección y su comentario). La primera, a la medida del nombre más largo
   // (letra monoespaciada: 1ch por carácter) más el asa de arrastre y la preselección.
+  // También el título de la sección (al 0.8 y en mayúsculas espaciadas: ~0.9ch por letra), para que
+  // no se corte («CONTADO…») cuando los nombres son cortos.
   const longest = Math.max(
     6,
     ...visible.flatMap((sec) => sec.rows.map((r) => String(r.name).length + (r.extra ? String(r.extra).length + 3 : 0))),
+    ...visible.map((sec) => Math.ceil(t(sec.title).length * 0.9)),
   )
   const columns = { gridTemplateColumns: `max(5rem, calc(${longest}ch + 1.5rem)) 6rem${showComments ? ' minmax(7rem, 1fr)' : ''}` }
 

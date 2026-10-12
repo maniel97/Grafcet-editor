@@ -64,5 +64,5 @@ export const ACTION_PRESETS = [
   { text: 'Luz OK', kind: 'continuous' },
   { text: 'A:=1', kind: 'stored-on' },
   { text: 'A:=0', kind: 'stored-off' },
-  { text: 'C:=C+1', kind: 'stored-on' },
+  // Contar (C:=C+1) va en el bloque «Contador», que además lo declara.
 ]

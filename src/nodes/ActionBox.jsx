@@ -34,6 +34,7 @@ export default function ActionBox({ action, borderClass, color, first, stepActiv
 
   return (
     <div
+      data-kind={kind}
       className={`diagram-text relative flex h-[56px] min-w-[96px] items-center justify-center border-2 px-[12px] whitespace-nowrap transition-colors ${borderClass} ${
         first ? '' : '-ml-[2px]'
       } ${emitting ? 'bg-green-200 font-semibold' : 'bg-white'}`}

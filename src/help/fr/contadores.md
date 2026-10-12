@@ -40,7 +40,7 @@ Ce même grafcet, prêt à simuler.
 Si la machine doit rester dans la même étape pendant qu’elle compte, on utilise une action **sur événement** : elle s’exécute à l’instant de l’événement, tant que l’étape est active.
 
 1. Double-clic sur l’étape, **Ajouter une action**, type « Sur événement ».
-2. Texte : `C:=C+1`. Dans sa condition (l’événement) : `↑P`.
+2. Texte : `C:=C+1`. Dans sa condition (l’événement) : `↑P`. Les boutons ↑ et ↓ à sa droite écrivent le front.
 
 Chaque front montant de P ajoute un tant que l’étape est active. La sortie de l’étape peut être `[C >= 10]`.
 
@@ -72,3 +72,8 @@ D’autres opérations marchent aussi : `N:=N+5`, `D:=A*2`, `M:=(A+B)/2`.
 L’éditeur n’utilise pas les blocs compteurs de l’automate (CTU, CTD) : un compteur est un **mot** (`MW100` sur S7-300/1200, `VW` sur S7-200) et `C:=C+1` devient une addition (`+I` sur S7-200). Les comparaisons utilisent les comparateurs de mots. Ainsi, toute opération se traduit comme dans le grafcet (`+5`, `-1`, `*2`), pas seulement compter un par un.
 
 Voir aussi : [Actions](acciones) (mémorisées et sur événement) · [Boucles et sauts](bucles) · [Transitions et réceptivités](transiciones).
+
+Pour t’entraîner pas à pas :
+
+```tutorial contador
+```

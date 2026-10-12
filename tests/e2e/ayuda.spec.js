@@ -138,6 +138,56 @@ test('tutorial «Una espera» de principio a fin', async ({ page }) => {
   expectNoErrors(errors)
 })
 
+// Contadores (#11): con los atajos del panel, una acción al evento y la planta.
+test('tutorial «Contar piezas» de principio a fin', async ({ page }) => {
+  const errors = await openEditor(page)
+  const tut = tutorial(page)
+  const panel = page.locator('[data-tour="propiedades"]')
+  await tut.start('Contadores', 'contador')
+  await tut.title('El punto de partida')
+  await tut.next()
+
+  await tut.title('Sumar uno')
+  await tut.step('1').dblclick()
+  await panel.getByRole('button', { name: '↑ C:=C+1' }).click()
+  await tut.title('Una por pieza')
+  await panel.getByLabel('Tipo de acción').last().selectOption('event')
+  const event = panel.getByLabel('Condición de la acción').last()
+  await event.fill('Pieza')
+  await event.press('Home')
+  await panel.getByTitle('Flanco de subida (↑a)').last().click()
+  await expect(event).toHaveValue('↑Pieza')
+
+  await tut.title('Comparar')
+  await tut.transition('Paro').dblclick()
+  const condition = panel.getByRole('combobox').first()
+  await condition.press('End')
+  await condition.pressSequentially(' + ')
+  await panel.getByRole('button', { name: '[C >= 3]' }).click()
+  await expect(condition).toHaveValue('!Paro + [C >= 3]')
+
+  await tut.title('Poner a cero')
+  await tut.step('0').dblclick()
+  await panel.getByRole('button', { name: '↑ C:=0' }).click()
+
+  await tut.title('Pruébalo')
+  await page.locator('[data-tour="Simular"]').click()
+  await hold(page, 'Pulsador Marcha')
+  await tut.title('Pasan las piezas')
+  const pieza = page.locator('[data-tour="entradas"]').getByRole('button', { name: 'pulsar' })
+  const counter = page.getByRole('textbox', { name: 'Valor de C' })
+  for (const n of ['1', '2']) {
+    await pieza.click({ delay: 150 })
+    await expect(counter).toHaveValue(n)
+  }
+  await pieza.click({ delay: 150 })
+  await tut.title('¡Hecho!')
+  await expect(counter).toHaveValue('0')
+  await tut.next()
+  await expect(page.locator('.tour')).toHaveCount(0)
+  expectNoErrors(errors)
+})
+
 test('tutorial «Elegir un camino» de principio a fin', async ({ page }) => {
   const errors = await openEditor(page)
   const tut = tutorial(page)

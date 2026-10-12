@@ -40,7 +40,7 @@ Este mesmo grafcet, pronto a simular.
 Se a máquina tem de continuar na mesma etapa enquanto conta, usa-se uma ação **no evento**: executa-se no instante do evento, enquanto a etapa está ativa.
 
 1. Duplo clique na etapa, **Adicionar ação**, tipo «No evento».
-2. Texto: `C:=C+1`. Na sua condição (o evento): `↑P`.
+2. Texto: `C:=C+1`. Na sua condição (o evento): `↑P`. Os botões ↑ e ↓ à direita escrevem o flanco.
 
 Cada flanco de P soma um enquanto a etapa está ativa. A saída da etapa pode ser `[C >= 10]`.
 
@@ -72,3 +72,8 @@ Outras operações também funcionam: `N:=N+5`, `D:=A*2`, `M:=(A+B)/2`.
 O editor não usa os blocos contadores do autómato (CTU, CTD): um contador é uma **palavra** (`MW100` em S7-300/1200, `VW` em S7-200) e `C:=C+1` transforma-se numa soma (`+I` em S7-200). As comparações usam os comparadores de palavras. Assim, qualquer operação traduz-se tal como no grafcet (`+5`, `-1`, `*2`), não só contar de um em um.
 
 Ver também: [Ações](acciones) (memorizadas e no evento) · [Ciclos e saltos](bucles) · [Transições e receptividades](transiciones).
+
+Para praticar passo a passo:
+
+```tutorial contador
+```

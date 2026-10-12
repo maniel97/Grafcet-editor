@@ -53,6 +53,10 @@ const linked = (from, to) => Boolean(from && to) && all('.react-flow__edge').som
 const slowStep = () => steps().find((n) => n.textContent.includes('Motor_lento'))
 const newParo = () => transitionsMatching(/^Paro$/).find((n) => linked(slowStep(), n))
 
+// «Contar piezas»: acciones de una etapa (data-kind en cada caja) con su texto y su condición.
+const stepHasAction = (label, kind, re) => () =>
+  [...(stepNode(label)()?.querySelectorAll(kind ? `[data-kind="${kind}"]` : '[data-kind]') ?? [])].some((a) => re.test(a.textContent.replace(/\s+/g, '')))
+
 // Tutorial del profesorado: el modo educativo, el escenario guardado y el diálogo del ejercicio.
 const education = () => {
   try {
@@ -196,6 +200,73 @@ export const TUTORIALS = [
         target: 'simulacion',
         title: N_('¡Hecho!'),
         text: N_('El tiempo siempre se escribe sobre una variable: 5s/X1 cuenta desde que se activó la etapa 1. Más formas (retardos, 3s/a/2s) en el artículo Temporizaciones.'),
+      },
+    ],
+  },
+  {
+    id: 'contador',
+    title: N_('Contar piezas'),
+    description: N_('Sobre el marcha-paro: un contador C cuenta las piezas que pasan por un sensor y la cinta se para sola a la tercera.'),
+    start: 'marcha-paro',
+    auto: true,
+    steps: [
+      {
+        target: 'lienzo',
+        title: N_('El punto de partida'),
+        text: N_('Es el marcha-paro: con Marcha arranca el motor de una cinta (etapa 1) y con Paro se para (etapa 0). Ahora la cinta tiene un sensor, Pieza, que se activa un momento cada vez que pasa una pieza.\nVamos a contarlas con un contador, C, y a parar la cinta sola cuando hayan pasado 3.'),
+      },
+      {
+        target: firstOf(panel, stepNode('1')),
+        free: true,
+        title: N_('Sumar uno'),
+        text: N_('Un contador es una variable que guarda un número. No hay un bloque «contador»: se cuenta con acciones que cambian su valor.\n1. Haz doble clic sobre la etapa 1: se abre su panel a la derecha.\n2. Abajo, en «Contador», deja el nombre C y pulsa el botón ↑ C:=C+1.\nSe añade la acción C:=C+1 («C pasa a valer C más uno») y C queda apuntado como contador en la tabla de variables.'),
+        waitFor: stepHasAction('1', null, /^C:=C\+1/),
+        hint: N_('Añade C:=C+1 a la etapa 1 con el botón del bloque «Contador».'),
+      },
+      {
+        target: firstOf(panel, stepNode('1')),
+        free: true,
+        title: N_('Una por pieza'),
+        text: N_('Tal como está, C sumaría uno solo al activarse la etapa: una vez por arranque. Para sumar uno con cada pieza mientras la cinta sigue en marcha, la acción tiene que ser «al evento».\n1. En la acción C:=C+1, cambia el tipo a «Al evento».\n2. Aparece la casilla de su condición: escribe Pieza.\n3. Pon el cursor delante de Pieza y pulsa el botón ↑ de su derecha: queda ↑Pieza, el flanco de subida (el instante en que llega cada pieza).'),
+        waitFor: stepHasAction('1', 'event', /↑Pieza.*C:=C\+1/),
+        hint: N_('Acción C:=C+1 al evento, con la condición ↑Pieza.'),
+      },
+      {
+        target: firstOf(panel, transitionNode(/Paro/)),
+        free: true,
+        title: N_('Comparar'),
+        text: N_('Ahora, que la cinta se pare sola al llegar a 3 piezas, sin quitar el pulsador Paro.\n1. Haz doble clic sobre la transición de debajo de la etapa 1 (Paro con una raya encima).\n2. Haz clic al final de su texto (!Paro) y escribe + (es «o»).\n3. En «Contador», deja el valor 3 y pulsa [C >= 3]: se añade donde está el cursor.\nQueda !Paro + [C >= 3]: se vuelve a la etapa 0 al pulsar Paro o cuando C llega a 3.'),
+        waitFor: transitionMatching(/Paro.*\+.*C\s*(>=|≥)\s*3/),
+        hint: N_('Receptividad !Paro + [C >= 3].'),
+      },
+      {
+        target: firstOf(panel, stepNode('0')),
+        free: true,
+        title: N_('Poner a cero'),
+        text: N_('Falta una cosa: al volver a la etapa 0, C sigue valiendo 3. En la siguiente marcha la cinta se pararía al momento.\n1. Haz doble clic sobre la etapa 0.\n2. En «Contador», pulsa ↑ C:=0.\nCada vez que se activa la etapa 0 (también al empezar), C vuelve a 0.'),
+        waitFor: stepHasAction('0', 'stored-on', /^C:=0/),
+        hint: N_('Añade C:=0 a la etapa 0.'),
+      },
+      {
+        target: firstOf(() => one('[data-tour="planta"]'), () => one('[data-tour="Simular"]')),
+        free: true,
+        title: N_('Pruébalo'),
+        text: N_('1. Pulsa Simular (en la barra de arriba): se abre la planta junto al grafcet.\n2. Pulsa el botón verde Marcha del panel de control de la planta.\nSe activa la etapa 1 y la cinta arranca.'),
+        waitFor: stepActive('1'),
+        hint: N_('Simula y pulsa Marcha en la planta.'),
+      },
+      {
+        target: firstOf(() => one('[data-tour="entradas"]'), () => one('[data-tour="simulacion"]')),
+        free: true,
+        title: N_('Pasan las piezas'),
+        text: N_('El sensor Pieza no está en la planta: está en el panel de la derecha, en Entradas.\n1. Pulsa tres veces su botón «pulsar» (o la tecla 1): cada pulsación es una pieza que pasa.\nEn «Marcas y contadores» verás C subir (1 / 3, 2 / 3…), y también en la acción de la etapa 1. A la tercera, la transición se cumple: vuelve la etapa 0, la cinta se para y C vuelve a 0.'),
+        waitFor: stepActive('0'),
+        hint: N_('Pulsa Pieza tres veces.'),
+      },
+      {
+        target: 'simulacion',
+        title: N_('¡Hecho!'),
+        text: N_('Ya conoces las piezas de un contador: declararlo (los botones de «Contador» lo hacen solos), sumar uno, compararlo y ponerlo a cero. Contar con un bucle de etapas y contar hacia abajo, en el artículo Contadores.'),
       },
     ],
   },
