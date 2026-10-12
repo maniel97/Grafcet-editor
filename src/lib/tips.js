@@ -173,10 +173,114 @@ export function studentTips(nodes, edges, plc) {
       'acciones',
     )
   }
+  // 6-8. Acciones memorizadas y contadores: qué escribe cada acción en cada variable.
+  //   set: A, A:=1 (cualquier constante distinta de 0) · reset: A:=0
+  //   up / down: C:=C+1 / C:=C-1 · other: cualquier otra expresión (N:=A*2)
+  const writes = new Map()
+  const reads = new Map() // variable -> ids de los nodos que la leen
+  const compared = new Map() // variable -> ids de los nodos que la comparan ([C >= 3])
+  for (const s of compiled.steps) {
+    for (const a of s.actions) {
+      if (a.conditionAst) for (const n of booleanVarsLoose(a.conditionAst)) push(reads, n, s.id)
+      if (a.conditionAst) for (const n of comparedVars(a.conditionAst)) push(compared, n, s.id)
+      if (a.kind !== 'stored-on' && a.kind !== 'stored-off' && a.kind !== 'event') continue
+      if (!a.assignment) {
+        if (a.symbol) push(writes, a.symbol, { step: s, how: 'set' })
+        continue
+      }
+      const { target, value } = a.assignment
+      for (const n of booleanVarsLoose(value)) if (n !== target) push(reads, n, s.id)
+      push(writes, target, { step: s, how: writeKind(target, value) })
+    }
+  }
+  for (const t of compiled.transitions) {
+    if (!t.ast) continue
+    for (const n of booleanVarsLoose(t.ast)) push(reads, n, t.id)
+    for (const n of comparedVars(t.ast)) push(compared, n, t.id)
+  }
+  // Un visor de la planta también lee la variable (p. ej. las piezas hechas en un display).
+  for (const e of plc?.scene?.elements ?? []) if (e.variable && !reads.has(e.variable)) reads.set(e.variable, [])
+  const stepsOf = (list) => [...new Set(list.map((w) => w.step))]
+  const where = (list) => stepsOf(list).map((s) => s.variable).join(', ')
+  for (const [v, list] of writes) {
+    const hows = new Set(list.map((w) => w.how))
+    const counts = hows.has('up') || hows.has('down')
+    // 6. Se pone a 1 y nada la vuelve a 0 (si además tiene acción continua, ya avisa la regla 5).
+    if (hows.size === 1 && hows.has('set') && !continuousIn.has(v)) {
+      add(
+        tr('{variable} se pone a 1 en {etapas} y ninguna acción la vuelve a poner a 0: se queda activa para siempre.', { variable: v, etapas: where(list) }),
+        tr('Una acción memorizada deja la variable en ese valor hasta que otra acción memorizada la cambie; desactivar la etapa no la apaga. Añade {reset} en la etapa donde tenga que apagarse (o «al desactivar» en la misma etapa). Si solo debe estar activa mientras dura la etapa, usa una acción continua.', {
+          reset: `${v}:=0`,
+        }),
+        stepsOf(list).map((s) => s.id),
+        'acciones',
+      )
+    }
+    if (!counts) continue
+    // 7. Cuenta pero nadie mira la cuenta.
+    if (!reads.has(v)) {
+      add(
+        tr('{contador} se cuenta en {etapas} pero no se lee en ninguna receptividad ni condición.', { contador: v, etapas: where(list) }),
+        tr('Un contador sirve para decidir algo cuando llega a un valor: compáralo en una receptividad, p. ej. {ejemplo}. Si no, contar no cambia nada.', {
+          ejemplo: `[${v} >= 3]`,
+        }),
+        stepsOf(list).map((s) => s.id),
+        'contadores',
+      )
+    } else if (compared.has(v) && !hows.has('reset') && !hows.has('other') && !hows.has('set') && !(hows.has('up') && hows.has('down'))) {
+      // 8. Se compara, solo sube (o solo baja) y nunca vuelve a su valor de partida. Si sube y baja
+      // (plazas de un aparcamiento) la cuenta es un saldo, y si solo se muestra (un total de piezas en
+      // un visor) tampoco hace falta ponerla a cero.
+      const counting = list.filter((w) => w.how === 'up' || w.how === 'down')
+      add(
+        tr('{contador} se cuenta en {etapas} pero nunca se pone a cero: en el segundo ciclo empieza con la cuenta del anterior.', { contador: v, etapas: where(counting) }),
+        tr('Al empezar la simulación vale 0, pero al volver a la etapa inicial sigue con el valor al que llegó. Ponlo a cero con {reset} como acción memorizada al activar la etapa inicial (o la etapa donde empieza cada cuenta).', {
+          reset: `${v}:=0`,
+        }),
+        stepsOf(counting).map((s) => s.id),
+        'contadores',
+      )
+    }
+  }
+  // 9. Se compara un contador que no cambia nunca (solo se pone a 0, o es una marca que nadie escribe).
+  for (const [v, ids] of compared) {
+    const list = writes.get(v) ?? []
+    const declared = types.get(v) === 'memory' || types.get(v) === 'counter'
+    if (list.length ? list.some((w) => w.how !== 'reset') : !declared) continue
+    add(
+      tr('{contador} se compara pero ninguna acción lo cuenta: vale siempre 0.', { contador: v }),
+      tr('Para que un contador avance, súmale uno en la etapa que se activa con cada cosa contada: {cuenta} como acción memorizada al activar (o al evento, p. ej. con ↑P).', {
+        cuenta: `${v}:=${v}+1`,
+      }),
+      [...new Set([...ids, ...stepsOf(list).map((s) => s.id)])],
+      'contadores',
+    )
+  }
   return tips
 }
 
-const push = (map, key, value) => map.set(key, [...(map.get(key) ?? []), value])
+// Qué hace una asignación con su variable (ver reglas 6-8).
+function writeKind(target, value) {
+  if (value.op === 'num') return value.value ? 'set' : 'reset'
+  if (value.op === 'arith' && (value.fn === '+' || value.fn === '-')) {
+    const self = (x) => x.op === 'var' && x.name === target
+    const constant = (x) => x.op === 'num' && x.value > 0
+    if (self(value.left) && constant(value.right)) return value.fn === '+' ? 'up' : 'down'
+    if (value.fn === '+' && constant(value.left) && self(value.right)) return 'up'
+  }
+  return 'other'
+}
+
+// Variables que aparecen dentro de una comparación ([C >= 3]).
+function comparedVars(ast, out = new Set()) {
+  if (ast.op === 'cmp') return booleanVarsLoose(ast, out)
+  if (ast.arg) comparedVars(ast.arg, out)
+  if (ast.left) comparedVars(ast.left, out)
+  if (ast.right) comparedVars(ast.right, out)
+  return out
+}
+
+const push =(map, key, value) => map.set(key, [...(map.get(key) ?? []), value])
 
 // Variables de una expresión cualquiera (también dentro de comparaciones).
 function booleanVarsLoose(ast, out = new Set()) {

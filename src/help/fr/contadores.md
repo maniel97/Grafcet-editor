@@ -62,7 +62,7 @@ D’autres opérations marchent aussi : `N:=N+5`, `D:=A*2`, `M:=(A+B)/2`.
 
 ## Erreurs typiques
 
-- **Oublier `C:=0`** : le compteur commence avec ce qu’il avait la fois précédente. Mets-le dans l’étape initiale (ou dans celle où commence chaque cycle).
+- **Oublier `C:=0`** : le compteur commence avec ce qu’il avait la fois précédente. Mets-le dans l’étape initiale (ou dans celle où commence chaque cycle). Vérifier te le rappelle si le compteur est comparé et que rien ne le remet à zéro.
 - **Compter sans front** (`P` au lieu de `↑P`) : tant que P est appuyé, la transition est vraie encore et encore et compte trop.
 - **Comparaisons non exclusives** (`[C <= 3]` et `[C >= 3]`) : avec C à 3, les deux sont vraies. Vérifier le détecte dans les divergences en OU.
 - **Compter dans une étape qui ne se répète pas** : `C:=C+1` ajoute une fois **par activation** ; si l’étape reste active, elle n’ajoute plus (pour cela, l’action sur événement).

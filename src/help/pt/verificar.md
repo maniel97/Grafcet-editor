@@ -8,7 +8,7 @@ O botão **Verificar** revê o grafcet continuamente. O seu número indica quant
 - **A estrutura**: etapas sem entrada (nunca se ativam) ou sem saída (nunca se desativam), transições soltas, retornos que ao mesmo tempo continuam para baixo, etapas a que não se chega a partir de nenhuma inicial.
 - **As divergências em OU**: se dois caminhos se puderem cumprir ao mesmo tempo, di-lo e dá um exemplo de valores em que acontece.
 - **Macroetapas, grafcets parciais e encapsulamento**: que cada macroetapa tenha a sua expansão (com entrada e saída), que as forçagens apontem para grafcets que existem, que cada encapsulante tenha o seu grafcet encapsulado.
-- **Conselhos**: erros típicos de quem aprende, como receptividades que usam saídas, temporizações de outra etapa, receptividades sempre falsas, etapas atravessadas sem parar ou saídas comandadas ao mesmo tempo por ação contínua e memorizada.
+- **Conselhos**: erros típicos de quem aprende, como receptividades que usam saídas, temporizações de outra etapa, receptividades sempre falsas, etapas atravessadas sem parar ou saídas comandadas ao mesmo tempo por ação contínua e memorizada, saídas memorizadas que nada volta a pôr a 0, ou contadores que nunca se põem a zero, que ninguém lê ou que se comparam sem nunca contar.
 
 ## Erros, avisos e conselhos
 

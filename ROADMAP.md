@@ -34,7 +34,7 @@ Que todo lo que ya existe funcione bien antes de añadir nada.
 - [x] [#1](https://github.com/maniel97/Grafcet-editor/issues/1) Emulador S7-200: auditoría instrucción por instrucción
 - [x] [#2](https://github.com/maniel97/Grafcet-editor/issues/2) Electroneumática: a0/a1 leen 0 en el primer ciclo del autómata
 - [x] [#3](https://github.com/maniel97/Grafcet-editor/issues/3) Generador de cableado: cilindro solo en el esquema sale como pulsadores y relé
-- [ ] [#4](https://github.com/maniel97/Grafcet-editor/issues/4) Verificar: avisos para contadores y acciones memorizadas
+- [x] [#4](https://github.com/maniel97/Grafcet-editor/issues/4) Verificar: avisos para contadores y acciones memorizadas
 - [x] [#5](https://github.com/maniel97/Grafcet-editor/issues/5) Textos sin traducir en las propiedades del esquema eléctrico
 - [ ] [#6](https://github.com/maniel97/Grafcet-editor/issues/6) Tabla de variables: la columna «Presel.» se puede editar pero no se usa
 

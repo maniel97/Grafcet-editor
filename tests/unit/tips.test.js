@@ -45,7 +45,7 @@ describe('consejos de Verificar', () => {
 
   it('receptividad constante', () => {
     expect(messages(loop('Marcha', '1'))).toEqual(['Receptividad «1» después de X1, que tiene acciones continuas: no llegarán a ejecutarse.'])
-    expect(loop('Marcha', '1', [{ text: 'C:=C+1', kind: 'stored-on' }])).toEqual([])
+    expect(messages(loop('Marcha', '1', [{ text: 'C:=C+1', kind: 'stored-on' }])).filter((m) => m.includes('«1»'))).toEqual([])
     expect(messages(loop('Marcha', '0'))).toEqual(['La receptividad «0» es siempre falsa: la transición no se franquea nunca.'])
   })
 
@@ -58,6 +58,37 @@ describe('consejos de Verificar', () => {
     ]
     const tips = studentTips(nodes, links([['s0', 't1'], ['t1', 's1'], ['s1', 't2'], ['t2', 's0']]), EMPTY_PLC)
     expect(messages(tips)).toEqual(['Motor se manda con acción continua (X1) y memorizada (X0).'])
+  })
+
+  it('acción memorizada que nunca vuelve a 0', () => {
+    const on = { text: 'Luz:=1', kind: 'stored-on' }
+    const tips = loop('Marcha', 'Paro', [on])
+    expect(messages(tips)).toEqual(['Luz se pone a 1 en X1 y ninguna acción la vuelve a poner a 0: se queda activa para siempre.'])
+    expect(tips[0].why).toContain('Luz:=0')
+    expect(tips[0].topic).toBe('acciones')
+    // También «Luz» como memorizada sin asignación.
+    expect(loop('Marcha', 'Paro', [{ text: 'Luz', kind: 'stored-on' }])).toHaveLength(1)
+    // Con su puesta a 0, al desactivar o en otra etapa, no hay consejo.
+    expect(loop('Marcha', 'Paro', [on, { text: 'Luz:=0', kind: 'stored-off' }])).toEqual([])
+  })
+
+  it('contadores: sin leer, sin poner a cero y sin contar', () => {
+    const up = { text: 'C:=C+1', kind: 'stored-on' }
+    expect(messages(loop('Marcha', 'Paro', [up]))).toEqual(['C se cuenta en X1 pero no se lee en ninguna receptividad ni condición.'])
+    expect(messages(loop('Marcha', '[C >= 3]', [up]))).toEqual([
+      'C se cuenta en X1 pero nunca se pone a cero: en el segundo ciclo empieza con la cuenta del anterior.',
+    ])
+    expect(loop('Marcha', '[C >= 3]', [up, { text: 'C:=0', kind: 'stored-off' }])).toEqual([])
+    // Sube y baja: es un saldo (plazas de un aparcamiento), no hace falta ponerlo a cero.
+    expect(loop('Marcha', '[C >= 3]', [up, { text: 'C:=C-1', kind: 'event', condition: '↑S' }])).toEqual([])
+    // Solo se pone a 0 y se compara: vale siempre 0.
+    const never = loop('Marcha', '[C >= 3]', [{ text: 'C:=0', kind: 'stored-on' }])
+    expect(messages(never)).toEqual(['C se compara pero ninguna acción lo cuenta: vale siempre 0.'])
+    expect(never[0].nodeIds).toEqual(['t2', 's1'])
+    // Sin ninguna acción: solo si está declarado como marca o contador (si no, es una entrada analógica).
+    expect(loop('Marcha', '[N >= 3]', ['Motor'])).toEqual([])
+    const declared = { ...EMPTY_PLC, variables: { N: { type: 'counter' } } }
+    expect(messages(loop('Marcha', '[N >= 3]', ['Motor'], declared))).toEqual(['N se compara pero ninguna acción lo cuenta: vale siempre 0.'])
   })
 
   it('los ejemplos del editor no dan consejos', () => {

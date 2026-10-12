@@ -62,7 +62,7 @@ Outras operações também funcionam: `N:=N+5`, `D:=A*2`, `M:=(A+B)/2`.
 
 ## Erros típicos
 
-- **Esquecer `C:=0`**: o contador começa com o que tinha da vez anterior. Põe-no na etapa inicial (ou naquela onde começa cada ciclo).
+- **Esquecer `C:=0`**: o contador começa com o que tinha da vez anterior. Põe-no na etapa inicial (ou naquela onde começa cada ciclo). O Verificar lembra-te disso se o contador é comparado e nada o põe a zero.
 - **Contar sem flanco** (`P` em vez de `↑P`): enquanto P está carregado, a transição cumpre-se uma e outra vez e conta a mais.
 - **Comparações que não são exclusivas** (`[C <= 3]` e `[C >= 3]`): com C a 3 cumprem-se as duas. Verificar deteta-o nas divergências em OU.
 - **Contar numa etapa que não se repete**: `C:=C+1` soma uma vez **por ativação**; se a etapa continua ativa, não volta a somar (para isso, a ação no evento).

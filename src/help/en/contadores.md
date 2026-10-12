@@ -62,7 +62,7 @@ Other operations work too: `N:=N+5`, `D:=A*2`, `M:=(A+B)/2`.
 
 ## Typical mistakes
 
-- **Forgetting `C:=0`**: the counter starts with whatever it had from the previous time. Put it in the initial step (or in the one where each cycle starts).
+- **Forgetting `C:=0`**: the counter starts with whatever it had from the previous time. Put it in the initial step (or in the one where each cycle starts). Verify reminds you if the counter is compared and nothing resets it.
 - **Counting without an edge** (`P` instead of `↑P`): while P is held down, the transition is true again and again and counts too many.
 - **Comparisons that are not exclusive** (`[C <= 3]` and `[C >= 3]`): with C at 3 both are true. Verify detects it in OR divergences.
 - **Counting in a step that does not repeat**: `C:=C+1` adds once **per activation**; if the step stays active, it does not add again (for that, the on-event action).

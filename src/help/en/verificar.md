@@ -8,7 +8,7 @@ The **Verify** button checks the grafcet continuously. Its number shows how many
 - **The structure**: steps without input (never activated) or without output (never deactivated), loose transitions, loops that also carry on downwards, steps that cannot be reached from any initial step.
 - **OR divergences**: if two paths can be true at the same time, it says so and gives an example of values for which it happens.
 - **Macro-steps, partial grafcets and enclosure**: that each macro-step has its expansion (with input and output), that forcing orders point to existing grafcets, that each enclosing step has its enclosed grafcet.
-- **Tips**: typical beginner mistakes, such as receptivities that use outputs, timings of another step, receptivities that are always false, steps passed through without stopping or outputs driven both by a continuous and a stored action.
+- **Tips**: typical beginner mistakes, such as receptivities that use outputs, timings of another step, receptivities that are always false, steps passed through without stopping or outputs driven both by a continuous and a stored action, stored outputs that nothing sets back to 0, or counters that are never reset, never read or compared without ever counting.
 
 ## Errors, warnings and tips
 

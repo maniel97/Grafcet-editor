@@ -8,7 +8,7 @@ Le bouton **Vérifier** contrôle le grafcet en continu. Son nombre indique comb
 - **La structure** : étapes sans entrée (jamais activées) ou sans sortie (jamais désactivées), transitions isolées, reprises qui continuent aussi vers le bas, étapes inaccessibles depuis toute étape initiale.
 - **Les divergences en OU** : si deux chemins peuvent être vrais en même temps, il le dit et donne un exemple de valeurs où cela arrive.
 - **Macro-étapes, grafcets partiels et encapsulation** : que chaque macro-étape ait son expansion (avec entrée et sortie), que les forçages visent des grafcets existants, que chaque étape encapsulante ait son grafcet encapsulé.
-- **Conseils** : erreurs typiques d’apprentissage, comme des réceptivités qui utilisent des sorties, des temporisations d’une autre étape, des réceptivités toujours fausses, des étapes traversées sans s’arrêter ou des sorties commandées à la fois par une action continue et une action mémorisée.
+- **Conseils** : erreurs typiques d’apprentissage, comme des réceptivités qui utilisent des sorties, des temporisations d’une autre étape, des réceptivités toujours fausses, des étapes traversées sans s’arrêter ou des sorties commandées à la fois par une action continue et une action mémorisée, des sorties mémorisées que rien ne remet à 0, ou des compteurs jamais remis à zéro, jamais lus ou comparés sans jamais compter.
 
 ## Erreurs, avertissements et conseils
 
