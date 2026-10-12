@@ -520,7 +520,7 @@ export default function GrafcetCanvas() {
       setNodes((nds) => nds.map((n) => (n.selected ? { ...n, selected: false } : n)))
       setEditingId(null)
       setCurrentSheet(id)
-      fitWhenReady(200)
+      fitWhenReady(200, (nds) => nds.every((n) => !!n.hidden === (sheetOf(n, id) !== id)))
     },
     [setNodes, fitWhenReady],
   )
@@ -737,7 +737,10 @@ export default function GrafcetCanvas() {
       setProjectNameState(project.name ?? '')
       setEditingId(null)
       if (project.viewport) setViewport(project.viewport)
-      else fitWhenReady(0)
+      else {
+        const ids = new Set(project.nodes.map((n) => n.id))
+        fitWhenReady(0, (nds) => nds.length === ids.size && nds.every((n) => ids.has(n.id)))
+      }
     },
     [getNodes, getEdges, takeSnapshot, setNodes, setEdges, setViewport, fitWhenReady],
   )

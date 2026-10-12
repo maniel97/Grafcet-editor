@@ -6,7 +6,7 @@ import { drawnBounds } from '../lib/exportImage'
 // saltos y la tabla), con margen. Sustituye al encuadre de React Flow, que lo recortaba.
 // También hace el encuadre inicial en cuanto React Flow ha medido los nodos.
 export function useFitDrawn(wrapperRef) {
-  const { getViewport, setViewport } = useReactFlow()
+  const { getViewport, setViewport, getNodes } = useReactFlow()
 
   const fitDrawn = useCallback(
     (duration = 300) => {
@@ -41,21 +41,31 @@ export function useFitDrawn(wrapperRef) {
     requestAnimationFrame(() => fitDrawn(duration))
   }, [nodesInitialized, fitDrawn])
 
-  // Pide un encuadre en cuanto todo esté medido (si ya lo está y no cambia nada, enseguida).
+  // Pide un encuadre en cuanto todo esté medido (si ya lo está, enseguida). Se mira en cada fotograma
+  // y nodo a nodo. isCurrent(nodos): los nodos de React Flow ya son los esperados. Al abrir otro
+  // proyecto, setNodes aún no ha llegado a React Flow en los primeros fotogramas: sin esto se
+  // encuadraba el proyecto anterior, el encuadre quedaba hecho y, con el equipo cargado, lo nuevo
+  // (la tabla de variables) se quedaba fuera de la vista.
   const fitWhenReady = useCallback(
-    (duration = 0) => {
+    (duration = 0, isCurrent = null) => {
       pending.current = duration
-      requestAnimationFrame(() =>
-        requestAnimationFrame(() => {
-          if (pending.current !== null && initializedRef.current) {
-            const d = pending.current
-            pending.current = null
-            fitDrawn(d)
-          }
-        }),
-      )
+      const started = performance.now()
+      const attempt = () => {
+        if (pending.current === null) return // ya encuadrado (por el efecto de arriba)
+        const nodes = getNodes()
+        const ready = (!isCurrent || isCurrent(nodes)) && nodes.every((n) => n.hidden || (n.measured?.width && n.measured?.height))
+        if (!ready && performance.now() - started < 5000) {
+          requestAnimationFrame(attempt)
+          return
+        }
+        const d = pending.current
+        pending.current = null
+        // Un fotograma más: los enlaces y receptividades se dibujan tras medir los nodos.
+        requestAnimationFrame(() => fitDrawn(d))
+      }
+      requestAnimationFrame(attempt)
     },
-    [fitDrawn],
+    [fitDrawn, getNodes],
   )
 
   return { fitDrawn, fitWhenReady }

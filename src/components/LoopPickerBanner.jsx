@@ -4,9 +4,11 @@ import { t } from '../lib/i18n'
 
 // Aviso flotante mientras la herramienta Bucle espera que se elija la etapa destino.
 // Ofrece atajos a las etapas iniciales, el destino más habitual de un bucle.
+// Abajo (encima de las pestañas de las hojas): el destino de un bucle está siempre más arriba que la
+// transición de origen, y arriba tapaba la etapa inicial cuando el grafcet quedaba centrado arriba.
 export default function LoopPickerBanner({ source, initialSteps, onPick, onCancel }) {
   return (
-    <div className="absolute left-1/2 top-3 z-10 flex -translate-x-1/2 items-center gap-2 rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm shadow-lg">
+    <div className="absolute bottom-14 left-1/2 z-10 flex -translate-x-1/2 items-center gap-2 rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm shadow-lg">
       <CornerLeftUp size={16} className="text-blue-600" />
       <span>
         {t('Bucle desde')}{' '}<strong>{source.data.condition ? <ConditionText text={source.data.condition} /> : t('la transición')}</strong>{t(': haz clic en la etapa destino')}

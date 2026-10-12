@@ -73,12 +73,15 @@ npm test           # lógica (Vitest): norma, trazado, variables, simulación, l
 npm run test:e2e   # navegador (Playwright): editor, simulador, planta, esquema, ayuda…
 npm run test:all   # todas: pasarlas antes de unir una rama a main
 npm run test:perf  # rendimiento al arrastrar (versión de producción)
+npm run test:stress # navegador con carga: el doble de navegadores que hilos, cada prueba 3 veces
 npm run lint       # oxlint
 ```
 
 Las pruebas de navegador usan un Chromium ya instalado (Brave, Chrome o Edge; o
 `PW_BROWSER_PATH`) y arrancan su propio servidor con la versión compilada (lo mismo que se publica).
 Van en paralelo con la mitad de los hilos del equipo; `PW_WORKERS=4 npm run test:e2e` usa otro número.
+`test:stress` sirve para cazar las que fallan solo a veces: si una falla allí, se arregla esperando a una
+condición real (posición estable, `expect.poll`), nunca con pausas fijas.
 
 ### Publicación
 
