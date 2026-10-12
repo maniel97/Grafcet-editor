@@ -15,7 +15,7 @@ It reads «**5 seconds since step 2 became active**». It is 0 when step 2 becom
 Step by step:
 
 1. Select the step (for example, step 2) and press the **+** below it: a transition appears.
-2. Double-click the transition and type `5s/X2`. Under «Common receptivities» there is a button that writes it with the step above.
+2. Double-click the transition and type `5s/X2`. Under «Common receptivities» there is a button that writes it with the step above. Further down, under «Timer», you choose the time, the unit, the step or variable and the kind of delay (also `t1/a/t2`): the button shows the text it inserts, and below it you can read what it means.
 3. Press **Simulate**: when step 2 becomes active, the transition will clear by itself after 5 s.
 
 > **Watch out:** the number after X is the **step being waited for**, usually the one right above. If you write `5s/X1` below step 2, it counts from when step 1 became active (Verify warns with a tip).

@@ -45,7 +45,7 @@ Que contar y temporizar sea cómodo de escribir y fácil de ver al simular.
 - [x] [#7](https://github.com/maniel97/Grafcet-editor/issues/7) Atajos para contadores en acciones y receptividades
 - [x] [#8](https://github.com/maniel97/Grafcet-editor/issues/8) Simulación: objetivo del contador y fijar su valor a mano
 - [x] [#9](https://github.com/maniel97/Grafcet-editor/issues/9) Valores en vivo sobre el lienzo: cuenta atrás y contadores
-- [ ] [#10](https://github.com/maniel97/Grafcet-editor/issues/10) Asistente de temporizaciones en el panel de la transición
+- [x] [#10](https://github.com/maniel97/Grafcet-editor/issues/10) Asistente de temporizaciones en el panel de la transición
 - [ ] [#11](https://github.com/maniel97/Grafcet-editor/issues/11) Tutorial guiado de contadores
 
 ## 0.3 alpha — vistas

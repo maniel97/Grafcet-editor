@@ -15,7 +15,7 @@ Elle se lit « **5 secondes depuis l’activation de l’étape 2** ». Elle vau
 Pas à pas :
 
 1. Sélectionne l’étape (par exemple, la 2) et appuie sur le **+** en dessous : une transition apparaît.
-2. Double-clique sur la transition et écris `5s/X2`. Dans « Réceptivités fréquentes », un bouton l’écrit avec l’étape du dessus.
+2. Double-clique sur la transition et écris `5s/X2`. Dans « Réceptivités fréquentes », un bouton l’écrit avec l’étape du dessus. Plus bas, dans « Temporisation », tu choisis le temps, l’unité, l’étape ou la variable et le type de retard (aussi `t1/a/t2`) : le bouton montre le texte qu’il insère et, en dessous, ce qu’il signifie.
 3. Appuie sur **Simuler** : quand l’étape 2 s’active, la transition sera franchie toute seule au bout de 5 s.
 
 > **Attention :** le numéro après X est celui de l’**étape attendue**, normalement celle juste au-dessus. Si tu écris `5s/X1` sous l’étape 2, le temps compte depuis l’activation de l’étape 1 (Vérifier le signale par un conseil).

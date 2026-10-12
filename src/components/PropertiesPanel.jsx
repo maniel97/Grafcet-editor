@@ -4,6 +4,7 @@ import { ACTION_KINDS, ACTION_PRESETS, actionKind, isAssignment, normalizeAction
 import AutocompleteInput from './AutocompleteInput'
 import { useDraft } from './useDraft'
 import { counterActions, counterConditions, isVariableName } from '../lib/counters'
+import { TIMER_MODES, TIMER_UNITS, timerReading, timerText } from '../lib/timers'
 import { t, N_ } from '../lib/i18n'
 
 const inputClass =
@@ -102,6 +103,66 @@ function CounterTools({ counters, withValue, items, onPick }) {
           </button>
         ))}
       </div>
+    </div>
+  )
+}
+
+// Asistente de temporizaciones (#10): tiempo, unidad, etapa o variable y tipo de retardo. El botón
+// muestra el texto exacto que inserta y debajo se lee qué significa.
+const smallInput = 'rounded-md border border-slate-300 px-2 py-0.5 font-mono text-xs focus:border-blue-500 focus:outline-none'
+function TimeInput({ label, value, unit, onValue, onUnit }) {
+  return (
+    <span className="flex items-center gap-0.5">
+      <input aria-label={label} inputMode="decimal" className={`${smallInput} w-12 text-right`} value={value} onChange={(e) => onValue(e.target.value.trim())} />
+      <select aria-label={t('Unidad de {tiempo}', { tiempo: label })} className={`${smallInput} px-1`} value={unit} onChange={(e) => onUnit(e.target.value)}>
+        {TIMER_UNITS.map((u) => (
+          <option key={u}>{u}</option>
+        ))}
+      </select>
+    </span>
+  )
+}
+function TimerTools({ previousSteps, refs, onPick }) {
+  const [timer, setTimer] = useState({ mode: 'on', on: '5', onUnit: 's', ref: `X${previousSteps[0] ?? 1}`, off: '2', offUnit: 's' })
+  const set = (patch) => setTimer((prev) => ({ ...prev, ...patch }))
+  const text = timerText(timer)
+  const reading = timerReading(timer)
+  return (
+    <div className="space-y-1">
+      <span className="text-xs text-slate-400">{t('Temporización')}</span>
+      <select aria-label={t('Tipo de temporización')} className={`${smallInput} w-full font-sans`} value={timer.mode} onChange={(e) => set({ mode: e.target.value })}>
+        {TIMER_MODES.map((m) => (
+          <option key={m.id} value={m.id}>
+            {t(m.label)}
+          </option>
+        ))}
+      </select>
+      <div className="flex flex-wrap items-center gap-1">
+        {timer.mode !== 'off' && <TimeInput label={t('Retardo a la subida')} value={timer.on} unit={timer.onUnit} onValue={(on) => set({ on })} onUnit={(onUnit) => set({ onUnit })} />}
+        <input
+          aria-label={t('Etapa o variable')}
+          list="timer-refs"
+          className={`${smallInput} min-w-20 flex-1`}
+          value={timer.ref}
+          onChange={(e) => set({ ref: e.target.value.trim() })}
+        />
+        <datalist id="timer-refs">
+          {refs.map((r) => (
+            <option key={r} value={r} />
+          ))}
+        </datalist>
+        {timer.mode !== 'on' && <TimeInput label={t('Retardo a la bajada')} value={timer.off} unit={timer.offUnit} onValue={(off) => set({ off })} onUnit={(offUnit) => set({ offUnit })} />}
+      </div>
+      <button
+        type="button"
+        disabled={!text}
+        title={t('Insertar en la receptividad')}
+        onClick={() => onPick(text)}
+        className="rounded-full border border-slate-300 bg-slate-50 px-2.5 py-0.5 font-mono text-xs text-slate-700 hover:border-blue-400 hover:bg-blue-50 hover:text-blue-700 disabled:opacity-40"
+      >
+        {text ?? '—'}
+      </button>
+      {reading && <p className="text-xs text-slate-500">{t(reading.text, reading.vars)}</p>}
     </div>
   )
 }
@@ -283,6 +344,8 @@ function TransitionFields({ data, onChange, previousSteps, vocabulary, counters,
   // Temporización normalizada referida a la etapa anterior: "5s/X2" (5 s desde que se activó X2).
   const timePresets = previousSteps.length ? previousSteps.map((label) => `5s/X${label}`) : ['5s/X1']
   const presets = ['1', 'a · b', 'a + b', '↑a', '↓a', ...timePresets, 'a AND b', 'a OR b']
+  // Para el asistente de temporizaciones: primero las etapas de encima, luego el resto.
+  const timerRefs = [...new Set([...previousSteps.map((label) => `X${label}`), ...vocabulary.map((v) => v.name)])]
 
   return (
     <>
@@ -335,6 +398,7 @@ function TransitionFields({ data, onChange, previousSteps, vocabulary, counters,
           onDeclareCounter?.(name)
         }}
       />
+      <TimerTools previousSteps={previousSteps} refs={timerRefs} onPick={insert} />
     </>
   )
 }

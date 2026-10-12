@@ -15,7 +15,7 @@ Se lee «**5 segundos desde que se activó la etapa 2**». Vale 0 al activarse l
 Paso a paso:
 
 1. Selecciona la etapa (por ejemplo, la 2) y pulsa el **+** de debajo: aparece una transición.
-2. Doble clic en la transición y escribe `5s/X2`. En «Receptividades frecuentes» hay un botón que lo pone con la etapa de encima.
+2. Doble clic en la transición y escribe `5s/X2`. En «Receptividades frecuentes» hay un botón que lo pone con la etapa de encima. Más abajo, en «Temporización», eliges el tiempo, la unidad, la etapa o variable y el tipo de retardo (también `t1/a/t2`): el botón muestra el texto que se inserta y debajo se lee qué significa.
 3. Pulsa **Simular**: cuando se active la etapa 2, la transición se franqueará sola a los 5 s.
 
 > **Ojo:** el número de la X es el de la **etapa que se espera**, normalmente la de justo encima. Si escribes `5s/X1` debajo de la etapa 2, contará desde que se activó la 1 (Verificar avisa con un consejo).
