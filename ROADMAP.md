@@ -60,7 +60,7 @@ Probarlo con alumnado real y recoger lo que salga. Esta fase se irá llenando co
 reporte en clase.
 
 - [x] [#12](https://github.com/maniel97/Grafcet-editor/issues/12) Estabilizar las pruebas e2e que fallan bajo carga
-- [ ] [#13](https://github.com/maniel97/Grafcet-editor/issues/13) Guía para contribuir (CONTRIBUTING)
+- [x] [#13](https://github.com/maniel97/Grafcet-editor/issues/13) Guía para contribuir (CONTRIBUTING)
 - [ ] [#19](https://github.com/maniel97/Grafcet-editor/issues/19) CI: ejecutar las pruebas e2e en cada pull request
 
 ## 1.0

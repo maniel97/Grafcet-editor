@@ -60,6 +60,8 @@ desde Ayuda > «Acerca de».
 
 ## Para desarrollar
 
+¿Quieres contribuir (código, ejemplos, ayuda o traducciones)? Lee la [guía para contribuir](CONTRIBUTING.md).
+
 ```bash
 npm install
 npm run dev      # servidor de desarrollo
