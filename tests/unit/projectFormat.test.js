@@ -158,5 +158,6 @@ describe('formato del proyecto', () => {
     for (const guide of PRACTICE_GUIDES) for (const p of guide.practices) add(p.teacher())
     for (const f of readdirSync('tests/e2e/fixtures')) if (f.endsWith('.json')) add(JSON.parse(readFileSync(`tests/e2e/fixtures/${f}`, 'utf8')))
     expect([...found].filter((k) => !documented.has(k)).sort()).toEqual([])
-  })
+    // Construye todos los ejemplos, ejercicios y guiones: aquí tarda unos 3 s, en GitHub más de 5.
+  }, 30_000)
 })
