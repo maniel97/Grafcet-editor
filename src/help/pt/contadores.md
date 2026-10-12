@@ -56,8 +56,7 @@ Outras operações também funcionam: `N:=N+5`, `D:=A*2`, `M:=(A+B)/2`.
 
 ## O que se vê ao simular
 
-- No painel da direita, **Marcas e contadores**, com o seu valor em cada momento.
-- Na secção **Marcas e contadores** do painel da direita, junto ao valor aparece o seu **objetivo** (com que é comparado: `2 / 3`). Para testar sem contar até lá, escreva o valor na sua caixa.
+- No painel da direita, **Marcas e contadores**, com o seu valor em cada momento e o seu **objetivo** (com que é comparado: `2 / 3`). Para testar sem contar até lá, escreva o valor na sua caixa.
 - **O que o grafcet espera** diz que comparação falta e o valor atual: com `[C >= 3]` e C a 1, «C = 1».
 - O **cronograma** mostra quando cada etapa se ativou (e, portanto, quando se contou).
 

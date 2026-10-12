@@ -56,8 +56,7 @@ Other operations work too: `N:=N+5`, `D:=A*2`, `M:=(A+B)/2`.
 
 ## What you see when simulating
 
-- In the right-hand panel, **Memory bits and counters**, with their value at every moment.
-- In the **Memory bits and counters** section of the right panel, next to the value you see its **target** (what it is compared with: `2 / 3`). To test without counting up to it, type the value in its box.
+- In the right-hand panel, **Memory bits and counters**, with their value at every moment and their **target** (what it is compared with: `2 / 3`). To test without counting up to it, type the value in its box.
 - **What the grafcet is waiting for** tells you which comparison is missing and the current value: with `[C >= 3]` and C at 1, «C = 1».
 - The **timing chart** shows when each step became active (and therefore when it counted).
 
