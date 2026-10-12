@@ -212,6 +212,20 @@ export function useSimulation(nodes, edges, plc, enabled) {
     [],
   )
 
+  // Fija a mano el valor de una marca o un contador (para probar sin contar hasta ahí), como se
+  // fuerza una entrada; las acciones lo siguen cambiando como siempre. Solo con el grafcet: en modo
+  // Autómata los valores son los de la CPU.
+  const setValue = useCallback(
+    (name, value) => {
+      const current = simRef.current
+      if (!current || cpuSetup) return
+      const next = { ...current, state: { ...current.state, values: { ...current.state.values, [name]: Number(value) || 0 } } }
+      simRef.current = next
+      setSim(next)
+    },
+    [cpuSetup],
+  )
+
   // Grabar: desde la situación inicial, con el tiempo en marcha.
   const startRecording = useCallback(() => {
     reset()
@@ -307,6 +321,7 @@ export function useSimulation(nodes, edges, plc, enabled) {
     speed,
     setSpeed,
     setInput,
+    setValue,
     step,
     advance,
     reset,

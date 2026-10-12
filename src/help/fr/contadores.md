@@ -57,6 +57,7 @@ D’autres opérations marchent aussi : `N:=N+5`, `D:=A*2`, `M:=(A+B)/2`.
 ## Ce qu’on voit en simulation
 
 - Dans le panneau de droite, **Bits internes et compteurs**, avec leur valeur à chaque instant.
+- Dans la section **Bits internes et compteurs** du panneau de droite, à côté de la valeur s’affiche son **objectif** (ce à quoi il est comparé : `2 / 3`). Pour tester sans compter jusque-là, saisissez la valeur dans sa case.
 - **Ce qu’attend le grafcet** indique quelle comparaison manque et la valeur actuelle : avec `[C >= 3]` et C à 1, « C = 1 ».
 - Le **chronogramme** montre quand chaque étape s’est activée (donc quand on a compté).
 

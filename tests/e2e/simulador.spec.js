@@ -43,7 +43,7 @@ test('simulación: flanco con pulsador, memorizada, temporización y Y', async (
   await page.waitForTimeout(250)
   await page.mouse.up()
   await expect.poll(() => activeSteps(page)).toBe('s1')
-  await expect(page.locator('aside div.font-mono').filter({ hasText: /^N/ }).first()).toHaveText(/N\s*1$/)
+  await expect(page.getByRole('textbox', { name: 'Valor de N' })).toHaveValue('1')
   await expect(page.getByText('3s/X1').last().locator('..')).toContainText(/\d\.\d \/ 3 s/)
 
   await page.getByLabel('Velocidad').selectOption('10')
@@ -430,7 +430,7 @@ test('escena: zoom con la rueda, centrado en el puntero', async ({ page }) => {
   const view = page.getByRole('region', { name: 'Escena de la planta' })
   const zoomText = () => view.getByText(/^\d+ %$/).first().innerText()
   const cyl = view.locator('[data-element="cylinder"]').first()
-  const b = await cyl.boundingBox()
+  const b = await stableBox(cyl) // tras el «ajustar a la vista» del principio
   const at = { x: b.x + b.width / 2, y: b.y + b.height / 2 }
   const before = await zoomText()
   await page.mouse.move(at.x, at.y)
@@ -1298,5 +1298,34 @@ test('esquema eléctrico: prensa electrohidráulica (4/3 en tándem, manómetro 
   await page.mouse.up()
   // Centro en tándem: la bomba descarga.
   await expect(gauge).toContainText(/0Z10 bar$/)
+  expectNoErrors(errors)
+})
+
+test('marcas y contadores: objetivo del contador y valor fijado a mano (#8)', async ({ page }) => {
+  const errors = await openEditor(page)
+  const desk = () => page.getByRole('region', { name: 'Panel de control' })
+  await openExample(page, /Contar pulsaciones/)
+  await page.getByRole('button', { name: /Simular/ }).click()
+  const value = page.getByRole('textbox', { name: 'Valor de C' })
+  // Se compara con 2 ([C < 2] y [C >= 2]): ese es su objetivo.
+  await expect(page.getByTitle('Objetivo: con qué se compara en el grafcet')).toHaveText('/ 2')
+  await expect(value).toHaveValue('0')
+  const b = await stableBox(desk().locator('[aria-label="Pulsador Marcha"]'))
+  await page.mouse.move(b.x + b.width / 2, b.y + b.height / 3)
+  await page.mouse.down()
+  await page.waitForTimeout(120)
+  await page.mouse.up()
+  await expect.poll(() => activeSteps(page)).toBe('s1')
+  // Sin contar hasta ahí: C = 2 a mano y la siguiente pulsación ya enciende la luz.
+  await value.fill('2')
+  await value.press('Enter')
+  await expect(value).toHaveValue('2')
+  await expect(desk().locator('[aria-label="Visualizador C"]')).toContainText('2')
+  const p = await stableBox(desk().locator('[aria-label="Pulsador P"]'))
+  await page.mouse.move(p.x + p.width / 2, p.y + p.height / 3)
+  await page.mouse.down()
+  await page.waitForTimeout(120)
+  await page.mouse.up()
+  await expect.poll(() => activeSteps(page)).toBe('s3')
   expectNoErrors(errors)
 })

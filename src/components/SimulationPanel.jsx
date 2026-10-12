@@ -24,6 +24,60 @@ const SPEEDS = [0.25, 0.5, 1, 2, 5, 10]
 // sacar al lienzo como panel flotante: con su botón o arrastrando el título hasta el lienzo.
 // children: el contenido, o una función ({ width }) que lo pinta al ancho disponible (width
 // indefinido: el del panel).
+// Marca o contador: su valor (se puede fijar a mano para probar, como se fuerza una entrada) y, en
+// los contadores, su objetivo: con qué se compara en el grafcet ([C >= 3] -> «/ 3»).
+function MemoryRow({ variable: v, value, onChange }) {
+  const counting = v.type === 'counter' || v.numeric
+  const [draft, setDraft] = useState(null)
+  const commit = () => {
+    if (draft !== null && draft.trim() !== '' && Number.isFinite(Number(draft.replace(',', '.')))) onChange(Number(draft.replace(',', '.')))
+    setDraft(null)
+  }
+  return (
+    <div className="flex items-center gap-2 py-0.5 font-mono text-sm">
+      <span className="flex-1 truncate">{v.name}</span>
+      {onChange && counting ? (
+        <input
+          aria-label={t('Valor de {variable}', { variable: v.name })}
+          title={t('Escribe un valor para probar sin tener que contar hasta ahí')}
+          inputMode="decimal"
+          className="w-14 rounded border border-slate-200 bg-slate-100 px-1.5 text-right tabular-nums focus:border-blue-400 focus:bg-white focus:outline-none"
+          value={draft ?? String(value)}
+          onFocus={(e) => {
+            setDraft(String(value))
+            e.target.select()
+          }}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={commit}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') e.currentTarget.blur()
+            if (e.key === 'Escape') {
+              setDraft(null)
+              e.currentTarget.blur()
+            }
+          }}
+        />
+      ) : onChange ? (
+        <button
+          type="button"
+          title={t('Cambiar a mano para probar')}
+          onClick={() => onChange(value ? 0 : 1)}
+          className="rounded bg-slate-100 px-1.5 hover:bg-blue-100"
+        >
+          {value}
+        </button>
+      ) : (
+        <span className="rounded bg-slate-100 px-1.5 tabular-nums">{value}</span>
+      )}
+      {counting && v.preset && (
+        <span className="shrink-0 text-xs text-slate-500" title={t('Objetivo: con qué se compara en el grafcet')}>
+          / {v.preset}
+        </span>
+      )}
+    </div>
+  )
+}
+
 function Section({ title, count, children, defaultOpen = true, tour, floatId, floating }) {
   const [open, setOpen] = useState(defaultOpen)
   const content = (size) => (typeof children === 'function' ? children(size) : children)
@@ -487,10 +541,7 @@ export default function SimulationPanel({ floating, simulation, scenarios = [], 
         {memories.length > 0 && (
           <Section title={t('Marcas y contadores')} count={memories.length}>
             {memories.map((v) => (
-              <div key={v.name} className="flex items-center gap-2 py-0.5 font-mono text-sm">
-                <span className="flex-1 truncate">{v.name}</span>
-                <span className="rounded bg-slate-100 px-1.5">{Number(values[v.name] ?? 0)}</span>
-              </div>
+              <MemoryRow key={v.name} variable={v} value={Number(values[v.name] ?? 0)} onChange={simulation.cpu ? null : (n) => simulation.setValue(v.name, n)} />
             ))}
           </Section>
         )}

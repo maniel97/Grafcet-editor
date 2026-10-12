@@ -140,6 +140,8 @@ export function buildPlcModel(nodes, edges, plc) {
       typeLabel: typeInfo(type).label,
       address: entry.address ?? '',
       preset: presetText(type, found) ?? '',
+      // Palabra (C:=C+1, [N > 3]) y no bit.
+      numeric: Boolean(found.numeric),
       comment: entry.comment ?? '',
       uses: [...found.uses],
       // Analógicas: señal y rango físico (lib/analog.js).
