@@ -1,0 +1,34 @@
+{
+  "nodes": {
+    "step": 2,
+    "transition": 2
+  },
+  "edges": 4,
+  "steps": [
+    "0*",
+    "1"
+  ],
+  "actions": [
+    "Motor",
+    "Piloto"
+  ],
+  "conditions": [
+    "Marcha",
+    "Paro"
+  ],
+  "variables": [],
+  "plc": [
+    "scheme",
+    "showAddresses",
+    "steps",
+    "variables"
+  ],
+  "scene": 0,
+  "electrical": [
+    0,
+    0
+  ],
+  "scenarios": [],
+  "exercise": null,
+  "sheets": []
+}

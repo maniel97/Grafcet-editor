@@ -2,6 +2,7 @@
 // enlace, detrás de «#p=». No hay servidor: la parte tras «#» ni siquiera se envía a la web que
 // aloja la aplicación. Quien abre el enlace recibe el proyecto completo (grafcet, tabla, planta,
 // escenarios y notas).
+import { FORMAT, FORMAT_VERSION, checkFormat } from './projectFormat'
 
 const PREFIX = '#p='
 // Más largo que esto, algunas aplicaciones de mensajería recortan el enlace.
@@ -26,19 +27,22 @@ async function transform(bytes, stream) {
 
 // Proyecto -> texto para el enlace.
 export async function encodeProject(project) {
-  const json = JSON.stringify({ format: 'grafcet-editor', version: 1, ...project })
+  const json = JSON.stringify({ format: FORMAT, version: FORMAT_VERSION, ...project })
   const packed = await transform(new TextEncoder().encode(json), new CompressionStream('deflate-raw'))
   return toBase64Url(packed)
 }
 
 // Texto del enlace -> proyecto (o un Error con un mensaje claro).
 export async function decodeProject(data) {
+  let project
   try {
     const bytes = await transform(fromBase64Url(data), new DecompressionStream('deflate-raw'))
-    return JSON.parse(new TextDecoder().decode(bytes))
+    project = JSON.parse(new TextDecoder().decode(bytes))
   } catch {
     throw new Error('El enlace está incompleto o dañado: puede que se haya recortado al enviarlo.')
   }
+  checkFormat(project) // de un editor más nuevo: aviso en vez de abrirlo a medias
+  return project
 }
 
 // Enlace completo para la página actual.

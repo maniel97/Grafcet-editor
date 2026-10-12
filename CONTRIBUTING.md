@@ -61,6 +61,7 @@ La estructura general está en el [README](README.md#estructura). Lo más habitu
 | esquema eléctrico y neumática | `src/components/elec/`, `src/lib/elec/` |
 | ejemplos, ejercicios y tutoriales | `src/lib/examples.js`, `src/lib/exerciseBank.js`, `src/lib/tutorials.js` |
 | wiki de ayuda | `src/help/` |
+| formato del archivo `.json` | [docs/formato-proyecto.md](docs/formato-proyecto.md), `src/lib/projectFormat.js` |
 
 ## Cómo se escribe el código
 
@@ -74,6 +75,10 @@ La estructura general está en el [README](README.md#estructura). Lo más habitu
 - **Sin dependencias nuevas** sin hablarlo antes: la aplicación funciona sin conexión y en un solo
   archivo (versión portable), y cada librería pesa.
 - Saltos de línea `LF` y codificación UTF-8.
+- **El formato del archivo es un compromiso**: los proyectos guardados tienen que seguir abriéndose.
+  Un campo nuevo se documenta en [docs/formato-proyecto.md](docs/formato-proyecto.md) (una prueba
+  lo exige); si un cambio hace que un editor anterior no entienda el archivo, sube la versión del
+  formato y lleva su migración (ver el documento).
 
 ## Añadir un ejemplo
 
@@ -151,7 +156,8 @@ nuevo lleva su prueba.
 - Si cierra una issue: `Fixes #N` al final del mensaje.
 - Si cierra algo de la [hoja de ruta](ROADMAP.md), marca su casilla.
 - Cada envío a `main` se publica solo en <https://grafcet-editor.com>: por eso todo lo que entra
-  tiene que pasar las pruebas. Las versiones (`0.1.0-alpha.N`) las saca el mantenedor.
+  tiene que pasar las pruebas. Las versiones (`0.1.0-alpha.N`) las saca el mantenedor: al sacar
+  cada una, `npm run formato:guardar` guarda su proyecto de referencia para las pruebas del formato.
 
 ---
 

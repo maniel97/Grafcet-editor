@@ -2,6 +2,8 @@
 // otro trabajo, limpiar el lienzo), el actual se guarda aquí, en este navegador, para poder
 // recuperarlo aunque no se hubiera guardado como archivo. Se conservan los últimos MAX_RECENT.
 
+import { FORMAT_VERSION } from './projectFormat'
+
 const STORAGE_KEY = 'grafcet-editor:recent'
 export const MAX_RECENT = 8
 
@@ -38,7 +40,7 @@ export function summarize(nodes) {
 // Guarda un trabajo. No guarda diagramas vacíos ni repite el último si es idéntico.
 export function pushRecent({ nodes, edges, plc, name }, reason, storage = globalThis.localStorage) {
   if (!nodes.some((n) => n.type === 'step' || n.type === 'transition')) return listRecent(storage)
-  const project = { name, nodes: strip(nodes), edges: strip(edges), plc }
+  const project = { version: FORMAT_VERSION, name, nodes: strip(nodes), edges: strip(edges), plc }
   const list = listRecent(storage)
   if (list[0] && JSON.stringify(list[0].project) === JSON.stringify(project)) return list
   const entry = { id: crypto.randomUUID(), savedAt: new Date().toISOString(), reason, summary: summarize(nodes), project }

@@ -149,3 +149,27 @@ test('modo educativo: menús sencillos por defecto y herramientas de clase al ac
   await expect(menu.getByRole('menuitem', { name: /Guion de prácticas/ })).toHaveCount(1)
   expectNoErrors(errors)
 })
+
+// Formato del archivo (#14): el proyecto de referencia se abre entero; uno de un formato más nuevo,
+// con aviso en vez de abrirse a medias.
+test('formato: el proyecto de referencia se abre y uno más nuevo avisa', async ({ page }) => {
+  const errors = await openEditor(page)
+  await page.locator('input[type=file]').setInputFiles('tests/fixtures/formato/0.1.0-alpha.9.json')
+  await expect(page.getByLabel('Nombre del proyecto')).toHaveValue('Proyecto de referencia del formato')
+  await expect(page.locator('.react-flow__node-step')).toHaveCount(2)
+  await expect(page.getByRole('tab', { name: 'Notas' })).toBeVisible() // su segunda hoja
+
+  let message = ''
+  page.once('dialog', async (dialog) => {
+    message = dialog.message()
+    await dialog.dismiss()
+  })
+  await page.locator('input[type=file]').setInputFiles({
+    name: 'futuro.json',
+    mimeType: 'application/json',
+    buffer: Buffer.from(JSON.stringify({ format: 'grafcet-editor', version: 99, nodes: [], edges: [] })),
+  })
+  await expect.poll(() => message).toContain('versión más nueva del editor')
+  await expect(page.getByLabel('Nombre del proyecto')).toHaveValue('Proyecto de referencia del formato') // no se ha abierto
+  expectNoErrors(errors)
+})

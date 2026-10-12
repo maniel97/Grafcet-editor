@@ -65,7 +65,7 @@ reporte en clase.
 
 ## 1.0
 
-- [ ] [#14](https://github.com/maniel97/Grafcet-editor/issues/14) Documentar y congelar el formato de proyecto
+- [x] [#14](https://github.com/maniel97/Grafcet-editor/issues/14) Documentar y congelar el formato de proyecto
 
 ## Aparcado
 

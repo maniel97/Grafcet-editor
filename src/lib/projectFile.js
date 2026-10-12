@@ -1,14 +1,11 @@
 // Guardado y carga de proyectos como .json local, sin servidor.
 
 import { EMPTY_PLC } from './addressing'
-import { fixAssignmentKind } from './actions'
 import { fileName } from './fileNames'
-import { sceneFromPlant } from './sim/scene'
 import { t } from './i18n'
 import { attachmentsOf, isPdf } from './pdfAttach'
-
-const FORMAT = 'grafcet-editor'
-const VERSION = 1
+import { FORMAT, FORMAT_VERSION, checkFormat, migrateProject } from './projectFormat'
+import { VERSION as APP_VERSION } from './about'
 
 export function downloadFile(content, filename, type) {
   const url = URL.createObjectURL(new Blob([content], { type }))
@@ -19,9 +16,10 @@ export function downloadFile(content, filename, type) {
   URL.revokeObjectURL(url)
 }
 
-// `plc` es la tabla de variables (lib/addressing.js); viaja dentro del mismo proyecto.
+// Formato del archivo: docs/formato-proyecto.md (y lib/projectFormat.js). `app`: versión del editor
+// que lo guardó (informativa; para abrirlo cuenta `version`, la del formato).
 export const projectJson = ({ nodes, edges, viewport, plc, name }) =>
-  JSON.stringify({ format: FORMAT, version: VERSION, savedAt: new Date().toISOString(), name, nodes, edges, viewport, plc }, null, 2)
+  JSON.stringify({ format: FORMAT, version: FORMAT_VERSION, app: APP_VERSION, savedAt: new Date().toISOString(), name, nodes, edges, viewport, plc }, null, 2)
 
 export function saveProject(project, filename = fileName('json')) {
   downloadFile(projectJson(project), filename, 'application/json')
@@ -56,66 +54,23 @@ export async function loadProjects(file) {
       throw new Error('El archivo no es un JSON válido.')
     }
   }
+  for (const r of raw) checkFormat(r.project)
   const found = raw.map((r) => ({ file: r.file, project: normalizeProject(r.project) })).filter((r) => r.project)
   if (!found.length) throw new Error('El archivo no contiene un proyecto Grafcet.')
   return found.sort((a, b) => a.file.localeCompare(b.file))
 }
 
-// Valida y adapta al formato actual un proyecto leído (de archivo o del autoguardado).
-// Devuelve null si no tiene forma de proyecto.
-// Planta por elementos de versiones anteriores (plc.plant) -> escena (plc.scene).
-function migratePlant(plc) {
-  if (!plc.plant) return plc
-  const { plant, ...rest } = plc
-  return plant.length && !rest.scene?.elements?.length ? { ...rest, scene: sceneFromPlant(plant) } : rest
-}
-
+// Valida y adapta al formato actual un proyecto leído (de archivo, del autoguardado, de un enlace
+// o de un ejemplo). Devuelve null si no tiene forma de proyecto. Las migraciones de formatos
+// anteriores están en lib/projectFormat.js.
 export function normalizeProject(project) {
   if (!project || !Array.isArray(project.nodes) || !Array.isArray(project.edges)) return null
-  const { nodes, edges } = migrateActionNodes(project.nodes, project.edges)
+  const { nodes, edges, plc } = migrateProject(project)
   return {
-    nodes: nodes.map(normalizeNode),
-    edges: edges.map(normalizeEdge),
+    nodes: nodes.map((n) => ({ ...n, selected: false })),
+    edges: edges.map((e) => ({ ...e, selected: false })),
     viewport: project.viewport,
     name: typeof project.name === 'string' ? project.name : undefined,
-    plc: project.plc ? migratePlant({ ...EMPTY_PLC, ...project.plc }) : EMPTY_PLC,
-  }
-}
-
-// Versiones anteriores usaban el enlace genérico "step" de React Flow; ahora todos son Grafcet.
-function normalizeEdge(edge) {
-  return { ...edge, type: 'grafcet', selected: false }
-}
-
-function normalizeNode(node) {
-  const n = { ...node, selected: false }
-  // Asignaciones guardadas como continuas (no hacían nada): memorizadas al activar.
-  if (n.type === 'step') n.data = { ...n.data, actions: (n.data?.actions ?? []).map(fixAssignmentKind) }
-  return n
-}
-
-// Proyectos de la primera versión guardaban las acciones como nodos sueltos
-// unidos a la etapa; se convierten en acciones de esa etapa.
-function migrateActionNodes(nodes, edges) {
-  const actionIds = new Set(nodes.filter((n) => n.type === 'action').map((n) => n.id))
-  if (actionIds.size === 0) return { nodes, edges }
-
-  const actionsByStep = {}
-  for (const e of edges) {
-    if (actionIds.has(e.target)) {
-      const action = nodes.find((n) => n.id === e.target)
-      ;(actionsByStep[e.source] ??= []).push(action.data?.label ?? '')
-    }
-  }
-
-  return {
-    nodes: nodes
-      .filter((n) => !actionIds.has(n.id))
-      .map((n) =>
-        actionsByStep[n.id]
-          ? { ...n, data: { ...n.data, actions: [...(n.data?.actions ?? []), ...actionsByStep[n.id]] } }
-          : n,
-      ),
-    edges: edges.filter((e) => !actionIds.has(e.source) && !actionIds.has(e.target)),
+    plc: plc ? { ...EMPTY_PLC, ...plc } : EMPTY_PLC,
   }
 }

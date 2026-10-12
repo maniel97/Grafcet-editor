@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { normalizeProject } from './projectFile'
+import { FORMAT_VERSION } from './projectFormat'
 
 // Autoguardado en este navegador: el trabajo sobrevive a recargas y cierres accidentales.
 // Es una red de seguridad local; para compartir o archivar se usa Guardar (.json).
@@ -18,7 +19,7 @@ export function loadAutosave() {
 function save({ nodes, edges, plc, name }) {
   try {
     const strip = (items) => items.map(({ selected: _selected, dragging: _dragging, ...rest }) => rest)
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ name, nodes: strip(nodes), edges: strip(edges), plc }))
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ version: FORMAT_VERSION, name, nodes: strip(nodes), edges: strip(edges), plc }))
   } catch {
     // Sin almacenamiento disponible (modo privado, cuota...): se sigue trabajando sin autoguardado.
   }

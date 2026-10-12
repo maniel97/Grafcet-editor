@@ -1,0 +1,16 @@
+{
+  "name": "Contador sin versión (autoguardado antiguo)",
+  "nodes": [
+    { "id": "s0", "type": "step", "position": { "x": 200, "y": 0 }, "data": { "label": "0", "initial": true, "actions": [{ "text": "C:=0", "kind": "stored-on" }] } },
+    { "id": "t1", "type": "transition", "position": { "x": 200, "y": 100 }, "data": { "condition": "↑P" } },
+    { "id": "s1", "type": "step", "position": { "x": 200, "y": 170 }, "data": { "label": "1", "actions": [{ "text": "C:=C+1", "kind": "continuous" }] } },
+    { "id": "t2", "type": "transition", "position": { "x": 200, "y": 270 }, "data": { "condition": "[C >= 3]" } }
+  ],
+  "edges": [
+    { "id": "s0-t1", "source": "s0", "target": "t1", "type": "grafcet" },
+    { "id": "t1-s1", "source": "t1", "target": "s1", "type": "grafcet" },
+    { "id": "s1-t2", "source": "s1", "target": "t2", "type": "grafcet" },
+    { "id": "t2-s0", "source": "t2", "target": "s0", "type": "grafcet" }
+  ],
+  "plc": { "scheme": "siemens", "showAddresses": false, "steps": {}, "variables": { "P": { "type": "input", "address": "I0.0" }, "C": { "type": "counter", "address": "" } } }
+}

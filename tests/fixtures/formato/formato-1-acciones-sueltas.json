@@ -1,0 +1,21 @@
+{
+  "format": "grafcet-editor",
+  "version": 1,
+  "savedAt": "2026-10-02T10:00:00.000Z",
+  "nodes": [
+    { "id": "s0", "type": "step", "position": { "x": 200, "y": 0 }, "data": { "label": "0", "initial": true } },
+    { "id": "t1", "type": "transition", "position": { "x": 200, "y": 100 }, "data": { "condition": "Marcha" } },
+    { "id": "s1", "type": "step", "position": { "x": 200, "y": 170 }, "data": { "label": "1" } },
+    { "id": "a1", "type": "action", "position": { "x": 320, "y": 170 }, "data": { "label": "Motor" } },
+    { "id": "a2", "type": "action", "position": { "x": 440, "y": 170 }, "data": { "label": "Piloto" } },
+    { "id": "t2", "type": "transition", "position": { "x": 200, "y": 270 }, "data": { "condition": "Paro" } }
+  ],
+  "edges": [
+    { "id": "s0-t1", "source": "s0", "target": "t1", "type": "step" },
+    { "id": "t1-s1", "source": "t1", "target": "s1", "type": "step" },
+    { "id": "s1-a1", "source": "s1", "target": "a1", "type": "step" },
+    { "id": "s1-a2", "source": "s1", "target": "a2", "type": "step" },
+    { "id": "s1-t2", "source": "s1", "target": "t2", "type": "step" },
+    { "id": "t2-s0", "source": "t2", "target": "s0", "type": "step" }
+  ]
+}

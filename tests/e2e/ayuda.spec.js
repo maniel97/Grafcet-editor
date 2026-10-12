@@ -176,12 +176,17 @@ test('tutorial «Contar piezas» de principio a fin', async ({ page }) => {
   await tut.title('Pasan las piezas')
   const pieza = page.locator('[data-tour="entradas"]').getByRole('button', { name: 'pulsar' })
   const counter = page.getByRole('textbox', { name: 'Valor de C' })
-  for (const n of ['1', '2']) {
-    await pieza.click({ delay: 150 })
-    await expect(counter).toHaveValue(n)
+  // Cada pieza: se mantiene pulsado hasta que la simulación la ha contado (con el equipo cargado,
+  // una pulsación de duración fija podía caer entre dos ciclos y no contarse).
+  const piece = async (done) => {
+    const b = await stableBox(pieza)
+    await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2)
+    await page.mouse.down()
+    await done()
+    await page.mouse.up()
   }
-  await pieza.click({ delay: 150 })
-  await tut.title('¡Hecho!')
+  for (const n of ['1', '2']) await piece(() => expect(counter).toHaveValue(n))
+  await piece(() => tut.title('¡Hecho!'))
   await expect(counter).toHaveValue('0')
   await tut.next()
   await expect(page.locator('.tour')).toHaveCount(0)
