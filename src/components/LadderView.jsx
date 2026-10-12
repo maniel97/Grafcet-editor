@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { AlertTriangle, Check, Copy, Download, FileCode, FileText, Image, Maximize2, Minimize2, Pause, Play, Table2, X } from 'lucide-react'
 import LadderDiagram from './LadderDiagram'
 import LadderZoom from './LadderZoom'
@@ -90,7 +90,20 @@ export default function LadderView({ nodes, edges, plc, grafcetErrors, exportPro
     }),
   )
 
-  const ladder = useMemo(() => generateLadder(nodes, edges, plc), [nodes, edges, plc])
+  // Mientras se arrastra algo en el grafcet, el ladder no se regenera en cada movimiento (con el panel
+  // abierto, un 50 % más de trabajo por fotograma en un grafcet grande): se hace una vez al soltar.
+  // Las posiciones sí cuentan (las transiciones se numeran de arriba abajo, los marcos por lo que
+  // encierran), así que no basta con ignorarlas.
+  const dragging = nodes.some((n) => n.dragging)
+  const [settled, setSettled] = useState(nodes)
+  if (!dragging && settled !== nodes) setSettled(nodes)
+  const ladder = useMemo(() => generateLadder(settled, edges, plc), [settled, edges, plc])
+  // Función estable para el clic en un segmento (así LadderDiagram, memorizado, no se redibuja por ella).
+  const showRef = useRef(onShowInGrafcet)
+  useEffect(() => {
+    showRef.current = onShowInGrafcet
+  })
+  const showRung = useCallback((rung) => showRef.current?.(rung.nodeIds[0]), [])
   // En vivo (y sin capas al exportar: el esquema exportado es siempre el limpio).
   const simCompiled = simulation?.compiled
   const simState = simulation?.sim?.state
@@ -329,7 +342,7 @@ export default function LadderView({ nodes, edges, plc, grafcetErrors, exportPro
             mode={mode}
             live={live}
             highlightNodeId={exportFormat ? null : highlightNodeId}
-            onRungClick={onShowInGrafcet && !exportFormat ? (rung) => onShowInGrafcet(rung.nodeIds[0]) : undefined}
+            onRungClick={onShowInGrafcet && !exportFormat ? showRung : undefined}
           />
         </LadderZoom>
       ) : (

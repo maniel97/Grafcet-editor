@@ -322,3 +322,28 @@ test('al abrir un panel, el grafcet se reencuadra', async ({ page }) => {
   }
   expectNoErrors(errors)
 })
+
+// Con el panel abierto, el ladder sigue al grafcet: al editar y tras un arrastre (que no lo regenera
+// en cada movimiento, solo al soltar).
+test('el ladder abierto se actualiza al editar y al soltar un arrastre', async ({ page }) => {
+  const errors = await openEditor(page)
+  await openExample(page, /^Marcha y paro/)
+  await page.getByTitle(/Paso a ladder/).click()
+  const svg = page.getByRole('region', { name: 'Ladder generado' }).locator('[data-ladder-svg]')
+  await expect(svg).toContainText('Marcha')
+  await page.locator('.react-flow__node-transition').filter({ hasText: 'Marcha' }).dblclick()
+  await page.getByRole('combobox').first().fill('Arranque')
+  await page.keyboard.press('Escape')
+  await expect(svg).toContainText('Arranque')
+  // Arrastrar una etapa con el panel abierto: se mueve y el ladder sigue al día (se regenera al soltar).
+  await page.locator('[data-tour="propiedades"]').getByTitle('Cerrar', { exact: true }).click()
+  const step = page.locator('.react-flow__node-step').nth(1)
+  const b = await stableBox(step)
+  await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(b.x + b.width / 2 + 160, b.y + b.height / 2 + 40, { steps: 8 })
+  await page.mouse.up()
+  await expect.poll(async () => (await step.boundingBox()).x).toBeGreaterThan(b.x + 100)
+  await expect(svg).toContainText('Tr1: X0 · «Arranque»')
+  expectNoErrors(errors)
+})

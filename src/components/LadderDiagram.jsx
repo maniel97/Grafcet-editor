@@ -1,4 +1,4 @@
-import { forwardRef } from 'react'
+import { forwardRef, memo } from 'react'
 import { t } from '../lib/i18n'
 
 // Dibujo SVG del ladder generado (lib/ladder/generate.js): un único SVG con todas las secciones
@@ -323,4 +323,6 @@ const LadderDiagram = forwardRef(function LadderDiagram({ ladder, mode = 'both',
   )
 })
 
-export default LadderDiagram
+// memo: con el panel del ladder abierto, el resto del editor se redibuja en cada movimiento de un
+// arrastre; el esquema solo cuando cambia de verdad (otro ladder, modo, estado en vivo o resaltado).
+export default memo(LadderDiagram)

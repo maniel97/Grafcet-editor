@@ -2,7 +2,8 @@ import { test } from '@playwright/test'
 
 // Medición de rendimiento al arrastrar en un diagrama grande (npm run test:perf).
 // No es una prueba de aprobado/suspenso: informa de los tiempos para comparar antes y después
-// de un cambio. Peor caso: tabla de variables en el lienzo y panel Verificar abierto.
+// de un cambio. Peor caso: tabla de variables en el lienzo y panel Verificar abierto (y, con
+// PERF_LADDER=1, también el panel del ladder).
 
 const STEPS = Number(process.env.PERF_STEPS ?? 120)
 
@@ -33,6 +34,14 @@ test(`arrastrar una etapa en un grafcet de ${STEPS} etapas`, async ({ page }) =>
   test.setTimeout(180_000)
   await page.goto('/')
   await page.waitForSelector('.react-flow__node')
+  // PERF_LADDER=1: con el panel del ladder abierto (se regenera con los cambios del grafcet). Se abre
+  // antes de cargar el proyecto: abrirlo después reencuadra el lienzo y se perdería la vista guardada.
+  if (process.env.PERF_LADDER) {
+    // Con su ancho mínimo, para que la etapa que se arrastra quede a la vista junto a Verificar.
+    await page.evaluate(() => localStorage.setItem('grafcet-editor:ladder-width', '360'))
+    await page.getByTitle(/Paso a ladder/).click()
+    await page.waitForSelector('[data-ladder-svg]')
+  }
   await page.locator('input[type=file]').setInputFiles({
     name: 'grande.json',
     mimeType: 'application/json',

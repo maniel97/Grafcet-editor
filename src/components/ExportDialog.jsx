@@ -102,6 +102,8 @@ export default function ExportDialog({ source, initialFormat = 'pdf', fileName, 
     return () => el.removeEventListener('wheel', onWheel)
   })
   const [saving, setSaving] = useState(false)
+  // Error de la vista previa o al guardar: dentro del diálogo, en vez de un alert() del navegador.
+  const [error, setError] = useState(null)
   const [today] = useState(() => new Date().toLocaleDateString('es-ES'))
 
   useEffect(() => {
@@ -115,7 +117,7 @@ export default function ExportDialog({ source, initialFormat = 'pdf', fileName, 
       .then((img) => !cancelled && setImage(img ?? null))
       .catch((err) => {
         if (cancelled) return
-        alert(t('No se pudo preparar la vista previa: {error}', { error: err.message }))
+        setError(t('No se pudo preparar la vista previa: {error}', { error: err.message }))
         setImage(null)
       })
     return () => {
@@ -166,12 +168,13 @@ export default function ExportDialog({ source, initialFormat = 'pdf', fileName, 
 
   const save = async () => {
     setSaving(true)
+    setError(null)
     try {
       if (format === 'pdf') await savePdf(allSheets ? allImages : image, pdfOptions, fileName('pdf'))
       else await source.save(format, options)
       onClose()
     } catch (err) {
-      alert(t('No se pudo exportar: {error}', { error: err.message }))
+      setError(t('No se pudo exportar: {error}', { error: err.message }))
       setSaving(false)
     }
   }
@@ -218,6 +221,15 @@ export default function ExportDialog({ source, initialFormat = 'pdf', fileName, 
           <X size={18} />
         </button>
       </div>
+      {error && (
+        <div role="alert" className="flex items-start gap-2 border-b border-red-200 bg-red-50 px-5 py-2 text-sm text-red-800">
+          <AlertTriangle size={16} className="mt-0.5 shrink-0" />
+          <span className="flex-1">{error}</span>
+          <button type="button" onClick={() => setError(null)} title={t('Cerrar el aviso')} aria-label={t('Cerrar el aviso')} className="rounded p-0.5 hover:bg-red-100">
+            <X size={14} />
+          </button>
+        </div>
+      )}
 
       <div className="flex max-h-[75vh] flex-col gap-5 overflow-y-auto px-5 py-4 md:flex-row">
         <div className="w-full space-y-4 md:w-52 md:shrink-0">

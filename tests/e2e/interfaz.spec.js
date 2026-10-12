@@ -159,17 +159,16 @@ test('formato: el proyecto de referencia se abre y uno más nuevo avisa', async 
   await expect(page.locator('.react-flow__node-step')).toHaveCount(2)
   await expect(page.getByRole('tab', { name: 'Notas' })).toBeVisible() // su segunda hoja
 
-  let message = ''
-  page.once('dialog', async (dialog) => {
-    message = dialog.message()
-    await dialog.dismiss()
-  })
   await page.locator('input[type=file]').setInputFiles({
     name: 'futuro.json',
     mimeType: 'application/json',
     buffer: Buffer.from(JSON.stringify({ format: 'grafcet-editor', version: 99, nodes: [], edges: [] })),
   })
-  await expect.poll(() => message).toContain('versión más nueva del editor')
+  // El aviso, en el propio editor (no un alert del navegador), y se cierra con su ✕.
+  const notice = page.getByRole('alert').filter({ hasText: 'versión más nueva del editor' })
+  await expect(notice).toBeVisible()
+  await notice.getByRole('button', { name: 'Cerrar el aviso' }).click()
+  await expect(notice).toHaveCount(0)
   await expect(page.getByLabel('Nombre del proyecto')).toHaveValue('Proyecto de referencia del formato') // no se ha abierto
   expectNoErrors(errors)
 })

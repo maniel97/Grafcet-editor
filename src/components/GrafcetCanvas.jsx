@@ -1,7 +1,7 @@
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ReactFlow, Background, BackgroundVariant, MiniMap, addEdge, useNodesInitialized, useNodesState, useEdgesState, useReactFlow } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
-import { Compass, Lock } from 'lucide-react'
+import { AlertTriangle, Compass, Lock, X } from 'lucide-react'
 
 import Toolbar from './Toolbar'
 import PropertiesPanel from './PropertiesPanel'
@@ -703,6 +703,9 @@ export default function GrafcetCanvas() {
   // Proyecto que llega en el enlace (lib/share.js): se ofrece abrirlo (lo de ahora va a «Trabajos
   // anteriores»).
   const [incoming, setIncoming] = useState(null) // { project } | { error }
+  // Aviso de error (abrir un archivo que no es un proyecto, de un formato más nuevo…), en vez de un
+  // alert() del navegador: se queda hasta cerrarlo o abrir otra cosa.
+  const [notice, setNotice] = useState(null)
   useEffect(() => {
     const check = () => {
       const data = sharedData()
@@ -736,6 +739,7 @@ export default function GrafcetCanvas() {
       setCurrentSheet(sheetsOf(project.plc ?? EMPTY_PLC)[0].id)
       setProjectNameState(project.name ?? '')
       setEditingId(null)
+      setNotice(null)
       if (project.viewport) setViewport(project.viewport)
       else {
         const ids = new Set(project.nodes.map((n) => n.id))
@@ -762,7 +766,7 @@ export default function GrafcetCanvas() {
         if (items.length > 1) setChoosing({ fileName: file.name, items })
         else openLoaded(items[0].project, file.name)
       } catch (err) {
-        alert(err.message)
+        setNotice(err.message)
       }
     },
     [openLoaded],
@@ -1185,6 +1189,15 @@ export default function GrafcetCanvas() {
               onClose={() => setExportFormat(null)}
             />
           </Suspense>
+        )}
+        {notice && (
+          <div role="alert" className="fixed left-1/2 top-16 z-50 flex max-w-[min(40rem,calc(100vw-2rem))] -translate-x-1/2 items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-800 shadow-xl">
+            <AlertTriangle size={16} className="mt-0.5 shrink-0" />
+            <span className="flex-1">{notice}</span>
+            <button type="button" onClick={() => setNotice(null)} title={t('Cerrar el aviso')} aria-label={t('Cerrar el aviso')} className="rounded p-0.5 hover:bg-red-100">
+              <X size={14} />
+            </button>
+          </div>
         )}
         {incoming && (
           <div role="alertdialog" aria-label={t('Proyecto compartido')} className="fixed left-1/2 top-16 z-50 flex -translate-x-1/2 items-center gap-3 rounded-lg bg-slate-900 px-4 py-2 text-sm text-white shadow-xl">
