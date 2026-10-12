@@ -260,6 +260,17 @@ export default function GrafcetCanvas() {
   // Con el lienzo estrecho (p. ej. el panel del ejercicio y el de propiedades abiertos a la vez),
   // el minimapa tapaba lo que se acaba de añadir abajo a la derecha (su botón +): se oculta.
   const [roomy, setRoomy] = useState(true)
+  // Zona de trabajo (grafcet + paneles): con poco ancho, los paneles van en pestañas (#18).
+  const rowRef = useRef(null)
+  const [rowWidth, setRowWidth] = useState(Infinity)
+  useEffect(() => {
+    const el = rowRef.current
+    if (!el || typeof ResizeObserver === 'undefined') return
+    const observer = new ResizeObserver(([entry]) => setRowWidth(entry.contentRect.width))
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [])
+  const [panelTab, setPanelTab] = useState('grafcet')
   useEffect(() => {
     const el = wrapperRef.current
     if (!el || typeof ResizeObserver === 'undefined') return
@@ -963,7 +974,30 @@ export default function GrafcetCanvas() {
     setStackGrow(grow ?? {})
     writePref(GROW_KEY, JSON.stringify(grow ?? {}))
   }
+  // Pestañas: si no caben el grafcet y un panel de 380 px uno al lado del otro (sin contar el panel
+  // de la simulación, que en un móvil va abajo). Al abrir un panel, su pestaña pasa a ser la elegida.
+  const openPanels = [elecView && 'elec', sceneShown && 'scene', ladderView && 'ladder'].filter(Boolean)
+  const tabbed = openPanels.length > 0 && rowWidth - (simulating && rowWidth >= 768 ? 320 : 0) < 760
+  const openKey = openPanels.join(',')
+  const [prevOpenKey, setPrevOpenKey] = useState(openKey)
+  if (openKey !== prevOpenKey) {
+    setPrevOpenKey(openKey)
+    const added = openPanels.find((id) => !prevOpenKey.split(',').includes(id))
+    if (added) setPanelTab(added)
+  }
+  const activeTab = openPanels.includes(panelTab) ? panelTab : 'grafcet'
+  const PANEL_TABS = { grafcet: t('Grafcet'), elec: t('Esquema eléctrico'), scene: t('Planta'), ladder: t('Ladder') }
+  // El grafcet se reencuadra cuando cambia el sitio que le dejan los paneles.
+  const layoutKey = tabbed ? `tabs:${activeTab}` : `${stackOrder.length}|${stackActive}|${anyFull}`
+  const layoutKeyRef = useRef(layoutKey)
+  useEffect(() => {
+    if (layoutKeyRef.current === layoutKey) return
+    layoutKeyRef.current = layoutKey
+    const id = requestAnimationFrame(() => fitDrawn(0))
+    return () => cancelAnimationFrame(id)
+  }, [layoutKey, fitDrawn])
   const dockFor = (id) => {
+    if (tabbed) return { tab: activeTab === id ? 'active' : 'hidden' }
     const button = stackOrder.length >= 2 && stackOrder.includes(id) && !anyFull ? <StackButton stacked={stackActive} onToggle={toggleStack} /> : null
     if (!stackActive) return { button }
     return { stacked: true, grow: stackGrow[id] ?? 1, button, top: stackOrder[0] === id ? null : <StackSeparator onGrow={setStackGrow} onCommit={commitGrow} /> }
@@ -1269,7 +1303,23 @@ export default function GrafcetCanvas() {
             </button>
           </div>
         )}
-        <div className="relative flex min-h-0 flex-1" {...floatDrop}>
+        {tabbed && (
+          <div role="tablist" aria-label={t('Vistas')} className="flex shrink-0 gap-1 overflow-x-auto border-b border-slate-200 bg-white px-2 py-1">
+            {['grafcet', ...openPanels].map((id) => (
+              <button
+                key={id}
+                type="button"
+                role="tab"
+                aria-selected={activeTab === id}
+                onClick={() => setPanelTab(id)}
+                className={`shrink-0 rounded-md px-3 py-1 text-sm ${activeTab === id ? 'bg-blue-600 font-medium text-white' : 'text-slate-600 hover:bg-slate-100'}`}
+              >
+                {PANEL_TABS[id]}
+              </button>
+            ))}
+          </div>
+        )}
+        <div ref={rowRef} className="relative flex min-h-0 flex-1" {...floatDrop}>
           {/* Capa de los paneles flotantes del simulador: sobre toda la zona de trabajo (grafcet,
               planta, esquema); solo los paneles reciben los clics. */}
           {simulating && <div ref={floatLayerRef} data-float-layer className="pointer-events-none absolute inset-0 z-30" />}

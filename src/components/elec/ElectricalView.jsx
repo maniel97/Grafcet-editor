@@ -772,7 +772,7 @@ function Inner({ schematic, onChange, elecState, onAction, variables = [], build
     >
       {/* Separador: arrastrar para repartir el espacio con el grafcet (doble clic: mitad y mitad). */}
       {dock?.top}
-      {!maximized && !dock?.stacked && (
+      {!maximized && !dock?.stacked && !dock?.tab && (
         <PanelSeparator
           sectionRef={sectionRef}
           {...separator}
@@ -780,7 +780,7 @@ function Inner({ schematic, onChange, elecState, onAction, variables = [], build
           title={tr('Arrastra para cambiar el ancho del esquema (doble clic: mitad y mitad)')}
         />
       )}
-      <header onDoubleClick={headerDoubleClick(onToggleMaximize)} className="flex flex-wrap items-center gap-1 border-b border-slate-200 px-2 py-1.5 text-xs">
+      <header onDoubleClick={headerDoubleClick(dock?.tab ? null : onToggleMaximize)} className="flex flex-wrap items-center gap-1 border-b border-slate-200 px-2 py-1.5 text-xs">
         <span className="mr-1 flex items-center gap-1 text-sm font-semibold">
           <Zap size={14} />{' '}{tr('Esquema eléctrico')}
         </span>
@@ -908,7 +908,7 @@ function Inner({ schematic, onChange, elecState, onAction, variables = [], build
           <Scan size={14} />
         </button>
         {dock?.button}
-        <button type="button" onClick={onToggleMaximize} title={maximized ? tr('Vista dividida') : tr('Pantalla completa')} className="rounded p-1 hover:bg-slate-100">
+        <button type="button" hidden={Boolean(dock?.tab)} onClick={onToggleMaximize} title={maximized ? tr('Vista dividida') : tr('Pantalla completa')} className="rounded p-1 hover:bg-slate-100">
           {maximized ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
         </button>
         <button type="button" onClick={onClose} title={tr('Cerrar el esquema')} className="rounded p-1 hover:bg-slate-100">

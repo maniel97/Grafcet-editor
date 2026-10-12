@@ -52,7 +52,7 @@ Que contar y temporizar sea cómodo de escribir y fácil de ver al simular.
 
 Ver a la vez el grafcet, la planta, el esquema y el ladder, y seguir el ladder durante la simulación.
 
-- [ ] [#18](https://github.com/maniel97/Grafcet-editor/issues/18) Vistas: varios editores a la vez y ladder en vivo durante la simulación
+- [x] [#18](https://github.com/maniel97/Grafcet-editor/issues/18) Vistas: varios editores a la vez y ladder en vivo durante la simulación
 
 ## 0.x beta — en el aula
 

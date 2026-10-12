@@ -1745,7 +1745,7 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
   useEffect(() => {
     const id = requestAnimationFrame(() => fitRef.current())
     return () => cancelAnimationFrame(id)
-  }, [maximized, fitTick, dock?.stacked, dock?.grow])
+  }, [maximized, fitTick, dock?.stacked, dock?.grow, dock?.tab])
   const state = worldState ?? { pos: {}, pressed: {}, pieces: [], counts: {} }
   // Potenciómetros: valor actual y ajuste relativo (rueda, flechas del teclado, arrastre táctil).
   const knobOf = (id) => state.knob?.[id] ?? Number(elements.find((x) => x.id === id)?.initial ?? 0.5)
@@ -2333,7 +2333,7 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
     >
       {/* Separador: arrastrar para repartir el espacio entre el grafcet y la planta. */}
       {dock?.top}
-      {!maximized && !dock?.stacked && (
+      {!maximized && !dock?.stacked && !dock?.tab && (
         <PanelSeparator
           sectionRef={sectionRef}
           {...separator}
@@ -2342,7 +2342,7 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
           onEnd={() => setFitTick((t) => t + 1)}
         />
       )}
-      <header onDoubleClick={headerDoubleClick(onToggleMaximize)} className="flex flex-wrap items-center gap-1 border-b border-slate-200 px-2 py-1.5 text-xs">
+      <header onDoubleClick={headerDoubleClick(dock?.tab ? null : onToggleMaximize)} className="flex flex-wrap items-center gap-1 border-b border-slate-200 px-2 py-1.5 text-xs">
         <span className="mr-1 text-sm font-semibold">{tr('Planta')}</span>
         <div className="flex rounded-md border border-slate-300 p-0.5" role="radiogroup" aria-label={tr('Modo de la escena')}>
           {[
@@ -2439,7 +2439,7 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
           <Scan size={14} />
         </button>
         {dock?.button}
-        <button type="button" onClick={onToggleMaximize} title={maximized ? tr('Vista dividida con el grafcet') : tr('Pantalla completa')} className="rounded p-1 hover:bg-slate-100">
+        <button type="button" hidden={Boolean(dock?.tab)} onClick={onToggleMaximize} title={maximized ? tr('Vista dividida con el grafcet') : tr('Pantalla completa')} className="rounded p-1 hover:bg-slate-100">
           {maximized ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
         </button>
         <button type="button" onClick={onClose} title={tr('Cerrar la planta')} className="rounded p-1 hover:bg-slate-100">

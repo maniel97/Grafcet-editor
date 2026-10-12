@@ -258,3 +258,67 @@ test('paneles apilados: planta y ladder en una columna junto al grafcet', async 
   expect(a.x + a.width).toBeLessThanOrEqual(b.x + 1)
   expectNoErrors(errors)
 })
+
+// #18 (fase 3): sin sitio para dos columnas, los paneles van en pestañas.
+test('pantallas estrechas: grafcet, planta y ladder en pestañas', async ({ page }) => {
+  await page.setViewportSize({ width: 1000, height: 800 })
+  const errors = await openEditor(page)
+  await openExample(page, /^Marcha y paro/)
+  await expect(page.getByRole('tablist', { name: 'Vistas' })).toHaveCount(0) // sin paneles, sin pestañas
+  await page.getByRole('button', { name: /Simular/ }).click()
+  const tabs = page.getByRole('tablist', { name: 'Vistas' })
+  const plant = page.locator('[data-tour="planta"]')
+  // Al abrirse, la planta pasa a ser la pestaña elegida y ocupa la zona de trabajo.
+  await expect(tabs.getByRole('tab', { name: 'Planta' })).toHaveAttribute('aria-selected', 'true')
+  await expect(plant).toBeVisible()
+  const area = await stableBox(page.locator('.react-flow').first())
+  const box = await stableBox(plant)
+  expect(Math.abs(box.x - area.x)).toBeLessThan(2)
+  expect(box.width).toBeGreaterThan(area.width - 4)
+  await expect(plant.getByRole('button', { name: 'Pantalla completa' })).toBeHidden()
+
+  await tabs.getByRole('tab', { name: 'Grafcet' }).click()
+  await expect(plant).toBeHidden()
+  await expect(page.locator('.react-flow__node-step').first()).toBeVisible()
+
+  // El ladder, en su propia pestaña; la planta conserva su estado (sigue simulando).
+  await page.getByTitle(/Paso a ladder/).click()
+  const view = page.getByRole('region', { name: 'Ladder generado' })
+  await expect(tabs.getByRole('tab', { name: 'Ladder' })).toHaveAttribute('aria-selected', 'true')
+  await expect(view).toBeVisible()
+  await expect(plant).toBeHidden()
+  await tabs.getByRole('tab', { name: 'Planta' }).click()
+  await expect(plant).toBeVisible()
+  await expect(view).toBeHidden()
+  // Al cerrar un panel, vuelve al grafcet.
+  await plant.getByTitle('Cerrar la planta').click()
+  await expect(tabs.getByRole('tab', { name: 'Grafcet' })).toHaveAttribute('aria-selected', 'true')
+  await expect(page.locator('.react-flow__node-step').first()).toBeVisible()
+
+  // Móvil: el ladder ocupa toda la zona de trabajo (no media pantalla abajo).
+  await page.getByRole('button', { name: /Detener/ }).click()
+  await page.setViewportSize({ width: 420, height: 800 })
+  await tabs.getByRole('tab', { name: 'Ladder' }).click()
+  const phone = await stableBox(view)
+  expect(phone.width).toBeGreaterThan(400)
+  expect(phone.height).toBeGreaterThan(500)
+  expectNoErrors(errors)
+})
+
+// Al abrir un panel, el grafcet se reencuadra en el sitio que le queda.
+test('al abrir un panel, el grafcet se reencuadra', async ({ page }) => {
+  await page.setViewportSize({ width: 1400, height: 900 })
+  const errors = await openEditor(page)
+  await openExample(page, /^Taladradora\s*Secuencia/)
+  await page.getByTitle(/Paso a ladder/).click()
+  await expect(page.getByRole('region', { name: 'Ladder generado' })).toBeVisible()
+  const canvas = await stableBox(page.locator('.react-flow').first())
+  for (const label of ['0', '3']) {
+    const step = page.locator('.react-flow__node-step').filter({ has: page.locator('.diagram-step-label', { hasText: new RegExp(`^${label}$`) }) })
+    const b = await stableBox(step)
+    expect(b.x).toBeGreaterThanOrEqual(canvas.x - 1)
+    expect(b.x + b.width).toBeLessThanOrEqual(canvas.x + canvas.width + 1)
+    expect(b.y + b.height).toBeLessThanOrEqual(canvas.y + canvas.height + 1)
+  }
+  expectNoErrors(errors)
+})

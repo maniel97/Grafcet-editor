@@ -25,9 +25,13 @@ export const boxChildren = (el) =>
   [...el.children].flatMap((c) => (getComputedStyle(c).display === 'contents' ? boxChildren(c) : [c]))
 
 // Tamaño y posición de un panel lateral: a pantalla completa (encima de todo, menos el panel de la
-// simulación), en la fila junto al grafcet con su ancho, o apilado en una columna con otros (dock:
-// { stacked, grow }), donde reparte el alto según grow.
+// simulación), en la fila junto al grafcet con su ancho, apilado en una columna con otros (dock:
+// { stacked, grow }), donde reparte el alto según grow, o en pestañas (dock.tab: 'active' | 'hidden')
+// cuando no caben dos columnas: el de la pestaña elegida ocupa la zona de trabajo; los demás se
+// ocultan sin desmontarse (conservan su estado).
 export function dockLayout({ maximized, simulating = true, dock, width, defaultWidth, min }) {
+  if (dock?.tab === 'hidden') return { position: 'hidden', style: undefined }
+  if (dock?.tab === 'active') return { position: `panel-tab absolute inset-y-0 left-0 z-20 ${simulating ? 'right-80' : 'right-0'}`, style: undefined }
   if (maximized) return { position: `absolute inset-y-0 left-0 z-20 ${simulating ? 'right-80' : 'right-0'}`, style: undefined }
   if (dock?.stacked) return { position: 'relative', style: { flex: `${dock.grow ?? 1} 1 0px`, minHeight: 140, width: '100%' } }
   return { position: 'relative', style: { width: width ?? defaultWidth, flexShrink: 1, minWidth: min } }

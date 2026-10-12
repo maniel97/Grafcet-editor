@@ -204,6 +204,15 @@ body {
   .react-flow__minimap {
     display: none;
   }
+  /* En pestañas (#18), el panel elegido ocupa toda la zona de trabajo, no media pantalla. */
+  .side-panel.panel-tab {
+    position: absolute;
+    inset: 0;
+    max-height: none;
+    border-top: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
 }
 
 /* Modo oscuro (Opciones > Tema). Se aplica a la interfaz (barra, paneles, menús, diálogos)

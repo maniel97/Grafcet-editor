@@ -151,7 +151,7 @@ export default function LadderView({ nodes, edges, plc, grafcetErrors, exportPro
       style={layout.style}
     >
       {dock?.top}
-      {!maximized && !dock?.stacked && (
+      {!maximized && !dock?.stacked && !dock?.tab && (
         <PanelSeparator
           sectionRef={sectionRef}
           {...separator}
@@ -159,14 +159,14 @@ export default function LadderView({ nodes, edges, plc, grafcetErrors, exportPro
           title={t('Arrastra para cambiar el ancho del ladder (doble clic: mitad y mitad)')}
         />
       )}
-      <header onDoubleClick={headerDoubleClick(onToggleMaximize)} className="flex flex-wrap items-center gap-x-3 gap-y-1.5 border-b border-slate-200 bg-white px-3 py-1.5">
+      <header onDoubleClick={headerDoubleClick(dock?.tab ? null : onToggleMaximize)} className="flex flex-wrap items-center gap-x-3 gap-y-1.5 border-b border-slate-200 bg-white px-3 py-1.5">
         <h2 className="text-sm font-semibold">{t('Paso a ladder')}</h2>
         <span className="text-xs text-slate-500">{t('{n} segmentos · método SET/RESET por etapas', { n: rungCount })}</span>
         <div className="ml-auto flex items-center gap-0.5 @5xl:order-last">
           {dock?.button}
           <button
             type="button"
-            onClick={onToggleMaximize}
+            hidden={Boolean(dock?.tab)} onClick={onToggleMaximize}
             title={maximized ? t('Vista dividida con el grafcet') : t('Pantalla completa')}
             aria-label={maximized ? t('Vista dividida con el grafcet') : t('Pantalla completa')}
             className="rounded-md p-1.5 text-slate-500 hover:bg-slate-100"
