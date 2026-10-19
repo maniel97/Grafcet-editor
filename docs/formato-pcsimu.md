@@ -138,6 +138,25 @@ Tamaño por defecto: 15 × 15.
 
 Tamaño por defecto: 25 × 25 (25 × 45 en las variantes 1 y 3).
 
+### 19 · Actuador neumático (cilindro)
+
+El tipo 19 reúne varios actuadores; `f15` dice cuál. Para el actuador neumático:
+
+| Campo | Valores |
+|---|---|
+| `f5`, `f7` | salida «expandir cilindro» |
+| `f6`, `f8` | salida «contraer cilindro» |
+| `f16` | salidas activas: 1 solo expandir, 10 solo contraer, 11 las dos |
+| `f4` | electroválvula: 0 monoestable (vuelve por muelle), 1 biestable |
+| `f9` | 1: tiene captador «actuador contraído», en la entrada `f11.f13` |
+| `f10` | 1: tiene captador «actuador expandido», en la entrada `f12.a` (el bit va en `a`) |
+| `f14` | orientación: 0 extremo derecho, 1 izquierdo, 2 arriba, 3 abajo |
+| `f15` | dibujo y estado inicial: 11 / 21 gráfico 1 contraído / expandido, 13 / 23 gráfico 2, 15 / 25 gráfico 3 |
+| `f17` | velocidad al expandir (los ejemplos usan 50) |
+| `texto` | `.%3d.%3d.%3d.%1d.%3d.%1d.%1d`: velocidad al contraer; byte y bit del captador del centro y si lo tiene; entrada analógica de posición y si la tiene; 0 unipolar, 1 bipolar |
+
+Tamaño por defecto: 60 × 20 (orientación 0 y 1) o 20 × 60 (2 y 3).
+
 ### 29 · Baliza
 
 Tres luces: **rojo `f5.f7`, ámbar `f6.f8` y verde `f14.f15`** (todas salidas Q). Tamaño por defecto

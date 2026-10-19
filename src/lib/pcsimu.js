@@ -16,7 +16,7 @@ import { t as tr } from './i18n'
 
 export const PCSIMU_HEADER = 'PC_SIMU*  1* 50*'
 export const PCSIMU_COLORS = { green: 0, black: 1, blue: 2, cyan: 3, red: 4, magenta: 5, yellow: 6, white: 7 }
-export const PCSIMU_TYPES = { switch: 1, button: 2, limit: 6, detector: 7, led: 11, sound: 15, motor: 18, beacon: 29, text: 1008 }
+export const PCSIMU_TYPES = { switch: 1, button: 2, limit: 6, detector: 7, led: 11, sound: 15, motor: 18, cylinder: 19, beacon: 29, text: 1008 }
 
 // Lo que no puede ir en un campo: los separadores del formato.
 const clean = (text) => String(text ?? '').replace(/[#*$]/g, ' ').trim()
@@ -59,6 +59,7 @@ const KINDS = {
   sensor: { pcsimu: 'detector', area: 'I', row: 2 },
   motor: { pcsimu: 'motor', area: 'Q', row: 0 },
   siren: { pcsimu: 'sound', area: 'Q', row: 0 },
+  cylinder: { pcsimu: 'cylinder', area: 'Q', row: 0, variable: 'extend' },
 }
 export const PCSIMU_SETA = 12 // Pulsador: f15 = 12 es la seta de emergencia (redonda, f16 = 0)
 // Detector: f12 = 0 inductivo, 1 capacitivo, 2 ultrasonido. El óptico y el de color del editor, como
@@ -82,10 +83,33 @@ const OBJECTS = {
   // justo debajo: el nombre va más abajo (labelGap) para no pisarla.
   motor: { type: 18, name: 'Motor', size: [35, 35], labelGap: 18, fields: ({ byte, bit, left }) => [1, byte, left?.byte ?? 0, bit, left?.bit ?? 0, 0, 0, 0, 0, 100, 0, 0, left ? 11 : 1, 0] },
   sound: { type: 15, name: 'Sonido', size: [35, 35], fields: ({ byte, bit }) => [1, byte, 0, bit, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] },
+  // Actuador neumático: expandir f5.f7 y contraer f6.f8 (f16: 1 solo expandir, 11 las dos); f4: 0
+  // electroválvula monoestable (vuelve por muelle), 1 biestable; captador contraído f11.f13 (si f9 = 1) y
+  // expandido f12.a (si f10 = 1); f14 orientación; f15: 11 gráfico 1 contraído, 21 expandido; f17 y el
+  // primer número de «texto», velocidad de expandir y de contraer (de 0 a 100).
+  cylinder: {
+    type: 19,
+    name: 'Actuador neumático',
+    size: [60, 20],
+    sizeVertical: [20, 60],
+    fields: ({ byte, bit, retract, a0, a1, orientation, extended }) => [
+      retract ? 1 : 0, byte, retract?.byte ?? 0, bit, retract?.bit ?? 0,
+      a0 ? 1 : 0, a1 ? 1 : 0, a0?.byte ?? 0, a1?.byte ?? 0, a0?.bit ?? 0,
+      orientation, extended ? 21 : 11, retract ? 11 : 1, CYLINDER_SPEED,
+    ],
+    text: () => `.${pad(CYLINDER_SPEED)}.${pad(0)}.${pad(0)}.0.${pad(0)}.0.0`,
+    a: ({ a1 }) => a1?.bit ?? 0,
+  },
   beacon: { type: 29, name: 'Baliza', size: [50, 125], fields: ({ red, amber, green }) => [0, red.byte, amber.byte, red.bit, amber.bit, 0, 0, 0, 0, 0, green.byte, green.bit, 0, 0] },
 }
+const CYLINDER_SPEED = 50 // la de los ejemplos de PC_SIMU
+const pad = (n) => String(n).padStart(3, ' ')
+// Giro del editor (grados, en sentido horario) -> orientación de PC_SIMU: 0 derecha, 1 izquierda, 2 arriba, 3 abajo.
+const ORIENTATION = { 0: 0, 90: 3, 180: 1, 270: 2 }
 const CELL = 80 // ancho mínimo de cada columna; más si el nombre debajo es más largo
 const PER_ROW = 8
+// Tamaño en el panel (el cilindro vertical, girado).
+const sizeOf = (item) => (item.orientation >= 2 && OBJECTS[item.object].sizeVertical) || OBJECTS[item.object].size
 const label = (text, cx, y) => ({ type: PCSIMU_TYPES.text, rect: [cx - 4 * text.length, y, cx + 4 * text.length, y + 17], text })
 
 // project -> { text, bytes (Windows-1252), warnings, count }. Arriba las salidas, en medio los mandos y
@@ -126,7 +150,7 @@ export function exportPcSimu(project) {
       if (SCENE_TYPES[e.type]?.group !== 'Decoración') skipped.set(e.type, (skipped.get(e.type) ?? 0) + 1)
       continue
     }
-    const name = e.variable?.trim()
+    const name = e[kind.variable ?? 'variable']?.trim()
     const color = e.type === 'emergency' ? PCSIMU_SETA : (PCSIMU_COLORS[e.color] ?? (kind.pcsimu === 'led' ? PCSIMU_COLORS.green : PCSIMU_COLORS.black))
     const nc = e.type === 'emergency' || e.contact === 'NC' ? 1 : 0
     const extra = { color, nc, kind: DETECTION[e.kind] ?? DETECTION.capacitive }
@@ -139,6 +163,22 @@ export function exportPcSimu(project) {
       }
       if (e.pulses?.trim()) warnings.push(`${name || typeName(e)}: el encoder (${e.pulses.trim()}) no pasa a PC_SIMU.`)
     }
+    if (e.type === 'cylinder') {
+      const leg = (key, area) => {
+        const v = e[key]?.trim()
+        if (!v) return null
+        const at = bitOf(v, area)
+        if (!at) missing(e, v, area)
+        return at
+      }
+      Object.assign(extra, { retract: leg('retract', 'Q'), a0: leg('retracted', 'I'), a1: leg('extended', 'I') })
+      const rot = ((Number(e.rot) || 0) % 360 + 360) % 360
+      extra.orientation = ORIENTATION[rot] ?? 0
+      extra.extended = Number(e.initial) === 1
+      const lost = ['position', 'vacuum', 'holding'].filter((k) => e[k]?.trim()).map((k) => e[k].trim())
+      if (lost.length) warnings.push(`${name || typeName(e)}: ${lost.join(', ')} no pasa${lost.length > 1 ? 'n' : ''} a PC_SIMU (posición analógica y ventosa).`)
+      if (e.mountedOn) warnings.push(`${name || typeName(e)}: en PC_SIMU no va montado sobre otro cilindro.`)
+    }
     add(e, kind.pcsimu, kind.area, kind.row, name, extra)
   }
   const objects = []
@@ -148,15 +188,16 @@ export function exportPcSimu(project) {
     row.sort((p, q) => p.byte - q.byte || p.bit - q.bit)
     for (let start = 0; start < row.length; start += PER_ROW) {
       const line = row.slice(start, start + PER_ROW)
-      const height = Math.max(...line.map((item) => OBJECTS[item.object].size[1]))
+      const height = Math.max(...line.map((item) => sizeOf(item)[1]))
       let x = 40
       for (const item of line) {
-        const { type, name, size, fields, labelGap = 0 } = OBJECTS[item.object]
+        const { type, name, fields, labelGap = 0, text, a } = OBJECTS[item.object]
+        const size = sizeOf(item)
         const width = Math.max(CELL, 8 * item.name.length + 16)
         const cx = x + width / 2
         // Todos con la base a la misma altura, y el nombre debajo.
         const rect = [cx - size[0] / 2, y + height - size[1], cx + size[0] / 2, y + height]
-        objects.push({ type, name, rect, fields: fields(item) })
+        objects.push({ type, name, rect, fields: fields(item), text: text?.(item) ?? '', a: a?.(item) ?? 0 })
         objects.push(label(item.name, cx, y + height + 12 + labelGap))
         x += width
       }

@@ -119,6 +119,27 @@ describe('PC_SIMU (.sim)', () => {
     expect(objects.find((o) => o.type === 7).fields[8]).toBe(0)
   })
 
+  it('cilindro: A+ / A− (biestable) o solo A+ (monoestable), sus captadores a0 y a1, orientación y estado inicial', () => {
+    const v = (address) => ({ address })
+    const variables = { 'A+': v('Q0.6'), 'A-': v('Q0.7'), a0: v('I2.7'), a1: v('I3.1'), 'B+': v('Q1.0'), b1: v('I1.2') }
+    const elements = [
+      { id: '1', type: 'cylinder', extend: 'A+', retract: 'A-', retracted: 'a0', extended: 'a1' },
+      { id: '2', type: 'cylinder', extend: 'B+', extended: 'b1', rot: 90, initial: 1, vacuum: 'V' },
+    ]
+    const { text, warnings } = exportPcSimu({ plc: { variables, scene: { elements } } })
+    expect(warnings).toEqual(['B+: V no pasa a PC_SIMU (posición analógica y ventosa).'])
+    const [a, b] = parsePcSimu(text).filter((o) => o.type === 19)
+    // f4 biestable, expandir Q0.6, contraer Q0.7, a0 I2.7 y a1 I3.1 (bit en «a»), derecha, gráfico 1 contraído, las dos salidas
+    expect(a.fields).toEqual([1, 0, 0, 6, 7, 1, 1, 2, 3, 7, 0, 11, 11, 50])
+    expect(a.a).toBe(1)
+    expect(a.text).toBe('. 50.  0.  0.0.  0.0.0')
+    expect(a.rect[2] - a.rect[0]).toBe(60)
+    // Monoestable (vuelve por muelle), solo a1, hacia abajo (vertical) y empieza fuera.
+    expect(b.fields).toEqual([0, 1, 0, 0, 0, 0, 1, 0, 1, 0, 3, 21, 1, 50])
+    expect(b.a).toBe(2)
+    expect(b.rect[3] - b.rect[1]).toBe(60)
+  })
+
   it('todos los ejemplos del editor se exportan sin pisarse', () => {
     for (const example of EXAMPLES) {
       const objects = parsePcSimu(exportPcSimu(example.build()).text)
