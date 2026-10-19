@@ -182,6 +182,26 @@ describe('PC_SIMU (.sim)', () => {
     objects.forEach((a, i) => objects.slice(i + 1).forEach((b) => expect(overlap(a.rect, b.rect)).toBe(false)))
   })
 
+  it('planta de frente: una pieza por orden, cilindros con su recorrido y nombres fuera de las franjas de los detectores', () => {
+    const example = (re) => parsePcSimu(exportPcSimu(EXAMPLES.find((e) => re.test(e.title)).build()).text)
+    const clasif = example(/Clasificación por tamaño con cinta reversible/)
+    // Con orden (Soltar): una sola pieza por activación.
+    expect(clasif.find((o) => o.type === 25).fields[13]).toBe(30000)
+    // Ningún nombre pisa la franja que vigila un detector (PC_SIMU la dibuja).
+    const zone = (o) => {
+      const [x1, y1, x2, y2] = o.rect
+      const d = o.fields[9]
+      return [[x2, y1, x2 + d, y2], [x1 - d, y1, x1, y2], [x1, y1 - d, x2, y1], [x1, y2, x2, y2 + d]][o.fields[10]]
+    }
+    const zones = clasif.filter((o) => o.type === 7).map(zone)
+    for (const l of clasif.filter((o) => o.type === 1008)) for (const z of zones) expect(overlap(l.rect, z), l.text).toBe(false)
+    // El elevador (160 px de recorrido): gráfico 2 (13), con el cuerpo de 160 · 19 / 35 = 87 px.
+    const estacion = example(/Estación de elevación/)
+    const elevador = estacion.find((o) => o.type === 19 && o.fields[10] === 2)
+    expect(elevador.fields[11]).toBe(13)
+    expect(elevador.rect[3] - elevador.rect[1]).toBe(87)
+  })
+
   it('todos los ejemplos del editor se exportan sin pisarse', () => {
     for (const example of EXAMPLES) {
       const objects = parsePcSimu(exportPcSimu(example.build()).text)

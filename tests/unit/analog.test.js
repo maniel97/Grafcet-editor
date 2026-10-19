@@ -56,7 +56,7 @@ describe('umbrales precalculados en el programa', () => {
     expect(plc.variables.Temperatura.address).toBe('AIW0')
     const { text } = toS7200(ladder, plc)
     expect(text).toContain('AW>=   AIW0, +21760') // 60 °C con 4–20 mA (en serie con la etapa)
-    expect(text).toContain('AW<    AIW0, +14080') // 30 °C
+    expect(text).toContain('AW<=   AIW0, +14079') // < 30 °C (14080), con <= como en las CPU 21x
     expect(text).toContain('MOVW   +16000, VW900') // Velocidad := 50 % con 0–10 V
     expect(text).toContain('MOVW   VW900, AQW0')
     expect(ladder.warnings).toEqual([])
@@ -140,7 +140,8 @@ describe('escalado en el autómata', () => {
     const l2 = generateLadder(n2, e2, p2)
     expect(l2.warnings).toEqual([])
     const { text } = toS7200(l2, p2)
-    expect(text).toMatch(/LDR>\s+VD960, VD964|AR>\s+VD960, VD964/)
+    // > entre reales: las CPU 21x no lo tienen; NOT de <= (en su propio bloque).
+    expect(text).toMatch(/LDR<=\s+VD960, VD964\r\nNOT/)
     const bomba = p2.variables.Bomba.address
     const level = (v) => (c) => c.words.set('AIW0', toRaw(v, p2.variables.Nivel, 's7200'))
     const setpoint = (c) => c.words.set('AIW2', toRaw(30, p2.variables.Consigna, 's7200'))

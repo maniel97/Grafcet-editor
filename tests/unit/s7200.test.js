@@ -176,6 +176,8 @@ describe('importable en Micro/WIN', async () => {
           expect(lines[0]).toMatch(/^LD /)
           expect(lines[2]).toMatch(/^= /)
         }
+        // Las CPU 21x (y el simulador S7_200, una 214) solo comparan con =, >= y <=.
+        for (const l of lines) expect(l, l).not.toMatch(/^(LD|A|O)[WRD](<|>|<>)\s/)
       }
     })
   }

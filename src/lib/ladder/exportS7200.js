@@ -170,6 +170,19 @@ export function toS7200(ladder, plc, { title = '' } = {}) {
   }
   const at = (op) => addresses.of(op)
   const CMP = { '>': '>', '<': '<', '>=': '>=', '<=': '<=', '=': '=', '<>': '<>' }
+  // Las CPU 21x (y el simulador S7_200, que es una 214) solo comparan con =, >= y <=. Con enteros,
+  // «x < 5» es «x <= 4» (y «5 < x», «x >= 6»); si no hay constante, o con reales, se niega la contraria:
+  // «x < y» es NOT «x >= y». Devuelve la comparación que se escribe y si va negada.
+  const OPPOSITE = { '<': '>=', '>': '<=', '<>': '=' }
+  const portable = (n) => {
+    if (!OPPOSITE[n.op]) return { ...n, negate: false }
+    if (!n.real && n.op !== '<>') {
+      const step = n.op === '<' ? -1 : 1
+      if (n.b.kind === 'num') return { ...n, op: n.op === '<' ? '<=' : '>=', b: { kind: 'num', value: n.b.value + step }, negate: false }
+      if (n.a.kind === 'num') return { ...n, op: n.op === '<' ? '>=' : '<=', a: n.b, b: { kind: 'num', value: n.a.value - step }, negate: false }
+    }
+    return { ...n, op: OPPOSITE[n.op], negate: true }
+  }
 
   const simple = (n) => n.type === 'contact' && (n.kind === 'NO' || n.kind === 'NC')
   // Bloque nuevo en la pila lógica.
@@ -182,9 +195,11 @@ export function toS7200(ladder, plc, { title = '' } = {}) {
       case 'contact':
         if (n.kind === 'P' || n.kind === 'N') return [pad('LD', at(n.operand)), n.kind === 'P' ? 'EU' : 'ED']
         return [pad(n.kind === 'NC' ? 'LDN' : 'LD', at(n.operand))]
-      case 'compare':
-        if (n.real) return [pad(`LDR${CMP[n.op]}`, n.real.slots.join(', '))]
-        return [pad(`LDW${CMP[n.op]}`, `${at(n.a)}, ${at(n.b)}`)]
+      case 'compare': {
+        const c = portable(n)
+        const line = c.real ? pad(`LDR${CMP[c.op]}`, c.real.slots.join(', ')) : pad(`LDW${CMP[c.op]}`, `${at(c.a)}, ${at(c.b)}`)
+        return c.negate ? [line, 'NOT'] : [line]
+      }
       case 'not':
         return [...block(n.item), 'NOT']
       case 'series':
@@ -195,8 +210,11 @@ export function toS7200(ladder, plc, { title = '' } = {}) {
         throw new Error(`Red no soportada: ${n.type}`)
     }
   }
-  const compareItem = (n, op) =>
-    n.real ? [pad(`${op}R${CMP[n.op]}`, n.real.slots.join(', '))] : [pad(`${op}W${CMP[n.op]}`, `${at(n.a)}, ${at(n.b)}`)]
+  const compareItem = (n, op) => {
+    const c = portable(n)
+    if (c.negate) return [...block(n), op === 'A' ? 'ALD' : 'OLD'] // negada: en un bloque propio
+    return c.real ? [pad(`${op}R${CMP[c.op]}`, c.real.slots.join(', '))] : [pad(`${op}W${CMP[c.op]}`, `${at(c.a)}, ${at(c.b)}`)]
+  }
   const andItem = (n) =>
     simple(n) ? [pad(n.kind === 'NC' ? 'AN' : 'A', at(n.operand))] : n.type === 'compare' ? compareItem(n, 'A') : [...block(n), 'ALD']
   const orItem = (n) =>
@@ -234,10 +252,10 @@ export function toS7200(ladder, plc, { title = '' } = {}) {
     return [
       ...lines,
       'LPS',
-      pad('AR>', `${target}, ${hi}`),
+      pad('AR>=', `${target}, ${hi}`), // (con >= y <=, que tienen todas las CPU: el resultado es el mismo)
       pad('MOVR', `${hi}, ${target}`),
       'LRD',
-      pad('AR<', `${target}, ${lo}`),
+      pad('AR<=', `${target}, ${lo}`),
       pad('MOVR', `${lo}, ${target}`),
       'LPP',
       pad('ROUND', `${target}, ${target}`),

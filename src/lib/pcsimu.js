@@ -93,10 +93,10 @@ const OBJECTS = {
     name: 'Actuador neumático',
     size: [60, 20],
     sizeVertical: [20, 60],
-    fields: ({ byte, bit, retract, a0, a1, orientation, extended, speed }) => [
+    fields: ({ byte, bit, retract, a0, a1, orientation, extended, speed, graphic }) => [
       retract ? 1 : 0, byte, retract?.byte ?? 0, bit, retract?.bit ?? 0,
       a0 ? 1 : 0, a1 ? 1 : 0, a0?.byte ?? 0, a1?.byte ?? 0, a0?.bit ?? 0,
-      orientation, extended ? 21 : 11, retract ? 11 : 1, speed ?? CYLINDER_SPEED,
+      orientation, (extended ? 21 : 11) + (graphic === 2 ? 2 : 0), retract ? 11 : 1, speed ?? CYLINDER_SPEED,
     ],
     text: ({ speed }) => `.${pad(speed ?? CYLINDER_SPEED)}.${pad(0)}.${pad(0)}.0.${pad(0)}.0.0`,
     a: ({ a1 }) => a1?.bit ?? 0,
@@ -115,7 +115,8 @@ const OBJECTS = {
     type: 25,
     name: 'Objeto',
     area: 'I',
-    fields: ({ trigger, area, auto, material }) => [area === 'Q' ? 1 : 0, trigger?.byte ?? 0, 0, trigger?.bit ?? 0, 0, auto ? 1 : 0, trigger ? 1 : 0, 0, 0, 0, 3, 0, material, FEED_PERIOD],
+    // Con orden, f17 muy alto: una sola pieza por activación (como el flanco del editor).
+    fields: ({ trigger, area, auto, material }) => [area === 'Q' ? 1 : 0, trigger?.byte ?? 0, 0, trigger?.bit ?? 0, 0, auto ? 1 : 0, trigger ? 1 : 0, 0, 0, 0, 3, 0, material, trigger ? ONE_PIECE : FEED_PERIOD],
   },
   // Perfil de aluminio: f15 50 horizontal / 51 vertical (gris claro); f13 = 1 «detener objeto» (las piezas se
   // apoyan encima); f14 = 1 «destruir objeto» (las que lo tocan desaparecen: una recogida).
@@ -129,7 +130,8 @@ const OBJECTS = {
   beacon: { type: 29, name: 'Baliza', size: [50, 125], fields: ({ red, amber, green }) => [0, red.byte, amber.byte, red.bit, amber.bit, 0, 0, 0, 0, 0, green.byte, green.bit, 0, 0] },
 }
 const CYLINDER_SPEED = 50 // la de los ejemplos de PC_SIMU
-const FEED_PERIOD = 40 // pasos entre pieza y pieza de un alimentador que sigue activo
+const FEED_PERIOD = 40 // pasos entre pieza y pieza de un alimentador automático
+const ONE_PIECE = 30000 // tantos pasos que, con orden, suelta una sola pieza aunque la orden dure
 // Velocidades: se supone un paso de simulación de PC_SIMU cada 50 ms (con ella, la velocidad 50 de sus
 // ejemplos saca un cilindro en 1 s, como el del editor por defecto).
 // Cinta: f17 / 12 px por paso -> f17 = 0,6 · px/s. Cilindro: f17 / 10 de 110 por paso -> f17 = 55 / s.
@@ -284,10 +286,10 @@ export function exportPcSimu(project, { reserved = [] } = {}) {
       extra.spring = !e.retract?.trim() // le falta la salida de recoger: se le da una (más abajo)
       extra.orientation = ORIENTATION[rot] ?? 0
       if (onMachine) {
-        // Con el gráfico 1, el vástago sale 11/19 del largo del cuerpo: el cuerpo, a la medida del recorrido,
-        // con la cara del vástago (recogido) donde el editor tiene la placa.
-        const W = Math.round(((Number(e.stroke) || 100) * 19) / 11)
-        Object.assign(extra, { rect: placed(e, 88 - W, -10, W, 20), speed: cylinderSpeed(e) })
+        // Con el gráfico 2, el vástago sale hasta 35/19 del largo del cuerpo (con el 1, solo 11/19): el cuerpo, a
+        // la medida del recorrido, con la cara del vástago (recogido) donde el editor tiene la placa.
+        const W = Math.round(((Number(e.stroke) || 100) * 19) / 35)
+        Object.assign(extra, { rect: placed(e, 88 - W, -10, W, 20), speed: cylinderSpeed(e), graphic: 2 })
       }
       extra.extended = Number(e.initial) === 1
       const lost = ['position', 'vacuum', 'holding'].filter((k) => e[k]?.trim()).map((k) => e[k].trim())
@@ -328,7 +330,14 @@ export function exportPcSimu(project, { reserved = [] } = {}) {
     const minX = Math.min(...machine.map((m) => m.rect[0]))
     const minY = Math.min(...machine.map((m) => m.rect[1]))
     const shift = (r) => [r[0] - minX + 40, r[1] - minY + 40, r[2] - minX + 40, r[3] - minY + 40]
-    const taken = machine.map((m) => shift(m.rect))
+    // Lo ocupado: los objetos y la franja que vigila cada detector (PC_SIMU la dibuja).
+    const taken = machine.flatMap((m) => {
+      const r = shift(m.rect)
+      if (m.object !== 'detector' && m.object !== 'limit') return [r]
+      const d = m.object === 'limit' ? 10 : m.range
+      const zone = [[r[2], r[1], r[2] + d, r[3]], [r[0] - d, r[1], r[0], r[3]], [r[0], r[1] - d, r[2], r[1]], [r[0], r[3], r[2], r[3] + d]][m.orientation ?? 0]
+      return [r, zone]
+    })
     for (const item of machine) {
       const { type, name, fields, text, a } = OBJECTS[item.object]
       const rect = shift(item.rect)
