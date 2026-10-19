@@ -230,15 +230,15 @@ unipolar, 1 bipolar.
 | `f9`, `f10.f11` | captador de nivel mínimo |
 | `f4`, `f12` | nivel analógico en la `AIW f12` |
 | `f16` | 0 / 1 líquidos / sólidos (V1.0), 2 / 3 líquidos / sólidos |
-| `f13` | capacidad (1000 por defecto) |
-| `a`, `b` | `a` = 1: muestra el nivel; `b`: el nivel, de 0 a 10000 |
+| `texto2` | capacidad (1000 en casi todos los ejemplos de PC_SIMU) |
+| `b` | el nivel, de 0 a la capacidad |
 
 ### 23 · Válvula
 
-`f5.f7`: su salida; `f10`: caudal; `f11` = 1: tiene líquido en su entrada; `f16`: 0 horizontal, 1
-vertical; `f15`, `f12`: salida analógica. Con su salida activa y líquido en la entrada, sube `f10` en cada
-paso el nivel del depósito de líquidos en cuyo borde de arriba apoya (cabiendo en su ancho, con 10 px de
-margen).
+`f5.f7`: su salida; `f10`: caudal (lo que sube o baja por paso el nivel, en la escala de la capacidad);
+`f11` = 1: tiene líquido en su entrada; `f16`: 0 horizontal, 1 vertical; `f15`, `f12`: salida analógica.
+En los ejemplos de PC_SIMU, la de llenado va encima del depósito y una tubería (tipo 24, `f16` = 1
+vertical) lleva el líquido hasta su borde; la de vaciado va pegada por debajo.
 
 ### 29 · Baliza
 
