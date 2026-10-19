@@ -114,7 +114,7 @@ const label = (text, cx, y) => ({ type: PCSIMU_TYPES.text, rect: [cx - 4 * text.
 
 // project -> { text, bytes (Windows-1252), warnings, count }. Arriba las salidas, en medio los mandos y
 // abajo los detectores, cada uno con el nombre de su variable debajo.
-export function exportPcSimu(project) {
+export function exportPcSimu(project, { reserved = [] } = {}) {
   const plc = project.plc ?? {}
   const elements = plc.scene?.elements ?? []
   const warnings = []
@@ -172,6 +172,7 @@ export function exportPcSimu(project) {
         return at
       }
       Object.assign(extra, { retract: leg('retract', 'Q'), a0: leg('retracted', 'I'), a1: leg('extended', 'I') })
+      extra.spring = !e.retract?.trim() // le falta la salida de recoger: se le da una (más abajo)
       const rot = ((Number(e.rot) || 0) % 360 + 360) % 360
       extra.orientation = ORIENTATION[rot] ?? 0
       extra.extended = Number(e.initial) === 1
@@ -180,6 +181,28 @@ export function exportPcSimu(project) {
       if (e.mountedOn) warnings.push(`${name || typeName(e)}: en PC_SIMU no va montado sobre otro cilindro.`)
     }
     add(e, kind.pcsimu, kind.area, kind.row, name, extra)
+  }
+  // PC_SIMU recoge un cilindro que empieza dentro solo con su salida «contraer» (y la de expandir a 0):
+  // no tiene vuelta por muelle. A los que no tienen A− se les da una salida libre que el .awl pone a
+  // NOT A+ (withAuxOutputs).
+  const aux = []
+  const springs = rows[0].filter((item) => item.spring)
+  if (springs.length) {
+    const used = new Set(reserved)
+    for (const item of rows[0]) used.add(`Q${item.byte}.${item.bit}`)
+    for (const v of Object.values(plc.variables ?? {})) {
+      const a = parseAddress(v?.address)
+      if (a?.area === 'Q' && a.index !== undefined) used.add(`Q${Math.floor(a.index / 8)}.${a.index % 8}`)
+    }
+    let free = 0
+    for (const item of springs) {
+      while (used.has(`Q${Math.floor(free / 8)}.${free % 8}`)) free++
+      item.retract = { byte: Math.floor(free / 8), bit: free % 8 }
+      const to = `Q${item.retract.byte}.${item.retract.bit}`
+      used.add(to)
+      aux.push({ from: `Q${item.byte}.${item.bit}`, to, name: item.name })
+      warnings.push(`${item.name}: vuelve por muelle; PC_SIMU lo recoge con su propia salida, así que el .awl pone ${to} = NOT Q${item.byte}.${item.bit}.`)
+    }
   }
   const objects = []
   let y = 40
@@ -210,5 +233,15 @@ export function exportPcSimu(project) {
     warnings.push(`Todavía no pasan a PC_SIMU: ${list}.`)
   }
   const text = pcsimuText(objects)
-  return { text, bytes: encodeAnsi(text), warnings, count: objects.filter((o) => o.type !== PCSIMU_TYPES.text).length }
+  return { text, bytes: encodeAnsi(text), warnings, aux, count: objects.filter((o) => o.type !== PCSIMU_TYPES.text).length }
+}
+
+// Las salidas auxiliares de exportPcSimu (cilindros con vuelta por muelle), como redes al final del OB1
+// del programa del S7-200 (toS7200): «aux = NOT A+».
+export function withAuxOutputs(awl, aux = []) {
+  if (!aux.length) return awl
+  const end = awl.indexOf('\r\nEND_ORGANIZATION_BLOCK')
+  let n = Math.max(0, ...[...awl.slice(0, end).matchAll(/^Network (\d+)/gm)].map((m) => Number(m[1])))
+  const nets = aux.map(({ from, to, name }) => [`Network ${++n} // PC_SIMU: ${to} recoge ${clean(name)} (vuelta por muelle)`, `LDN    ${from}`, `=      ${to}`].join('\r\n'))
+  return `${awl.slice(0, end)}\r\n${nets.join('\r\n')}${awl.slice(end)}`
 }

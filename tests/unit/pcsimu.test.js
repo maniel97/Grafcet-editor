@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { exportPcSimu, parsePcSimu, pcsimuText, PCSIMU_COLORS, PCSIMU_SETA } from '../../src/lib/pcsimu'
+import { exportPcSimu, parsePcSimu, pcsimuText, PCSIMU_COLORS, PCSIMU_SETA, withAuxOutputs } from '../../src/lib/pcsimu'
 import { PRACTICE_GUIDES } from '../../src/lib/practiceGuides'
 import { EXAMPLES } from '../../src/lib/examples'
 
@@ -119,7 +119,7 @@ describe('PC_SIMU (.sim)', () => {
     expect(objects.find((o) => o.type === 7).fields[8]).toBe(0)
   })
 
-  it('cilindro: A+ / A− (biestable) o solo A+ (monoestable), sus captadores a0 y a1, orientación y estado inicial', () => {
+  it('cilindro: A+ / A− o solo A+ (vuelta por muelle), sus captadores a0 y a1, orientación y estado inicial', () => {
     const v = (address) => ({ address })
     const variables = { 'A+': v('Q0.6'), 'A-': v('Q0.7'), a0: v('I2.7'), a1: v('I3.1'), 'B+': v('Q1.0'), b1: v('I1.2') }
     const elements = [
@@ -127,17 +127,32 @@ describe('PC_SIMU (.sim)', () => {
       { id: '2', type: 'cylinder', extend: 'B+', extended: 'b1', rot: 90, initial: 1, vacuum: 'V' },
     ]
     const { text, warnings } = exportPcSimu({ plc: { variables, scene: { elements } } })
-    expect(warnings).toEqual(['B+: V no pasa a PC_SIMU (posición analógica y ventosa).'])
+    expect(warnings).toEqual([
+      'B+: V no pasa a PC_SIMU (posición analógica y ventosa).',
+      'B+: vuelve por muelle; PC_SIMU lo recoge con su propia salida, así que el .awl pone Q0.0 = NOT Q1.0.',
+    ])
     const [a, b] = parsePcSimu(text).filter((o) => o.type === 19)
     // f4 biestable, expandir Q0.6, contraer Q0.7, a0 I2.7 y a1 I3.1 (bit en «a»), derecha, gráfico 1 contraído, las dos salidas
     expect(a.fields).toEqual([1, 0, 0, 6, 7, 1, 1, 2, 3, 7, 0, 11, 11, 50])
     expect(a.a).toBe(1)
     expect(a.text).toBe('. 50.  0.  0.0.  0.0.0')
     expect(a.rect[2] - a.rect[0]).toBe(60)
-    // Monoestable (vuelve por muelle), solo a1, hacia abajo (vertical) y empieza fuera.
-    expect(b.fields).toEqual([0, 1, 0, 0, 0, 0, 1, 0, 1, 0, 3, 21, 1, 50])
+    // Con vuelta por muelle (sin A−): PC_SIMU solo lo recoge con su salida «contraer», así que lleva una
+    // libre (Q0.0) que el .awl pone a NOT B+. Solo a1, hacia abajo (vertical) y empieza fuera.
+    expect(b.fields).toEqual([1, 1, 0, 0, 0, 0, 1, 0, 1, 0, 3, 21, 11, 50])
     expect(b.a).toBe(2)
     expect(b.rect[3] - b.rect[1]).toBe(60)
+  })
+
+  it('la salida auxiliar de un cilindro con muelle: libre (ni de la tabla ni del programa) y como red al final del OB1', () => {
+    const variables = { 'A+': { address: 'Q0.0' }, L: { address: 'Q0.2' } }
+    const elements = [{ id: '1', type: 'cylinder', extend: 'A+' }, { id: '2', type: 'lamp', variable: 'L' }]
+    const { aux } = exportPcSimu({ plc: { variables, scene: { elements } } }, { reserved: ['Q0.1'] })
+    expect(aux).toEqual([{ from: 'Q0.0', to: 'Q0.3', name: 'A+' }])
+    const awl = ['ORGANIZATION_BLOCK MAIN:OB1', 'BEGIN', 'Network 1 // x', 'LD     I0.0', '=      Q0.0', 'END_ORGANIZATION_BLOCK', 'SUBROUTINE_BLOCK SBR_0:SBR0', 'Network 1 // ', 'END_SUBROUTINE_BLOCK'].join('\r\n')
+    const out = withAuxOutputs(awl, aux).split('\r\n')
+    expect(out.slice(5, 9)).toEqual(['Network 2 // PC_SIMU: Q0.3 recoge A+ (vuelta por muelle)', 'LDN    Q0.0', '=      Q0.3', 'END_ORGANIZATION_BLOCK'])
+    expect(withAuxOutputs(awl, [])).toBe(awl)
   })
 
   it('todos los ejemplos del editor se exportan sin pisarse', () => {

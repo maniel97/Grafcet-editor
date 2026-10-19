@@ -157,6 +157,17 @@ El tipo 19 reúne varios actuadores; `f15` dice cuál. Para el actuador neumáti
 
 Tamaño por defecto: 60 × 20 (orientación 0 y 1) o 20 × 60 (2 y 3).
 
+Cómo lo mueve la simulación (la posición del vástago va en `b`, de 0 a 110):
+
+- **Si empieza dentro** (`f15` = 11, 13 o 15), monoestable o biestable, usa **las dos salidas**: sale
+  con expandir = 1 y contraer = 0, y vuelve con expandir = 0 y contraer = 1. Una vez arrancado, llega
+  hasta el final aunque la salida se apague. No tiene vuelta por muelle: sin salida de contraer no
+  vuelve. (Por eso el editor, para un cilindro sin A−, le da una salida libre y añade al `.awl` una red
+  que la pone a NOT A+.)
+- **Si empieza fuera** (`f15` = 21, 23 o 25) y es monoestable, solo mira la salida de contraer: vuelve
+  con ella a 1 y sale por muelle con ella a 0. Biestable, como el anterior.
+- Velocidades: `f17` / 10 al salir y el primer número de `texto` / 10 al volver (como poco, 1 por paso).
+
 ### 29 · Baliza
 
 Tres luces: **rojo `f5.f7`, ámbar `f6.f8` y verde `f14.f15`** (todas salidas Q). Tamaño por defecto

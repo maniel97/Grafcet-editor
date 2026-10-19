@@ -23,3 +23,17 @@ test('exportar a PC_SIMU: el panel en .sim y el programa en .awl, con el motor d
   await expect(dialog).toBeHidden()
   expectNoErrors(errors)
 })
+
+test('exportar a PC_SIMU: los cilindros con vuelta por muelle llevan su salida de recoger en el .awl', async ({ page }) => {
+  const errors = await openEditor(page)
+  await openExample(page, /Estación de elevación/)
+  await page.getByRole('button', { name: /Exportar/ }).click()
+  await page.getByRole('menuitem', { name: /Planta para PC_SIMU/ }).click()
+  const dialog = page.getByRole('dialog', { name: 'Planta para PC_SIMU' })
+  await expect(dialog).toContainText('el .awl pone Q0.6 = NOT Q0.3')
+  const awl = await download(page, () => dialog.getByRole('button', { name: 'Programa .awl' }).click())
+  const text = (await readFile(await awl.path())).toString('latin1')
+  expect(text).toContain('LDN    Q0.3\r\n=      Q0.6\r\nNetwork')
+  expect(text).toContain('LDN    Q0.4\r\n=      Q0.7\r\nEND_ORGANIZATION_BLOCK')
+  expectNoErrors(errors)
+})

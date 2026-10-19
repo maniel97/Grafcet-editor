@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { AlertTriangle, Download, MonitorPlay, X } from 'lucide-react'
-import { exportPcSimu } from '../lib/pcsimu'
+import { exportPcSimu, withAuxOutputs } from '../lib/pcsimu'
 import { generateLadder } from '../lib/ladder/generate'
 import { encodeAnsi, toS7200 } from '../lib/ladder/exportS7200'
 import { downloadFile } from '../lib/projectFile'
@@ -14,8 +14,10 @@ export default function PcSimuDialog({ nodes, edges, plc, onClose }) {
   useEffect(() => {
     if (!dialogRef.current.open) dialogRef.current.showModal()
   }, [])
-  const sim = useMemo(() => exportPcSimu({ plc }), [plc])
-  const awl = useMemo(() => toS7200(generateLadder(nodes, edges, plc), plc, { title: getProjectName().trim() }), [nodes, edges, plc])
+  const program = useMemo(() => toS7200(generateLadder(nodes, edges, plc), plc, { title: getProjectName().trim() }), [nodes, edges, plc])
+  // Las salidas que ya usa el programa no se reparten como auxiliares (cilindros con muelle).
+  const sim = useMemo(() => exportPcSimu({ plc }, { reserved: program.text.match(/\bQ\d+\.\d\b/g) ?? [] }), [plc, program])
+  const awl = useMemo(() => ({ ...program, text: withAuxOutputs(program.text, sim.aux) }), [program, sim])
   const ansi = 'text/plain;charset=windows-1252'
   const button = 'flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium disabled:opacity-40'
 
