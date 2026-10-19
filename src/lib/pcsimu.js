@@ -1,21 +1,14 @@
 // Planta virtual -> PC_SIMU (.sim). PC_SIMU es un simulador de S7-200 muy usado en FP: carga el
 // programa y lo prueba con un panel de pulsadores, pilotos y máquinas dibujadas.
 //
-// Formato (deducido de los .sim de ejemplo de PC_SIMU, texto en Windows-1252):
-//   PC_SIMU*  1* 50*<objeto>**<objeto>** … **<objeto>*$$$
+// Formato (sacado de PC_SIMU.exe y comprobado con sus .sim de ejemplo; detalle en docs/formato-pcsimu.md):
+//   PC_SIMU*  1* 50*<objeto>**<objeto>** … **<objeto>*$$$   (texto en Windows-1252)
 //   objeto = n*tipo#nombre*x1*y1*x2*y2*f4*…*f17#texto#texto2#grupo*a*b
-// n: orden desde 0; (x1, y1)-(x2, y2): rectángulo en la pantalla; f4…f17: 14 enteros cuyo
-// sentido depende del tipo. En todos los que se exportan, f4 dice si es entrada (0) o salida (1) y
-// f5 y f7 son el byte y el bit de la dirección (I f5.f7 o Q f5.f7). Además:
-//   2 Pulsador, 1 Interruptor, 6 Final de carrera, 7 Detector: f9 1 = contacto NC.
-//   2 Pulsador, 1 Interruptor, 11 Led: f15 color, f16 modelo o forma (0 = redondo).
-//   18 Motor, 15 Sonido: salidas, con los demás campos copiados de los ejemplos.
-//   1008 texto suelto: rectángulo de 8 px por letra y 17 de alto; el texto va en «texto».
-// Colores (f15), comprobados en PC_SIMU, iguales en leds y pulsadores (redondos y cuadrados): 0 verde,
-// 1 negro, 2 azul, 3 cian, 4 rojo, 5 magenta, 6 amarillo, 7 blanco. Con f16 = 1 los pulsadores son
-// cuadrados y admiten además 8 verde oscuro, 9 marcha «I», 11 paro «O» y 13 amarillo; valores fuera
-// de estos pueden cerrar PC_SIMU.
-// Lo que no se exporta todavía (cilindros, cintas, depósitos…) sale en los avisos, con su tipo (en español, como los de la exportación a S7-200).
+// n: orden desde 0; (x1, y1)-(x2, y2): rectángulo en la pantalla; f4…f17: 14 enteros cuyo sentido
+// depende del tipo (en los de un bit, f5 y f7 son el byte y el bit de la dirección: I f5.f7 o Q f5.f7).
+// 1008 es un texto suelto: rectángulo de 8 px por letra y 17 de alto; el texto va en «texto».
+// Lo que no se exporta todavía (cilindros, cintas, depósitos…) sale en los avisos, con su tipo (en
+// español, como los de la exportación a S7-200).
 import { parseAddress } from './addressing'
 import { encodeAnsi } from './ladder/exportS7200'
 import { SCENE_TYPES } from './sim/scene'
@@ -23,7 +16,7 @@ import { t as tr } from './i18n'
 
 export const PCSIMU_HEADER = 'PC_SIMU*  1* 50*'
 export const PCSIMU_COLORS = { green: 0, black: 1, blue: 2, cyan: 3, red: 4, magenta: 5, yellow: 6, white: 7 }
-export const PCSIMU_TYPES = { switch: 1, button: 2, limit: 6, detector: 7, led: 11, sound: 15, motor: 18, text: 1008 }
+export const PCSIMU_TYPES = { switch: 1, button: 2, limit: 6, detector: 7, led: 11, sound: 15, motor: 18, beacon: 29, text: 1008 }
 
 // Lo que no puede ir en un campo: los separadores del formato.
 const clean = (text) => String(text ?? '').replace(/[#*$]/g, ' ').trim()
@@ -54,10 +47,9 @@ export function parsePcSimu(content) {
   return objects
 }
 
-// Lo que PC_SIMU recibe: cada tipo de la planta, con el objeto de PC_SIMU y sus campos. Los campos
-// copian un objeto de los .sim de ejemplo (así PC_SIMU no se encuentra valores que no conoce) y solo
-// cambian la dirección (f5 byte, f7 bit), el contacto (f9: 1 = NC) y el color (f15).
-//   row: fila del panel (arriba las salidas, luego los mandos y abajo los detectores).
+// Lo que PC_SIMU recibe: cada tipo de la planta, con el objeto de PC_SIMU. Los campos de cada objeto
+// están en docs/formato-pcsimu.md (sacados de PC_SIMU.exe: lo que hace con ellos su cuadro de
+// propiedades). row: fila del panel (arriba las salidas, luego los mandos y abajo los detectores).
 const KINDS = {
   button: { pcsimu: 'button', area: 'I', row: 1 },
   emergency: { pcsimu: 'button', area: 'I', row: 1 },
@@ -68,18 +60,28 @@ const KINDS = {
   motor: { pcsimu: 'motor', area: 'Q', row: 0 },
   siren: { pcsimu: 'sound', area: 'Q', row: 0 },
 }
-// Las patas que no pasan (con su aviso): el giro inverso y el encoder del motor.
-const EXTRA = { motor: ['reverse', 'pulses'] }
-// El semáforo: un led por luz (rojo, ámbar y verde), seguidos en la fila de las salidas.
+export const PCSIMU_SETA = 12 // Pulsador: f15 = 12 es la seta de emergencia (redonda, f16 = 0)
+// Detector: f12 = 0 inductivo, 1 capacitivo, 2 ultrasonido. El óptico y el de color del editor, como
+// capacitivo (detecta cualquier pieza).
+const DETECTION = { inductive: 0, capacitive: 1 }
+// El semáforo, como baliza (rojo f5.f7, ámbar f6.f8, verde f14.f15) si tiene las tres luces; si no,
+// un led por luz.
 const LIGHTS = [['red', 'red'], ['amber', 'yellow'], ['green', 'green']]
+// f4: 1 en las salidas (led, motor, sonido) y 0 en las entradas; en finales de carrera y detectores es
+// además si está pulsado mientras se simula, así que en el archivo va a 0. La baliza lo deja a 0.
 const OBJECTS = {
   led: { type: 11, name: 'Led', size: [25, 25], fields: ({ byte, bit, color }) => [1, byte, 0, bit, 0, 0, 0, 0, 0, 0, 0, color, 0, 0] },
   button: { type: 2, name: 'Pulsador', size: [25, 25], fields: ({ byte, bit, nc, color }) => [0, byte, 0, bit, 0, nc, 0, 0, 0, 0, 0, color, 0, 0] },
-  switch: { type: 1, name: 'Interruptor', size: [25, 25], fields: ({ byte, bit, nc, color }) => [0, byte, 0, bit, 0, nc, 0, 0, 0, 0, 0, color, 0, 0] },
-  limit: { type: 6, name: 'Final de carrera', size: [20, 40], fields: ({ byte, bit, nc }) => [0, byte, 0, bit, 0, nc, 0, 0, 0, 10, 2, 0, 0, 0] },
-  detector: { type: 7, name: 'Detector', size: [30, 20], fields: ({ byte, bit, nc }) => [0, byte, 0, bit, 0, nc, 0, 0, 1, 0, 0, 1, 0, 0] },
-  motor: { type: 18, name: 'Motor', size: [35, 35], fields: ({ byte, bit }) => [1, byte, 0, bit, 1, 0, 1, 0, 1, 100, 0, 0, 1, 0] },
+  switch: { type: 1, name: 'Interruptor', size: [25, 25], fields: ({ byte, bit, nc }) => [0, byte, 0, bit, 0, nc, 0, 0, 0, 0, 0, 0, 0, 0] },
+  // f14 = 2: accionado desde arriba (vertical); f15 = 0: el dibujo «Final de carrera 1».
+  limit: { type: 6, name: 'Final de carrera', size: [20, 40], fields: ({ byte, bit, nc }) => [0, byte, 0, bit, 0, nc, 0, 0, 0, 0, 2, 0, 0, 0] },
+  // f13 = 10: distancia de detección (la de PC_SIMU por defecto); f14 = 0: mira a la derecha; f15 = 1: «Detector 2».
+  detector: { type: 7, name: 'Detector', size: [30, 20], fields: ({ byte, bit, nc, kind }) => [0, byte, 0, bit, 0, nc, 0, 0, kind, 10, 0, 1, 0, 0] },
+  // Giro a la derecha en f5.f7 y a la izquierda en f6.f8; f16: 1 solo derecha, 11 las dos. f13: frecuencia
+  // máxima del variador (100, la de PC_SIMU); f17 = 0: 3000 rpm.
+  motor: { type: 18, name: 'Motor', size: [35, 35], fields: ({ byte, bit, left }) => [1, byte, left?.byte ?? 0, bit, left?.bit ?? 0, 0, 0, 0, 0, 100, 0, 0, left ? 11 : 1, 0] },
   sound: { type: 15, name: 'Sonido', size: [35, 35], fields: ({ byte, bit }) => [1, byte, 0, bit, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] },
+  beacon: { type: 29, name: 'Baliza', size: [50, 125], fields: ({ red, amber, green }) => [0, red.byte, amber.byte, red.bit, amber.bit, 0, 0, 0, 0, 0, green.byte, green.bit, 0, 0] },
 }
 const CELL = 80 // ancho mínimo de cada columna; más si el nombre debajo es más largo
 const PER_ROW = 8
@@ -99,17 +101,21 @@ export function exportPcSimu(project) {
     const a = parseAddress(name ? plc.variables?.[name]?.address : '')
     return a && a.area === area && a.index !== undefined ? { byte: Math.floor(a.index / 8), bit: a.index % 8 } : null
   }
+  const missing = (e, name, area) => warnings.push(`${name || typeName(e)}: sin una dirección ${area} de bit; no se exporta.`)
   const add = (e, object, area, row, name, extra = {}) => {
     const at = bitOf(name, area)
-    if (!at) {
-      warnings.push(`${name || typeName(e)}: sin una dirección ${area} de bit; no se exporta.`)
-      return
-    }
+    if (!at) return missing(e, name, area)
     rows[row].push({ object, name, ...at, ...extra })
   }
   for (const e of elements) {
     if (e.type === 'trafficlight') {
       const lights = LIGHTS.filter(([key]) => e[key]?.trim())
+      const at = Object.fromEntries(lights.map(([key]) => [key, bitOf(e[key].trim(), 'Q')]))
+      if (lights.length === 3 && Object.values(at).every(Boolean)) {
+        const name = e.text?.trim() || e.red.trim()
+        rows[0].push({ object: 'beacon', name, ...at.red, ...at })
+        continue
+      }
       if (!lights.length) warnings.push(`${typeName(e)}: sin salidas; no se exporta.`)
       for (const [key, color] of lights) add(e, 'led', 'Q', 0, e[key].trim(), { color: PCSIMU_COLORS[color] })
       continue
@@ -120,13 +126,19 @@ export function exportPcSimu(project) {
       continue
     }
     const name = e.variable?.trim()
-    const color = PCSIMU_COLORS[e.type === 'emergency' ? 'red' : e.color] ?? (kind.pcsimu === 'led' ? PCSIMU_COLORS.green : PCSIMU_COLORS.black)
+    const color = e.type === 'emergency' ? PCSIMU_SETA : (PCSIMU_COLORS[e.color] ?? (kind.pcsimu === 'led' ? PCSIMU_COLORS.green : PCSIMU_COLORS.black))
     const nc = e.type === 'emergency' || e.contact === 'NC' ? 1 : 0
-    add(e, kind.pcsimu, kind.area, kind.row, name, { color, nc })
-    if (name && e.type === 'emergency') warnings.push(`${name}: la seta sale como un pulsador rojo normalmente cerrado.`)
-    for (const leg of EXTRA[e.type] ?? []) {
-      if (e[leg]?.trim()) warnings.push(`${name || typeName(e)}: ${leg === 'reverse' ? 'el giro inverso' : 'el encoder'} (${e[leg].trim()}) no pasa a PC_SIMU.`)
+    const extra = { color, nc, kind: DETECTION[e.kind] ?? DETECTION.capacitive }
+    if (e.type === 'motor') {
+      const reverse = e.reverse?.trim()
+      if (reverse) {
+        extra.left = bitOf(reverse, 'Q')
+        if (!extra.left) missing(e, reverse, 'Q')
+        else warnings.push(`${name || typeName(e)}: en PC_SIMU, ${reverse} es la salida de giro a la izquierda (en el editor invierte el giro de la marcha).`)
+      }
+      if (e.pulses?.trim()) warnings.push(`${name || typeName(e)}: el encoder (${e.pulses.trim()}) no pasa a PC_SIMU.`)
     }
+    add(e, kind.pcsimu, kind.area, kind.row, name, extra)
   }
   const objects = []
   let y = 40

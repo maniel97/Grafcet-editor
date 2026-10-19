@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { exportPcSimu, parsePcSimu, pcsimuText, PCSIMU_COLORS } from '../../src/lib/pcsimu'
+import { exportPcSimu, parsePcSimu, pcsimuText, PCSIMU_COLORS, PCSIMU_SETA } from '../../src/lib/pcsimu'
 import { PRACTICE_GUIDES } from '../../src/lib/practiceGuides'
 import { EXAMPLES } from '../../src/lib/examples'
 
@@ -44,12 +44,12 @@ describe('PC_SIMU (.sim)', () => {
     objects.forEach((a, i) => objects.slice(i + 1).forEach((b) => expect(overlap(a.rect, b.rect)).toBe(false)))
   })
 
-  it('las setas salen como pulsador rojo NC, y lo que no es del panel se avisa con su tipo', () => {
+  it('las setas salen como la seta de PC_SIMU (pulsador con f15 = 12, NC), y lo que no es del panel se avisa con su tipo', () => {
     const { text, warnings } = exportPcSimu(practice('p4'))
-    const seta = parsePcSimu(text).filter((o) => o.type === 2 && o.fields[5] === 1)
+    const seta = parsePcSimu(text).filter((o) => o.type === 2 && o.fields[11] === PCSIMU_SETA)
     expect(seta).toHaveLength(2)
-    expect(seta.every((o) => o.fields[11] === PCSIMU_COLORS.red)).toBe(true)
-    expect(warnings.some((w) => /Seta1: la seta sale como un pulsador rojo/.test(w))).toBe(true)
+    expect(seta.every((o) => o.fields[5] === 1 && o.fields[12] === 0)).toBe(true) // NC y redonda
+    expect(warnings.some((w) => /seta/.test(w))).toBe(false)
     expect(warnings.at(-1)).toMatch(/Todavía no pasan a PC_SIMU: .*Cinta \(1\)/)
   })
 
@@ -80,28 +80,40 @@ describe('PC_SIMU (.sim)', () => {
       { id: '6', type: 'button', variable: 'Marcha_general', color: 'green' },
     ]
     const { text, warnings, count } = exportPcSimu({ plc: { variables, scene: { elements } } })
-    expect(count).toBe(8)
-    expect(warnings).toEqual(['Motor: el giro inverso (Atras) no pasa a PC_SIMU.'])
+    expect(count).toBe(6)
+    expect(warnings).toEqual(['Motor: en PC_SIMU, Atras es la salida de giro a la izquierda (en el editor invierte el giro de la marcha).'])
     const objects = parsePcSimu(text)
     const of = (type) => objects.filter((o) => o.type === type)
-    // f4 (0 entrada, 1 salida), byte, bit y NC
+    // f4 (1 salida, 0 entrada), byte, bit y NC
     const io = (o) => [o.fields[0], o.fields[1], o.fields[3], o.fields[5]]
     expect(of(6).map(io)).toEqual([[0, 0, 2, 1]])
     expect(of(7).map(io)).toEqual([[0, 0, 3, 0]])
-    expect(of(18).map(io)).toEqual([[1, 0, 0, 0]])
     expect(of(15).map(io)).toEqual([[1, 0, 2, 0]])
-    expect(of(11).map((o) => [o.fields[1], o.fields[3], o.fields[11]])).toEqual([
-      [1, 0, PCSIMU_COLORS.red],
-      [1, 1, PCSIMU_COLORS.yellow],
-      [1, 2, PCSIMU_COLORS.green],
-    ])
+    // El motor: derecha en Q0.0, izquierda (el giro inverso) en Q0.1 y las dos activas (f16 = 11).
+    const [motor] = of(18)
+    expect([motor.fields[1], motor.fields[3], motor.fields[2], motor.fields[4], motor.fields[12]]).toEqual([0, 0, 0, 1, 11])
+    // El semáforo, como baliza: rojo f5.f7, ámbar f6.f8 y verde f14.f15.
+    const [baliza] = of(29)
+    expect([baliza.fields[1], baliza.fields[3], baliza.fields[2], baliza.fields[4], baliza.fields[10], baliza.fields[11]]).toEqual([1, 0, 1, 1, 1, 2])
     // Salidas arriba, mandos en medio y detectores abajo.
     const top = (type) => Math.min(...of(type).map((o) => o.rect[1]))
     const bottom = (type) => Math.max(...of(type).map((o) => o.rect[3]))
-    expect(bottom(11)).toBeLessThan(top(2))
+    expect(bottom(29)).toBeLessThan(top(2))
     expect(bottom(2)).toBeLessThan(Math.min(top(6), top(7)))
     // Ni los nombres largos se pisan.
     objects.forEach((a, i) => objects.slice(i + 1).forEach((b) => expect(overlap(a.rect, b.rect)).toBe(false)))
+  })
+
+  it('un semáforo sin las tres luces sale como leds; un detector inductivo lleva su tipo (f12 = 0)', () => {
+    const variables = { R: { address: 'Q0.0' }, V: { address: 'Q0.2' }, Pieza: { address: 'I0.0' } }
+    const elements = [
+      { id: '1', type: 'trafficlight', red: 'R', amber: '', green: 'V' },
+      { id: '2', type: 'sensor', variable: 'Pieza', kind: 'inductive' },
+    ]
+    const objects = parsePcSimu(exportPcSimu({ plc: { variables, scene: { elements } } }).text)
+    expect(objects.filter((o) => o.type === 29)).toHaveLength(0)
+    expect(objects.filter((o) => o.type === 11).map((o) => [o.fields[3], o.fields[11]])).toEqual([[0, PCSIMU_COLORS.red], [2, PCSIMU_COLORS.green]])
+    expect(objects.find((o) => o.type === 7).fields[8]).toBe(0)
   })
 
   it('todos los ejemplos del editor se exportan sin pisarse', () => {
