@@ -141,6 +141,32 @@ const OBJECTS = {
   pot: { type: 17, name: 'Potenciómetro', area: 'I', size: [40, 30], fields: ({ ai }) => [0, ai, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0] },
   // Texto suelto (los rótulos de una planta de frente).
   caption: { type: 1008, name: '', area: 'I', fields: () => [], text: ({ caption }) => caption },
+  // Válvula: abre con f5.f7; f10 caudal (lo que sube por paso el nivel, de 0 a 10000, del depósito en cuyo
+  // borde de arriba apoya; o lo que baja el del depósito al que va pegada por debajo); f11 = 1: hay líquido
+  // en su entrada; f16 = 1: vertical.
+  valve: { type: 23, name: 'Válvula', size: [30, 30], fields: ({ byte, bit, rate = 10, liquid = true }) => [0, byte, 0, bit, 0, 0, rate, liquid ? 1 : 0, 0, 0, 0, 0, 1, 0] },
+  // Depósito: captadores de nivel máximo f5.f7 (si f15 = 1), medio f6.f8 (si f17 = 1) y mínimo f10.f11 (si f9 =
+  // 1); nivel analógico en la AIW f12 (si f4 = 1); f16 = 2: líquidos; f13 capacidad; a = 1: muestra el nivel;
+  // b: el nivel (de 0 a 10000).
+  tankBody: {
+    type: 22,
+    name: 'Depósito',
+    fields: ({ max, mid, min, ai }) => [ai == null ? 0 : 1, max?.byte ?? 0, mid?.byte ?? 0, max?.bit ?? 0, mid?.bit ?? 0, min ? 1 : 0, min?.byte ?? 0, min?.bit ?? 0, ai ?? 0, 1000, 0, max ? 1 : 0, 2, mid ? 1 : 0],
+    a: () => 1,
+    b: ({ initial }) => Math.round(10000 * initial),
+  },
+  // El depósito del editor, con sus válvulas: las de llenado encima (apoyadas en su borde) y la de vaciado
+  // pegada por debajo.
+  tank: {
+    name: 'Depósito',
+    size: [90, 180],
+    parts: (item, [x1, y1, x2, y2]) => [
+      ...(item.fill ? [{ object: 'valve', ...item.fill, rate: item.fillRate, rect: [x1 + 10, y1, x1 + 40, y1 + 30] }] : []),
+      ...(item.fine ? [{ object: 'valve', ...item.fine, rate: item.fineRate, rect: [x2 - 40, y1, x2 - 10, y1 + 30] }] : []),
+      { ...item, object: 'tankBody', rect: [x1, y1 + 30, x2, y2 - 30] },
+      ...(item.drain ? [{ object: 'valve', ...item.drain, rate: item.drainRate, liquid: false, rect: [x1 + 30, y2 - 30, x1 + 60, y2] }] : []),
+    ],
+  },
   beacon: { type: 29, name: 'Baliza', size: [50, 125], fields: ({ red, amber, green }) => [0, red.byte, amber.byte, red.bit, amber.bit, 0, 0, 0, 0, 0, green.byte, green.bit, 0, 0] },
 }
 const CYLINDER_SPEED = 50 // la de los ejemplos de PC_SIMU
@@ -278,6 +304,46 @@ export function exportPcSimu(project, { reserved = [], addressOf } = {}) {
       }
       if (!lights.length) warnings.push(`${typeName(e)}: sin salidas; no se exporta.`)
       for (const [key, color] of lights) add(e, 'led', 'Q', 0, e[key].trim(), { color: PCSIMU_COLORS[color] })
+      continue
+    }
+    if (e.type === 'tank') {
+      const leg = (key, area) => {
+        const v = e[key]?.trim()
+        if (!v) return null
+        const at = bitOf(v, area)
+        if (!at) missing(e, v, area)
+        return at
+      }
+      const [fill, fine, drain] = ['fill', 'fillFine', 'drain'].map((k) => leg(k, 'Q'))
+      const [high, low, empty] = ['high', 'low', 'empty'].map((k) => leg(k, 'I'))
+      const level = e.level?.trim()
+      const ai = level ? /^AIW(\d+)$/i.exec(addr(level)) : null
+      if (level && !ai) warnings.push(`${level}: sin una entrada analógica AIW; el nivel analógico no pasa a PC_SIMU.`)
+      // Caudal: lo que sube el nivel (de 10000) en cada paso de PC_SIMU, que por defecto es de 100 ms.
+      const rate = (t) => Math.max(1, Math.round(1000 / (Number(t) || 10)))
+      rows[0].push({
+        object: 'tank',
+        name: e.text?.trim() || typeName(e),
+        byte: fill?.byte ?? 990,
+        bit: fill?.bit ?? 0,
+        fill,
+        fine,
+        drain,
+        // Tres captadores en PC_SIMU (máximo, medio y mínimo): el alto, el bajo y el de vacío del editor.
+        max: high,
+        mid: empty ? low : null,
+        min: empty ?? low,
+        ai: ai ? Number(ai[1]) : null,
+        initial: Math.max(0, Math.min(1, Number(e.initial) || 0)),
+        fillRate: rate(e.fillTime),
+        fineRate: Math.max(1, Math.round(rate(e.fillTime) / 5)),
+        drainRate: rate(e.drainTime),
+      })
+      continue
+    }
+    if (e.type === 'valve') {
+      const name = e.variable?.trim()
+      add(e, 'valve', 'Q', 0, name, {})
       continue
     }
     if (e.type === 'display') {
@@ -444,7 +510,7 @@ export function exportPcSimu(project, { reserved = [], addressOf } = {}) {
         const parts = OBJECTS[item.object].parts?.(item, rect) ?? [{ ...item, rect }]
         for (const part of parts) {
           const o = OBJECTS[part.object]
-          objects.push({ type: o.type, name: o.name, rect: part.rect, fields: o.fields(part), text: o.text?.(part) ?? '', a: o.a?.(part) ?? 0 })
+          objects.push({ type: o.type, name: o.name, rect: part.rect, fields: o.fields(part), text: o.text?.(part) ?? '', a: o.a?.(part) ?? 0, b: o.b?.(part) ?? 0 })
         }
         objects.push(label(item.name, cx, y + height + 12 + labelGap))
         x += width

@@ -208,6 +208,38 @@ Cada pieza es un rectángulo (hasta 100 a la vez). Caen si no tienen nada debajo
 de la pantalla (x > 1920 o y > 1080). Los detectores y los finales de carrera las ven en una franja
 pegada a su lado (el de `f14`), de `f13` px de largo (10 en los finales de carrera).
 
+### 12 · Display
+
+Muestra en BCD cuatro salidas seguidas por cifra, a partir de `f5.f7` (`f11` cifras). `f4` = 1, `f10` = 1.
+Los ejemplos de PC_SIMU usan displays de una cifra: las decenas en `Q0.4`, a la izquierda, y las
+unidades en `Q0.0`, a la derecha. El editor exporta así un visualizador: cuatro displays de una cifra en
+dos bytes libres, que el `.awl` llena con el valor en BCD (`IBCD`).
+
+### 17 · Potenciómetro
+
+`f5`: n.º de la entrada analógica (`AIW f5`). `f9`: forma (0 lineal vertical, 1 horizontal, 2 redondo,
+3 numérico). `f12`, `f13`: escala del valor que muestra; `f10`, `f11`: su unidad (dos letras); `f16`: 0
+unipolar, 1 bipolar.
+
+### 22 · Depósito
+
+| Campo | Valores |
+|---|---|
+| `f15`, `f5.f7` | captador de nivel máximo (si `f15` = 1) |
+| `f17`, `f6.f8` | captador de nivel medio |
+| `f9`, `f10.f11` | captador de nivel mínimo |
+| `f4`, `f12` | nivel analógico en la `AIW f12` |
+| `f16` | 0 / 1 líquidos / sólidos (V1.0), 2 / 3 líquidos / sólidos |
+| `f13` | capacidad (1000 por defecto) |
+| `a`, `b` | `a` = 1: muestra el nivel; `b`: el nivel, de 0 a 10000 |
+
+### 23 · Válvula
+
+`f5.f7`: su salida; `f10`: caudal; `f11` = 1: tiene líquido en su entrada; `f16`: 0 horizontal, 1
+vertical; `f15`, `f12`: salida analógica. Con su salida activa y líquido en la entrada, sube `f10` en cada
+paso el nivel del depósito de líquidos en cuyo borde de arriba apoya (cabiendo en su ancho, con 10 px de
+margen).
+
 ### 29 · Baliza
 
 Tres luces: **rojo `f5.f7`, ámbar `f6.f8` y verde `f14.f15`** (todas salidas Q). Tamaño por defecto

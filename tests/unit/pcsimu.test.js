@@ -243,6 +243,22 @@ describe('PC_SIMU (.sim)', () => {
     expect(cinta.rect[1] - rotulo.rect[1]).toBe(135) // 200 − 15 − 50
   })
 
+  it('depósitos: con su válvula de llenado apoyada en el borde de arriba y la de vaciado pegada por debajo', () => {
+    const objects = parsePcSimu(exportPcSimu(EXAMPLES.find((e) => /Mezcladora/.test(e.title)).build()).text)
+    const tanks = objects.filter((o) => o.type === 22)
+    const valves = objects.filter((o) => o.type === 23)
+    expect(tanks).toHaveLength(2)
+    // A: llenar Q0.1 (4 s: caudal 250), vaciar Q0.4 (3 s: 333); alto I0.3 como máximo y vacío I0.5 como mínimo.
+    const [a] = tanks
+    expect([a.fields[11], a.fields[1], a.fields[3], a.fields[5], a.fields[6], a.fields[7], a.fields[13]]).toEqual([1, 0, 3, 1, 0, 5, 0])
+    expect([a.fields[12], a.a, a.b]).toEqual([2, 1, 0]) // líquidos, con el nivel a la vista, vacío
+    const over = valves.filter((v) => v.rect[0] >= a.rect[0] && v.rect[2] <= a.rect[2])
+    const fill = over.find((v) => v.rect[3] <= a.rect[1] + 10 && v.rect[3] >= a.rect[1])
+    const drain = over.find((v) => v.rect[1] === a.rect[3])
+    expect([fill.fields[1], fill.fields[3], fill.fields[6], fill.fields[7]]).toEqual([0, 1, 250, 1])
+    expect([drain.fields[1], drain.fields[3], drain.fields[6], drain.fields[7]]).toEqual([0, 4, 333, 0])
+  })
+
   it('todos los ejemplos del editor se exportan sin pisarse', () => {
     for (const example of EXAMPLES) {
       const objects = parsePcSimu(exportPcSimu(example.build()).text)
