@@ -31,8 +31,9 @@ describe('PC_SIMU (.sim)', () => {
     ])
     const buttons = objects.filter((o) => o.type === 2)
     // byte, bit, NC, color
+    expect(PCSIMU_COLORS).toMatchObject({ green: 0, black: 1, red: 4, yellow: 6 }) // comprobados en PC_SIMU
     expect(buttons.map((o) => [o.fields[1], o.fields[3], o.fields[5], o.fields[11]])).toEqual([
-      [0, 0, 0, PCSIMU_COLORS.green], // negro: aún sin comprobar, sale verde
+      [0, 0, 0, PCSIMU_COLORS.black],
       [0, 1, 0, PCSIMU_COLORS.red],
     ])
     expect(objects.filter((o) => o.type === 1008).map((o) => o.text)).toEqual(['LV', 'LR', 'LA', 'PM', 'PP'])

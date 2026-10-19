@@ -10,9 +10,10 @@
 //     f15 color, f16 modelo (0 = redondo).
 //   11 Led: f4 = 1, f5 byte y f7 bit de la salida (Q f5.f7), f15 color, f16 forma (0 = redondo).
 //   1008 texto suelto: rectángulo de 8 px por letra y 17 de alto; el texto va en «texto».
-// Colores (f15), comprobados en PC_SIMU (leds y pulsadores): 0 verde, 2 azul, 4 rojo, 6 amarillo.
-// Los demás (negro, cian, magenta, blanco) faltan por comprobar: salen en verde los leds y los
-// pulsadores, como la marcha.
+// Colores (f15), comprobados en PC_SIMU, iguales en leds y pulsadores (redondos y cuadrados): 0 verde,
+// 1 negro, 2 azul, 3 cian, 4 rojo, 5 magenta, 6 amarillo, 7 blanco. Con f16 = 1 los pulsadores son
+// cuadrados y admiten además 8 verde oscuro, 9 marcha «I», 11 paro «O» y 13 amarillo; valores fuera
+// de estos pueden cerrar PC_SIMU.
 // Lo que pase por algo que no se exporta todavía (cilindros, cintas, detectores…) sale en los
 // avisos, con su tipo (en español, como los de la exportación a S7-200).
 import { parseAddress } from './addressing'
@@ -21,7 +22,7 @@ import { SCENE_TYPES } from './sim/scene'
 import { t as tr } from './i18n'
 
 export const PCSIMU_HEADER = 'PC_SIMU*  1* 50*'
-export const PCSIMU_COLORS = { green: 0, blue: 2, red: 4, yellow: 6 }
+export const PCSIMU_COLORS = { green: 0, black: 1, blue: 2, cyan: 3, red: 4, magenta: 5, yellow: 6, white: 7 }
 export const PCSIMU_TYPES = { switch: 1, button: 2, led: 11, text: 1008 }
 
 // Lo que no puede ir en un campo: los separadores del formato.
@@ -96,7 +97,7 @@ export function exportPcSimu(project) {
       const x = 40 + (i % PER_ROW) * STEP
       const rect = [x, y, x + SIZE, y + SIZE]
       const { e, kind, name, byte, bit } = item
-      const color = PCSIMU_COLORS[e.type === 'emergency' ? 'red' : e.color] ?? PCSIMU_COLORS.green
+      const color = PCSIMU_COLORS[e.type === 'emergency' ? 'red' : e.color] ?? (kind.pcsimu === 'led' ? PCSIMU_COLORS.green : PCSIMU_COLORS.black)
       const nc = e.type === 'emergency' || e.contact === 'NC' ? 1 : 0
       if (kind.pcsimu === 'led') objects.push({ type: PCSIMU_TYPES.led, name: 'Led', rect, fields: [1, byte, 0, bit, 0, 0, 0, 0, 0, 0, 0, color, 0, 0] })
       else objects.push({ type: PCSIMU_TYPES[kind.pcsimu], name: kind.pcsimu === 'switch' ? 'Interruptor' : 'Pulsador', rect, fields: [0, byte, 0, bit, 0, nc, 0, 0, 0, 0, 0, color, 0, 0] })
