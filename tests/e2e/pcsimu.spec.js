@@ -2,14 +2,14 @@ import { readFile } from 'node:fs/promises'
 import { expect, test } from '@playwright/test'
 import { download, expectNoErrors, openEditor, openExample } from './helpers'
 
-test('exportar a PC_SIMU: el panel en .sim y el programa en .awl, con los avisos de lo que no pasa', async ({ page }) => {
+test('exportar a PC_SIMU: el panel en .sim y el programa en .awl, con el motor de la planta', async ({ page }) => {
   const errors = await openEditor(page)
   await openExample(page, /Marcha y paro de un motor/)
   await page.getByRole('button', { name: /Exportar/ }).click()
   await page.getByRole('menuitem', { name: /Planta para PC_SIMU/ }).click()
   const dialog = page.getByRole('dialog', { name: 'Planta para PC_SIMU' })
-  await expect(dialog.locator('[data-pcsimu-count]')).toHaveText('3 elementos en el panel.')
-  await expect(dialog).toContainText('no se exportan: Motor (1)')
+  await expect(dialog.locator('[data-pcsimu-count]')).toHaveText('4 elementos en el panel.') // marcha, paro, piloto y el motor
+  await expect(dialog).not.toContainText('Todavía no pasan')
 
   const sim = await download(page, () => dialog.getByRole('button', { name: 'Panel .sim' }).click())
   expect(sim.suggestedFilename()).toMatch(/-pc-simu\.sim$/)
