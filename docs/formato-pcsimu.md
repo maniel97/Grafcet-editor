@@ -249,6 +249,26 @@ Tres luces: **rojo `f5.f7`, ámbar `f6.f8` y verde `f14.f15`** (todas salidas Q)
 
 El texto va en `texto`; el rectángulo, 8 px por letra y 17 de alto.
 
+## Cómo exporta el editor una planta
+
+- **El pupitre** (lo que en el editor va en el pupitre: mandos, pilotos, visualizadores…) sale como un
+  panel en filas: salidas arriba, mandos en medio y detectores abajo, cada uno con su nombre debajo.
+- **Una planta vista de frente** (como PC_SIMU) sale a escala, con cada elemento en su sitio: cintas,
+  alimentadores, detectores, finales de carrera, cilindros (con el cuerpo a la medida de su recorrido),
+  plataformas, recogidas, barreras, rampas y rótulos. El panel, a su derecha.
+- **Una planta vista desde arriba** se proyecta: las cintas, de frente; la pieza del alimentador, apoyada
+  en su cinta; los detectores cuyo haz cruza la cinta, encima de ella mirando hacia abajo (si en el
+  editor el haz solo llega a media cinta, de frente solo ven las piezas altas). Lo que aparta las piezas a
+  un lado de la cinta (desviadores, rampas) no tiene equivalente de frente.
+- **Lo que PC_SIMU necesita y el programa no tiene** se añade al `.awl` en salidas libres: la de recoger
+  un cilindro con vuelta por muelle, la de cerrar una barrera que cierra por su peso y los dos bytes en
+  BCD de cada visualizador.
+- **El tiempo:** PC_SIMU mueve piezas, cintas y líquidos al ritmo con el que redibuja la pantalla (y de
+  su «velocidad de simulación»), no al del autómata. Las velocidades se calculan para un paso de 100 ms
+  (el de su velocidad por defecto), pero lo que se ve no coincide con los tiempos del programa.
+- **El simulador S7_200** viene con una CPU 214, que no tiene `<`, `>`, `<>` (el editor los reescribe
+  con `=`, `>=` y `<=`) ni las instrucciones de reales de las entradas analógicas escaladas.
+
 ## Cómo se ha averiguado
 
 1. El guardado es un único `sprintf` con el formato

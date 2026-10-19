@@ -277,6 +277,27 @@ describe('PC_SIMU (.sim)', () => {
     expect(warnings.some((w) => /no sostiene ni frena piezas/.test(w))).toBe(true)
   })
 
+  it('planta vista desde arriba: la cinta de frente, la pieza apoyada en ella y los detectores encima, mirando hacia abajo', () => {
+    const objects = parsePcSimu(exportPcSimu(EXAMPLES.find((e) => e.title === 'Cinta reversible').build()).text)
+    const cinta = objects.find((o) => o.type === 20)
+    const alim = objects.find((o) => o.type === 25)
+    // Marcha adelante a la derecha y atrás a la izquierda.
+    expect([cinta.fields[12], cinta.fields[11]]).toEqual([1, 1])
+    // La pieza (28 px) sale ya apoyada en la cinta, en la posición del alimentador.
+    expect(cinta.rect[1] - (alim.rect[3] + 28)).toBe(1)
+    expect((alim.rect[0] + alim.rect[2]) / 2 - cinta.rect[0]).toBe(100) // x 140 − 40
+    // Los dos detectores de fin, encima de la cinta en sus x (70 y 450), mirando hacia abajo hasta ella.
+    const dets = objects.filter((o) => o.type === 7)
+    expect(dets.map((o) => [(o.rect[0] + o.rect[2]) / 2 - cinta.rect[0], o.fields[10], o.rect[3] + o.fields[9]])).toEqual([
+      [30, 3, cinta.rect[1]],
+      [410, 3, cinta.rect[1]],
+    ])
+    // Clasificadora: el inductivo, encima de la cinta; el desviador y la rampa (de lado) no pasan, con su aviso.
+    const clasif = exportPcSimu(EXAMPLES.find((e) => e.title === 'Clasificadora por material').build())
+    expect(parsePcSimu(clasif.text).find((o) => o.type === 7).fields[8]).toBe(0)
+    expect(clasif.warnings.some((w) => /desviadores, rampas/.test(w))).toBe(true)
+  })
+
   it('todos los ejemplos del editor se exportan sin pisarse', () => {
     for (const example of EXAMPLES) {
       const objects = parsePcSimu(exportPcSimu(example.build()).text)

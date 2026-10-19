@@ -11,7 +11,7 @@
 // español, como los de la exportación a S7-200).
 import { parseAddress } from './addressing'
 import { encodeAnsi } from './ladder/exportS7200'
-import { SCENE_TYPES, PIECE_SIZES, worldRect } from './sim/scene'
+import { SCENE_TYPES, PIECE_SIZES, sensorZone, worldRect } from './sim/scene'
 import { t as tr } from './i18n'
 
 export const PCSIMU_HEADER = 'PC_SIMU*  1* 50*'
@@ -196,6 +196,7 @@ const cylinderSpeed = (e) => clampSpeed(55 / (Number(e.time) || 1))
 // (place: 'desk'), al panel.
 const MACHINE = new Set(['conveyor', 'feeder', 'sensor', 'limit', 'cylinder', 'platform', 'sink', 'barrier', 'ramp'])
 // Rectángulo de PC_SIMU [x1, y1, x2, y2] de un rectángulo local del elemento del editor.
+const rectOf = (r) => [r.x, r.y, r.x + r.w, r.y + r.h]
 const placed = (e, x, y, w, h) => {
   const r = worldRect(e, x, y, w, h)
   return [r.x, r.y, r.x + r.w, r.y + r.h]
@@ -263,9 +264,24 @@ export function exportPcSimu(project, { reserved = [], addressOf } = {}) {
   const front = Boolean(plc.scene?.gravity)
   const once = new Set() // avisos que van una sola vez
   const note = (w) => once.has(w) || (once.add(w), warnings.push(w))
+  const rotOf = (e) => ((Number(e.rot) || 0) % 360 + 360) % 360
+  // Planta vista desde arriba: PC_SIMU la ve de frente. Pasan las cintas horizontales; lo que va sobre una
+  // (el alimentador) y los detectores cuyo haz la cruza, proyectados (beltUnder).
+  const belts = front ? [] : elements.filter((e) => e.type === 'conveyor' && e.place !== 'desk' && (rotOf(e) === 0 || rotOf(e) === 180)).map((e) => placed(e, 0, -15, Number(e.length) || 240, 30))
+  const beltUnder = (r) => belts.find((b) => overlapsRect(b, r))
   for (const e of elements) {
-    const onMachine = front && e.place !== 'desk' && MACHINE.has(e.type)
-    const rot = ((Number(e.rot) || 0) % 360 + 360) % 360
+    const rot = rotOf(e)
+    if (!front && e.place !== 'desk' && (e.type === 'ramp' || e.type === 'diverter' || e.type === 'sink')) {
+      if (e.type !== 'sink') note('Vista desde arriba: lo que aparta las piezas a un lado de la cinta (desviadores, rampas) no pasa a PC_SIMU, que la ve de frente; las piezas siguen por la cinta.')
+      continue
+    }
+    let onMachine = e.place !== 'desk' && MACHINE.has(e.type)
+    if (!front && onMachine) {
+      if (e.type === 'conveyor') onMachine = rot === 0 || rot === 180
+      else if (e.type === 'feeder') onMachine = Boolean(beltUnder([e.x - 1, e.y - 1, e.x + 1, e.y + 1]))
+      else if (e.type === 'sensor') onMachine = (rot === 90 || rot === 270) && Boolean(beltUnder(rectOf(sensorZone(e))))
+      else onMachine = false
+    }
     if (onMachine && e.type === 'conveyor') {
       if (rot !== 0 && rot !== 180) {
         warnings.push(`${e.text?.trim() || typeName(e)}: en PC_SIMU las cintas van en horizontal; no se exporta.`)
@@ -289,7 +305,9 @@ export function exportPcSimu(project, { reserved = [], addressOf } = {}) {
       const trigger = q ?? (t ? bitOf(t, 'I') : null)
       if (t && !trigger) missing(e, t, 'I o Q')
       // La pieza sale por debajo del alimentador, donde la deja el editor (se ajusta después del bucle).
-      machine.push({ object: 'feeder', name: '', piece: { x: e.x, y: e.y - h / 2, w, h }, trigger, area: q ? 'Q' : 'I', auto: !t && e.auto !== false, material: e.material === 'metal' ? 5 : 6 })
+      // (desde arriba, la pieza está sobre la cinta: en PC_SIMU, apoyada en ella)
+      const restOn = front ? null : beltUnder([e.x - 1, e.y - 1, e.x + 1, e.y + 1])[1]
+      machine.push({ object: 'feeder', name: '', piece: { x: e.x, y: e.y - h / 2, w, h }, restOn, trigger, area: q ? 'Q' : 'I', auto: !t && e.auto !== false, material: e.material === 'metal' ? 5 : 6 })
       continue
     }
     if (onMachine && e.type === 'platform') {
@@ -458,6 +476,17 @@ export function exportPcSimu(project, { reserved = [], addressOf } = {}) {
       if (e.mountedOn) warnings.push(`${name || typeName(e)}: en PC_SIMU no va montado sobre otro cilindro.`)
     }
     if (onMachine && e.type === 'sensor') Object.assign(extra, { rect: placed(e, -10, -5, 20, 10), orientation: ORIENTATION[rot] ?? 0, range: Math.round(Number(e.range) || 60) })
+    if (onMachine && e.type === 'sensor' && !front) {
+      // Desde arriba, el haz cruza la cinta de lado: en PC_SIMU, el detector va encima, mirando hacia abajo, en
+      // el mismo punto. Si el haz no llega al centro de la cinta (a t px de él), solo ve las piezas de más de
+      // 2t: de frente, las de más de 2t de alto, así que su franja baja hasta 2t por encima de la cinta.
+      const zone = rectOf(sensorZone(e))
+      const belt = beltUnder(zone)
+      const c = (belt[1] + belt[3]) / 2
+      const t = zone[1] <= c && c <= zone[3] ? 0 : Math.min(Math.abs(zone[1] - c), Math.abs(zone[3] - c))
+      const cx = (zone[0] + zone[2]) / 2
+      Object.assign(extra, { rect: [cx - 5, belt[1] - 80, cx + 5, belt[1] - 60], orientation: 3, range: Math.max(1, Math.round(60 - 2 * t)) })
+    }
     // El rodillo del final de carrera, encima del anclaje (girado con el elemento).
     if (onMachine && e.type === 'limit') Object.assign(extra, { rect: placed(e, -6, -8, 12, 23), orientation: LIMIT_SIDE[rot] ?? 2 })
     add(e, kind.pcsimu, kind.area, kind.row, name, extra)
@@ -474,7 +503,8 @@ export function exportPcSimu(project, { reserved = [], addressOf } = {}) {
     const { x, y, w, h } = m.piece
     const below = surfaces.filter((r) => r[0] < x + w / 2 && x - w / 2 < r[2] && r[1] >= y + h).map((r) => r[1])
     let top = y
-    if (below.length) {
+    if (m.restOn != null) top = m.restOn - h - 1
+    else if (below.length) {
       const floor = Math.min(...below)
       if (sideZones.some((z) => overlapsRect(z, [x - w / 2, y, x + w / 2, floor]))) top = floor - h - 1
     }
