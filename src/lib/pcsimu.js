@@ -93,10 +93,10 @@ const OBJECTS = {
     name: 'Actuador neumático',
     size: [60, 20],
     sizeVertical: [20, 60],
-    fields: ({ byte, bit, retract, a0, a1, orientation, extended, speed, graphic }) => [
+    fields: ({ byte, bit, retract, a0, a1, orientation, extended, speed }) => [
       retract ? 1 : 0, byte, retract?.byte ?? 0, bit, retract?.bit ?? 0,
       a0 ? 1 : 0, a1 ? 1 : 0, a0?.byte ?? 0, a1?.byte ?? 0, a0?.bit ?? 0,
-      orientation, (extended ? 21 : 11) + (graphic === 2 ? 2 : 0), retract ? 11 : 1, speed ?? CYLINDER_SPEED,
+      orientation, extended ? 21 : 11, retract ? 11 : 1, speed ?? CYLINDER_SPEED,
     ],
     text: ({ speed }) => `.${pad(speed ?? CYLINDER_SPEED)}.${pad(0)}.${pad(0)}.0.${pad(0)}.0.0`,
     a: ({ a1 }) => a1?.bit ?? 0,
@@ -228,9 +228,8 @@ export function exportPcSimu(project, { reserved = [] } = {}) {
       const q = t ? bitOf(t, 'Q') : null
       const trigger = q ?? (t ? bitOf(t, 'I') : null)
       if (t && !trigger) missing(e, t, 'I o Q')
-      // La pieza sale por debajo del alimentador, justo donde la deja el editor.
-      const rect = [e.x - w / 2, e.y - h / 2 - h, e.x + w / 2, e.y - h / 2]
-      machine.push({ object: 'feeder', name: '', rect, trigger, area: q ? 'Q' : 'I', auto: !t && e.auto !== false, material: e.material === 'metal' ? 5 : 6 })
+      // La pieza sale por debajo del alimentador, donde la deja el editor (se ajusta después del bucle).
+      machine.push({ object: 'feeder', name: '', piece: { x: e.x, y: e.y - h / 2, w, h }, trigger, area: q ? 'Q' : 'I', auto: !t && e.auto !== false, material: e.material === 'metal' ? 5 : 6 })
       continue
     }
     if (onMachine && e.type === 'platform') {
@@ -286,10 +285,11 @@ export function exportPcSimu(project, { reserved = [] } = {}) {
       extra.spring = !e.retract?.trim() // le falta la salida de recoger: se le da una (más abajo)
       extra.orientation = ORIENTATION[rot] ?? 0
       if (onMachine) {
-        // Con el gráfico 2, el vástago sale hasta 35/19 del largo del cuerpo (con el 1, solo 11/19): el cuerpo, a
-        // la medida del recorrido, con la cara del vástago (recogido) donde el editor tiene la placa.
-        const W = Math.round(((Number(e.stroke) || 100) * 19) / 35)
-        Object.assign(extra, { rect: placed(e, 88 - W, -10, W, 20), speed: cylinderSpeed(e), graphic: 2 })
+        // PC_SIMU empuja (y sube, en vertical) las piezas con el gráfico 1, en el que el vástago sale 11/19 del
+        // largo del cuerpo: el cuerpo, a la medida del recorrido, con la cara del vástago (recogido) donde el
+        // editor tiene la placa, y tan ancho como ella (28 px) para alcanzar las mismas piezas.
+        const W = Math.round(((Number(e.stroke) || 100) * 19) / 11)
+        Object.assign(extra, { rect: placed(e, 88 - W, -14, W, 28), speed: cylinderSpeed(e) })
       }
       extra.extended = Number(e.initial) === 1
       const lost = ['position', 'vacuum', 'holding'].filter((k) => e[k]?.trim()).map((k) => e[k].trim())
@@ -300,6 +300,24 @@ export function exportPcSimu(project, { reserved = [] } = {}) {
     // El rodillo del final de carrera, encima del anclaje (girado con el elemento).
     if (onMachine && e.type === 'limit') Object.assign(extra, { rect: placed(e, -6, -8, 12, 23), orientation: LIMIT_SIDE[rot] ?? 2 })
     add(e, kind.pcsimu, kind.area, kind.row, name, extra)
+  }
+  // Dónde aparece cada pieza. PC_SIMU da por vista una pieza en cuanto roza la franja de un detector (el
+  // editor mira su centro): si al caer fuera a cruzar la de uno que mira de lado, aparece ya apoyada en la
+  // superficie de debajo (si no, un detector de altura vería alta toda pieza que cae).
+  const surfaces = machine.filter((m) => m.object === 'conveyor' || (m.object === 'profile' && m.support)).map((m) => m.rect)
+  const sideZones = machine.filter((m) => m.object === 'detector' && m.orientation <= 1).map((m) => {
+    const r = m.rect
+    return m.orientation === 0 ? [r[2], r[1], r[2] + m.range, r[3]] : [r[0] - m.range, r[1], r[0], r[3]]
+  })
+  for (const m of machine.filter((m) => m.object === 'feeder')) {
+    const { x, y, w, h } = m.piece
+    const below = surfaces.filter((r) => r[0] < x + w / 2 && x - w / 2 < r[2] && r[1] >= y + h).map((r) => r[1])
+    let top = y
+    if (below.length) {
+      const floor = Math.min(...below)
+      if (sideZones.some((z) => overlapsRect(z, [x - w / 2, y, x + w / 2, floor]))) top = floor - h - 1
+    }
+    m.rect = [x - w / 2, top - h, x + w / 2, top]
   }
   // PC_SIMU recoge un cilindro que empieza dentro solo con su salida «contraer» (y la de expandir a 0):
   // no tiene vuelta por muelle. A los que no tienen A− se les da una salida libre que el .awl pone a

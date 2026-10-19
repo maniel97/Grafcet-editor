@@ -182,7 +182,7 @@ describe('PC_SIMU (.sim)', () => {
     objects.forEach((a, i) => objects.slice(i + 1).forEach((b) => expect(overlap(a.rect, b.rect)).toBe(false)))
   })
 
-  it('planta de frente: una pieza por orden, cilindros con su recorrido y nombres fuera de las franjas de los detectores', () => {
+  it('planta de frente: una pieza por orden y sin cruzar detectores al caer, cilindros con su recorrido y nombres fuera de las franjas', () => {
     const example = (re) => parsePcSimu(exportPcSimu(EXAMPLES.find((e) => re.test(e.title)).build()).text)
     const clasif = example(/Clasificación por tamaño con cinta reversible/)
     // Con orden (Soltar): una sola pieza por activación.
@@ -195,11 +195,16 @@ describe('PC_SIMU (.sim)', () => {
     }
     const zones = clasif.filter((o) => o.type === 7).map(zone)
     for (const l of clasif.filter((o) => o.type === 1008)) for (const z of zones) expect(overlap(l.rect, z), l.text).toBe(false)
-    // El elevador (160 px de recorrido): gráfico 2 (13), con el cuerpo de 160 · 19 / 35 = 87 px.
+    // La pieza aparece ya sobre la cinta: al caer cruzaría la franja de «Alta» (PC_SIMU la daría por alta).
+    const cinta = clasif.find((o) => o.type === 20)
+    const pieza = clasif.find((o) => o.type === 25)
+    expect(cinta.rect[1] - (pieza.rect[3] + 28)).toBe(1)
+    // El elevador (160 px de recorrido): gráfico 1 (el que empuja y sube piezas en PC_SIMU), con el cuerpo de
+    // 160 · 19 / 11 = 276 px y 28 de ancho (el de la placa del editor).
     const estacion = example(/Estación de elevación/)
     const elevador = estacion.find((o) => o.type === 19 && o.fields[10] === 2)
-    expect(elevador.fields[11]).toBe(13)
-    expect(elevador.rect[3] - elevador.rect[1]).toBe(87)
+    expect(elevador.fields[11]).toBe(11)
+    expect([elevador.rect[2] - elevador.rect[0], elevador.rect[3] - elevador.rect[1]]).toEqual([28, 276])
   })
 
   it('todos los ejemplos del editor se exportan sin pisarse', () => {
