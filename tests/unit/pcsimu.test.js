@@ -44,13 +44,12 @@ describe('PC_SIMU (.sim)', () => {
     objects.forEach((a, i) => objects.slice(i + 1).forEach((b) => expect(overlap(a.rect, b.rect)).toBe(false)))
   })
 
-  it('las setas salen como la seta de PC_SIMU (pulsador con f15 = 12, NC), y lo que no es del panel se avisa con su tipo', () => {
+  it('las setas salen como la seta de PC_SIMU (pulsador con f15 = 12, NC)', () => {
     const { text, warnings } = exportPcSimu(practice('p4'))
     const seta = parsePcSimu(text).filter((o) => o.type === 2 && o.fields[11] === PCSIMU_SETA)
     expect(seta).toHaveLength(2)
     expect(seta.every((o) => o.fields[5] === 1 && o.fields[12] === 0)).toBe(true) // NC y redonda
     expect(warnings.some((w) => /seta/.test(w))).toBe(false)
-    expect(warnings.at(-1)).toMatch(/Todavía no pasan a PC_SIMU: .*Cinta \(1\)/)
   })
 
   it('un mando sin dirección de entrada se avisa y no se exporta; los separadores no llegan al archivo', () => {
@@ -153,6 +152,34 @@ describe('PC_SIMU (.sim)', () => {
     const out = withAuxOutputs(awl, aux).split('\r\n')
     expect(out.slice(5, 9)).toEqual(['Network 2 // PC_SIMU: Q0.3 recoge A+ (vuelta por muelle)', 'LDN    Q0.0', '=      Q0.3', 'END_ORGANIZATION_BLOCK'])
     expect(withAuxOutputs(awl, [])).toBe(awl)
+  })
+
+  it('planta de frente: la máquina a escala (cinta, alimentador, detectores, recogida) y el panel a su derecha', () => {
+    const { text, warnings } = exportPcSimu(practice('p4'))
+    // «Caja» suelta la caja sin pasar por el autómata: PC_SIMU los une por una entrada libre.
+    expect(warnings).toEqual(['Caja: no pasa por el autómata; en PC_SIMU el pulsador y el alimentador usan la entrada libre I0.4.'])
+    const objects = parsePcSimu(text)
+    const one = (type) => objects.filter((o) => o.type === type)
+    const [cinta] = one(20)
+    // Marcha a la derecha con M (Q0.0), sin marcha atrás; 420 px en 5 s.
+    expect([cinta.fields[1], cinta.fields[3], cinta.fields[12], cinta.fields[11], cinta.fields[13]]).toEqual([0, 0, 1, 0, 50])
+    expect([cinta.rect[2] - cinta.rect[0], cinta.rect[3] - cinta.rect[1]]).toEqual([420, 30])
+    // El alimentador: grande (44 px), por una entrada (f4 = 0) I0.4, suelta hacia abajo, piezas de plástico.
+    const [alim] = one(25)
+    expect([alim.fields[0], alim.fields[1], alim.fields[3], alim.fields[6], alim.fields[10], alim.fields[12]]).toEqual([0, 0, 4, 1, 3, 6])
+    expect(alim.rect[2] - alim.rect[0]).toBe(44)
+    // La pieza sale justo encima de la cinta: su base (debajo del alimentador + 44) queda por encima de ella.
+    expect(alim.rect[3] + 44).toBeLessThanOrEqual(cinta.rect[1])
+    // Pulsador «Caja» en el panel con esa misma entrada.
+    expect(one(2).find((o) => o.fields[1] === 0 && o.fields[3] === 4)).toBeTruthy()
+    // Detectores: S1 mira hacia arriba (f14 = 2) a 70 px; S2 a la derecha a 80.
+    expect(one(7).map((o) => [o.fields[3], o.fields[10], o.fields[9]])).toEqual([[0, 2, 70], [3, 0, 80]])
+    // La recogida, un perfil que destruye las piezas.
+    expect(one(19).map((o) => [o.fields[10], o.fields[9]])).toEqual([[1, 0]])
+    // El panel, a la derecha de la máquina.
+    const machineRight = Math.max(...[...one(20), ...one(25), ...one(7), ...one(19)].map((o) => o.rect[2]))
+    expect(Math.min(...[...one(2), ...one(11)].map((o) => o.rect[0]))).toBeGreaterThan(machineRight)
+    objects.forEach((a, i) => objects.slice(i + 1).forEach((b) => expect(overlap(a.rect, b.rect)).toBe(false)))
   })
 
   it('todos los ejemplos del editor se exportan sin pisarse', () => {

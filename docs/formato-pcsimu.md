@@ -168,6 +168,46 @@ Cómo lo mueve la simulación (la posición del vástago va en `b`, de 0 a 110):
   con ella a 1 y sale por muelle con ella a 0. Biestable, como el anterior.
 - Velocidades: `f17` / 10 al salir y el primer número de `texto` / 10 al volver (como poco, 1 por paso).
 
+### 20 · Cinta
+
+| Campo | Valores |
+|---|---|
+| `f5`, `f7` | salida «desplazamiento derecha» (cuenta si `f16` = 1) |
+| `f6`, `f8` | salida «desplazamiento izquierda» (cuenta si `f15` = 1) |
+| `f14` | dibujo e inclinación: 0 / 1 / 2 «Cinta (V1.0)» horizontal / 45° / 135°; 3–5 «Cinta 2»; 6–8 «Cinta 2 con motor» |
+| `f17` | velocidad: avanza `f17` / 12 px por paso |
+| `f9`, `f10`, `f11` | variador: unipolar / bipolar, si lo tiene y su entrada analógica |
+
+Mueve las piezas que tienen la base sobre su cara de arriba (con 12 px de margen). Con las dos salidas a
+la vez, no se mueve.
+
+### 25 · Objeto (alimentador de piezas)
+
+| Campo | Valores |
+|---|---|
+| `f10` | 1: suelta piezas con una señal, la de `f5.f7` |
+| `f4` | esa señal es una entrada (0) o una salida (1) |
+| `f9` | 1: suelta piezas sin señal |
+| `f14` | lado por el que sale la pieza: 0 derecha, 1 izquierda, 2 arriba, 3 abajo |
+| `f16` | pieza: 0 caja, 1 bolsa, 2 áridos, 3 botella, 4 bote, 5 metálica, 6 plástica, 7 de color, 8 persona, 9 vehículo, 11 imagen propia |
+| `f17` | pasos entre pieza y pieza mientras sigue activo |
+
+La pieza tiene el tamaño del rectángulo del objeto y aparece pegada a él. Suelta una en cuanto se activa
+y otra cada `f17` pasos mientras siga activo.
+
+### 19 · Perfil de aluminio (`f15` de 50 a 61)
+
+`f15`: par horizontal, impar vertical (50 / 51 gris claro, 52 / 53 gris oscuro, y luego rectangular y
+redondo). `f13` = 1 «detener objeto»: las piezas se apoyan encima. `f14` = 1 «destruir objeto»: las piezas
+que lo tocan desaparecen. `f11`, `f12`: desplazar en X, en Y. Solo actúa por arriba: no frena una pieza
+que le llega de lado.
+
+### Las piezas
+
+Cada pieza es un rectángulo (hasta 100 a la vez). Caen si no tienen nada debajo, y desaparecen al salir
+de la pantalla (x > 1920 o y > 1080). Los detectores y los finales de carrera las ven en una franja
+pegada a su lado (el de `f14`), de `f13` px de largo (10 en los finales de carrera).
+
 ### 29 · Baliza
 
 Tres luces: **rojo `f5.f7`, ámbar `f6.f8` y verde `f14.f15`** (todas salidas Q). Tamaño por defecto
