@@ -167,6 +167,20 @@ const OBJECTS = {
       ...(item.drain ? [{ object: 'valve', ...item.drain, rate: item.drainRate, liquid: false, rect: [x1 + 30, y2 - 30, x1 + 60, y2] }] : []),
     ],
   },
+  // Puerta (tipo 21) con el dibujo «Barrera» (f12 = 6): abre con f5.f7 y cierra con f6.f8; final de carrera
+  // «cerrada» en f14.f15 (si f10 = 1) y «abierta» en f16.f9 (si f11 = 1); f17 velocidad.
+  door: {
+    type: 21,
+    name: 'Barrera',
+    size: [100, 30],
+    fields: ({ byte, bit, close, retract, opened, closed }) => {
+      const shut = close ?? retract
+      return [0, byte, shut?.byte ?? 0, bit, shut?.bit ?? 0, opened?.bit ?? 0, closed ? 1 : 0, opened ? 1 : 0, 6, 0, closed?.byte ?? 0, closed?.bit ?? 0, opened?.byte ?? 0, 50]
+    },
+  },
+  // Tope (tipo 26): f14 0 horizontal (las piezas se apoyan), 1 / 2 inclinado 45° / 135°, 3 / 4 rampa por la
+  // que bajan solas hacia la derecha / la izquierda; f15 = 1: destruye las piezas.
+  ramp: { type: 26, name: 'Tope', area: 'I', fields: ({ slope }) => [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, slope, 0, 0, 0] },
   beacon: { type: 29, name: 'Baliza', size: [50, 125], fields: ({ red, amber, green }) => [0, red.byte, amber.byte, red.bit, amber.bit, 0, 0, 0, 0, 0, green.byte, green.bit, 0, 0] },
 }
 const CYLINDER_SPEED = 50 // la de los ejemplos de PC_SIMU
@@ -180,7 +194,7 @@ const conveyorSpeed = (e) => clampSpeed((0.6 * (Number(e.length) || 240)) / (Num
 const cylinderSpeed = (e) => clampSpeed(55 / (Number(e.time) || 1))
 // Lo que va a escala en una planta vista de frente (scene.gravity, como PC_SIMU); lo del pupitre
 // (place: 'desk'), al panel.
-const MACHINE = new Set(['conveyor', 'feeder', 'sensor', 'limit', 'cylinder', 'platform', 'sink'])
+const MACHINE = new Set(['conveyor', 'feeder', 'sensor', 'limit', 'cylinder', 'platform', 'sink', 'barrier', 'ramp'])
 // Rectángulo de PC_SIMU [x1, y1, x2, y2] de un rectángulo local del elemento del editor.
 const placed = (e, x, y, w, h) => {
   const r = worldRect(e, x, y, w, h)
@@ -304,6 +318,45 @@ export function exportPcSimu(project, { reserved = [], addressOf } = {}) {
       }
       if (!lights.length) warnings.push(`${typeName(e)}: sin salidas; no se exporta.`)
       for (const [key, color] of lights) add(e, 'led', 'Q', 0, e[key].trim(), { color: PCSIMU_COLORS[color] })
+      continue
+    }
+    if (e.type === 'heater') {
+      // PC_SIMU no simula temperaturas: la resistencia, como piloto rojo; la temperatura, con un potenciómetro
+      // en su entrada analógica (se pone a mano) y el termostato, con un interruptor.
+      const label = e.text?.trim() || typeName(e)
+      if (e.heat?.trim()) add(e, 'led', 'Q', 0, e.heat.trim(), { color: PCSIMU_COLORS.red })
+      const temp = e.temperature?.trim()
+      if (temp) {
+        const m = /^AIW(\d+)$/i.exec(String(addr(temp)).trim())
+        if (m) rows[1].push({ object: 'pot', name: temp, ai: Number(m[1]), byte: 900 + Number(m[1]), bit: 0 })
+        else warnings.push(`${temp}: sin una entrada analógica AIW; no se exporta.`)
+      }
+      if (e.thermostat?.trim()) add(e, 'switch', 'I', 1, e.thermostat.trim(), { nc: 0 })
+      warnings.push(`${label}: PC_SIMU no simula la temperatura; se pone a mano con el potenciómetro${e.thermostat?.trim() ? ' y el termostato con su interruptor' : ''}.`)
+      continue
+    }
+    if (e.type === 'barrier') {
+      const leg = (key, area) => {
+        const v = e[key]?.trim()
+        if (!v) return null
+        const at = bitOf(v, area)
+        if (!at) missing(e, v, area)
+        return at
+      }
+      const extra = { close: leg('close', 'Q'), opened: leg('opened', 'I'), closed: leg('closed', 'I'), spring: !e.close?.trim() }
+      if (onMachine) {
+        extra.rect = placed(e, 0, -22, Number(e.length) || 140, 22)
+        note(`${e.text?.trim() || typeName(e)}: en PC_SIMU la barrera se abre y se cierra, pero no sostiene ni frena piezas.`)
+      }
+      add(e, 'door', 'Q', 0, e.open?.trim(), extra)
+      continue
+    }
+    if (onMachine && e.type === 'ramp') {
+      if (rot === 90 || rot === 270) {
+        warnings.push(`${e.text?.trim() || typeName(e)}: en PC_SIMU las rampas bajan hacia un lado; una vertical no se exporta.`)
+        continue
+      }
+      machine.push({ object: 'ramp', name: '', rect: placed(e, 0, -20, Number(e.length) || 120, 40), slope: rot === 180 ? 4 : 3 })
       continue
     }
     if (e.type === 'tank') {
@@ -457,7 +510,11 @@ export function exportPcSimu(project, { reserved = [], addressOf } = {}) {
       const to = `Q${item.retract.byte}.${item.retract.bit}`
       used.add(to)
       aux.push({ from: `Q${item.byte}.${item.bit}`, to, name: item.name })
-      warnings.push(`${item.name}: vuelve por muelle; PC_SIMU lo recoge con su propia salida, así que el .awl pone ${to} = NOT Q${item.byte}.${item.bit}.`)
+      warnings.push(
+        item.object === 'door'
+          ? `${item.name}: cierra por su peso; PC_SIMU la cierra con su propia salida, así que el .awl pone ${to} = NOT Q${item.byte}.${item.bit}.`
+          : `${item.name}: vuelve por muelle; PC_SIMU lo recoge con su propia salida, así que el .awl pone ${to} = NOT Q${item.byte}.${item.bit}.`,
+      )
     }
   }
   const objects = []

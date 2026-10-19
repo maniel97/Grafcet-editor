@@ -217,7 +217,10 @@ describe('PC_SIMU (.sim)', () => {
     // La consigna (IW66 en la tabla, de S7-300) es una AIW en el programa del S7-200: el potenciómetro, en esa.
     const consigna = program.addressOf({ kind: 'var', name: 'Consigna' })
     expect(consigna).toMatch(/^AIW\d+$/)
-    expect(objects.find((o) => o.type === 17).fields[1]).toBe(Number(consigna.slice(3)))
+    // (y otro en la de la temperatura: PC_SIMU no simula el calentador, se pone a mano)
+    const temp = program.addressOf({ kind: 'var', name: 'Temp' })
+    expect(objects.filter((o) => o.type === 17).map((o) => o.fields[1]).sort()).toEqual([Number(consigna.slice(3)), Number(temp.slice(3))].sort())
+    expect(sim.warnings.some((w) => /no simula la temperatura/.test(w))).toBe(true)
     // Dos visualizadores: 4 displays de una cifra cada uno, unidades a la derecha (QBn.0) y millares a la izquierda.
     const digits = objects.filter((o) => o.type === 12)
     expect(digits).toHaveLength(8)
@@ -257,6 +260,21 @@ describe('PC_SIMU (.sim)', () => {
     const drain = over.find((v) => v.rect[1] === a.rect[3])
     expect([fill.fields[1], fill.fields[3], fill.fields[6], fill.fields[7]]).toEqual([0, 1, 250, 1])
     expect([drain.fields[1], drain.fields[3], drain.fields[6], drain.fields[7]]).toEqual([0, 4, 333, 0])
+  })
+
+  it('barrera: abre con su salida, sus finales de carrera, y si cierra por su peso, una salida para cerrarla', () => {
+    const { text, warnings, aux } = exportPcSimu(EXAMPLES.find((e) => /Apilador con trampilla/.test(e.title)).build())
+    const door = parsePcSimu(text).find((o) => o.type === 21)
+    // Abrir Q0.1; abierta b1 = I0.2 (f16.f9) y cerrada b0 = I0.3 (f14.f15); dibujo «Barrera».
+    expect([door.fields[1], door.fields[3], door.fields[8]]).toEqual([0, 1, 6])
+    expect([door.fields[7], door.fields[12], door.fields[5]]).toEqual([1, 0, 2])
+    expect([door.fields[6], door.fields[10], door.fields[11]]).toEqual([1, 0, 3])
+    // Sin salida de cerrar: una libre, NOT abrir.
+    const shut = aux.find((x) => x.from === 'Q0.1')
+    expect(shut).toBeTruthy()
+    expect(`Q${door.fields[2]}.${door.fields[4]}`).toBe(shut.to)
+    expect(warnings.some((w) => /cierra por su peso/.test(w))).toBe(true)
+    expect(warnings.some((w) => /no sostiene ni frena piezas/.test(w))).toBe(true)
   })
 
   it('todos los ejemplos del editor se exportan sin pisarse', () => {
