@@ -127,6 +127,20 @@ const OBJECTS = {
     fields: ({ vertical, support, destroy }) => [0, 0, 0, 0, 0, 0, 0, 0, 0, support ? 1 : 0, destroy ? 1 : 0, vertical ? 51 : 50, 0, 0],
     text: () => `.${pad(0)}.${pad(0)}.${pad(0)}.0.${pad(0)}.0.0`,
   },
+  // Display: muestra en BCD 4 salidas seguidas a partir de f5.f7, una cifra por cada f11 (aquí, 1).
+  digit: { type: 12, name: 'Display', fields: ({ byte, bit }) => [1, byte, 0, bit, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0] },
+  // Visualizador del editor: cuatro displays de una cifra (las unidades, a la derecha), en las dos salidas de
+  // byte que el .awl llena con el valor en BCD (withAuxOutputs).
+  display: {
+    name: 'Display',
+    size: [4 * 30 + 3 * 4, 36],
+    parts: ({ qb }, [x1, y1]) =>
+      [[qb[1], 4], [qb[1], 0], [qb[0], 4], [qb[0], 0]].map(([byte, bit], i) => ({ object: 'digit', byte, bit, rect: [x1 + i * 34, y1, x1 + i * 34 + 30, y1 + 36] })),
+  },
+  // Potenciómetro: f5 n.º de la entrada analógica (AIW f5); f9 forma (1: lineal horizontal); f16 0 unipolar.
+  pot: { type: 17, name: 'Potenciómetro', area: 'I', size: [40, 30], fields: ({ ai }) => [0, ai, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0] },
+  // Texto suelto (los rótulos de una planta de frente).
+  caption: { type: 1008, name: '', area: 'I', fields: () => [], text: ({ caption }) => caption },
   beacon: { type: 29, name: 'Baliza', size: [50, 125], fields: ({ red, amber, green }) => [0, red.byte, amber.byte, red.bit, amber.bit, 0, 0, 0, 0, 0, green.byte, green.bit, 0, 0] },
 }
 const CYLINDER_SPEED = 50 // la de los ejemplos de PC_SIMU
@@ -160,7 +174,7 @@ const label = (text, cx, y) => ({ type: PCSIMU_TYPES.text, rect: [cx - 4 * text.
 
 // project -> { text, bytes (Windows-1252), warnings, count }. Arriba las salidas, en medio los mandos y
 // abajo los detectores, cada uno con el nombre de su variable debajo.
-export function exportPcSimu(project, { reserved = [] } = {}) {
+export function exportPcSimu(project, { reserved = [], addressOf } = {}) {
   const plc = project.plc ?? {}
   const elements = plc.scene?.elements ?? []
   const warnings = []
@@ -187,9 +201,15 @@ export function exportPcSimu(project, { reserved = [] } = {}) {
       warnings.push(`${v}: no pasa por el autómata; en PC_SIMU el pulsador y el alimentador usan la entrada libre I${plantOnly[v].byte}.${plantOnly[v].bit}.`)
     }
   }
+  // La dirección con la que la usa el programa del S7-200 (toS7200 cambia las que no existen en un S7-200,
+  // como IW64 o M40.0): si se exporta junto a él, la suya (addressOf); si no, la de la tabla.
+  const addr = (name) => {
+    const raw = name ? plc.variables?.[name]?.address : ''
+    return raw && addressOf ? addressOf({ kind: 'var', name }) : (raw ?? '')
+  }
   const bitOf = (name, area) => {
     if (area === 'I' && plantOnly[name]) return plantOnly[name]
-    const a = parseAddress(name ? plc.variables?.[name]?.address : '')
+    const a = parseAddress(addr(name))
     return a && a.area === area && a.index !== undefined ? { byte: Math.floor(a.index / 8), bit: a.index % 8 } : null
   }
   const missing = (e, name, area) => warnings.push(`${name || typeName(e)}: sin una dirección ${area} de bit; no se exporta.`)
@@ -238,6 +258,11 @@ export function exportPcSimu(project, { reserved = [] } = {}) {
       machine.push({ object: 'profile', name: '', rect: placed(e, 0, 0, Number(e.length) || 160, 14), vertical, support: !vertical })
       continue
     }
+    if (front && e.type === 'label' && e.text?.trim()) {
+      const caption = clean(e.text.trim())
+      machine.push({ object: 'caption', name: '', caption, rect: [e.x, e.y, e.x + 8 * caption.length, e.y + 17] })
+      continue
+    }
     if (onMachine && e.type === 'sink') {
       // Un perfil que hace desaparecer las piezas que caen en él.
       machine.push({ object: 'profile', name: '', rect: placed(e, -30, 24, 60, 6), destroy: true })
@@ -253,6 +278,23 @@ export function exportPcSimu(project, { reserved = [] } = {}) {
       }
       if (!lights.length) warnings.push(`${typeName(e)}: sin salidas; no se exporta.`)
       for (const [key, color] of lights) add(e, 'led', 'Q', 0, e[key].trim(), { color: PCSIMU_COLORS[color] })
+      continue
+    }
+    if (e.type === 'display') {
+      const name = e.variable?.trim()
+      const word = String(addr(name)).trim().toUpperCase()
+      if (!/^([CT]\d+|(V|M|I|Q|AI|AQ)W\d+)$/.test(word)) warnings.push(`${name || typeName(e)}: sin una palabra del S7-200 (C, T, VW, MW, AIW…); no se exporta.`)
+      else {
+        if (/^A?IW/.test(word)) warnings.push(`${name}: el display de PC_SIMU muestra la entrada analógica en bruto (sin pasar a unidades).`)
+        rows[0].push({ object: 'display', name, word, byte: 999, bit: 0 })
+      }
+      continue
+    }
+    if (e.type === 'potentiometer') {
+      const name = e.variable?.trim()
+      const m = /^AIW(\d+)$/i.exec(String(addr(name)).trim())
+      if (!m) warnings.push(`${name || typeName(e)}: sin una entrada analógica AIW; no se exporta.`)
+      else rows[1].push({ object: 'pot', name, ai: Number(m[1]), byte: 900 + Number(m[1]), bit: 0 })
       continue
     }
     const kind = KINDS[e.type]
@@ -319,17 +361,28 @@ export function exportPcSimu(project, { reserved = [] } = {}) {
     }
     m.rect = [x - w / 2, top - h, x + w / 2, top]
   }
-  // PC_SIMU recoge un cilindro que empieza dentro solo con su salida «contraer» (y la de expandir a 0):
-  // no tiene vuelta por muelle. A los que no tienen A− se les da una salida libre que el .awl pone a
-  // NOT A+ (withAuxOutputs).
+  // Salidas libres para lo que PC_SIMU necesita y el programa no tiene (withAuxOutputs las rellena en el .awl):
+  // - un cilindro que empieza dentro solo vuelve con su salida «contraer» (y la de expandir a 0): no tiene
+  //   vuelta por muelle; a los que no tienen A−, una salida que el .awl pone a NOT A+;
+  // - un visualizador muestra salidas en BCD: dos bytes enteros con su valor.
   const aux = []
   const springs = [...rows[0], ...machine].filter((item) => item.spring)
-  if (springs.length) {
+  const displays = rows[0].filter((item) => item.object === 'display')
+  if (springs.length || displays.length) {
     const used = new Set(reserved)
-    for (const item of [...rows[0], ...machine]) if (item.byte !== undefined && OBJECTS[item.object].area !== 'I') used.add(`Q${item.byte}.${item.bit}`)
-    for (const v of Object.values(plc.variables ?? {})) {
-      const a = parseAddress(v?.address)
+    for (const item of [...rows[0], ...machine]) if (item.byte !== undefined && item.object !== 'display' && OBJECTS[item.object].area !== 'I') used.add(`Q${item.byte}.${item.bit}`)
+    for (const name of Object.keys(plc.variables ?? {})) {
+      const a = parseAddress(addr(name))
       if (a?.area === 'Q' && a.index !== undefined) used.add(`Q${Math.floor(a.index / 8)}.${a.index % 8}`)
+    }
+    const freeByte = (b) => [0, 1, 2, 3, 4, 5, 6, 7].every((bit) => !used.has(`Q${b}.${bit}`))
+    for (const item of displays) {
+      let b = 0
+      while (!freeByte(b) || !freeByte(b + 1)) b++
+      for (const bb of [b, b + 1]) for (let bit = 0; bit < 8; bit++) used.add(`Q${bb}.${bit}`)
+      item.qb = [b, b + 1]
+      aux.push({ kind: 'display', word: item.word, qb: item.qb, name: item.name })
+      warnings.push(`${item.name}: PC_SIMU lo muestra con displays en BCD; el .awl copia ${item.word} a QB${b} y QB${b + 1}.`)
     }
     let free = 0
     for (const item of springs) {
@@ -382,13 +435,17 @@ export function exportPcSimu(project, { reserved = [] } = {}) {
       const height = Math.max(...line.map((item) => sizeOf(item)[1]))
       let x = panelX
       for (const item of line) {
-        const { type, name, fields, labelGap = 0, text, a } = OBJECTS[item.object]
+        const { labelGap = 0 } = OBJECTS[item.object]
         const size = sizeOf(item)
-        const width = Math.max(CELL, 8 * item.name.length + 16)
+        const width = Math.max(CELL, 8 * item.name.length + 16, size[0] + 24)
         const cx = x + width / 2
         // Todos con la base a la misma altura, y el nombre debajo.
         const rect = [cx - size[0] / 2, y + height - size[1], cx + size[0] / 2, y + height]
-        objects.push({ type, name, rect, fields: fields(item), text: text?.(item) ?? '', a: a?.(item) ?? 0 })
+        const parts = OBJECTS[item.object].parts?.(item, rect) ?? [{ ...item, rect }]
+        for (const part of parts) {
+          const o = OBJECTS[part.object]
+          objects.push({ type: o.type, name: o.name, rect: part.rect, fields: o.fields(part), text: o.text?.(part) ?? '', a: o.a?.(part) ?? 0 })
+        }
         objects.push(label(item.name, cx, y + height + 12 + labelGap))
         x += width
       }
@@ -401,15 +458,20 @@ export function exportPcSimu(project, { reserved = [] } = {}) {
     warnings.push(`Todavía no pasan a PC_SIMU: ${list}.`)
   }
   const text = pcsimuText(objects)
-  return { text, bytes: encodeAnsi(text), warnings, aux, count: objects.filter((o) => o.type !== PCSIMU_TYPES.text).length }
+  return { text, bytes: encodeAnsi(text), warnings, aux, machine: machine.length > 0, count: objects.filter((o) => o.type !== PCSIMU_TYPES.text).length }
 }
 
-// Las salidas auxiliares de exportPcSimu (cilindros con vuelta por muelle), como redes al final del OB1
-// del programa del S7-200 (toS7200): «aux = NOT A+».
+// Las salidas auxiliares de exportPcSimu, como redes al final del OB1 del programa del S7-200 (toS7200):
+// «aux = NOT A+» (cilindros con vuelta por muelle) y el valor de un visualizador en BCD.
 export function withAuxOutputs(awl, aux = []) {
   if (!aux.length) return awl
   const end = awl.indexOf('\r\nEND_ORGANIZATION_BLOCK')
   let n = Math.max(0, ...[...awl.slice(0, end).matchAll(/^Network (\d+)/gm)].map((m) => Number(m[1])))
-  const nets = aux.map(({ from, to, name }) => [`Network ${++n} // PC_SIMU: ${to} recoge ${clean(name)} (vuelta por muelle)`, `LDN    ${from}`, `=      ${to}`].join('\r\n'))
+  const nets = aux.map(({ kind, from, to, name, word, qb }) =>
+    kind === 'display'
+      ? // El valor en BCD (en VW990, fuera de lo que usa el programa): unidades y decenas en el primer byte.
+        [`Network ${++n} // PC_SIMU: ${clean(name)} en los displays (QB${qb[0]}-QB${qb[1]}, BCD)`, 'LD     SM0.0', `MOVW   ${word}, VW990`, 'IBCD   VW990', `MOVB   VB991, QB${qb[0]}`, `MOVB   VB990, QB${qb[1]}`].join('\r\n')
+      : [`Network ${++n} // PC_SIMU: ${to} recoge ${clean(name)} (vuelta por muelle)`, `LDN    ${from}`, `=      ${to}`].join('\r\n'),
+  )
   return `${awl.slice(0, end)}\r\n${nets.join('\r\n')}${awl.slice(end)}`
 }

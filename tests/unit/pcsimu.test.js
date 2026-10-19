@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { exportPcSimu, parsePcSimu, pcsimuText, PCSIMU_COLORS, PCSIMU_SETA, withAuxOutputs } from '../../src/lib/pcsimu'
 import { PRACTICE_GUIDES } from '../../src/lib/practiceGuides'
 import { EXAMPLES } from '../../src/lib/examples'
+import { generateLadder } from '../../src/lib/ladder/generate'
+import { toS7200 } from '../../src/lib/ladder/exportS7200'
 
 const practice = (id) => PRACTICE_GUIDES[0].practices.find((p) => p.id === id).teacher()
 const overlap = (a, b) => a[0] < b[2] && b[0] < a[2] && a[1] < b[3] && b[1] < a[3]
@@ -205,6 +207,40 @@ describe('PC_SIMU (.sim)', () => {
     const elevador = estacion.find((o) => o.type === 19 && o.fields[10] === 2)
     expect(elevador.fields[11]).toBe(11)
     expect([elevador.rect[2] - elevador.rect[0], elevador.rect[3] - elevador.rect[1]]).toEqual([28, 276])
+  })
+
+  it('horno: potenciómetro en su AIW y visualizadores en BCD, con las direcciones del programa del S7-200', () => {
+    const p = EXAMPLES.find((e) => /Horno con consigna/.test(e.title)).build()
+    const program = toS7200(generateLadder(p.nodes, p.edges, p.plc), p.plc, { title: 'Horno' })
+    const sim = exportPcSimu(p, { reserved: program.text.match(/\bQ\d+\.\d\b/g) ?? [], addressOf: program.addressOf })
+    const objects = parsePcSimu(sim.text)
+    // La consigna (IW66 en la tabla, de S7-300) es una AIW en el programa del S7-200: el potenciómetro, en esa.
+    const consigna = program.addressOf({ kind: 'var', name: 'Consigna' })
+    expect(consigna).toMatch(/^AIW\d+$/)
+    expect(objects.find((o) => o.type === 17).fields[1]).toBe(Number(consigna.slice(3)))
+    // Dos visualizadores: 4 displays de una cifra cada uno, unidades a la derecha (QBn.0) y millares a la izquierda.
+    const digits = objects.filter((o) => o.type === 12)
+    expect(digits).toHaveLength(8)
+    expect(sim.aux.filter((x) => x.kind === 'display').map((x) => x.word)).toEqual([consigna, program.addressOf({ kind: 'var', name: 'Temp' })])
+    const [first] = sim.aux
+    const row = digits.slice(0, 4).map((o) => [o.fields[1], o.fields[3]])
+    expect(row).toEqual([[first.qb[1], 4], [first.qb[1], 0], [first.qb[0], 4], [first.qb[0], 0]])
+    // Las salidas de los displays, libres: ni de la tabla ni del programa.
+    for (const qb of sim.aux.flatMap((x) => x.qb)) expect(program.text).not.toMatch(new RegExp(`\bQ${qb}\.`))
+    // Y su red en el .awl: el valor en BCD, unidades y decenas en el primer byte.
+    const awl = withAuxOutputs(program.text, sim.aux)
+    expect(awl).toContain(`MOVW   ${consigna}, VW990\r\nIBCD   VW990\r\nMOVB   VB991, QB${first.qb[0]}\r\nMOVB   VB990, QB${first.qb[1]}`)
+    expect(sim.warnings.some((w) => /en bruto/.test(w))).toBe(true)
+    objects.forEach((a, i) => objects.slice(i + 1).forEach((b) => expect(overlap(a.rect, b.rect)).toBe(false)))
+  })
+
+  it('planta de frente: los rótulos, como texto en su sitio', () => {
+    const plc = { scene: { gravity: true, elements: [{ id: 'r', type: 'label', x: 100, y: 50, text: 'Zona de carga' }, { id: 'c', type: 'conveyor', x: 100, y: 200, rot: 0, motor: '', length: 200 }] }, variables: {} }
+    const objects = parsePcSimu(exportPcSimu({ plc }).text)
+    const rotulo = objects.find((o) => o.type === 1008 && o.text === 'Zona de carga')
+    const cinta = objects.find((o) => o.type === 20)
+    expect(rotulo.rect[0]).toBe(cinta.rect[0])
+    expect(cinta.rect[1] - rotulo.rect[1]).toBe(135) // 200 − 15 − 50
   })
 
   it('todos los ejemplos del editor se exportan sin pisarse', () => {

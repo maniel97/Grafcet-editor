@@ -15,8 +15,12 @@ export default function PcSimuDialog({ nodes, edges, plc, onClose }) {
     if (!dialogRef.current.open) dialogRef.current.showModal()
   }, [])
   const program = useMemo(() => toS7200(generateLadder(nodes, edges, plc), plc, { title: getProjectName().trim() }), [nodes, edges, plc])
-  // Las salidas que ya usa el programa no se reparten como auxiliares (cilindros con muelle).
-  const sim = useMemo(() => exportPcSimu({ plc }, { reserved: program.text.match(/\bQ\d+\.\d\b/g) ?? [] }), [plc, program])
+  // Con las direcciones del programa (las que no existen en un S7-200 las cambia), y sin repartir como
+  // auxiliares las salidas que ya usa.
+  const sim = useMemo(
+    () => exportPcSimu({ plc }, { reserved: program.text.match(/\bQ\d+\.\d\b/g) ?? [], addressOf: program.addressOf }),
+    [plc, program],
+  )
   const awl = useMemo(() => ({ ...program, text: withAuxOutputs(program.text, sim.aux) }), [program, sim])
   const ansi = 'text/plain;charset=windows-1252'
   const button = 'flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium disabled:opacity-40'
@@ -38,8 +42,14 @@ export default function PcSimuDialog({ nodes, edges, plc, onClose }) {
       </div>
       <div className="space-y-3 px-5 py-4 text-sm">
         <p className="text-slate-600">
-          {t('Los pulsadores, interruptores, setas y pilotos de la planta virtual pasan a un panel de PC_SIMU, cada uno con su dirección y su color. En PC_SIMU, abre el .sim y carga el programa .awl.')}
+          {t('La planta virtual pasa a PC_SIMU: el pupitre como un panel, cada mando y piloto con su dirección y su color, y, si la planta se ve de frente, la máquina a escala. En PC_SIMU, abre el .sim y carga el programa .awl.')}
         </p>
+        {sim.machine && (
+          <p className="flex items-start gap-1.5 rounded bg-amber-50 p-2 text-amber-800" role="note" data-pcsimu-timing>
+            <AlertTriangle size={15} className="mt-0.5 shrink-0" />
+            {t('En PC_SIMU, las piezas y las cintas avanzan al ritmo con el que se redibuja la pantalla (y de su velocidad de simulación), no al del autómata: los tiempos del programa no coinciden con lo que se ve. Para probar los tiempos, usa la simulación del editor.')}
+          </p>
+        )}
         <p data-pcsimu-count>
           {sim.count ? t('{n} elementos en el panel.', { n: sim.count }) : t('La planta no tiene pulsadores ni pilotos con dirección: el panel saldría vacío.')}
         </p>
