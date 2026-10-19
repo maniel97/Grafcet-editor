@@ -237,8 +237,9 @@ unipolar, 1 bipolar.
 
 `f5.f7`: su salida; `f10`: caudal (lo que sube o baja por paso el nivel, en la escala de la capacidad);
 `f11` = 1: tiene líquido en su entrada; `f16`: 0 horizontal, 1 vertical; `f15`, `f12`: salida analógica.
-En los ejemplos de PC_SIMU, la de llenado va encima del depósito y una tubería (tipo 24, `f16` = 1
-vertical) lleva el líquido hasta su borde; la de vaciado va pegada por debajo.
+Con su salida activa y líquido en la entrada, la de llenado sube el nivel del depósito de líquidos en
+cuyo borde de arriba apoya (dentro de su ancho, con 10 px de margen); la de vaciado va pegada por debajo.
+(Los ejemplos de PC_SIMU la ponen más arriba y llevan el líquido con una tubería, tipo 24.)
 
 ### 29 · Baliza
 
