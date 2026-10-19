@@ -73,7 +73,7 @@ describe('guion de prácticas', async () => {
     const { pages, starts } = buildGuide({ title: guide.title, sheet: guide.sheet, rules: guide.rules, practices }, measure)
     const textsOf = (p) => p.items.filter((i) => i.t === 'text').map((i) => i.text)
     expect(textsOf(pages[0]).join(' ').replace(/\s+/g, ' ')).toContain('Cada práctica debe incluir')
-    expect(starts).toHaveLength(5)
+    expect(starts).toHaveLength(7)
     starts.forEach((page, i) => {
       expect(textsOf(pages[page - 1])).toContain(`PRÁCTICA Nº ${i + 1}`)
       // El índice dice la página buena.

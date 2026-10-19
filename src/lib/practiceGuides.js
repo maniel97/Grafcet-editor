@@ -16,8 +16,8 @@ const scenario = (id, name, duration, events) => ({ id, name, duration, events: 
 const behaviour = (...scenarios) => ({ scenarios, outputs: [], tolerance: 0.5, counts: true })
 
 // Proyecto del profesor: grafcet + planta + comentarios de la tabla + esquema, y el ejercicio.
-function practice({ name, nodes, edges, scene, comments, steps, scenarios, exercise }) {
-  const project = withSchematic(documented({ name, nodes, edges, plc: { ...EMPTY_PLC, scene } }, { variables: comments, steps }))
+function practice({ name, nodes, edges, scene, comments, steps, scenarios, exercise, variables = {} }) {
+  const project = withSchematic(documented({ name, nodes, edges, plc: { ...EMPTY_PLC, scene, variables } }, { variables: comments, steps }))
   return normalizeProject({
     ...project,
     name,
@@ -239,11 +239,106 @@ function thirteenCycles() {
   })
 }
 
+// --- Práctica 6: luces verde, roja y amarilla con un pulsador de marcha --------------------------
+function threeLights() {
+  const nodes = [
+    step('s0', '0', 200, 0, [], { initial: true }),
+    // Con flanco: si se vuelve al reposo pulsando Pm, no arranca otra vez mientras siga pulsado.
+    trans('t1', '↑Pm', 200, 100),
+    step('s1', '1', 200, 170, ['LV', 'LR']),
+    trans('t2', '3s/X1', 200, 270),
+    step('s2', '2', 200, 340, ['LR', 'LA']),
+    trans('t3', '10s/X2 + ↑Pm', 200, 440),
+  ]
+  const edges = links([['s0', 't1'], ['t1', 's1'], ['s1', 't2'], ['t2', 's2'], ['s2', 't3'], ['t3', 's0']])
+  const scene = {
+    elements: [
+      desk('button', 'Pm', 'Marcha (Pm)', { contact: 'NO', color: 'green' }),
+      desk('lamp', 'LV', 'Luz verde', { color: 'green' }),
+      desk('lamp', 'LR', 'Luz roja', { color: 'red' }),
+      desk('lamp', 'LA', 'Luz amarilla', { color: 'yellow' }),
+    ],
+  }
+  return practice({
+    name: 'Luces verde, roja y amarilla',
+    nodes,
+    edges,
+    scene,
+    comments: { Pm: 'Pulsador de marcha', LV: 'Luz verde', LR: 'Luz roja', LA: 'Luz amarilla' },
+    steps: { 0: 'Luces apagadas', 1: 'Verde y roja (3 s)', 2: 'Roja y amarilla (10 s o Pm)' },
+    scenarios: [
+      scenario('ciclo', 'Un ciclo completo', 16, [[0.5, 'Pm', 1], [0.8, 'Pm', 0]]),
+      scenario('cortar', 'Pm otra vez a mitad', 10, [[0.5, 'Pm', 1], [0.8, 'Pm', 0], [6, 'Pm', 1], [6.3, 'Pm', 0]]),
+    ],
+    exercise: {
+      title: 'Práctica 6. Luces verde, roja y amarilla',
+      statement: `Al accionar un pulsador de marcha (**Pm**) se encienden una luz verde (**LV**) y otra roja (**LR**). La luz verde se apaga a los **3 s**, momento en el que se enciende una luz amarilla (**LA**). Las luces roja y amarilla siguen encendidas **10 s** más o hasta que se vuelva a accionar el pulsador de marcha.${TASK}`,
+      parts: { plant: 'locked', variables: 'locked', electrical: 'given' },
+      checks: { warnings: false, sequence: '', scenario: '', behaviour: behaviour('ciclo', 'cortar'), requirements: [{ id: 'timer' }, { id: 'edge' }] },
+      hints: { enabled: true, items: ['Tres etapas: apagadas, verde y roja, roja y amarilla. La roja va en las dos etapas en que está encendida.', 'El paso de la etapa 1 a la 2 es una temporización: `3s/X1`.', 'La etapa 2 termina por tiempo o por el pulsador: `10s/X2 + ↑Pm`. Usa el flanco `↑Pm` (también para arrancar) para que una pulsación larga no vuelva a arrancar el ciclo.'] },
+    },
+  })
+}
+
+// --- Práctica 7: tres leds en secuencia (1 s, 2 s y 1,538 s) con marcha y paro -------------------
+function ledSequence() {
+  const nodes = [
+    step('s0', '0', 200, 0, [], { initial: true }),
+    trans('t1', 'PM · !PP', 200, 100),
+    step('s1', '1', 200, 170, ['LV']),
+    // El paro apaga todo al momento: cada etapa vuelve al reposo con PP (divergencia en O con
+    // receptividades excluyentes, para que nunca se franqueen las dos).
+    trans('t2', '1s/X1 · !PP', 200, 270),
+    trans('t3', 'PP', -20, 270),
+    step('s2', '2', 200, 340, ['LR']),
+    trans('t4', '2s/X2 · !PP', 200, 440),
+    trans('t5', 'PP', -20, 440),
+    step('s3', '3', 200, 510, ['LA']),
+    trans('t6', '1.538s/X3 + PP', 200, 610),
+  ]
+  const edges = links([
+    ['s0', 't1'], ['t1', 's1'], ['s1', 't2'], ['s1', 't3'], ['t2', 's2'], ['t3', 's0'],
+    ['s2', 't4'], ['s2', 't5'], ['t4', 's3'], ['t5', 's0'], ['s3', 't6'], ['t6', 's0'],
+  ])
+  // El panel del enunciado: tres leds y los pulsadores PM (negro) y PP (rojo).
+  const scene = {
+    elements: [
+      desk('button', 'PM', 'Marcha (PM)', { contact: 'NO', color: 'black' }),
+      desk('button', 'PP', 'Paro (PP)', { contact: 'NO', color: 'red' }),
+      desk('lamp', 'LV', 'Led verde', { color: 'green' }),
+      desk('lamp', 'LR', 'Led rojo', { color: 'red' }),
+      desk('lamp', 'LA', 'Led amarillo', { color: 'yellow' }),
+    ],
+  }
+  return practice({
+    name: 'Tres leds en secuencia',
+    nodes,
+    edges,
+    scene,
+    // 1,538 s solo es exacto con un temporizador de 1 ms (T32 o T96 en el S7-200); con uno de
+    // 100 ms se quedaría en 1,5 s.
+    variables: { '1.538s/X3': { address: 'T32' } },
+    comments: { PM: 'Pulsador de marcha', PP: 'Pulsador de paro', LV: 'Led verde', LR: 'Led rojo', LA: 'Led amarillo', '1.538s/X3': 'Temporizador de 1 ms (1,538 s exactos)' },
+    steps: { 0: 'Leds apagados', 1: 'Led verde (1 s)', 2: 'Led rojo (2 s)', 3: 'Led amarillo (1,538 s)' },
+    scenarios: [
+      scenario('secuencia', 'Una secuencia completa', 7, [[0.5, 'PM', 1], [0.8, 'PM', 0]]),
+      scenario('paro', 'Paro con el led rojo encendido', 5, [[0.5, 'PM', 1], [0.8, 'PM', 0], [2.2, 'PP', 1], [2.5, 'PP', 0]]),
+    ],
+    exercise: {
+      title: 'Práctica 7. Tres leds en secuencia',
+      statement: `Al pulsar **PM** se enciende el led verde **LV** durante **1 s**; a continuación, el led rojo **LR** durante **2 s** y, por último, el led amarillo **LA** durante **1,538 s**.\n\n- El pulsador de paro (**PP**) del panel apaga los leds en cualquier momento y deja el sistema en reposo.${TASK}`,
+      parts: { plant: 'locked', variables: 'locked', electrical: 'given' },
+      checks: { warnings: false, sequence: '', scenario: '', behaviour: behaviour('secuencia', 'paro'), requirements: [{ id: 'timer' }, { id: 'or' }] },
+      hints: { enabled: true, items: ['Una etapa por led, cada una con su temporización: `1s/X1`, `2s/X2` y `1.538s/X3`.', 'Para el paro, cada etapa con un led tiene una segunda salida hacia el reposo con `PP` (divergencia en O). Para que las dos salidas sean excluyentes, la del tiempo lleva `· !PP`.', '1,538 s no se puede contar con un temporizador de 100 ms: en el S7-200 usa uno de 1 ms (T32 o T96).'] },
+    },
+  })
+}
+
 export const PRACTICE_GUIDES = [
   {
     id: 'guion-automatas',
     title: 'Prácticas de programación de autómatas',
-    description: 'Un guion completo: normas generales, una práctica guiada con su solución y cuatro prácticas con autocorrección.',
+    description: 'Un guion completo: normas generales, una práctica guiada con su solución y seis prácticas con autocorrección.',
     sheet: { subject: 'Integración de Sistemas', course: 'Curso 2026-2027', cycle: 'Mecatrónica Industrial', center: '', teacher: '' },
     rules:
       'A continuación tienes una serie de prácticas obligatorias de programación de autómatas. El primer paso es **adaptar el enunciado a un caso real** del mundo industrial con una dificultad parecida.\n\n- Las prácticas se simulan en el editor (planta virtual) y, si se puede, en el autómata real.\n- Cada práctica es **individual**, aunque durante el aprendizaje hayas tenido ayuda del profesor o de los compañeros. Los archivos copiados se consideran no presentados.\n- La entrega fuera de plazo se penaliza progresivamente.\n- Se valoran la ejecución y la presentación (formato, ortografía, limpieza): **30 %** la entrega y **70 %** la calidad.\n- Se entregan en **un único PDF con portada**: Exportar > Dossier lo genera con tu proyecto dentro.\n\n# Cada práctica debe incluir\n- Enunciado\n- Breve contenido teórico, si procede\n- GRAFCET\n- Conexionado de los elementos\n- Programa (ladder y AWL)\n- Tabla de variables\n- Simulación\n- Posibles mejoras o aportaciones, si procede\n- Problemas encontrados y cómo se han resuelto, si procede',
@@ -253,6 +348,8 @@ export const PRACTICE_GUIDES = [
       { id: 'p3', teacher: singleCylinder },
       { id: 'p4', teacher: conveyorEmergency },
       { id: 'p5', teacher: thirteenCycles },
+      { id: 'p6', teacher: threeLights },
+      { id: 'p7', teacher: ledSequence },
     ],
   },
 ]

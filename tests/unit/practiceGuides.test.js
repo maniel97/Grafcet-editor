@@ -59,6 +59,35 @@ describe('guion de prácticas de ejemplo', () => {
     expect(paro.length / 2).toBeLessThan(4)
     expect(paro.at(-1)).toBeGreaterThan(5.2)
   })
+
+  // (las entradas del panel tardan un paso, 0,05 s, en llegar al autómata)
+  const near = (got, want) => {
+    expect(got).toHaveLength(want.length)
+    got.forEach((t, i) => expect(Math.abs(t - want[i])).toBeLessThanOrEqual(0.1))
+  }
+
+  it('práctica 6: verde 3 s; roja y amarilla 10 s más, o hasta pulsar otra vez la marcha', () => {
+    const ciclo = run(teacher('p6'), 'ciclo').samples
+    near(edgesOf(ciclo, 'LV').times, [0.5, 3.5])
+    near(edgesOf(ciclo, 'LA').times, [3.5, 13.5])
+    near(edgesOf(ciclo, 'LR').times, [0.5, 13.5]) // la roja no parpadea al cambiar de etapa
+    const cortar = run(teacher('p6'), 'cortar').samples
+    near(edgesOf(cortar, 'LR').times, [0.5, 6])
+    expect(cortar.at(-1).values.X0).toBe(1)
+  })
+
+  it('práctica 7: verde 1 s, rojo 2 s, amarillo 1,538 s (temporizador de 1 ms); el paro apaga todo', () => {
+    const project = teacher('p7')
+    const s = run(project, 'secuencia').samples
+    near(edgesOf(s, 'LV').times, [0.5, 1.5])
+    near(edgesOf(s, 'LR').times, [1.5, 3.5])
+    near(edgesOf(s, 'LA').times, [3.5, 5.038])
+    expect(project.plc.variables['1.538s/X3'].address).toBe('T32')
+    const paro = run(project, 'paro').samples
+    near(edgesOf(paro, 'LR').times, [1.5, 2.2])
+    expect(edgesOf(paro, 'LA').times).toHaveLength(0)
+    expect(paro.at(-1).values.X0).toBe(1)
+  })
 })
 
 describe('mandos de la planta en los escenarios', () => {
