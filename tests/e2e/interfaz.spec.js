@@ -27,7 +27,7 @@ for (const width of [1500, 1280, 1100]) {
     const exportBtn = page.getByRole('button', { name: /Exportar/ })
     const menu = page.getByRole('menu', { name: 'Formatos de exportación' })
     await exportBtn.click()
-    await expect(menu.getByRole('menuitem')).toHaveCount(5) // PNG, SVG, PDF, dossier y compartir (sin el modo educativo)
+    await expect(menu.getByRole('menuitem')).toHaveCount(6) // PNG, SVG, PDF, dossier, PC_SIMU y compartir (sin el modo educativo)
     await page.keyboard.press('Escape')
     await expect(menu).toHaveCount(0)
     await exportBtn.click()
@@ -141,7 +141,7 @@ test('modo educativo: menús sencillos por defecto y herramientas de clase al ac
   await expect(menu.getByRole('menuitem', { name: /Corregir entregas/ })).toHaveCount(1)
   await page.keyboard.press('Escape')
   menu = await openMenu(/^Exportar/)
-  await expect(menu.getByRole('menuitem')).toHaveCount(7)
+  await expect(menu.getByRole('menuitem')).toHaveCount(8)
   // Se recuerda al volver a entrar.
   await page.reload()
   await page.waitForSelector('.react-flow__node')

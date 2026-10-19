@@ -15,6 +15,7 @@ const DossierDialog = lazy(() => import('./DossierDialog'))
 const ShareDialog = lazy(() => import('./ShareDialog'))
 const GuideDialog = lazy(() => import('./GuideDialog'))
 const ExerciseDialog = lazy(() => import('./ExerciseDialog'))
+const PcSimuDialog = lazy(() => import('./PcSimuDialog'))
 
 // Los que abren o crean un proyecto (todo lo que había queda en «Trabajos anteriores»):
 // - projects: 'examples' | 'recent' | … (Abrir: ejemplos, ejercicios, trabajos anteriores)
@@ -93,7 +94,7 @@ export function ProjectDialogs({
   )
 }
 
-// Los de Exportar, según format: 'dossier', 'share', 'guide', 'exercise' o un formato de imagen o
+// Los de Exportar, según format: 'dossier', 'share', 'guide', 'exercise', 'pcsimu' o un formato de imagen o
 // PDF ('svg', 'png', 'pdf'…, con su vista previa).
 export function ExportDialogs({
   format,
@@ -130,6 +131,8 @@ export function ExportDialogs({
         />
       ) : format === 'share' ? (
         <ShareDialog project={shareProject} onDownload={onDownload} onClose={onClose} />
+      ) : format === 'pcsimu' ? (
+        <PcSimuDialog nodes={nodes} edges={edges} plc={plc} onClose={onClose} />
       ) : format === 'guide' ? (
         <GuideDialog plc={plc} onChange={(guide) => setPlc((p) => ({ ...p, guide }))} onGenerate={onGenerateGuide} onClose={onClose} />
       ) : format === 'exercise' ? (
