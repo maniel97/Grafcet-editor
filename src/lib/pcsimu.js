@@ -10,6 +10,7 @@
 // Lo que no se exporta todavía (cilindros, cintas, depósitos…) sale en los avisos, con su tipo (en
 // español, como los de la exportación a S7-200).
 import { parseAddress } from './addressing'
+import { analogConfig, isAnalog, rawRange } from './analog'
 import { encodeAnsi } from './ladder/exportS7200'
 import { SCENE_TYPES, PIECE_SIZES, sensorZone, worldRect } from './sim/scene'
 import { t as tr } from './i18n'
@@ -141,30 +142,32 @@ const OBJECTS = {
   pot: { type: 17, name: 'Potenciómetro', area: 'I', size: [40, 30], fields: ({ ai }) => [0, ai, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0] },
   // Texto suelto (los rótulos de una planta de frente).
   caption: { type: 1008, name: '', area: 'I', fields: () => [], text: ({ caption }) => caption },
-  // Válvula: abre con f5.f7; f10 caudal (lo que sube por paso el nivel, de 0 a 10000, del depósito en cuyo
-  // borde de arriba apoya; o lo que baja el del depósito al que va pegada por debajo); f11 = 1: hay líquido
-  // en su entrada; f16 = 1: vertical.
-  valve: { type: 23, name: 'Válvula', size: [30, 30], fields: ({ byte, bit, rate = 10, liquid = true }) => [0, byte, 0, bit, 0, 0, rate, liquid ? 1 : 0, 0, 0, 0, 0, 1, 0] },
+  // Válvula: abre con f5.f7; f10 caudal (lo que sube o baja por paso el nivel del depósito, en la escala de su
+  // capacidad); f11 = 1: hay líquido en su entrada; f16 = 1: vertical. Como en los ejemplos de PC_SIMU, la de
+  // llenado va encima del depósito y una tubería lleva el líquido hasta su borde; la de vaciado, pegada por debajo.
+  valve: { type: 23, name: 'Válvula', size: [40, 30], fields: ({ byte, bit, rate = 10, liquid = true }) => [0, byte, 0, bit, 0, 0, rate, liquid ? 1 : 0, 0, 0, 0, 0, 1, 0] },
+  // Tubería: f16 = 1 vertical.
+  pipe: { type: 24, name: 'Tubería', area: 'I', fields: () => [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0] },
   // Depósito: captadores de nivel máximo f5.f7 (si f15 = 1), medio f6.f8 (si f17 = 1) y mínimo f10.f11 (si f9 =
-  // 1); nivel analógico en la AIW f12 (si f4 = 1); f16 = 2: líquidos; f13 capacidad; a = 1: muestra el nivel;
-  // b: el nivel (de 0 a 10000).
+  // 1); nivel analógico en la AIW f12 (si f4 = 1); f16 = 2: líquidos; su capacidad, en el segundo texto; b: el
+  // nivel (de 0 a la capacidad).
   tankBody: {
     type: 22,
     name: 'Depósito',
-    fields: ({ max, mid, min, ai }) => [ai == null ? 0 : 1, max?.byte ?? 0, mid?.byte ?? 0, max?.bit ?? 0, mid?.bit ?? 0, min ? 1 : 0, min?.byte ?? 0, min?.bit ?? 0, ai ?? 0, 1000, 0, max ? 1 : 0, 2, mid ? 1 : 0],
-    a: () => 1,
-    b: ({ initial }) => Math.round(10000 * initial),
+    fields: ({ max, mid, min, ai }) => [ai == null ? 0 : 1, max?.byte ?? 0, mid?.byte ?? 0, max?.bit ?? 0, mid?.bit ?? 0, min ? 1 : 0, min?.byte ?? 0, min?.bit ?? 0, ai ?? 0, 0, 0, max ? 1 : 0, 2, mid ? 1 : 0],
+    text2: () => String(TANK_CAPACITY),
+    b: ({ initial }) => Math.round(TANK_CAPACITY * initial),
   },
-  // El depósito del editor, con sus válvulas: las de llenado encima (apoyadas en su borde) y la de vaciado
-  // pegada por debajo.
+  // El depósito del editor, con sus válvulas: las de llenado encima (con su tubería hasta el borde) y la de
+  // vaciado pegada por debajo.
   tank: {
     name: 'Depósito',
-    size: [90, 180],
+    size: [100, 200],
     parts: (item, [x1, y1, x2, y2]) => [
-      ...(item.fill ? [{ object: 'valve', ...item.fill, rate: item.fillRate, rect: [x1 + 10, y1, x1 + 40, y1 + 30] }] : []),
-      ...(item.fine ? [{ object: 'valve', ...item.fine, rate: item.fineRate, rect: [x2 - 40, y1, x2 - 10, y1 + 30] }] : []),
-      { ...item, object: 'tankBody', rect: [x1, y1 + 30, x2, y2 - 30] },
-      ...(item.drain ? [{ object: 'valve', ...item.drain, rate: item.drainRate, liquid: false, rect: [x1 + 30, y2 - 30, x1 + 60, y2] }] : []),
+      ...(item.fill ? [{ object: 'valve', ...item.fill, rate: item.fillRate, rect: [x1 + 4, y1, x1 + 44, y1 + 30] }, { object: 'pipe', rect: [x1 + 19, y1 + 30, x1 + 29, y1 + 50] }] : []),
+      ...(item.fine ? [{ object: 'valve', ...item.fine, rate: item.fineRate, rect: [x2 - 44, y1, x2 - 4, y1 + 30] }, { object: 'pipe', rect: [x2 - 29, y1 + 30, x2 - 19, y1 + 50] }] : []),
+      { ...item, object: 'tankBody', rect: [x1, y1 + 50, x2, y2 - 30] },
+      ...(item.drain ? [{ object: 'valve', ...item.drain, rate: item.drainRate, liquid: false, rect: [x1 + 30, y2 - 30, x1 + 70, y2] }] : []),
     ],
   },
   // Puerta (tipo 21) con el dibujo «Barrera» (f12 = 6): abre con f5.f7 y cierra con f6.f8; final de carrera
@@ -184,6 +187,7 @@ const OBJECTS = {
   beacon: { type: 29, name: 'Baliza', size: [50, 125], fields: ({ red, amber, green }) => [0, red.byte, amber.byte, red.bit, amber.bit, 0, 0, 0, 0, 0, green.byte, green.bit, 0, 0] },
 }
 const CYLINDER_SPEED = 50 // la de los ejemplos de PC_SIMU
+const TANK_CAPACITY = 1000 // la de los ejemplos de PC_SIMU
 const FEED_PERIOD = 40 // pasos entre pieza y pieza de un alimentador automático
 const ONE_PIECE = 30000 // tantos pasos que, con orden, suelta una sola pieza aunque la orden dure
 // Velocidades: se supone un paso de simulación de PC_SIMU cada 50 ms (con ella, la velocidad 50 de sus
@@ -390,8 +394,8 @@ export function exportPcSimu(project, { reserved = [], addressOf } = {}) {
       const level = e.level?.trim()
       const ai = level ? /^AIW(\d+)$/i.exec(addr(level)) : null
       if (level && !ai) warnings.push(`${level}: sin una entrada analógica AIW; el nivel analógico no pasa a PC_SIMU.`)
-      // Caudal: lo que sube el nivel (de 10000) en cada paso de PC_SIMU, que por defecto es de 100 ms.
-      const rate = (t) => Math.max(1, Math.round(1000 / (Number(t) || 10)))
+      // Caudal: lo que sube el nivel (de la capacidad, 1000) en cada paso de PC_SIMU, que por defecto es de 100 ms.
+      const rate = (t) => Math.max(1, Math.round((TANK_CAPACITY * 0.1) / (Number(t) || 10)))
       rows[0].push({
         object: 'tank',
         name: e.text?.trim() || typeName(e),
@@ -422,8 +426,15 @@ export function exportPcSimu(project, { reserved = [], addressOf } = {}) {
       const word = String(addr(name)).trim().toUpperCase()
       if (!/^([CT]\d+|(V|M|I|Q|AI|AQ)W\d+)$/.test(word)) warnings.push(`${name || typeName(e)}: sin una palabra del S7-200 (C, T, VW, MW, AIW…); no se exporta.`)
       else {
-        if (/^A?IW/.test(word)) warnings.push(`${name}: el display de PC_SIMU muestra la entrada analógica en bruto (sin pasar a unidades).`)
-        rows[0].push({ object: 'display', name, word, byte: 999, bit: 0 })
+        // Una analógica, en sus unidades (de su valor en bruto, con su escala): (bruto − r0) · (máx − mín) / (r1 − r0) + mín.
+        const entry = plc.variables?.[name]
+        let scale = null
+        if (isAnalog(entry?.type)) {
+          const { signal, min, max } = analogConfig(entry)
+          const [r0, r1] = rawRange(signal, 's7200')
+          scale = { r0, rspan: r1 - r0, min: Math.round(min), span: Math.round(max - min) }
+        }
+        rows[0].push({ object: 'display', name, word, scale, byte: 999, bit: 0 })
       }
       continue
     }
@@ -530,7 +541,7 @@ export function exportPcSimu(project, { reserved = [], addressOf } = {}) {
       while (!freeByte(b) || !freeByte(b + 1)) b++
       for (const bb of [b, b + 1]) for (let bit = 0; bit < 8; bit++) used.add(`Q${bb}.${bit}`)
       item.qb = [b, b + 1]
-      aux.push({ kind: 'display', word: item.word, qb: item.qb, name: item.name })
+      aux.push({ kind: 'display', word: item.word, qb: item.qb, name: item.name, scale: item.scale })
       warnings.push(`${item.name}: PC_SIMU lo muestra con displays en BCD; el .awl copia ${item.word} a QB${b} y QB${b + 1}.`)
     }
     let free = 0
@@ -597,7 +608,7 @@ export function exportPcSimu(project, { reserved = [], addressOf } = {}) {
         const parts = OBJECTS[item.object].parts?.(item, rect) ?? [{ ...item, rect }]
         for (const part of parts) {
           const o = OBJECTS[part.object]
-          objects.push({ type: o.type, name: o.name, rect: part.rect, fields: o.fields(part), text: o.text?.(part) ?? '', a: o.a?.(part) ?? 0, b: o.b?.(part) ?? 0 })
+          objects.push({ type: o.type, name: o.name, rect: part.rect, fields: o.fields(part), text: o.text?.(part) ?? '', text2: o.text2?.(part) ?? '', a: o.a?.(part) ?? 0, b: o.b?.(part) ?? 0 })
         }
         objects.push(label(item.name, cx, y + height + 12 + labelGap))
         x += width
@@ -620,10 +631,21 @@ export function withAuxOutputs(awl, aux = []) {
   if (!aux.length) return awl
   const end = awl.indexOf('\r\nEND_ORGANIZATION_BLOCK')
   let n = Math.max(0, ...[...awl.slice(0, end).matchAll(/^Network (\d+)/gm)].map((m) => Number(m[1])))
-  const nets = aux.map(({ kind, from, to, name, word, qb }) =>
+  const sign = (v) => (v < 0 ? String(v) : `+${v}`)
+  const nets = aux.map(({ kind, from, to, name, word, qb, scale }) =>
     kind === 'display'
-      ? // El valor en BCD (en VW990, fuera de lo que usa el programa): unidades y decenas en el primer byte.
-        [`Network ${++n} // PC_SIMU: ${clean(name)} en los displays (QB${qb[0]}-QB${qb[1]}, BCD)`, 'LD     SM0.0', `MOVW   ${word}, VW990`, 'IBCD   VW990', `MOVB   VB991, QB${qb[0]}`, `MOVB   VB990, QB${qb[1]}`].join('\r\n')
+      ? // El valor en BCD (en VW990, fuera de lo que usa el programa): unidades y decenas en el primer byte. Una
+        // analógica, antes en sus unidades, con enteros (MUL da 32 bits en VD984; DIV deja el cociente en VW986).
+        [
+          `Network ${++n} // PC_SIMU: ${clean(name)} en los displays (QB${qb[0]}-QB${qb[1]}, BCD)`,
+          'LD     SM0.0',
+          ...(scale
+            ? [`MOVW   ${word}, VW986`, `-I     ${sign(scale.r0)}, VW986`, 'MOVW   +0, VW984', `MUL    ${sign(scale.span)}, VD984`, `DIV    ${sign(scale.rspan)}, VD984`, `+I     ${sign(scale.min)}, VW986`, 'MOVW   VW986, VW990']
+            : [`MOVW   ${word}, VW990`]),
+          'IBCD   VW990',
+          `MOVB   VB991, QB${qb[0]}`,
+          `MOVB   VB990, QB${qb[1]}`,
+        ].join('\r\n')
       : [`Network ${++n} // PC_SIMU: ${to} recoge ${clean(name)} (vuelta por muelle)`, `LDN    ${from}`, `=      ${to}`].join('\r\n'),
   )
   return `${awl.slice(0, end)}\r\n${nets.join('\r\n')}${awl.slice(end)}`
