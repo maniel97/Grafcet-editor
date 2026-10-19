@@ -234,9 +234,11 @@ describe('PC_SIMU (.sim)', () => {
     // y en BCD, unidades y decenas en el primer byte.
     const awl = withAuxOutputs(program.text, sim.aux)
     const { min, max } = p.plc.variables.Consigna
-    expect(awl).toContain(
-      [`MOVW   ${consigna}, VW986`, '-I     +0, VW986', 'MOVW   +0, VW984', `MUL    +${max - min}, VD984`, 'DIV    +32000, VD984', `+I     +${min}, VW986`, 'MOVW   VW986, VW990', 'IBCD   VW990', `MOVB   VB991, QB${first.qb[0]}`, `MOVB   VB990, QB${first.qb[1]}`].join('\r\n'),
-    )
+    expect(awl).toContain([`MOVW   ${consigna}, VW986`, '-I     +0, VW986', 'MOVW   +0, VW984', `MUL    +${max - min}, VD984`, 'DIV    +32000, VD984', `+I     +${min}, VW986`, 'MOVW   VW986, VW990'].join('\r\n'))
+    // Entre 0 y 9999 (IBCD no convierte negativos ni más de 4 cifras), y a BCD.
+    expect(awl).toContain(['LDW<=  VW990, -1', 'MOVW   +0, VW990'].join('\r\n'))
+    expect(awl).toContain(['LDW>=  VW990, +10000', 'MOVW   +9999, VW990'].join('\r\n'))
+    expect(awl).toContain(['LD     SM0.0', 'IBCD   VW990', `MOVB   VB991, QB${first.qb[0]}`, `MOVB   VB990, QB${first.qb[1]}`].join('\r\n'))
     objects.forEach((a, i) => objects.slice(i + 1).forEach((b) => expect(overlap(a.rect, b.rect)).toBe(false)))
   })
 
@@ -249,7 +251,7 @@ describe('PC_SIMU (.sim)', () => {
     expect(cinta.rect[1] - rotulo.rect[1]).toBe(135) // 200 − 15 − 50
   })
 
-  it('depósitos: con su válvula de llenado encima (y su tubería) y la de vaciado pegada por debajo', () => {
+  it('depósitos: con su válvula de llenado apoyada en el borde de arriba y la de vaciado pegada por debajo', () => {
     const objects = parsePcSimu(exportPcSimu(EXAMPLES.find((e) => /Mezcladora/.test(e.title)).build()).text)
     const tanks = objects.filter((o) => o.type === 22)
     const valves = objects.filter((o) => o.type === 23)
@@ -258,11 +260,10 @@ describe('PC_SIMU (.sim)', () => {
     const [a] = tanks
     expect([a.fields[11], a.fields[1], a.fields[3], a.fields[5], a.fields[6], a.fields[7], a.fields[13]]).toEqual([1, 0, 3, 1, 0, 5, 0])
     expect([a.fields[12], a.text2, a.b]).toEqual([2, '1000', 0]) // líquidos, capacidad 1000, vacío
-    // Como en los ejemplos de PC_SIMU: la válvula de llenado encima, con una tubería hasta el borde del depósito;
-    // la de vaciado, pegada por debajo. Caudal en la escala de la capacidad (1000 en 4 s, a 100 ms el paso: 25).
-    const fill = valves.find((v) => v.rect[3] < a.rect[1] && v.rect[0] >= a.rect[0] && v.rect[2] <= a.rect[2])
-    const pipe = objects.find((o) => o.type === 24 && o.rect[1] === fill.rect[3])
-    expect(pipe.rect[3]).toBe(a.rect[1])
+    // La válvula de llenado, apoyada en el borde de arriba y centrada; la de vaciado, pegada por debajo. Caudal
+    // en la escala de la capacidad (1000 en 4 s, a 100 ms el paso: 25).
+    const fill = valves.find((v) => v.rect[3] === a.rect[1])
+    expect((fill.rect[0] + fill.rect[2]) / 2).toBe((a.rect[0] + a.rect[2]) / 2)
     expect([fill.fields[1], fill.fields[3], fill.fields[6], fill.fields[7]]).toEqual([0, 1, 25, 1])
     const drain = valves.find((v) => v.rect[1] === a.rect[3])
     expect([drain.fields[1], drain.fields[3], drain.fields[6], drain.fields[7]]).toEqual([0, 4, 33, 0])
