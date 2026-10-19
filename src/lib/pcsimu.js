@@ -353,8 +353,11 @@ export function exportPcSimu(project, { reserved = [] } = {}) {
       const r = shift(m.rect)
       if (m.object !== 'detector' && m.object !== 'limit') return [r]
       const d = m.object === 'limit' ? 10 : m.range
-      const zone = [[r[2], r[1], r[2] + d, r[3]], [r[0] - d, r[1], r[0], r[3]], [r[0], r[1] - d, r[2], r[1]], [r[0], r[3], r[2], r[3] + d]][m.orientation ?? 0]
-      return [r, zone]
+      // (la de un detector vertical, PC_SIMU la dibuja hacia arriba y hacia abajo)
+      const up = [r[0], r[1] - d, r[2], r[1]]
+      const down = [r[0], r[3], r[2], r[3] + d]
+      const zones = [[[r[2], r[1], r[2] + d, r[3]]], [[r[0] - d, r[1], r[0], r[3]]], [up, down], [up, down]][m.orientation ?? 0]
+      return [r, ...zones]
     })
     for (const item of machine) {
       const { type, name, fields, text, a } = OBJECTS[item.object]
