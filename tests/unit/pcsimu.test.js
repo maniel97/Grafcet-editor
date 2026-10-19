@@ -92,6 +92,9 @@ describe('PC_SIMU (.sim)', () => {
     // El motor: derecha en Q0.0, izquierda (el giro inverso) en Q0.1 y las dos activas (f16 = 11).
     const [motor] = of(18)
     expect([motor.fields[1], motor.fields[3], motor.fields[2], motor.fields[4], motor.fields[12]]).toEqual([0, 0, 0, 1, 11])
+    // Su nombre, más abajo: PC_SIMU escribe la velocidad («3000 r.p.m.») justo debajo del motor.
+    const motorLabel = objects.find((o) => o.type === 1008 && o.text === 'Motor')
+    expect(motorLabel.rect[1] - motor.rect[3]).toBeGreaterThanOrEqual(28)
     // El semáforo, como baliza: rojo f5.f7, ámbar f6.f8 y verde f14.f15.
     const [baliza] = of(29)
     expect([baliza.fields[1], baliza.fields[3], baliza.fields[2], baliza.fields[4], baliza.fields[10], baliza.fields[11]]).toEqual([1, 0, 1, 1, 1, 2])

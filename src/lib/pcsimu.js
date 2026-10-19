@@ -78,8 +78,9 @@ const OBJECTS = {
   // f13 = 10: distancia de detección (la de PC_SIMU por defecto); f14 = 0: mira a la derecha; f15 = 1: «Detector 2».
   detector: { type: 7, name: 'Detector', size: [30, 20], fields: ({ byte, bit, nc, kind }) => [0, byte, 0, bit, 0, nc, 0, 0, kind, 10, 0, 1, 0, 0] },
   // Giro a la derecha en f5.f7 y a la izquierda en f6.f8; f16: 1 solo derecha, 11 las dos. f13: frecuencia
-  // máxima del variador (100, la de PC_SIMU); f17 = 0: 3000 rpm.
-  motor: { type: 18, name: 'Motor', size: [35, 35], fields: ({ byte, bit, left }) => [1, byte, left?.byte ?? 0, bit, left?.bit ?? 0, 0, 0, 0, 0, 100, 0, 0, left ? 11 : 1, 0] },
+  // máxima del variador (100, la de PC_SIMU); f17 = 0: 3000 rpm. PC_SIMU escribe la velocidad («3000 r.p.m.»)
+  // justo debajo: el nombre va más abajo (labelGap) para no pisarla.
+  motor: { type: 18, name: 'Motor', size: [35, 35], labelGap: 18, fields: ({ byte, bit, left }) => [1, byte, left?.byte ?? 0, bit, left?.bit ?? 0, 0, 0, 0, 0, 100, 0, 0, left ? 11 : 1, 0] },
   sound: { type: 15, name: 'Sonido', size: [35, 35], fields: ({ byte, bit }) => [1, byte, 0, bit, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] },
   beacon: { type: 29, name: 'Baliza', size: [50, 125], fields: ({ red, amber, green }) => [0, red.byte, amber.byte, red.bit, amber.bit, 0, 0, 0, 0, 0, green.byte, green.bit, 0, 0] },
 }
@@ -150,13 +151,13 @@ export function exportPcSimu(project) {
       const height = Math.max(...line.map((item) => OBJECTS[item.object].size[1]))
       let x = 40
       for (const item of line) {
-        const { type, name, size, fields } = OBJECTS[item.object]
+        const { type, name, size, fields, labelGap = 0 } = OBJECTS[item.object]
         const width = Math.max(CELL, 8 * item.name.length + 16)
         const cx = x + width / 2
         // Todos con la base a la misma altura, y el nombre debajo.
         const rect = [cx - size[0] / 2, y + height - size[1], cx + size[0] / 2, y + height]
         objects.push({ type, name, rect, fields: fields(item) })
-        objects.push(label(item.name, cx, y + height + 12))
+        objects.push(label(item.name, cx, y + height + 12 + labelGap))
         x += width
       }
       y += height + 60
