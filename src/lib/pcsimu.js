@@ -94,10 +94,10 @@ const OBJECTS = {
     name: 'Actuador neumático',
     size: [60, 20],
     sizeVertical: [20, 60],
-    fields: ({ byte, bit, retract, a0, a1, orientation, extended, speed }) => [
+    fields: ({ byte, bit, retract, a0, a1, orientation, extended, speed, graphic2 }) => [
       retract ? 1 : 0, byte, retract?.byte ?? 0, bit, retract?.bit ?? 0,
       a0 ? 1 : 0, a1 ? 1 : 0, a0?.byte ?? 0, a1?.byte ?? 0, a0?.bit ?? 0,
-      orientation, extended ? 21 : 11, retract ? 11 : 1, speed ?? CYLINDER_SPEED,
+      orientation, (graphic2 ? 13 : 11) + (extended ? 10 : 0), retract ? 11 : 1, speed ?? CYLINDER_SPEED,
     ],
     text: ({ speed }) => `.${pad(speed ?? CYLINDER_SPEED)}.${pad(0)}.${pad(0)}.0.${pad(0)}.0.0`,
     a: ({ a1 }) => a1?.bit ?? 0,
@@ -201,7 +201,8 @@ const OBJECTS = {
   selector: { type: 3, name: 'Selector', area: 'I', size: [30, 30], fields: ({ byte, bit, n }) => [0, byte, 0, bit, 0, n, 0, 0, 0, 0, 0, 0, 0, 0] },
   // Ascensor (tipo 27), de 4 plantas (B, 1, 2, 3): sube f5.f7, baja f6.f8, abre la puerta f4.f14, la cierra
   // f12.f16; f17 velocidad. Las entradas, de 4 en 4 bits (byte y bit de cada una, hasta IB15): en f10, puerta
-  // abierta, puerta cerrada, modo (0: un detector por planta), detector en cabina y el byte de la planta B; en
+  // abierta, puerta cerrada, modo (1: un detector por planta; 0: uno solo en la cabina, que se enciende en todas),
+  // detector en cabina y el byte de la planta B; en
   // f11, el bit de la B y las plantas 1, 2 y 3; en f9, las condiciones de seguridad (sin usar).
   elevator: {
     type: 27,
@@ -209,7 +210,7 @@ const OBJECTS = {
     size: [226, 610],
     fields: ({ byte, bit, down, open, close, floors, doorOpen, doorClosed }) => {
       const nib = (list) => list.reduce((v, x, i) => v + (x & 15) * 16 ** i, 0)
-      const f10 = nib([doorOpen.byte, doorOpen.bit, doorClosed.byte, doorClosed.bit, 0, 0, 0, floors[0].byte])
+      const f10 = nib([doorOpen.byte, doorOpen.bit, doorClosed.byte, doorClosed.bit, 1, 0, 0, floors[0].byte])
       const f11 = nib([floors[0].bit, floors[1].byte, floors[1].bit, floors[2].byte, floors[2].bit, floors[3].byte, floors[3].bit, 0])
       return [open.byte, byte, down.byte, bit, down.bit, 0, f10, f11, close.byte, 0, open.bit, 0, close.bit, 50]
     },
@@ -321,6 +322,8 @@ export function exportPcSimu(project, { reserved = [], addressOf } = {}) {
   // (el alimentador) y los detectores cuyo haz la cruza, proyectados (beltUnder).
   const belts = front ? [] : elements.filter((e) => e.type === 'conveyor' && e.place !== 'desk' && (rotOf(e) === 0 || rotOf(e) === 180)).map((e) => placed(e, 0, -15, Number(e.length) || 240, 30))
   const beltUnder = (r) => belts.find((b) => overlapsRect(b, r))
+  // Cilindros que llevan algo (otro montado en su vástago, su ventosa): en PC_SIMU, con el gráfico 2.
+  const carriers = new Set(elements.filter((e) => e.type === 'cylinder' && e.place !== 'desk').flatMap((e) => [e.mountedOn, e.vacuum?.trim() ? e.id : null]).filter(Boolean))
   for (let e of elements) {
     const rot = rotOf(e)
     if (!front && e.place !== 'desk' && (e.type === 'ramp' || e.type === 'diverter' || e.type === 'sink')) {
@@ -636,6 +639,12 @@ export function exportPcSimu(project, { reserved = [], addressOf } = {}) {
         // editor tiene la placa, y tan ancho como ella (28 px) para alcanzar las mismas piezas.
         const W = Math.round(((Number(e.stroke) || 100) * 19) / 11)
         Object.assign(extra, { rect: placed(e, 88 - W, -14, W, 28), speed: cylinderSpeed(e) })
+        if (carriers.has(e.id)) {
+          // Solo los gráficos 2 y 3 llevan su grupo; en el 2 el vástago sale 7/18 del largo (b de 0 a 350, a
+          // W/20/45 por unidad), con la cara a 0,745 del largo.
+          const W2 = Math.round(((Number(e.stroke) || 100) * 18) / 7)
+          Object.assign(extra, { rect: placed(e, 88 - Math.round(W2 * 0.745), -14, W2, 28), graphic2: true })
+        }
       }
       extra.extended = Number(e.initial) === 1
       if (onMachine) {

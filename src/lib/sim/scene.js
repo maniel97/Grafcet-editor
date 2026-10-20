@@ -545,15 +545,18 @@ export function sceneStep(scene, state, values, dt) {
     if (dir) next.pos[e.id] = Math.round(clamp((next.pos[e.id] ?? 0) + (dir * dt) / Math.max(0.1, Number(e.time) || 2)) * 1e6) / 1e6
   }
 
-  // Ascensores: la cabina sube o baja con su orden (no con las dos), entre la planta baja y la última; la
-  // puerta se abre y se cierra con las suyas.
+  // Ascensores: la cabina sube o baja con su orden (no con las dos), entre la planta baja y la última, si la
+  // puerta está cerrada; la puerta se abre y se cierra con las suyas, en una planta.
   for (const e of elements) {
     if (e.type !== 'elevator' || stuck(e)) continue
     const now = next.lift?.[e.id] ?? { at: 0, door: 0 }
     const move = on(values, e.up) && !on(values, e.down) ? 1 : on(values, e.down) && !on(values, e.up) ? -1 : 0
     const door = on(values, e.open) && !on(values, e.close) ? 1 : on(values, e.close) && !on(values, e.open) ? -1 : 0
-    const at = Math.min(elevatorFloors(e) - 1, Math.max(0, now.at + (move * dt) / Math.max(0.1, Number(e.floorTime) || 2)))
-    next.lift = { ...next.lift, [e.id]: { at: Math.round(at * 1e6) / 1e6, door: Math.round(clamp(now.door + (door * dt) / Math.max(0.1, Number(e.doorTime) || 1)) * 1e6) / 1e6 } }
+    // Como en PC_SIMU: la cabina no se mueve con la puerta abierta, y la puerta solo se abre en una planta.
+    const atFloor = Math.abs(now.at - Math.round(now.at)) < 0.02
+    const at = now.door > 0 ? now.at : Math.min(elevatorFloors(e) - 1, Math.max(0, now.at + (move * dt) / Math.max(0.1, Number(e.floorTime) || 2)))
+    const doorNext = atFloor ? clamp(now.door + (door * dt) / Math.max(0.1, Number(e.doorTime) || 1)) : now.door
+    next.lift = { ...next.lift, [e.id]: { at: Math.round(at * 1e6) / 1e6, door: Math.round(doorNext * 1e6) / 1e6 } }
   }
 
   // Depósitos: se llenan y vacían con sus válvulas.

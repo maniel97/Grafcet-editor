@@ -420,9 +420,9 @@ describe('PC_SIMU (.sim)', () => {
     const f = (k) => a.fields[k - 4]
     expect([f(5), f(7), f(6), f(8), f(4), f(14), f(12), f(16)]).toEqual([0, 0, 0, 1, 0, 2, 0, 3])
     const nib = (x) => Array.from({ length: 8 }, (_, i) => (x >> (4 * i)) & 15)
-    // f10: puerta abierta I0.4, cerrada I0.5, modo 0, (cabina), byte de la B (0); f11: bit de la B y las plantas
+    // f10: puerta abierta I0.4, cerrada I0.5, modo 1, (cabina), byte de la B (0); f11: bit de la B y las plantas
     // 1 (I0.1), 2 (I0.2) y 3 (la que no tiene el del editor: la primera entrada libre, I0.3).
-    expect(nib(f(10))).toEqual([0, 4, 0, 5, 0, 0, 0, 0])
+    expect(nib(f(10))).toEqual([0, 4, 0, 5, 1, 0, 0, 0]) // modo 1: un detector por planta
     expect(nib(f(11))).toEqual([0, 0, 1, 0, 2, 0, 3, 0])
     expect(warnings).toEqual(['Ascensor: el ascensor de PC_SIMU tiene 4 plantas (B, 1, 2 y 3); las que sobran, con detectores en entradas libres.'])
   })
@@ -436,7 +436,8 @@ describe('PC_SIMU (.sim)', () => {
     ]
     const { text, warnings } = exportPcSimu({ plc: { variables, scene: { gravity: true, elements } } })
     const objects = parsePcSimu(text).filter((o) => o.type === 19)
-    const [x, z] = [0, 1].map((bit) => objects.find((o) => o.fields[11] === 11 && o.fields[3] === bit && o.fields[1] === 0))
+    // Los dos llevan algo: gráfico 2 (f15 = 13), el único (con el 3) que mueve su grupo.
+    const [x, z] = [0, 1].map((bit) => objects.find((o) => o.fields[11] === 13 && o.fields[3] === bit && o.fields[1] === 0))
     const suction = objects.find((o) => o.fields[11] === 100)
     expect(x.group).toBe('Grupo_1')
     expect(z.name).toBe('Grupo_1') // va con X

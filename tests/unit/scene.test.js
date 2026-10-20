@@ -299,8 +299,13 @@ describe('escena: detectores típicos y sensores analógicos', () => {
     expect(sceneInputs(scene, s)).toMatchObject({ P2: 1 })
     s = run(scene, s, { AP: 1 }, 1)
     expect(sceneInputs(scene, s)).toMatchObject({ PA: 1, PC: 0 })
+    s = run(scene, s, { AP: 1, B: 1 }, 1) // con la puerta abierta no baja
+    expect(sceneInputs(scene, s)).toMatchObject({ P2: 1 })
     s = run(scene, s, { CP: 1 }, 1)
     expect(sceneInputs(scene, s)).toMatchObject({ PA: 0, PC: 1 })
+    s = run(scene, s, { B: 1 }, 1) // entre plantas, la puerta no se abre
+    s = run(scene, s, { AP: 1 }, 1)
+    expect(sceneInputs(scene, s)).toMatchObject({ P1: 0, P2: 0, PA: 0, PC: 1 })
   })
 
   it('calentador: la temperatura sube con la resistencia y el termostato salta en la consigna', () => {
