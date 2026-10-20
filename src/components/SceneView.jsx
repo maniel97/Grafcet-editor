@@ -26,6 +26,7 @@ import {
   worldRect,
   platformRect,
   SCENE_FLOOR,
+  selectorPositions,
 } from '../lib/sim/scene'
 import { copyToClipboard, pasteFromClipboard } from '../lib/sim/sceneClipboard'
 import { faces, pieceBox, reliefBoxes, reliefOrder } from '../lib/sim/relief'
@@ -216,6 +217,56 @@ function ScaleShape({ kg }) {
       <rect x="-20" y="16" width="40" height="15" rx="2" fill="#0f172a" />
       <text x="16" y="27" textAnchor="end" fontSize="10" fontFamily="ui-monospace, Consolas, monospace" fill="#4ade80">
         {String(Math.round(kg * 10) / 10).replace('.', ',')} kg
+      </text>
+    </g>
+  )
+}
+// Selector: mando giratorio que apunta a la posición elegida (de 2 a 4, repartidas en 90°), con su
+// nombre corto alrededor.
+function SelectorShape({ e, at }) {
+  const n = selectorPositions(e)
+  const angle = (i) => -45 + (n === 1 ? 0 : (90 * i) / (n - 1))
+  const short = (i) => {
+    const name = String(e[`pos${i + 1}`] ?? '').trim()
+    return name ? name.slice(0, 4) : '0'
+  }
+  return (
+    <g>
+      {Array.from({ length: n }, (_, i) => {
+        const a = (angle(i) * Math.PI) / 180
+        return (
+          <text key={i} x={Math.sin(a) * 27} y={-Math.cos(a) * 27 + 3} textAnchor="middle" fontSize="8" fontWeight={i === at ? 700 : 400} fill={i === at ? ON : INK}>
+            {short(i)}
+          </text>
+        )
+      })}
+      <circle r="17" fill="#e2e8f0" stroke={INK} />
+      <rect x="-4" y="-15" width="8" height="30" rx="3" fill="#334155" transform={`rotate(${angle(at)})`} />
+      <circle r="3" cy="-10" fill="white" transform={`rotate(${angle(at)})`} />
+    </g>
+  )
+}
+// Barra: el valor entre su mínimo y su máximo, en vertical o en horizontal, con la cifra debajo.
+function BargraphShape({ e, value }) {
+  const min = Number(e.min ?? 0)
+  const max = Number(e.max ?? 100)
+  const v = Number(value)
+  const f = Number.isFinite(v) && max !== min ? Math.min(1, Math.max(0, (v - min) / (max - min))) : 0
+  const text = Number.isFinite(v) ? String(Math.round(v * 10) / 10).replace('.', ',') : '—'
+  return e.vertical === false ? (
+    <g>
+      <rect x="-40" y="-10" width="80" height="20" rx="3" fill="#f1f5f9" stroke={INK} />
+      <rect x="-38" y="-8" width={76 * f} height="16" rx="2" fill="#2563eb" />
+      <text y="24" textAnchor="middle" fontSize="10" fill={INK}>
+        {text}
+      </text>
+    </g>
+  ) : (
+    <g>
+      <rect x="-10" y="-40" width="20" height="80" rx="3" fill="#f1f5f9" stroke={INK} />
+      <rect x="-8" y={38 - 76 * f} width="16" height={76 * f} rx="2" fill="#2563eb" />
+      <text y="54" textAnchor="middle" fontSize="10" fill={INK}>
+        {text}
       </text>
     </g>
   )
@@ -602,6 +653,10 @@ function boundsOf(e, pos = 0) {
       return r(0, 0, Number(e.width) || 300, Number(e.height) || 200)
     case 'potentiometer':
       return r(-22, -22, 44, 60)
+    case 'selector':
+      return r(-32, -36, 64, 56)
+    case 'bargraph':
+      return e.vertical === false ? r(-40, -10, 80, 40) : r(-12, -40, 24, 100)
     case 'heater':
       return r(-40, -24, 80, 48)
     case 'feeder':
@@ -1132,6 +1187,40 @@ function Properties({ element, variables, onChange, onDelete, onRotate, onCreate
           {number('time', tr('Tiempo en recorrerla (s)'), 0.1, 0.1)}
         </>
       )}
+      {element.type === 'selector' && (
+        <>
+          <label className="block">
+            <span className="text-slate-500">{tr('Posiciones')}</span>
+            <select value={selectorPositions(element)} onChange={(ev) => set({ positions: Number(ev.target.value) })} className={field}>
+              {[2, 3, 4].map((n) => (
+                <option key={n} value={n}>
+                  {n}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="block">
+            <span className="text-slate-500">{tr('Posición al empezar')}</span>
+            <select value={Math.min(selectorPositions(element) - 1, Number(element.initial) || 0)} onChange={(ev) => set({ initial: Number(ev.target.value) })} className={field}>
+              {Array.from({ length: selectorPositions(element) }, (_, i) => (
+                <option key={i} value={i}>
+                  {element[`pos${i + 1}`] || tr('Posición {n}', { n: i + 1 })}
+                </option>
+              ))}
+            </select>
+          </label>
+        </>
+      )}
+      {element.type === 'bargraph' && (
+        <>
+          {number('min', tr('Mínimo'), -1e6, 1)}
+          {number('max', tr('Máximo'), -1e6, 1)}
+          <label className="flex items-center gap-1">
+            <input type="checkbox" checked={element.vertical !== false} onChange={(ev) => set({ vertical: ev.target.checked })} />
+            <span>{tr('Vertical')}</span>
+          </label>
+        </>
+      )}
       {element.type === 'potentiometer' && (
         <label className="block">
           <span className="text-slate-500">{tr('Posición al empezar (%)')}</span>
@@ -1293,6 +1382,8 @@ const HINTS = {
   image: N_('Imagen: una foto o un plano de fondo (se dibuja debajo de todo).'),
   scale: N_('Báscula: valor analógico con el peso (kg) de las piezas que tiene encima; el metal pesa el triple.'),
   potentiometer: N_('Potenciómetro: entrada analógica manual (consignas, velocidades…). En modo Usar, arrastra a izquierda o derecha.'),
+  selector: N_('Selector: de 2 a 4 posiciones (Manual / 0 / Automático…), cada una con su entrada, que está a 1 mientras el selector está en ella. En modo Usar, pulsa para pasar a la siguiente.'),
+  bargraph: N_('Barra: muestra el valor de una variable (analógica o numérica) entre un mínimo y un máximo.'),
   heater: N_('Calentador: la resistencia sube la temperatura (analógica, °C) con inercia; termostato digital opcional.'),
   feeder: N_('Alimentador: suelta piezas solo, con una salida del grafcet o al pulsarlo en modo Usar.'),
   sink: N_('Recogida: retira y cuenta las piezas que caen dentro.'),
@@ -1338,6 +1429,8 @@ function ModulePreview({ item }) {
     distance: <DistanceShape e={{ ...e, range: 120 }} distance={70} />,
     scale: <ScaleShape kg={3} />,
     potentiometer: <PotentiometerShape value={0.65} />,
+    selector: <SelectorShape e={{ ...e, pos1: tr('Manual'), pos3: tr('Automático') }} at={2} />,
+    bargraph: <BargraphShape e={e} value={65} />,
     heater: <HeaterShape e={e} temp={85} heating />,
     diverter: <DiverterShape e={e} active />,
     ramp: <RampShape e={e} />,
@@ -1426,7 +1519,7 @@ const UNDER = ['image', 'pipe', 'conveyor', 'sink', 'ramp', 'diverter', 'platfor
 // mecanismo (como el cuadro eléctrico real). e.place: 'desk' | 'machine' (por defecto, máquina).
 // En la isométrica, los rótulos esquivan los volúmenes salvo los alargados (van en el suelo delante).
 const ISO_LONG = ['conveyor', 'platform', 'ramp', 'pipe', 'image']
-const DESK_TYPES = ['button', 'switch', 'emergency', 'potentiometer', 'lamp', 'display']
+const DESK_TYPES = ['button', 'switch', 'emergency', 'selector', 'potentiometer', 'lamp', 'display', 'bargraph']
 const isDesk = (e) => DESK_TYPES.includes(e.type) && e.place === 'desk'
 
 
@@ -1486,6 +1579,10 @@ function drawElement(e, { scene, state, values, time, signals, iso = false }) {
       return <ScaleShape kg={weighed(state, e)} />
     case 'potentiometer':
       return <PotentiometerShape value={state.knob?.[e.id] ?? Number(e.initial ?? 0.5)} />
+    case 'selector':
+      return <SelectorShape e={e} at={state.selected?.[e.id] ?? (Number(e.initial) || 0)} />
+    case 'bargraph':
+      return <BargraphShape e={e} value={values[e.variable]} />
     case 'heater':
       return <HeaterShape e={e} temp={state.temp?.[e.id] ?? Number(e.ambient ?? 20)} heating={isOn(values, e.heat)} />
     default:
@@ -1511,7 +1608,7 @@ export function SceneStatic({ scene, variables = [] }) {
     for (let i = 0; i < items.length; i += 2) lines.push(items.slice(i, i + 2).join(' · '))
     return lines
   }
-  const turns = (e) => !['button', 'switch', 'emergency', 'lamp', 'sink', 'feeder', 'tank', 'motor', 'display', 'scale', 'potentiometer', 'heater', 'siren', 'trafficlight', 'label', 'image'].includes(e.type)
+  const turns = (e) => !['button', 'switch', 'emergency', 'lamp', 'sink', 'feeder', 'tank', 'motor', 'display', 'scale', 'potentiometer', 'selector', 'bargraph', 'heater', 'siren', 'trafficlight', 'label', 'image'].includes(e.type)
   const desk = elements.filter((e) => DESK_TYPES.includes(e.type) && e.place === 'desk')
   const machine = elements.filter((e) => !desk.includes(e))
   const boxes = machine.map((e) => boundsOf(placed(scene, state, e), 1))
@@ -2185,6 +2282,7 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
     if (e.type === 'button') onAction(e.id, phase === 'down' ? 'press' : 'release')
     else if (phase === 'down' && (e.type === 'switch' || e.type === 'emergency')) onAction(e.id, 'toggle')
     else if (phase === 'down' && e.type === 'feeder') onAction(e.id, 'feed')
+    else if (phase === 'down' && e.type === 'selector') onAction(e.id, 'next')
   }
 
   const onPointerDown = (ev, e) => {
@@ -2276,8 +2374,8 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
   const deskItems = elements.filter(isDesk)
   const draw = (e) => drawElement(e, { scene, state, values, time, signals, iso })
   // Los mandos y pilotos no se giran (su rótulo se lee siempre).
-  const turns = (e) => !['button', 'switch', 'emergency', 'lamp', 'sink', 'feeder', 'tank', 'motor', 'display', 'scale', 'potentiometer', 'heater', 'siren', 'trafficlight', 'label', 'image'].includes(e.type)
-  const operable = (e) => ['button', 'switch', 'emergency', 'feeder', 'potentiometer'].includes(e.type)
+  const turns = (e) => !['button', 'switch', 'emergency', 'lamp', 'sink', 'feeder', 'tank', 'motor', 'display', 'scale', 'potentiometer', 'selector', 'bargraph', 'heater', 'siren', 'trafficlight', 'label', 'image'].includes(e.type)
+  const operable = (e) => ['button', 'switch', 'emergency', 'selector', 'feeder', 'potentiometer'].includes(e.type)
   const underRank = (e) => (e.type === 'image' ? -2 : UNDER.includes(e.type) ? -1 : 0)
   // Elementos y piezas en orden de dibujo: lo de debajo primero (las piezas van encima). En la
   // isométrica, además, del fondo hacia delante, con las piezas entre los demás elementos.

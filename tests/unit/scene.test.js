@@ -247,6 +247,21 @@ describe('escena: detectores típicos y sensores analógicos', () => {
     expect(sceneInputs(scene, s, range)).toEqual({ Consigna: 8 })
   })
 
+  it('selector: cada posición con su entrada, a 1 solo la de la posición elegida (una sin entrada, ninguna)', () => {
+    const scene = { elements: [{ id: 's', type: 'selector', x: 0, y: 0, positions: 3, pos1: 'Man', pos2: '', pos3: 'Auto', initial: 1 }] }
+    let s = sceneInit(scene)
+    expect(sceneInputs(scene, s)).toEqual({ Man: 0, Auto: 0 }) // en la del medio (0)
+    s = sceneAction(scene, s, 's', 'next')
+    expect(sceneInputs(scene, s)).toEqual({ Man: 0, Auto: 1 })
+    s = sceneAction(scene, s, 's', 'next') // vuelve a la primera
+    expect(sceneInputs(scene, s)).toEqual({ Man: 1, Auto: 0 })
+    s = sceneAction(scene, s, 's', 'set:7') // fuera de rango: la última
+    expect(sceneInputs(scene, s)).toEqual({ Man: 0, Auto: 1 })
+    // Con 2 posiciones, la 3.ª y la 4.ª no cuentan aunque tengan variable.
+    const two = { elements: [{ id: 's', type: 'selector', x: 0, y: 0, positions: 2, pos1: 'A', pos2: 'B', pos3: 'C' }] }
+    expect(sceneInputs(two, sceneInit(two))).toEqual({ A: 1, B: 0 })
+  })
+
   it('calentador: la temperatura sube con la resistencia y el termostato salta en la consigna', () => {
     const scene = { elements: [{ id: 'h', type: 'heater', x: 0, y: 0, heat: 'R', temperature: 'T', thermostat: 'TS', setpoint: 60, ambient: 20, maxTemp: 120, tau: 10 }] }
     let s = sceneInit(scene)

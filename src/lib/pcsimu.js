@@ -187,6 +187,18 @@ const OBJECTS = {
   // Tope (tipo 26): f14 0 horizontal (las piezas se apoyan), 1 / 2 inclinado 45° / 135°, 3 / 4 rampa por la
   // que bajan solas hacia la derecha / la izquierda; f15 = 1: destruye las piezas.
   ramp: { type: 26, name: 'Tope', area: 'I', fields: ({ slope }) => [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, slope, 0, 0, 0] },
+  // Selector (tipo 3): f9 entradas seguidas desde f5.f7, una por posición (a 1 la de la posición en que está);
+  // f16 = 0: dibujo «Conmutador 1».
+  selector: { type: 3, name: 'Selector', area: 'I', size: [30, 30], fields: ({ byte, bit, n }) => [0, byte, 0, bit, 0, n, 0, 0, 0, 0, 0, 0, 0, 0] },
+  // Barra (tipo 16): la salida analógica AQW f5, de f7 a f4 en bruto, mostrada de f13 a f12; f9: 0 vertical,
+  // 1 horizontal; f16 = 0 unipolar.
+  bar: {
+    type: 16,
+    name: 'Barra',
+    size: [25, 80],
+    sizeVertical: [25, 80],
+    fields: ({ ao, r0, r1, min, max, vertical }) => [r1, ao, 0, r0, 0, vertical ? 0 : 1, 0, 0, max, min, 0, 0, 0, 0],
+  },
   beacon: { type: 29, name: 'Baliza', size: [50, 125], fields: ({ red, amber, green }) => [0, red.byte, amber.byte, red.bit, amber.bit, 0, 0, 0, 0, 0, green.byte, green.bit, 0, 0] },
 }
 const CYLINDER_SPEED = 50 // la de los ejemplos de PC_SIMU
@@ -277,7 +289,7 @@ export function exportPcSimu(project, { reserved = [], addressOf } = {}) {
   // (el alimentador) y los detectores cuyo haz la cruza, proyectados (beltUnder).
   const belts = front ? [] : elements.filter((e) => e.type === 'conveyor' && e.place !== 'desk' && (rotOf(e) === 0 || rotOf(e) === 180)).map((e) => placed(e, 0, -15, Number(e.length) || 240, 30))
   const beltUnder = (r) => belts.find((b) => overlapsRect(b, r))
-  for (const e of elements) {
+  for (let e of elements) {
     const rot = rotOf(e)
     if (!front && e.place !== 'desk' && (e.type === 'ramp' || e.type === 'diverter' || e.type === 'sink')) {
       if (e.type !== 'sink') note('Vista desde arriba: lo que aparta las piezas a un lado de la cinta (desviadores, rampas) no pasa a PC_SIMU, que la ve de frente; las piezas siguen por la cinta.')
@@ -431,6 +443,38 @@ export function exportPcSimu(project, { reserved = [], addressOf } = {}) {
       const name = e.variable?.trim()
       add(e, 'valve', 'Q', 0, name, {})
       continue
+    }
+    if (e.type === 'selector') {
+      const n = Math.min(4, Math.max(2, Math.round(Number(e.positions) || 3)))
+      const vars = Array.from({ length: n }, (_, i) => e[`pos${i + 1}`]?.trim() || '')
+      const at = vars.map((v) => (v ? bitOf(v, 'I') : null))
+      vars.forEach((v, i) => v && !at[i] && missing(e, v, 'I'))
+      // PC_SIMU: una entrada por posición, seguidas. Una posición sin entrada (el «0») vale si su bit está libre.
+      const k = at.findIndex(Boolean)
+      const base = k < 0 ? -1 : at[k].byte * 8 + at[k].bit - k
+      const fits = base >= 0 && at.every((a, i) => (a ? a.byte * 8 + a.bit === base + i : !vars[i] && !usedI.has(base + i)))
+      const title = e.text?.trim() || vars.filter(Boolean).join(' / ')
+      if (fits) rows[1].push({ object: 'selector', name: title, byte: Math.floor(base / 8), bit: base % 8, n })
+      else {
+        if (k >= 0) warnings.push(`${title}: en PC_SIMU un selector usa entradas seguidas, una por posición; sale como interruptores sueltos.`)
+        vars.forEach((v, i) => at[i] && rows[1].push({ object: 'switch', name: v, ...at[i], nc: 0 }))
+      }
+      continue
+    }
+    if (e.type === 'bargraph') {
+      const name = e.variable?.trim()
+      const word = String(addr(name)).trim().toUpperCase()
+      const ao = /^AQW(\d+)$/.exec(word)
+      const entry = plc.variables?.[name]
+      if (ao && isAnalog(entry?.type)) {
+        const { signal, min, max } = analogConfig(entry)
+        const [r0, r1] = rawRange(signal, 's7200')
+        rows[0].push({ object: 'bar', name: e.text?.trim() || name, ao: Number(ao[1]), r0, r1, min: Math.round(min), max: Math.round(max), vertical: e.vertical !== false, byte: 950, bit: 0 })
+        continue
+      }
+      // PC_SIMU solo muestra en barra una salida analógica: lo demás, con displays (como un visualizador).
+      if (name) warnings.push(`${name}: PC_SIMU solo muestra en barra una salida analógica (AQW); sale en displays.`)
+      e = { ...e, type: 'display' }
     }
     if (e.type === 'display') {
       const name = e.variable?.trim()

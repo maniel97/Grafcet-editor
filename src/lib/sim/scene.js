@@ -20,6 +20,9 @@ export const SCENE_TYPES = {
   button: { label: N_('Pulsador'), group: N_('Mandos'), defaults: { variable: '', contact: 'NO', color: 'green', text: '' } },
   switch: { label: N_('Interruptor'), group: N_('Mandos'), defaults: { variable: '', contact: 'NO', text: '' } },
   emergency: { label: N_('Seta de emergencia'), group: N_('Mandos'), defaults: { variable: '', text: N_('Emergencia') } },
+  // Selector de 2 a 4 posiciones (Manual / 0 / Auto…): cada posición, su entrada (o ninguna); initial: la de
+  // empezar (0, la primera).
+  selector: { label: N_('Selector'), group: N_('Mandos'), defaults: { positions: 3, pos1: '', pos2: '', pos3: '', pos4: '', initial: 0, text: '' } },
   lamp: { label: N_('Piloto'), group: N_('Señalización'), defaults: { variable: '', color: 'green', text: '' } },
   cylinder: {
     label: N_('Cilindro'),
@@ -50,6 +53,8 @@ export const SCENE_TYPES = {
   },
   motor: { label: N_('Motor'), group: N_('Actuadores'), defaults: { variable: '', reverse: '', pulses: '', text: '' } },
   display: { label: N_('Visualizador'), group: N_('Señalización'), defaults: { variable: '', text: '' } },
+  // Barra: el valor de una variable (analógica o numérica) entre un mínimo y un máximo.
+  bargraph: { label: N_('Barra'), group: N_('Señalización'), defaults: { variable: '', min: 0, max: 100, vertical: true, text: '' } },
   diverter: { label: N_('Desviador'), group: N_('Actuadores'), defaults: { gate: '', length: 80, time: 0.5, text: '' } },
   ramp: { label: N_('Rampa'), group: N_('Proceso'), defaults: { length: 120, time: 1, text: '' } },
   platform: { label: N_('Plataforma'), group: N_('Proceso'), defaults: { length: 160, text: '' } },
@@ -67,6 +72,12 @@ export const SCENE_VARS = {
   button: [['variable', 'Entrada', 'in']],
   switch: [['variable', 'Entrada', 'in']],
   emergency: [['variable', 'Entrada', 'in']],
+  selector: [
+    ['pos1', N_('Posición 1 (entrada)'), 'in'],
+    ['pos2', N_('Posición 2 (entrada)'), 'in'],
+    ['pos3', N_('Posición 3 (entrada)'), 'in'],
+    ['pos4', N_('Posición 4 (entrada)'), 'in'],
+  ],
   lamp: [['variable', 'Salida', 'out']],
   cylinder: [
     ['extend', 'Sale (A+)', 'out'],
@@ -109,6 +120,7 @@ export const SCENE_VARS = {
     ['pulses', N_('Encoder: 1 impulso por vuelta (opcional)'), 'in'],
   ],
   display: [['variable', 'Valor', 'any']],
+  bargraph: [['variable', 'Valor', 'any']],
   diverter: [['gate', 'Desviar (salida)', 'out']],
   ramp: [],
   platform: [],
@@ -322,12 +334,17 @@ const fraction = (values, name) => {
 const clamp = (x) => Math.min(1, Math.max(0, x))
 const elementsOf = (scene) => scene?.elements ?? []
 
+// Selector: cuántas posiciones tiene (de 2 a 4) y en cuál empieza.
+export const selectorPositions = (e) => Math.min(4, Math.max(2, Math.round(Number(e.positions) || 3)))
+const selectorStart = (e) => Math.min(selectorPositions(e) - 1, Math.max(0, Math.round(Number(e.initial) || 0)))
+
 export function sceneInit(scene) {
   const pos = {}
   const pressed = {}
   const level = {}
   const knob = {}
   const temp = {}
+  const selected = {}
   for (const e of elementsOf(scene)) {
     // initial: 1 si el cilindro empieza con el vástago fuera.
     if (e.type === 'cylinder') pos[e.id] = Number(e.initial) ? 1 : 0
@@ -336,9 +353,10 @@ export function sceneInit(scene) {
     if (e.type === 'button' || e.type === 'switch' || e.type === 'emergency') pressed[e.id] = false
     if (e.type === 'tank') level[e.id] = clamp(Number(e.initial) || 0)
     if (e.type === 'potentiometer') knob[e.id] = clamp(Number(e.initial ?? 0.5))
+    if (e.type === 'selector') selected[e.id] = selectorStart(e)
     if (e.type === 'heater') temp[e.id] = Number(e.ambient ?? 20)
   }
-  return { pos, pressed, level, knob, temp, angle: {}, faults: {}, held: {}, pieces: [], counts: {}, nextPiece: 1, fed: {} }
+  return { pos, pressed, level, knob, temp, selected, angle: {}, faults: {}, held: {}, pieces: [], counts: {}, nextPiece: 1, fed: {} }
 }
 
 // Pieza nueva en un alimentador (si su sitio está libre; con `gap`, también ese margen alrededor:
@@ -608,6 +626,10 @@ export function sceneInputs(scene, state, analogRange = () => null) {
       if (e.closed) inputs[e.closed] = pos <= 0.001 && fault(e) !== 'sensor:closed' ? 1 : 0
     }
     if (e.type === 'potentiometer' && e.variable) scaled(e.variable, state.knob?.[e.id] ?? 0.5)
+    if (e.type === 'selector') {
+      const at = state.selected?.[e.id] ?? selectorStart(e)
+      for (let i = 0; i < selectorPositions(e); i++) if (e[`pos${i + 1}`]) inputs[e[`pos${i + 1}`]] = at === i ? 1 : 0
+    }
     if (e.type === 'distance' && e.variable) {
       const d = fault(e) === 'broken' ? null : measuredDistance(scene, state, e)
       scaled(e.variable, d === null ? 1 : d / (Number(e.range) || 200))
@@ -688,6 +710,11 @@ export function sceneAction(scene, state, id, action) {
   if (action === 'toggle') return { ...state, pressed: { ...state.pressed, [id]: !state.pressed[id] } }
   if (action === 'feed' && e.type === 'feeder') return feed(state, e)
   if (action.startsWith('set:') && e.type === 'potentiometer') return { ...state, knob: { ...state.knob, [id]: clamp(Number(action.slice(4))) } }
+  if (e.type === 'selector' && (action === 'next' || action.startsWith('set:'))) {
+    const n = selectorPositions(e)
+    const at = action === 'next' ? ((state.selected?.[id] ?? selectorStart(e)) + 1) % n : Math.min(n - 1, Math.max(0, Math.round(Number(action.slice(4)))))
+    return { ...state, selected: { ...state.selected, [id]: at } }
+  }
   if (action.startsWith('fault:')) return { ...state, faults: { ...state.faults, [id]: action.slice('fault:'.length) || null } }
   return state
 }
@@ -771,6 +798,8 @@ const REQUIRED = {
   tank: ['fill', 'drain'],
   motor: ['variable'],
   display: ['variable'],
+  bargraph: ['variable'],
+  selector: ['pos1', 'pos2', 'pos3', 'pos4'],
   diverter: ['gate'],
   siren: ['variable'],
   valve: ['variable'],

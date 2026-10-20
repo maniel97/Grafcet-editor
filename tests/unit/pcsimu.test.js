@@ -339,6 +339,39 @@ describe('PC_SIMU (.sim)', () => {
     expect(cpu.bits.get('V1012.0')).toBe(true)
   })
 
+  it('selector: con entradas seguidas (una posición sin entrada, si su bit está libre), el de PC_SIMU; si no, interruptores', () => {
+    const v = (address) => ({ address })
+    const variables = { Man: v('I0.0'), Auto: v('I0.2'), Otra: v('I0.6'), B: v('I1.0') }
+    const sel = (positions, pos) => ({ id: 's', type: 'selector', x: 0, y: 0, positions, ...pos, text: 'Modo' })
+    const one = (el) => exportPcSimu({ plc: { variables, scene: { elements: [el] } } })
+    // Man / 0 / Auto en I0.0, (I0.1 libre), I0.2: un selector de 3 entradas desde I0.0.
+    const ok = one(sel(3, { pos1: 'Man', pos2: '', pos3: 'Auto' }))
+    const [s3] = parsePcSimu(ok.text).filter((o) => o.type === 3)
+    expect([s3.fields[1], s3.fields[3], s3.fields[5]]).toEqual([0, 0, 3])
+    expect(ok.warnings).toEqual([])
+    // Man / Otra: no seguidas; sale como dos interruptores, con aviso.
+    const no = one(sel(2, { pos1: 'Man', pos2: 'Otra' }))
+    expect(parsePcSimu(no.text).filter((o) => o.type === 1).map((o) => [o.fields[1], o.fields[3]])).toEqual([[0, 0], [0, 6]])
+    expect(no.warnings[0]).toMatch(/Modo: en PC_SIMU un selector usa entradas seguidas/)
+    // Una posición sin entrada cuyo bit sí se usa (I0.1 lo tiene B? no: B es I1.0) -> con I0.1 ocupada, no vale.
+    const busy = exportPcSimu({ plc: { variables: { ...variables, X: v('I0.1') }, scene: { elements: [sel(3, { pos1: 'Man', pos2: '', pos3: 'Auto' })] } } })
+    expect(parsePcSimu(busy.text).filter((o) => o.type === 3)).toHaveLength(0)
+  })
+
+  it('barra: de una salida analógica, la barra de PC_SIMU con su escala; de otra variable, displays', () => {
+    const variables = { Vel: { address: 'AQW0', type: 'analogOut', signal: '0-10V', min: 0, max: 50 }, C: { address: 'C1', type: 'counter' } }
+    const elements = [
+      { id: 'b', type: 'bargraph', x: 0, y: 0, variable: 'Vel', min: 0, max: 50, vertical: false, text: 'Velocidad' },
+      { id: 'c', type: 'bargraph', x: 0, y: 0, variable: 'C', min: 0, max: 10 },
+    ]
+    const { text, warnings, aux } = exportPcSimu({ plc: { variables, scene: { elements } } })
+    const [bar] = parsePcSimu(text).filter((o) => o.type === 16)
+    // AQW0, de 0 a 32000 en bruto, mostrada de 0 a 50, horizontal.
+    expect([bar.fields[1], bar.fields[3], bar.fields[0], bar.fields[9], bar.fields[8], bar.fields[5]]).toEqual([0, 0, 32000, 0, 50, 1])
+    expect(warnings[0]).toMatch(/C: PC_SIMU solo muestra en barra una salida analógica/)
+    expect(aux.filter((x) => x.kind === 'display').map((x) => x.word)).toEqual(['C1'])
+  })
+
   it('todos los ejemplos del editor se exportan sin pisarse', () => {
     for (const example of EXAMPLES) {
       const objects = parsePcSimu(exportPcSimu(example.build()).text)
