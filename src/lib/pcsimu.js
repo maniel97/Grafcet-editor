@@ -892,12 +892,17 @@ export function withAuxOutputs(awl, aux = []) {
             `Network ${i + 1} // PC_SIMU: ${clean(x.name)} (preselector en BCD en IB${x.bytes.join(', IB')}) a ${x.word}`,
             'LD     SM0.0',
             // PC_SIMU da las cifras de izquierda a derecha, de 4 en 4 bits desde el bit 0 (la primera, la de
-            // más peso, en el medio byte bajo): cada byte con sus medios bytes cambiados, y la palabra
-            // desplazada hasta que las unidades queden a la derecha.
+            // más peso, en el medio byte bajo): en cada byte se cambian los dos medios bytes y la palabra se
+            // desplaza hasta que las unidades queden a la derecha. Con instrucciones de palabra (SLW, SRW, ANDW,
+            // ORW), que tiene también la CPU 214 (RLB, girar un byte, solo las 22x).
             `MOVB   IB${x.bytes[0]}, VB1016`,
-            'RLB    VB1016, 4',
             x.bytes[1] === undefined ? 'MOVB   0, VB1017' : `MOVB   IB${x.bytes[1]}, VB1017`,
-            'RLB    VB1017, 4',
+            'MOVW   VW1016, VW1018',
+            'SLW    VW1016, 4',
+            'ANDW   -3856, VW1016', // 16#F0F0
+            'SRW    VW1018, 4',
+            'ANDW   +3855, VW1018', // 16#0F0F
+            'ORW    VW1018, VW1016',
             ...(x.digits < 4 ? [`SRW    VW1016, ${4 * (4 - x.digits)}`] : []),
             'BCDI   VW1016',
             `MOVW   VW1016, ${x.word}`,
