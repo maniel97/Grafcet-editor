@@ -203,6 +203,16 @@ function RotaryShape({ e, pos, values }) {
     </g>
   )
 }
+// Dibujo: línea, rectángulo o elipse, con su color y (salvo la línea) su relleno.
+function DrawingShape({ e }) {
+  const w = Number(e.width) || 0
+  const h = Number(e.height) || 0
+  const stroke = e.color || '#000000'
+  const fill = e.fill || 'none'
+  if (e.kind === 'line') return <line x1="0" y1="0" x2={w} y2={h} stroke={stroke} strokeWidth="2" strokeLinecap="round" />
+  if (e.kind === 'ellipse') return <ellipse cx={w / 2} cy={h / 2} rx={Math.abs(w / 2)} ry={Math.abs(h / 2)} fill={fill} stroke={stroke} strokeWidth="1.5" />
+  return <rect x={Math.min(0, w)} y={Math.min(0, h)} width={Math.abs(w)} height={Math.abs(h)} fill={fill} stroke={stroke} strokeWidth="1.5" />
+}
 function ConveyorShape({ e, running, t }) {
   const length = Number(e.length) || 240
   const offset = running ? (t * 40) % 20 : 0
@@ -803,6 +813,11 @@ function boundsOf(e, pos = 0) {
     }
     case 'image':
       return r(0, 0, Number(e.width) || 300, Number(e.height) || 200)
+    case 'shape': {
+      const w = Number(e.width) || 0
+      const h = Number(e.height) || 0
+      return r(Math.min(0, w) - 3, Math.min(0, h) - 3, Math.abs(w) + 6, Math.abs(h) + 6)
+    }
     case 'potentiometer':
       return r(-22, -22, 44, 60)
     case 'selector':
@@ -1358,6 +1373,31 @@ function Properties({ element, variables, onChange, onDelete, onRotate, onCreate
         </>
       )}
       {element.type === 'label' && number('size', tr('Tamaño de letra (px)'), 8, 1)}
+      {element.type === 'shape' && (
+        <>
+          <label className="block">
+            <span className="text-slate-500">{tr('Figura')}</span>
+            <select value={element.kind ?? 'rect'} onChange={(ev) => set({ kind: ev.target.value })} className={field}>
+              <option value="line">{tr('Línea')}</option>
+              <option value="rect">{tr('Rectángulo')}</option>
+              <option value="ellipse">{tr('Elipse')}</option>
+            </select>
+          </label>
+          {number('width', tr('Ancho (px)'), -2000, 10)}
+          {number('height', tr('Alto (px)'), -2000, 10)}
+          <label className="flex items-center gap-2">
+            <span className="text-slate-500">{tr('Color')}</span>
+            <input type="color" value={element.color || '#000000'} onChange={(ev) => set({ color: ev.target.value })} />
+          </label>
+          {element.kind !== 'line' && (
+            <label className="flex items-center gap-2">
+              <input type="checkbox" checked={Boolean(element.fill)} onChange={(ev) => set({ fill: ev.target.checked ? '#cbd5e1' : '' })} />
+              <span className="text-slate-500">{tr('Relleno')}</span>
+              {element.fill && <input type="color" value={element.fill} onChange={(ev) => set({ fill: ev.target.value })} />}
+            </label>
+          )}
+        </>
+      )}
       {element.type === 'image' && (
         <>
           <label className="block">
@@ -1605,6 +1645,7 @@ const HINTS = {
   pipe: N_('Tubería: decoración; se pinta de azul, con el fluido moviéndose, mientras la variable elegida está activa.'),
   label: N_('Rótulo: texto libre en la escena (nombre de la estación, zonas…).'),
   image: N_('Imagen: una foto o un plano de fondo (se dibuja debajo de todo).'),
+  shape: N_('Dibujo: una línea, un rectángulo o una elipse, con su color y su relleno (decoración, como los de PC_SIMU).'),
   scale: N_('Báscula: valor analógico con el peso (kg) de las piezas que tiene encima; el metal pesa el triple.'),
   potentiometer: N_('Potenciómetro: entrada analógica manual (consignas, velocidades…). En modo Usar, arrastra a izquierda o derecha.'),
   selector: N_('Selector: de 2 a 4 posiciones (Manual / 0 / Automático…), cada una con su entrada, que está a 1 mientras el selector está en ella. En modo Usar, pulsa para pasar a la siguiente.'),
@@ -1674,6 +1715,7 @@ function ModulePreview({ item }) {
     barrier: <BarrierShape e={e} pos={0.4} />,
     label: <LabelShape e={{ ...e, text: tr('Estación 1') }} />,
     image: <ImageShape e={{ ...e, width: 160, height: 100 }} />,
+    shape: <DrawingShape e={{ kind: 'rect', width: 50, height: 30, color: '#334155', fill: '#cbd5e1' }} />,
   }
   const b = boundsOf(
     type === 'conveyor' ? { ...e, length: 160 } : type === 'distance' ? { ...e, range: 120 } : type === 'pipe' ? { ...e, length: 120 } : type === 'image' ? { ...e, width: 160, height: 100 } : type === 'label' ? { ...e, text: tr('Estación 1') } : e,
@@ -1745,7 +1787,7 @@ async function loadImage(file) {
 }
 
 // Elementos por los que pasan las piezas: se dibujan debajo de todo.
-const UNDER = ['image', 'pipe', 'conveyor', 'sink', 'ramp', 'diverter', 'platform']
+const UNDER = ['image', 'shape', 'pipe', 'conveyor', 'sink', 'ramp', 'diverter', 'platform']
 
 // Panel de control: los mandos y la señalización pueden ir en un panel fijo, aparte del
 // mecanismo (como el cuadro eléctrico real). e.place: 'desk' | 'machine' (por defecto, máquina).
@@ -1809,6 +1851,8 @@ function drawElement(e, { scene, state, values, time, signals, iso = false }) {
       return <LabelShape e={e} />
     case 'image':
       return <ImageShape e={e} />
+    case 'shape':
+      return <DrawingShape e={e} />
     case 'scale':
       return <ScaleShape kg={weighed(state, e)} />
     case 'potentiometer':
@@ -1848,7 +1892,7 @@ export function SceneStatic({ scene, variables = [] }) {
     for (let i = 0; i < items.length; i += 2) lines.push(items.slice(i, i + 2).join(' · '))
     return lines
   }
-  const turns = (e) => !['button', 'switch', 'emergency', 'lamp', 'sink', 'feeder', 'tank', 'motor', 'display', 'scale', 'potentiometer', 'selector', 'keypad', 'preselector', 'bargraph', 'elevator', 'heater', 'siren', 'trafficlight', 'label', 'image'].includes(e.type)
+  const turns = (e) => !['button', 'switch', 'emergency', 'lamp', 'sink', 'feeder', 'tank', 'motor', 'display', 'scale', 'potentiometer', 'selector', 'keypad', 'preselector', 'bargraph', 'elevator', 'heater', 'siren', 'trafficlight', 'label', 'image', 'shape'].includes(e.type)
   const desk = elements.filter((e) => DESK_TYPES.includes(e.type) && e.place === 'desk')
   const machine = elements.filter((e) => !desk.includes(e))
   const boxes = machine.map((e) => boundsOf(placed(scene, state, e), 1))
@@ -1880,7 +1924,7 @@ export function SceneStatic({ scene, variables = [] }) {
           return (
             <g key={e.id}>
               <g transform={`translate(${e.x} ${e.y})${turns(e) ? ` rotate(${e.rot ?? 0})` : ''}`}>{drawElement(e, { scene, state, values: {}, time: 0, signals })}</g>
-              {at && e.type !== 'label' && !((e.type === 'image' || e.type === 'pipe') && !e.text) && (
+              {at && e.type !== 'label' && e.type !== 'shape' && !((e.type === 'image' || e.type === 'pipe') && !e.text) && (
                 <text x={at.x} y={at.y} textAnchor={at.anchor} fontSize="11" fill="#334155">
                   {labelOf(e)}
                 </text>
@@ -2616,7 +2660,7 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
   const shown = elements.map((e) => (drag?.ids.includes(e.id) ? { ...e, x: e.x + drag.dx, y: e.y + drag.dy } : resize?.id === e.id ? resize.preview : e))
   // Los cilindros montados en el vástago de otro, donde están ahora.
   const machine = shown.filter((e) => !isDesk(e)).map((e) => (e.type === 'cylinder' ? placed(scene ?? { elements: [] }, state, e) : e))
-  const labelled = (e) => !(e.type === 'label' || ((e.type === 'image' || e.type === 'pipe') && !e.text))
+  const labelled = (e) => !(e.type === 'label' || e.type === 'shape' || ((e.type === 'image' || e.type === 'pipe') && !e.text))
   const iso = isIso(scene)
   const isoOf = (e) => isoBoxes(scene ?? { elements: [] }, state, e)
   const planSpots = layoutLabels(
@@ -2633,7 +2677,7 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
   const deskItems = elements.filter(isDesk)
   const draw = (e) => drawElement(e, { scene, state, values, time, signals, iso })
   // Los mandos y pilotos no se giran (su rótulo se lee siempre).
-  const turns = (e) => !['button', 'switch', 'emergency', 'lamp', 'sink', 'feeder', 'tank', 'motor', 'display', 'scale', 'potentiometer', 'selector', 'keypad', 'preselector', 'bargraph', 'elevator', 'heater', 'siren', 'trafficlight', 'label', 'image'].includes(e.type)
+  const turns = (e) => !['button', 'switch', 'emergency', 'lamp', 'sink', 'feeder', 'tank', 'motor', 'display', 'scale', 'potentiometer', 'selector', 'keypad', 'preselector', 'bargraph', 'elevator', 'heater', 'siren', 'trafficlight', 'label', 'image', 'shape'].includes(e.type)
   const operable = (e) => ['button', 'switch', 'emergency', 'selector', 'keypad', 'preselector', 'feeder', 'potentiometer'].includes(e.type)
   const underRank = (e) => (e.type === 'image' ? -2 : UNDER.includes(e.type) ? -1 : 0)
   // Elementos y piezas en orden de dibujo: lo de debajo primero (las piezas van encima). En la
@@ -3032,7 +3076,7 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
             {/* Rótulos (sin girar) */}
             {machine.map((e) => {
               // Sin rótulo debajo: los de texto, y las imágenes y tuberías sin nombre propio.
-              if (e.type === 'label' || ((e.type === 'image' || e.type === 'pipe') && !e.text)) return null
+              if (e.type === 'label' || e.type === 'shape' || ((e.type === 'image' || e.type === 'pipe') && !e.text)) return null
               const at = labelSpots.get(e.id)
               if (!at) return null // sin texto (p. ej. una plataforma sin nombre)
               return (

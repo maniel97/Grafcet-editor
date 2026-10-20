@@ -12,6 +12,8 @@ const ROT = { 0: 0, 1: 180, 2: 270, 3: 90 }
 const LIMIT_ROT = { 2: 0, 0: 90, 3: 180, 1: 270 }
 const DESK = new Set(['button', 'switch', 'emergency', 'selector', 'keypad', 'potentiometer', 'lamp', 'bargraph'])
 
+// Color de Windows (COLORREF: 0x00BBGGRR) -> #rrggbb.
+const colorOf = (c) => `#${[c & 255, (c >> 8) & 255, (c >> 16) & 255].map((v) => v.toString(16).padStart(2, '0')).join('')}`
 const center = (r) => [(r[0] + r[2]) / 2, (r[1] + r[3]) / 2]
 // Ancla del elemento (x, y) para que su rectángulo local (lx, ly, w, h), girado `rot`, quede centrado en el
 // del archivo: lo contrario de worldRect.
@@ -82,6 +84,7 @@ export function importPcSimu(text) {
   const carriers = []
   const tools = []
   let electric = 0
+  const paints = []
   for (const o of objects) {
     const W = o.rect[2] - o.rect[0]
     const H = o.rect[3] - o.rect[1]
@@ -314,13 +317,30 @@ export function importPcSimu(text) {
         break
       case 1008:
         break
-      case 1001:
+      case 1001: {
+        // Línea: f4 1 o 3, de la esquina de arriba a la izquierda a la de abajo a la derecha; 2 o 4, la otra
+        // diagonal.
+        const flip = f(o, 4) === 2 || f(o, 4) === 4
+        add(o, 'shape', { x: o.rect[0], y: flip ? o.rect[3] : o.rect[1], kind: 'line', width: W, height: flip ? -H : H, color: colorOf(f(o, 15)), fill: '' })
+        break
+      }
       case 1002:
       case 1003:
       case 1004:
       case 1005:
+        if (W < 1 && H < 1) break // un punto suelto: nada que dibujar
+        add(o, 'shape', {
+          x: o.rect[0],
+          y: o.rect[1],
+          kind: o.type === 1003 || o.type === 1005 ? 'ellipse' : 'rect',
+          width: W,
+          height: H,
+          color: colorOf(f(o, 15)),
+          fill: o.type >= 1004 ? colorOf(f(o, 15)) : '',
+        })
+        break
       case 1006:
-        skip('dibujo (línea, rectángulo, elipse…)')
+        paints.push(o) // el bote de pintura: rellena la figura en la que cae (abajo)
         break
       case 30:
         skip('motor paso a paso')
@@ -379,6 +399,13 @@ export function importPcSimu(text) {
     if (best.drain) best.e.drain = v
     else if (!best.e.fill) best.e.fill = v
     else best.e.fillFine = v
+  }
+  // Bote de pintura (1006): rellena del color la figura más pequeña que contiene su punto.
+  for (const o of paints) {
+    const [x, y] = [o.rect[0], o.rect[1]]
+    const inside = elements.filter((e) => e.type === 'shape' && e.kind !== 'line' && x >= e.x && x <= e.x + e.width && y >= e.y && y <= e.y + e.height)
+    const target = inside.sort((a, b) => a.width * a.height - b.width * b.height)[0]
+    if (target) target.fill = colorOf(f(o, 15))
   }
   for (const e of elements) delete e.rect
 

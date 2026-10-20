@@ -84,6 +84,9 @@ export const SCENE_TYPES = {
   barrier: { label: N_('Barrera'), group: N_('Actuadores'), defaults: { open: '', close: '', opened: '', closed: '', length: 140, time: 2, text: '' } },
   pipe: { label: N_('Tubería'), group: N_('Decoración'), defaults: { variable: '', length: 160, text: '' } },
   label: { label: N_('Rótulo'), group: N_('Decoración'), defaults: { text: N_('Rótulo'), size: 16 } },
+  // Dibujo: una línea, un rectángulo o una elipse (con relleno, opcional), como los de PC_SIMU. La línea va de
+  // (x, y) a (x + width, y + height).
+  shape: { label: N_('Dibujo'), group: N_('Decoración'), defaults: { kind: 'rect', width: 100, height: 60, color: '#000000', fill: '' } },
   image: { label: N_('Imagen'), group: N_('Decoración'), defaults: { src: '', width: 300, height: 200, text: '' } },
 }
 
@@ -195,6 +198,7 @@ export const SCENE_VARS = {
   pipe: [['variable', 'Circula si… (opcional)', 'any']],
   label: [],
   image: [],
+  shape: [],
 }
 
 // Tamaño del depósito (anclaje: esquina superior izquierda) y de sus sensores de nivel.

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { exportPcSimu, parsePcSimu } from '../../src/lib/pcsimu'
+import { exportPcSimu, parsePcSimu, pcsimuText } from '../../src/lib/pcsimu'
 import { importPcSimu, isPcSimu, withPcSimuPlant } from '../../src/lib/pcsimuImport'
 import { EXAMPLES } from '../../src/lib/examples'
 
@@ -72,5 +72,27 @@ describe('Importar de PC_SIMU (.sim)', () => {
     const uses = JSON.stringify(next.scene.elements)
     expect(uses).toContain('"Arranque"') // I0.0 se queda con su nombre
     expect(Object.values(next.variables).filter((v) => v.address === 'I0.0')).toHaveLength(1)
+  })
+
+  it('dibujos: líneas, rectángulos y elipses con su color, y el bote de pintura rellena la figura en la que cae', () => {
+    const blank = Array(14).fill(0)
+    const withColor = (c, f4 = 0) => blank.map((v, i) => (i === 11 ? c : i === 0 ? f4 : v))
+    const text = pcsimuText([
+      { type: 1002, rect: [100, 100, 200, 160], fields: withColor(0) },
+      { type: 1006, rect: [150, 130, 150, 130], fields: withColor(0x808080) },
+      { type: 1001, rect: [10, 10, 60, 40], fields: withColor(0xff0000, 2) },
+      { type: 1005, rect: [300, 300, 340, 320], fields: withColor(0x00ff00) },
+    ])
+    const { project, skipped } = importPcSimu(text)
+    expect(skipped).toEqual([])
+    const shapes = project.plc.scene.elements.filter((e) => e.type === 'shape')
+    expect(shapes).toEqual([
+      expect.objectContaining({ kind: 'rect', x: 100, y: 100, width: 100, height: 60, color: '#000000', fill: '#808080' }),
+      expect.objectContaining({ kind: 'line', x: 10, y: 40, width: 50, height: -30, color: '#0000ff' }),
+      expect.objectContaining({ kind: 'ellipse', width: 40, height: 20, color: '#00ff00', fill: '#00ff00' }),
+    ])
+    // Y de vuelta: el rectángulo relleno sale relleno (1004) y con su borde (1002).
+    const types = parsePcSimu(exportPcSimu(project).text).map((o) => o.type).sort()
+    expect(types).toEqual([1001, 1002, 1004, 1005])
   })
 })

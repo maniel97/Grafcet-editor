@@ -177,6 +177,13 @@ const OBJECTS = {
   },
   // Potenciómetro: f5 n.º de la entrada analógica (AIW f5); f9 forma (1: lineal horizontal); f16 0 unipolar.
   pot: { type: 17, name: 'Potenciómetro', area: 'I', size: [40, 30], fields: ({ ai }) => [0, ai, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0] },
+  // Dibujos (los «Dibujo» del editor): línea 1001 (f4 1: \, 2: /), rectángulo 1002, elipse 1003, y rellenos 1004
+  // y 1005; f15, el color (COLORREF de Windows, 0x00BBGGRR).
+  line: { type: 1001, name: '', area: 'I', fields: ({ flip, color }) => [flip ? 2 : 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, color, 0, 0] },
+  rectangle: { type: 1002, name: '', area: 'I', fields: ({ color }) => [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, color, 0, 0] },
+  ellipse: { type: 1003, name: '', area: 'I', fields: ({ color }) => [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, color, 0, 0] },
+  rectangleFill: { type: 1004, name: '', area: 'I', fields: ({ color }) => [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, color, 0, 0] },
+  ellipseFill: { type: 1005, name: '', area: 'I', fields: ({ color }) => [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, color, 0, 0] },
   // Texto suelto (los rótulos de una planta de frente).
   caption: { type: 1008, name: '', area: 'I', fields: () => [], text: ({ caption }) => caption },
   // Válvula: abre con f5.f7; f10 caudal (lo que sube o baja por paso el nivel del depósito, en la escala de su
@@ -523,6 +530,24 @@ export function exportPcSimu(project, { reserved = [], addressOf } = {}) {
       else {
         if (k >= 0) warnings.push(`${title}: en PC_SIMU un selector usa entradas seguidas, una por posición; sale como interruptores sueltos.`)
         vars.forEach((v, i) => at[i] && rows[1].push({ object: 'switch', name: v, ...at[i], nc: 0 }))
+      }
+      continue
+    }
+    if (e.type === 'shape') {
+      // #rrggbb -> COLORREF (0x00BBGGRR).
+      const colorref = (hex) => {
+        const m = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex || '#000000') ?? [0, '00', '00', '00']
+        return parseInt(m[1], 16) + parseInt(m[2], 16) * 256 + parseInt(m[3], 16) * 65536
+      }
+      const w = Number(e.width) || 0
+      const h = Number(e.height) || 0
+      const rect = [Math.min(e.x, e.x + w), Math.min(e.y, e.y + h), Math.max(e.x, e.x + w), Math.max(e.y, e.y + h)]
+      const color = colorref(e.color)
+      if (e.kind === 'line') machine.push({ object: 'line', name: '', rect, flip: w * h < 0, color })
+      else {
+        const ellipse = e.kind === 'ellipse'
+        if (e.fill) machine.push({ object: ellipse ? 'ellipseFill' : 'rectangleFill', name: '', rect, color: colorref(e.fill) })
+        if (!e.fill || colorref(e.fill) !== color) machine.push({ object: ellipse ? 'ellipse' : 'rectangle', name: '', rect, color })
       }
       continue
     }
