@@ -590,7 +590,7 @@ test('ejemplo pick & place: la ventosa lleva la pieza del almacén al destino', 
   await view.getByRole('button', { name: '+ Pick & place (2 cilindros)' }).click()
   const props = view.getByLabel('Propiedades del elemento')
   await expect(props.getByRole('combobox', { name: 'Montado en el vástago de' })).toHaveValue(/.+/)
-  await expect(props.getByRole('combobox', { name: 'Ventosa: vacío (opcional)' })).toBeVisible()
+  await expect(props.getByRole('combobox', { name: 'Ventosa o pinza: coge (opcional)' })).toBeVisible()
   expectNoErrors(errors)
 })
 
