@@ -263,6 +263,14 @@ const OBJECTS = {
   },
   // Teclado (tipo 4): f10 filas × f11 columnas de teclas, cada una una entrada, seguidas desde f5.f7 (f16 = 0).
   keypad: { type: 4, name: 'Teclado', area: 'I', size: [75, 100], fields: ({ byte, bit, rows, cols }) => [0, byte, 0, bit, 0, 0, rows, cols, 0, 0, 0, 0, 0, 0] },
+  // Motor paso a paso (tipo 30): salidas f5.f7, f6.f8, f14.f15, f10.f11; cero f12.f13; f16 controlador; f17 medio
+  // paso; f9 pasos por vuelta (500, 200, 100, 48, 40, 24); f4 = 1, el disco graduado.
+  stepper: {
+    type: 30,
+    name: 'Motor paso a paso',
+    size: [100, 100],
+    fields: ({ o, zero, drive, half, steps }) => [1, o[0].byte, o[1].byte, o[0].bit, o[1].bit, steps, o[3].byte, o[3].bit, zero.byte, zero.bit, o[2].byte, o[2].bit, drive, half ? 1 : 0],
+  },
   // Teclado en matriz (tipo 4, f16 = 1): columnas en entradas desde f5.f7, filas en salidas desde f6.f8; f10 filas,
   // f11 columnas; «texto», el rótulo de la primera tecla.
   keypadMatrix: { type: 4, name: 'Teclado', area: 'I', size: [75, 100], fields: ({ col, row, rows, cols }) => [0, col.byte, row.byte, col.bit, row.bit, 0, rows, cols, 0, 0, 0, 0, 1, 0] },
@@ -665,6 +673,29 @@ export function exportPcSimu(project, { reserved = [], addressOf } = {}) {
       }
       if (at.some((a, k) => !a || index(a) !== index(at[0]) + k)) warnings.push(`${title}: PC_SIMU lee una cifra en 4 bits seguidos desde el de peso 1; se exporta desde ${area}${at[0].byte}.${at[0].bit}.`)
       ;(area === 'Q' ? rows[0] : rows[1]).push({ object: e.type === 'digit' ? 'digit' : 'wheel', name: title, ...at[0] })
+      continue
+    }
+    if (e.type === 'stepper') {
+      const title = e.text?.trim() || e.o1?.trim() || typeName(e)
+      const o = [1, 2, 3, 4].map((k) => (e[`o${k}`]?.trim() ? bitOf(e[`o${k}`].trim(), 'Q') : null))
+      if (!o[0]) {
+        warnings.push(`${title}: sin su salida 1; no se exporta.`)
+        continue
+      }
+      const free = { byte: 0, bit: 0 }
+      const zero = e.zero?.trim() ? bitOf(e.zero.trim(), 'I') : null
+      const item = {
+        object: 'stepper',
+        name: title,
+        ...o[0],
+        o: o.map((a) => a ?? free),
+        zero: zero ?? free,
+        drive: ['unipolar', 'bipolar', 'cwccw', 'pulseDir'].indexOf(e.drive ?? 'pulseDir'),
+        half: Boolean(e.half),
+        steps: Math.max(0, [500, 200, 100, 48, 40, 24].indexOf(Number(e.steps) || 200)),
+      }
+      if (front && e.place !== 'desk') machine.push({ ...item, rect: [e.x - 50, e.y - 50, e.x + 50, e.y + 50] })
+      else rows[0].push(item)
       continue
     }
     if (e.type === 'keypadMatrix') {

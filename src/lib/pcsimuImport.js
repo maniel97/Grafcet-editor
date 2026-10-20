@@ -10,6 +10,8 @@ const COLOR_OF = { 0: 'green', 1: 'black', 2: 'blue', 3: 'blue', 4: 'red', 5: 'r
 const ROT = { 0: 0, 1: 180, 2: 270, 3: 90 }
 // Lado por el que se acciona un final de carrera -> giro del editor.
 const LIMIT_ROT = { 2: 0, 0: 90, 3: 180, 1: 270 }
+// Pasos por vuelta del motor paso a paso, por su f9.
+const STEPS = [500, 200, 100, 48, 40, 24]
 const DESK = new Set(['button', 'switch', 'emergency', 'selector', 'keypad', 'keypadMatrix', 'potentiometer', 'lamp', 'bargraph', 'digit', 'digitSwitch'])
 
 // Color de Windows (COLORREF: 0x00BBGGRR) -> #rrggbb.
@@ -384,9 +386,24 @@ export function importPcSimu(text, images = {}) {
       case 1006:
         paints.push(o) // el bote de pintura: rellena la figura en la que cae (abajo)
         break
-      case 30:
-        skip('motor paso a paso')
+      case 30: {
+        // Motor paso a paso: salidas f5.f7, f6.f8, f14.f15 y f10.f11; cero en f12.f13; f16 controlador (0 unipolar,
+        // 1 bipolar, 2 pulsos a derechas / izquierdas, 3 pulsos y sentido); f17 = 1 medio paso; f9 pasos por vuelta.
+        const drive = ['unipolar', 'bipolar', 'cwccw', 'pulseDir'][f(o, 16)] ?? 'pulseDir'
+        const four = drive === 'unipolar' || drive === 'bipolar'
+        add(o, 'stepper', {
+          ...at(o),
+          drive,
+          half: f(o, 17) === 1,
+          steps: STEPS[f(o, 9)] ?? 200,
+          o1: output(o, f(o, 5), f(o, 7)),
+          o2: output(o, f(o, 6), f(o, 8)),
+          o3: four ? output(o, f(o, 14), f(o, 15)) : '',
+          o4: four ? output(o, f(o, 10), f(o, 11)) : '',
+          zero: input(o, f(o, 12), f(o, 13)),
+        })
         break
+      }
       case 12:
       case 5: {
         // Display (12) o preselector (5) de f11 cifras: cada una, 4 bits seguidos desde f5.f7 (la primera, la de la

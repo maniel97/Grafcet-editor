@@ -346,6 +346,22 @@ describe('escena: detectores típicos y sensores analógicos', () => {
     expect(sceneInputs(scene, s)).toEqual({ C1: 0, C2: 1 })
   })
 
+  it('motor paso a paso: un paso por pulso (sentido con la otra salida) y, en 4 fases, por el giro de la fase', () => {
+    const e = { id: 'm', type: 'stepper', x: 0, y: 0, drive: 'pulseDir', steps: 24, o1: 'P', o2: 'D', zero: 'Z' }
+    let s = sceneInit({ elements: [e] })
+    const pulse = (st, extra = {}) => run({ elements: [e] }, run({ elements: [e] }, st, { P: 1, ...extra }, 0.05), extra, 0.05)
+    s = pulse(pulse(s))
+    expect(s.angle.m).toBe(30)
+    expect(sceneInputs({ elements: [e] }, s).Z).toBe(0)
+    s = pulse(pulse(s, { D: 1 }), { D: 1 })
+    expect(s.angle.m).toBe(0)
+    expect(sceneInputs({ elements: [e] }, s).Z).toBe(1)
+    const four = { ...e, drive: 'bipolar', o1: 'A', o2: 'B', o3: 'C', o4: 'E' }
+    let t = sceneInit({ elements: [four] })
+    for (const phase of ['A', 'B', 'C']) t = run({ elements: [four] }, t, { [phase]: 1 }, 0.05)
+    expect(t.angle.m).toBe(30) // A -> B -> C: dos pasos de 15°
+  })
+
   it('calentador: la temperatura sube con la resistencia y el termostato salta en la consigna', () => {
     const scene = { elements: [{ id: 'h', type: 'heater', x: 0, y: 0, heat: 'R', temperature: 'T', thermostat: 'TS', setpoint: 60, ambient: 20, maxTemp: 120, tau: 10 }] }
     let s = sceneInit(scene)

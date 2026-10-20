@@ -28,9 +28,9 @@ describe('Importar de PC_SIMU (.sim)', () => {
   })
 
   it('lo que no tiene equivalente, contado aparte (para el aviso)', () => {
-    const stepper = { type: 30, rect: [0, 0, 40, 40], fields: [] }
-    const { skipped } = importPcSimu(pcsimuText([stepper, stepper]))
-    expect(skipped).toEqual([{ what: 'motor paso a paso', count: 2 }])
+    const unknown = { type: 99, rect: [0, 0, 40, 40], fields: [] }
+    const { skipped } = importPcSimu(pcsimuText([unknown, unknown]))
+    expect(skipped).toEqual([{ what: 'objeto de tipo 99', count: 2 }])
   })
 
   it('las variables, con el nombre del rótulo de al lado (y su dirección)', () => {
@@ -160,5 +160,16 @@ describe('Importar de PC_SIMU (.sim)', () => {
     expect(k).toMatchObject({ type: 'keypadMatrix', rows: 2, columns: 2, labels: '1,2,3,4', r1: 'Q4_0', r2: 'Q4_1', c1: 'I1_0', c2: 'I1_1' })
     const out = parsePcSimu(exportPcSimu(project).text).find((o) => o.type === 4)
     expect([out.fields[1], out.fields[2], out.fields[3], out.fields[4], out.fields[6], out.fields[7], out.fields[12]]).toEqual([1, 4, 0, 0, 2, 2, 1])
+  })
+
+  it('motor paso a paso: su controlador, sus pasos y sus salidas, de ida y vuelta', () => {
+    const variables = { P: { address: 'Q0.0' }, D: { address: 'Q0.1' }, Z: { address: 'I0.3' } }
+    const elements = [{ id: 's', type: 'stepper', x: 100, y: 100, drive: 'cwccw', steps: 24, o1: 'P', o2: 'D', zero: 'Z' }]
+    const sim = exportPcSimu({ plc: { variables, scene: { gravity: true, elements } } })
+    const o = parsePcSimu(sim.text).find((x) => x.type === 30)
+    expect([o.fields[1], o.fields[3], o.fields[4], o.fields[5], o.fields[9], o.fields[12]]).toEqual([0, 0, 1, 5, 3, 2])
+    const stepper = importPcSimu(sim.text).project.plc.scene.elements.find((e) => e.type === 'stepper')
+    // Un rótulo por objeto: la primera salida recupera su nombre; las demás, el de su dirección.
+    expect(stepper).toMatchObject({ drive: 'cwccw', steps: 24, o1: 'P', o2: 'Q0_1', zero: 'I0_3' })
   })
 })

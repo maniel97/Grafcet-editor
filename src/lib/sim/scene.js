@@ -77,6 +77,14 @@ export const SCENE_TYPES = {
   // Motor: gira con su salida (con `stop`, arranca con ella y para con la de parar, como un biestable). look: su
   // dibujo, como las herramientas de PC_SIMU (MOTOR_LOOKS); size: su tamaño (px); mountedOn: en el vástago de un
   // cilindro.
+  // Motor paso a paso, como el de PC_SIMU: un paso (360° / steps) por pulso. drive: 'pulseDir' (o1 pulsos, o2
+  // sentido), 'cwccw' (o1 pulsos a derechas, o2 a izquierdas), 'unipolar' o 'bipolar' (o1…o4, las 4 fases: el
+  // sentido, por el giro de la fase activa; con medio paso, medio paso por cambio). zero: a 1 en la posición 0.
+  stepper: {
+    label: N_('Motor paso a paso'),
+    group: N_('Actuadores'),
+    defaults: { drive: 'pulseDir', half: false, steps: 200, o1: '', o2: '', o3: '', o4: '', zero: '', text: '' },
+  },
   motor: { label: N_('Motor'), group: N_('Actuadores'), defaults: { variable: '', reverse: '', pulses: '', stop: '', look: 'motor', size: 40, mountedOn: '', text: '' } },
   display: { label: N_('Visualizador'), group: N_('Señalización'), defaults: { variable: '', text: '' } },
   // Barra: el valor de una variable (analógica o numérica) entre un mínimo y un máximo.
@@ -203,6 +211,13 @@ export const SCENE_VARS = {
     ['high', 'Sensor nivel alto', 'in'],
     ['empty', N_('Sensor de vacío (opcional)'), 'in'],
     ['level', N_('Nivel (analógica)'), 'analog'],
+  ],
+  stepper: [
+    ['o1', N_('Salida 1 (pulsos, o fase 1)'), 'out'],
+    ['o2', N_('Salida 2 (sentido, pulsos a izquierdas o fase 2)'), 'out'],
+    ['o3', N_('Salida 3 (fase 3)'), 'out'],
+    ['o4', N_('Salida 4 (fase 4)'), 'out'],
+    ['zero', N_('Detector de cero (entrada)'), 'in'],
   ],
   motor: [
     ['variable', 'Marcha', 'out'],
@@ -498,6 +513,8 @@ const elementsOf = (scene) => scene?.elements ?? []
 
 // Selector: cuántas posiciones tiene (de 2 a 4) y en cuál empieza.
 export const selectorPositions = (e) => Math.min(4, Math.max(2, Math.round(Number(e.positions) || 3)))
+// Motor paso a paso: lo que gira cada paso (grados).
+export const stepAngle = (e) => 360 / Math.max(1, Number(e.steps) || 200)
 // Cifra BCD: el número de sus 4 bits (de 0 a 15; más de 9 no es una cifra).
 export const digitValue = (e, values) => [1, 2, 4, 8].reduce((v, w) => v + (Number(values?.[e[`b${w}`]]) ? w : 0), 0)
 // Ascensor: cuántas plantas (de 2 a 4).
@@ -683,6 +700,32 @@ export function sceneStep(scene, state, values, dt) {
     const closing = e.close ? on(values, e.close) : !opening
     const dir = opening && !closing ? 1 : closing && !opening ? -1 : 0
     if (dir) next.pos[e.id] = Math.round(clamp((next.pos[e.id] ?? 0) + (dir * dt) / Math.max(0.1, Number(e.time) || 2)) * 1e6) / 1e6
+  }
+
+  // Motores paso a paso: cada pulso (flanco de subida) o cambio de fase, un paso.
+  for (const e of elements) {
+    if (e.type !== 'stepper' || stuck(e)) continue
+    const now = [1, 2, 3, 4].map((k) => on(values, e[`o${k}`]))
+    const before = next.stepIn?.[e.id] ?? [false, false, false, false]
+    let steps = 0
+    if (e.drive === 'cwccw') steps = (now[0] && !before[0] ? 1 : 0) - (now[1] && !before[1] ? 1 : 0)
+    else if (e.drive === 'unipolar' || e.drive === 'bipolar') {
+      // La fase activa como un vector (fase k a 90°·k): el giro de una a otra, en pasos completos (90°).
+      const phase = (p) => {
+        const x = (p[0] ? 1 : 0) - (p[2] ? 1 : 0)
+        const y = (p[1] ? 1 : 0) - (p[3] ? 1 : 0)
+        return x || y ? Math.atan2(y, x) : null
+      }
+      const a = phase(before)
+      const b = phase(now)
+      if (a !== null && b !== null) {
+        let d = ((b - a) * 180) / Math.PI
+        d = ((d + 540) % 360) - 180
+        steps = Math.round(d / 45) / 2 // de medio en medio paso
+      }
+    } else if (now[0] && !before[0]) steps = now[1] ? -1 : 1
+    if (steps) next.angle = { ...next.angle, [e.id]: (((next.angle?.[e.id] ?? 0) + steps * stepAngle(e)) % 360 + 360) % 360 }
+    next.stepIn = { ...next.stepIn, [e.id]: now }
   }
 
   // Teclados en matriz: las filas que el programa tiene activas (las entradas de sus columnas las leen).
@@ -883,6 +926,10 @@ export function sceneInputs(scene, state, analogRange = () => null) {
       if (e.temperature) inputs[e.temperature] = fault(e) === 'sensor:temperature' ? 0 : t
       if (e.thermostat) inputs[e.thermostat] = t >= Number(e.setpoint ?? 60) ? 1 : 0
     }
+    if (e.type === 'stepper' && e.zero) {
+      const a = (((state.angle?.[e.id] ?? 0) % 360) + 360) % 360
+      inputs[e.zero] = a < stepAngle(e) / 2 || a > 360 - stepAngle(e) / 2 ? 1 : 0
+    }
     if (e.type === 'motor' && e.pulses) {
       // Medio giro a 1 y medio a 0 (en los dos sentidos).
       const angle = (((state.angle?.[e.id] ?? 0) % 360) + 360) % 360
@@ -1055,6 +1102,7 @@ const REQUIRED = {
   heater: ['heat'],
   tank: ['fill', 'drain'],
   motor: ['variable'],
+  stepper: ['o1'],
   display: ['variable'],
   bargraph: ['variable'],
   selector: ['pos1', 'pos2', 'pos3', 'pos4'],

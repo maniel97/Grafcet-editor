@@ -929,6 +929,21 @@ function MotorShape({ angle, running, look = 'motor', size = 40 }) {
   })()
   return <g transform={k === 1 ? undefined : `scale(${k})`}>{body}</g>
 }
+// Motor paso a paso: un disco graduado (una marca cada 30°) con su aguja, y el cero arriba.
+function StepperShape({ angle }) {
+  return (
+    <g>
+      <circle r="28" fill="#f8fafc" stroke={INK} strokeWidth="1.5" />
+      {Array.from({ length: 12 }, (_, i) => (
+        <line key={i} x1="0" y1="-28" x2="0" y2={i === 0 ? -20 : -24} stroke={i === 0 ? '#dc2626' : '#64748b'} strokeWidth={i === 0 ? 2 : 1} transform={`rotate(${i * 30})`} />
+      ))}
+      <g transform={`rotate(${angle})`}>
+        <path d="M -3 0 L 0 -22 L 3 0 Z" fill="#475569" />
+      </g>
+      <circle r="4" fill={INK} />
+    </g>
+  )
+}
 function DisplayShape({ value }) {
   const text = Number.isFinite(Number(value)) ? String(Math.round(Number(value) * 100) / 100).replace('.', ',') : '—'
   return (
@@ -1048,6 +1063,8 @@ function boundsOf(e, pos = 0) {
       return sinkRect(e)
     case 'tank':
       return r(0, -24, TANK.w + 14, TANK.h + 40)
+    case 'stepper':
+      return r(-30, -30, 60, 60)
     case 'motor': {
       const k = (Number(e.size) || 40) / 40
       return r(-24 * k, -28 * k, 48 * k, 52 * k)
@@ -1722,6 +1739,35 @@ function Properties({ element, variables, onChange, onDelete, onRotate, onCreate
           {number('initial', tr('Planta al empezar (0: la baja)'), 0, 1)}
         </>
       )}
+      {element.type === 'stepper' && (
+        <>
+          <label className="block">
+            <span className="text-slate-500">{tr('Controlador')}</span>
+            <select value={element.drive ?? 'pulseDir'} onChange={(ev) => set({ drive: ev.target.value })} className={field}>
+              <option value="pulseDir">{tr('Pulsos y sentido')}</option>
+              <option value="cwccw">{tr('Pulsos a derechas y a izquierdas')}</option>
+              <option value="unipolar">{tr('4 fases, unipolar')}</option>
+              <option value="bipolar">{tr('4 fases, bipolar')}</option>
+            </select>
+          </label>
+          <label className="block">
+            <span className="text-slate-500">{tr('Pasos por vuelta')}</span>
+            <select value={String(element.steps ?? 200)} onChange={(ev) => set({ steps: Number(ev.target.value) })} className={field}>
+              {[500, 200, 100, 48, 40, 24].map((n) => (
+                <option key={n} value={n}>
+                  {n} ({Math.round((3600 / n)) / 10}°)
+                </option>
+              ))}
+            </select>
+          </label>
+          {(element.drive === 'unipolar' || element.drive === 'bipolar') && (
+            <label className="flex items-center gap-1">
+              <input type="checkbox" checked={Boolean(element.half)} onChange={(ev) => set({ half: ev.target.checked })} />
+              {tr('Medio paso')}
+            </label>
+          )}
+        </>
+      )}
       {element.type === 'keypadMatrix' && (
         <>
           {number('rows', tr('Filas (de 1 a 4)'), 1, 1)}
@@ -1926,6 +1972,7 @@ const HINTS = {
   digit: N_('Cifra BCD: una cifra de display, de 0 a 9, que el programa pone en 4 salidas (bits de peso 1, 2, 4 y 8), como los displays de PC_SIMU.'),
   digitSwitch: N_('Rueda BCD: una cifra de preselector, de 0 a 9, que pone 4 entradas (bits de peso 1, 2, 4 y 8). En modo Usar, arriba la sube y abajo la baja.'),
   keypadMatrix: N_('Teclado en matriz, como el de PC_SIMU: el programa activa las filas una a una (salidas) y lee en las columnas (entradas) las teclas pulsadas de la fila activa.'),
+  stepper: N_('Motor paso a paso, como el de PC_SIMU: gira un paso por pulso (o por cambio de fase, en los de 4 fases), con un detector de cero.'),
   keypad: N_('Teclado: de 1 a 12 teclas, cada una un pulsador con su entrada (a 1 mientras se mantiene pulsada). En modo Usar, pulsa las teclas.'),
   preselector: N_('Preselector: de 1 a 4 cifras que dan un número a su variable (piezas por lote, una consigna…). En modo Usar, pulsa encima de una cifra para subirla y debajo para bajarla.'),
   bargraph: N_('Barra: muestra el valor de una variable (analógica o numérica) entre un mínimo y un máximo.'),
@@ -1978,6 +2025,7 @@ function ModulePreview({ item }) {
     selector: <SelectorShape e={{ ...e, pos1: tr('Manual'), pos3: tr('Automático') }} at={2} />,
     bargraph: <BargraphShape e={e} value={65} />,
     keypad: <KeypadShape e={e} pressed={(i) => i === 4} />,
+    stepper: <StepperShape angle={60} />,
     keypadMatrix: <KeypadShape e={{ ...e, rows: 4, columns: 3 }} pressed={(i) => i === 4} />,
     digit: <DigitShape value={7} />,
     digitSwitch: <DigitSwitchShape value={3} />,
@@ -2104,6 +2152,8 @@ function drawElement(e, { scene, state, values, time, signals, iso = false }) {
       return <SinkShape count={state.counts[e.id] ?? 0} />
     case 'tank':
       return <TankShape e={e} level={state.level?.[e.id] ?? (Number(e.initial) || 0)} values={values} iso={iso} />
+    case 'stepper':
+      return <StepperShape angle={state.angle?.[e.id] ?? 0} />
     case 'motor':
       return <MotorShape angle={state.angle?.[e.id] ?? 0} running={motorRunning(e, state, values)} look={e.look} size={e.size} />
     case 'display':
@@ -2176,7 +2226,7 @@ export function SceneStatic({ scene, variables = [] }) {
     for (let i = 0; i < items.length; i += 2) lines.push(items.slice(i, i + 2).join(' · '))
     return lines
   }
-  const turns = (e) => !['button', 'switch', 'emergency', 'lamp', 'sink', 'feeder', 'tank', 'motor', 'display', 'scale', 'potentiometer', 'selector', 'keypad', 'keypadMatrix', 'preselector', 'digit', 'digitSwitch', 'bargraph', 'elevator', 'heater', 'siren', 'trafficlight', 'label', 'image', 'shape'].includes(e.type)
+  const turns = (e) => !['button', 'switch', 'emergency', 'lamp', 'sink', 'feeder', 'tank', 'motor', 'display', 'scale', 'potentiometer', 'selector', 'keypad', 'keypadMatrix', 'preselector', 'digit', 'stepper', 'digitSwitch', 'bargraph', 'elevator', 'heater', 'siren', 'trafficlight', 'label', 'image', 'shape'].includes(e.type)
   const desk = elements.filter((e) => DESK_TYPES.includes(e.type) && e.place === 'desk')
   const machine = elements.filter((e) => !desk.includes(e))
   const boxes = machine.map((e) => boundsOf(placed(scene, state, e), 1))
@@ -2967,7 +3017,7 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
   const deskItems = elements.filter(isDesk)
   const draw = (e) => drawElement(e, { scene, state, values, time, signals, iso })
   // Los mandos y pilotos no se giran (su rótulo se lee siempre).
-  const turns = (e) => !['button', 'switch', 'emergency', 'lamp', 'sink', 'feeder', 'tank', 'motor', 'display', 'scale', 'potentiometer', 'selector', 'keypad', 'keypadMatrix', 'preselector', 'digit', 'digitSwitch', 'bargraph', 'elevator', 'heater', 'siren', 'trafficlight', 'label', 'image', 'shape'].includes(e.type)
+  const turns = (e) => !['button', 'switch', 'emergency', 'lamp', 'sink', 'feeder', 'tank', 'motor', 'display', 'scale', 'potentiometer', 'selector', 'keypad', 'keypadMatrix', 'preselector', 'digit', 'stepper', 'digitSwitch', 'bargraph', 'elevator', 'heater', 'siren', 'trafficlight', 'label', 'image', 'shape'].includes(e.type)
   const operable = (e) => ['button', 'switch', 'emergency', 'selector', 'keypad', 'keypadMatrix', 'preselector', 'digitSwitch', 'feeder', 'potentiometer'].includes(e.type) || (e.type === 'image' && Boolean(e.press))
   const underRank = (e) => (e.type === 'image' ? -2 : UNDER.includes(e.type) ? -1 : 0)
   // Elementos y piezas en orden de dibujo: lo de debajo primero (las piezas van encima). En la
