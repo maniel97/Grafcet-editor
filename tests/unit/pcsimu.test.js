@@ -411,6 +411,22 @@ describe('PC_SIMU (.sim)', () => {
     expect(cpu.words.get('VW50')).toBe(47)
   })
 
+  it('ascensor: el de PC_SIMU, con sus salidas y sus entradas empaquetadas de 4 en 4 bits', () => {
+    const v = (address) => ({ address })
+    const variables = { S: v('Q0.0'), B: v('Q0.1'), AP: v('Q0.2'), CP: v('Q0.3'), P0: v('I0.0'), P1: v('I0.1'), P2: v('I0.2'), PA: v('I0.4'), PC: v('I0.5') }
+    const elements = [{ id: 'a', type: 'elevator', x: 0, y: 0, floors: 3, up: 'S', down: 'B', open: 'AP', close: 'CP', f1: 'P0', f2: 'P1', f3: 'P2', doorOpen: 'PA', doorClosed: 'PC', text: 'Ascensor' }]
+    const { text, warnings } = exportPcSimu({ plc: { variables, scene: { elements } } })
+    const [a] = parsePcSimu(text).filter((o) => o.type === 27)
+    const f = (k) => a.fields[k - 4]
+    expect([f(5), f(7), f(6), f(8), f(4), f(14), f(12), f(16)]).toEqual([0, 0, 0, 1, 0, 2, 0, 3])
+    const nib = (x) => Array.from({ length: 8 }, (_, i) => (x >> (4 * i)) & 15)
+    // f10: puerta abierta I0.4, cerrada I0.5, modo 0, (cabina), byte de la B (0); f11: bit de la B y las plantas
+    // 1 (I0.1), 2 (I0.2) y 3 (la que no tiene el del editor: la primera entrada libre, I0.3).
+    expect(nib(f(10))).toEqual([0, 4, 0, 5, 0, 0, 0, 0])
+    expect(nib(f(11))).toEqual([0, 0, 1, 0, 2, 0, 3, 0])
+    expect(warnings).toEqual(['Ascensor: el ascensor de PC_SIMU tiene 4 plantas (B, 1, 2 y 3); las que sobran, con detectores en entradas libres.'])
+  })
+
   it('todos los ejemplos del editor se exportan sin pisarse', () => {
     for (const example of EXAMPLES) {
       const objects = parsePcSimu(exportPcSimu(example.build()).text)

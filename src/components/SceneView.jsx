@@ -27,6 +27,7 @@ import {
   platformRect,
   SCENE_FLOOR,
   selectorPositions,
+  elevatorFloors,
   keypadColumns,
   keypadCount,
   keypadLabel,
@@ -247,6 +248,35 @@ function SelectorShape({ e, at }) {
       <circle r="17" fill="#e2e8f0" stroke={INK} />
       <rect x="-4" y="-15" width="8" height="30" rx="3" fill="#334155" transform={`rotate(${angle(at)})`} />
       <circle r="3" cy="-10" fill="white" transform={`rotate(${angle(at)})`} />
+    </g>
+  )
+}
+// Ascensor: el hueco con sus plantas (la baja abajo), la cabina a su altura y la puerta en dos hojas que se
+// abren hacia los lados.
+const FLOOR_H = 60
+const SHAFT_W = 70
+function ElevatorShape({ e, at = 0, door = 0, values = {} }) {
+  const n = elevatorFloors(e)
+  const h = n * FLOOR_H
+  const y = (k) => h / 2 - (k + 1) * FLOOR_H // borde de arriba de la planta k
+  const cabinY = y(at) + 6
+  const leaf = ((SHAFT_W - 20) / 2) * (1 - door)
+  return (
+    <g>
+      <rect x={-SHAFT_W / 2} y={-h / 2} width={SHAFT_W} height={h} fill="#f1f5f9" stroke={INK} />
+      {Array.from({ length: n }, (_, k) => (
+        <g key={k}>
+          <line x1={-SHAFT_W / 2} x2={SHAFT_W / 2} y1={y(k) + FLOOR_H} y2={y(k) + FLOOR_H} stroke="#94a3b8" />
+          <text x={-SHAFT_W / 2 - 4} y={y(k) + FLOOR_H / 2 + 4} textAnchor="end" fontSize="11" fill={isOn(values, e[`f${k + 1}`]) ? ON : INK}>
+            {k === 0 ? 'B' : k}
+          </text>
+        </g>
+      ))}
+      <rect x={-SHAFT_W / 2 + 6} y={cabinY} width={SHAFT_W - 12} height={FLOOR_H - 12} rx="2" fill="#cbd5e1" stroke="#334155" strokeWidth="1.5" />
+      <rect x={-SHAFT_W / 2 + 10} y={cabinY + 4} width={leaf} height={FLOOR_H - 20} fill="#64748b" />
+      <rect x={SHAFT_W / 2 - 10 - leaf} y={cabinY + 4} width={leaf} height={FLOOR_H - 20} fill="#64748b" />
+      {isOn(values, e.up) && <path d={`M ${SHAFT_W / 2 + 8} ${-6} l 6 -10 l 6 10 z`} fill={ON} />}
+      {isOn(values, e.down) && <path d={`M ${SHAFT_W / 2 + 8} ${6} l 6 10 l 6 -10 z`} fill={ON} />}
     </g>
   )
 }
@@ -720,6 +750,10 @@ function boundsOf(e, pos = 0) {
       return r(-22, -22, 44, 60)
     case 'selector':
       return r(-32, -36, 64, 56)
+    case 'elevator': {
+      const h = elevatorFloors(e) * FLOOR_H
+      return r(-SHAFT_W / 2 - 16, -h / 2, SHAFT_W + 40, h)
+    }
     case 'keypad': {
       const { w, h } = keypadSize(e)
       return r(-w / 2 - 4, -h / 2 - 4, w + 8, h + 8)
@@ -1284,6 +1318,14 @@ function Properties({ element, variables, onChange, onDelete, onRotate, onCreate
           </label>
         </>
       )}
+      {element.type === 'elevator' && (
+        <>
+          {number('floors', tr('Plantas (de 2 a 4)'), 2, 1)}
+          {number('floorTime', tr('De una planta a la siguiente (s)'), 0.5, 0.5)}
+          {number('doorTime', tr('Abrir o cerrar la puerta (s)'), 0.2, 0.1)}
+          {number('initial', tr('Planta al empezar (0: la baja)'), 0, 1)}
+        </>
+      )}
       {element.type === 'keypad' && (
         <>
           {number('count', tr('Teclas (de 1 a 12)'), 1, 1)}
@@ -1472,6 +1514,7 @@ const HINTS = {
   scale: N_('Báscula: valor analógico con el peso (kg) de las piezas que tiene encima; el metal pesa el triple.'),
   potentiometer: N_('Potenciómetro: entrada analógica manual (consignas, velocidades…). En modo Usar, arrastra a izquierda o derecha.'),
   selector: N_('Selector: de 2 a 4 posiciones (Manual / 0 / Automático…), cada una con su entrada, que está a 1 mientras el selector está en ella. En modo Usar, pulsa para pasar a la siguiente.'),
+  elevator: N_('Ascensor: cabina que sube y baja entre 2 y 4 plantas, con un detector en cada una, y puerta que se abre y se cierra con sus finales de carrera. Las llamadas, con pulsadores.'),
   keypad: N_('Teclado: de 1 a 12 teclas, cada una un pulsador con su entrada (a 1 mientras se mantiene pulsada). En modo Usar, pulsa las teclas.'),
   preselector: N_('Preselector: de 1 a 4 cifras que dan un número a su variable (piezas por lote, una consigna…). En modo Usar, pulsa encima de una cifra para subirla y debajo para bajarla.'),
   bargraph: N_('Barra: muestra el valor de una variable (analógica o numérica) entre un mínimo y un máximo.'),
@@ -1523,6 +1566,7 @@ function ModulePreview({ item }) {
     selector: <SelectorShape e={{ ...e, pos1: tr('Manual'), pos3: tr('Automático') }} at={2} />,
     bargraph: <BargraphShape e={e} value={65} />,
     keypad: <KeypadShape e={e} pressed={(i) => i === 4} />,
+    elevator: <ElevatorShape e={e} at={1} door={0.6} />,
     preselector: <PreselectorShape e={e} value={25} />,
     heater: <HeaterShape e={e} temp={85} heating />,
     diverter: <DiverterShape e={e} active />,
@@ -1676,6 +1720,8 @@ function drawElement(e, { scene, state, values, time, signals, iso = false }) {
       return <SelectorShape e={e} at={state.selected?.[e.id] ?? (Number(e.initial) || 0)} />
     case 'bargraph':
       return <BargraphShape e={e} value={values[e.variable]} />
+    case 'elevator':
+      return <ElevatorShape e={e} at={state.lift?.[e.id]?.at ?? (Number(e.initial) || 0)} door={state.lift?.[e.id]?.door ?? 0} values={values} />
     case 'keypad':
       return <KeypadShape e={e} pressed={(i) => Boolean(state.pressed?.[`${e.id}:${i}`])} />
     case 'preselector':
@@ -1705,7 +1751,7 @@ export function SceneStatic({ scene, variables = [] }) {
     for (let i = 0; i < items.length; i += 2) lines.push(items.slice(i, i + 2).join(' · '))
     return lines
   }
-  const turns = (e) => !['button', 'switch', 'emergency', 'lamp', 'sink', 'feeder', 'tank', 'motor', 'display', 'scale', 'potentiometer', 'selector', 'keypad', 'preselector', 'bargraph', 'heater', 'siren', 'trafficlight', 'label', 'image'].includes(e.type)
+  const turns = (e) => !['button', 'switch', 'emergency', 'lamp', 'sink', 'feeder', 'tank', 'motor', 'display', 'scale', 'potentiometer', 'selector', 'keypad', 'preselector', 'bargraph', 'elevator', 'heater', 'siren', 'trafficlight', 'label', 'image'].includes(e.type)
   const desk = elements.filter((e) => DESK_TYPES.includes(e.type) && e.place === 'desk')
   const machine = elements.filter((e) => !desk.includes(e))
   const boxes = machine.map((e) => boundsOf(placed(scene, state, e), 1))
@@ -2490,7 +2536,7 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
   const deskItems = elements.filter(isDesk)
   const draw = (e) => drawElement(e, { scene, state, values, time, signals, iso })
   // Los mandos y pilotos no se giran (su rótulo se lee siempre).
-  const turns = (e) => !['button', 'switch', 'emergency', 'lamp', 'sink', 'feeder', 'tank', 'motor', 'display', 'scale', 'potentiometer', 'selector', 'keypad', 'preselector', 'bargraph', 'heater', 'siren', 'trafficlight', 'label', 'image'].includes(e.type)
+  const turns = (e) => !['button', 'switch', 'emergency', 'lamp', 'sink', 'feeder', 'tank', 'motor', 'display', 'scale', 'potentiometer', 'selector', 'keypad', 'preselector', 'bargraph', 'elevator', 'heater', 'siren', 'trafficlight', 'label', 'image'].includes(e.type)
   const operable = (e) => ['button', 'switch', 'emergency', 'selector', 'keypad', 'preselector', 'feeder', 'potentiometer'].includes(e.type)
   const underRank = (e) => (e.type === 'image' ? -2 : UNDER.includes(e.type) ? -1 : 0)
   // Elementos y piezas en orden de dibujo: lo de debajo primero (las piezas van encima). En la

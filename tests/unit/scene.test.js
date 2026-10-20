@@ -285,6 +285,24 @@ describe('escena: detectores típicos y sensores analógicos', () => {
     expect(sceneInputs(scene, s)).toEqual({ Lote: 0 })
   })
 
+  it('ascensor: la cabina sube y baja entre plantas (detector de cada una) y la puerta se abre y se cierra', () => {
+    const scene = { elements: [{ id: 'a', type: 'elevator', x: 0, y: 0, floors: 3, up: 'S', down: 'B', open: 'AP', close: 'CP', f1: 'P0', f2: 'P1', f3: 'P2', doorOpen: 'PA', doorClosed: 'PC', floorTime: 2, doorTime: 1 }] }
+    let s = sceneInit(scene)
+    expect(sceneInputs(scene, s)).toEqual({ P0: 1, P1: 0, P2: 0, PA: 0, PC: 1 })
+    s = run(scene, s, { S: 1 }, 1) // a medio camino
+    expect(sceneInputs(scene, s)).toMatchObject({ P0: 0, P1: 0 })
+    s = run(scene, s, { S: 1 }, 1)
+    expect(sceneInputs(scene, s)).toMatchObject({ P0: 0, P1: 1, P2: 0 })
+    s = run(scene, s, { S: 1 }, 10) // no pasa de la última
+    expect(sceneInputs(scene, s)).toMatchObject({ P2: 1 })
+    s = run(scene, s, { S: 1, B: 1 }, 1) // con las dos órdenes, quieta
+    expect(sceneInputs(scene, s)).toMatchObject({ P2: 1 })
+    s = run(scene, s, { AP: 1 }, 1)
+    expect(sceneInputs(scene, s)).toMatchObject({ PA: 1, PC: 0 })
+    s = run(scene, s, { CP: 1 }, 1)
+    expect(sceneInputs(scene, s)).toMatchObject({ PA: 0, PC: 1 })
+  })
+
   it('calentador: la temperatura sube con la resistencia y el termostato salta en la consigna', () => {
     const scene = { elements: [{ id: 'h', type: 'heater', x: 0, y: 0, heat: 'R', temperature: 'T', thermostat: 'TS', setpoint: 60, ambient: 20, maxTemp: 120, tau: 10 }] }
     let s = sceneInit(scene)

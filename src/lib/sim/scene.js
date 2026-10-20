@@ -66,6 +66,14 @@ export const SCENE_TYPES = {
   siren: { label: N_('Sirena'), group: N_('Señalización'), defaults: { variable: '', sound: false, text: '' } },
   trafficlight: { label: N_('Semáforo'), group: N_('Señalización'), defaults: { red: '', amber: '', green: '', text: '' } },
   valve: { label: N_('Electroválvula'), group: N_('Actuadores'), defaults: { variable: '', text: '' } },
+  // Ascensor: cabina que sube y baja entre 2 y 4 plantas (floorTime: segundos de una a la siguiente) y puerta
+  // que se abre y se cierra (doorTime); un detector por planta y finales de carrera de la puerta. initial: la
+  // planta en que empieza (0, la baja).
+  elevator: {
+    label: N_('Ascensor'),
+    group: N_('Actuadores'),
+    defaults: { floors: 3, up: '', down: '', open: '', close: '', f1: '', f2: '', f3: '', f4: '', doorOpen: '', doorClosed: '', floorTime: 2, doorTime: 1, initial: 0, text: '' },
+  },
   barrier: { label: N_('Barrera'), group: N_('Actuadores'), defaults: { open: '', close: '', opened: '', closed: '', length: 140, time: 2, text: '' } },
   pipe: { label: N_('Tubería'), group: N_('Decoración'), defaults: { variable: '', length: 160, text: '' } },
   label: { label: N_('Rótulo'), group: N_('Decoración'), defaults: { text: N_('Rótulo'), size: 16 } },
@@ -151,6 +159,18 @@ export const SCENE_VARS = {
     ['green', 'Verde (salida)', 'out'],
   ],
   valve: [['variable', 'Abrir (salida)', 'out']],
+  elevator: [
+    ['up', N_('Sube (salida)'), 'out'],
+    ['down', N_('Baja (salida)'), 'out'],
+    ['open', N_('Abre la puerta (salida)'), 'out'],
+    ['close', N_('Cierra la puerta (salida)'), 'out'],
+    ['f1', N_('En la planta baja (entrada)'), 'in'],
+    ['f2', N_('En la planta 1 (entrada)'), 'in'],
+    ['f3', N_('En la planta 2 (entrada)'), 'in'],
+    ['f4', N_('En la planta 3 (entrada)'), 'in'],
+    ['doorOpen', N_('Puerta abierta (entrada)'), 'in'],
+    ['doorClosed', N_('Puerta cerrada (entrada)'), 'in'],
+  ],
   barrier: [
     ['open', 'Abrir (salida)', 'out'],
     ['close', N_('Cerrar (salida; vacío = por su peso)'), 'out'],
@@ -356,6 +376,8 @@ const elementsOf = (scene) => scene?.elements ?? []
 
 // Selector: cuántas posiciones tiene (de 2 a 4) y en cuál empieza.
 export const selectorPositions = (e) => Math.min(4, Math.max(2, Math.round(Number(e.positions) || 3)))
+// Ascensor: cuántas plantas (de 2 a 4).
+export const elevatorFloors = (e) => Math.min(4, Math.max(2, Math.round(Number(e.floors) || 3)))
 // Teclado: cuántas teclas (de 1 a 12) y cuántas columnas; preselector: cuántas cifras (de 1 a 4).
 export const keypadCount = (e) => Math.min(12, Math.max(1, Math.round(Number(e.count) || 12)))
 export const keypadColumns = (e) => Math.min(keypadCount(e), Math.max(1, Math.round(Number(e.columns) || 3)))
@@ -372,6 +394,7 @@ export function sceneInit(scene) {
   const temp = {}
   const selected = {}
   const preset = {}
+  const lift = {}
   for (const e of elementsOf(scene)) {
     // initial: 1 si el cilindro empieza con el vástago fuera.
     if (e.type === 'cylinder') pos[e.id] = Number(e.initial) ? 1 : 0
@@ -381,10 +404,11 @@ export function sceneInit(scene) {
     if (e.type === 'tank') level[e.id] = clamp(Number(e.initial) || 0)
     if (e.type === 'potentiometer') knob[e.id] = clamp(Number(e.initial ?? 0.5))
     if (e.type === 'selector') selected[e.id] = selectorStart(e)
+    if (e.type === 'elevator') lift[e.id] = { at: Math.min(elevatorFloors(e) - 1, Math.max(0, Math.round(Number(e.initial) || 0))), door: 0 }
     if (e.type === 'preselector') preset[e.id] = presetClamp(e, Number(e.initial) || 0)
     if (e.type === 'heater') temp[e.id] = Number(e.ambient ?? 20)
   }
-  return { pos, pressed, level, knob, temp, selected, preset, angle: {}, faults: {}, held: {}, pieces: [], counts: {}, nextPiece: 1, fed: {} }
+  return { pos, pressed, level, knob, temp, selected, preset, lift, angle: {}, faults: {}, held: {}, pieces: [], counts: {}, nextPiece: 1, fed: {} }
 }
 
 // Pieza nueva en un alimentador (si su sitio está libre; con `gap`, también ese margen alrededor:
@@ -521,6 +545,17 @@ export function sceneStep(scene, state, values, dt) {
     if (dir) next.pos[e.id] = Math.round(clamp((next.pos[e.id] ?? 0) + (dir * dt) / Math.max(0.1, Number(e.time) || 2)) * 1e6) / 1e6
   }
 
+  // Ascensores: la cabina sube o baja con su orden (no con las dos), entre la planta baja y la última; la
+  // puerta se abre y se cierra con las suyas.
+  for (const e of elements) {
+    if (e.type !== 'elevator' || stuck(e)) continue
+    const now = next.lift?.[e.id] ?? { at: 0, door: 0 }
+    const move = on(values, e.up) && !on(values, e.down) ? 1 : on(values, e.down) && !on(values, e.up) ? -1 : 0
+    const door = on(values, e.open) && !on(values, e.close) ? 1 : on(values, e.close) && !on(values, e.open) ? -1 : 0
+    const at = Math.min(elevatorFloors(e) - 1, Math.max(0, now.at + (move * dt) / Math.max(0.1, Number(e.floorTime) || 2)))
+    next.lift = { ...next.lift, [e.id]: { at: Math.round(at * 1e6) / 1e6, door: Math.round(clamp(now.door + (door * dt) / Math.max(0.1, Number(e.doorTime) || 1)) * 1e6) / 1e6 } }
+  }
+
   // Depósitos: se llenan y vacían con sus válvulas.
   for (const e of elements) {
     if (e.type !== 'tank' || stuck(e)) continue
@@ -654,6 +689,12 @@ export function sceneInputs(scene, state, analogRange = () => null) {
       if (e.closed) inputs[e.closed] = pos <= 0.001 && fault(e) !== 'sensor:closed' ? 1 : 0
     }
     if (e.type === 'potentiometer' && e.variable) scaled(e.variable, state.knob?.[e.id] ?? 0.5)
+    if (e.type === 'elevator') {
+      const { at, door } = state.lift?.[e.id] ?? { at: 0, door: 0 }
+      for (let k = 0; k < elevatorFloors(e); k++) if (e[`f${k + 1}`]) inputs[e[`f${k + 1}`]] = Math.abs(at - k) < 0.02 ? 1 : 0
+      if (e.doorOpen) inputs[e.doorOpen] = door >= 0.999 ? 1 : 0
+      if (e.doorClosed) inputs[e.doorClosed] = door <= 0.001 ? 1 : 0
+    }
     if (e.type === 'keypad') for (let i = 0; i < keypadCount(e); i++) if (e[`k${i + 1}`]) inputs[e[`k${i + 1}`]] = state.pressed?.[`${e.id}:${i}`] ? 1 : 0
     if (e.type === 'preselector' && e.variable) inputs[e.variable] = state.preset?.[e.id] ?? presetClamp(e, Number(e.initial) || 0)
     if (e.type === 'selector') {
@@ -845,6 +886,7 @@ const REQUIRED = {
   siren: ['variable'],
   valve: ['variable'],
   barrier: ['open'],
+  elevator: ['up', 'down'],
   trafficlight: ['red', 'amber', 'green'],
 }
 
