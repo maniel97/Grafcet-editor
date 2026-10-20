@@ -190,6 +190,12 @@ const OBJECTS = {
   // Selector (tipo 3): f9 entradas seguidas desde f5.f7, una por posición (a 1 la de la posición en que está);
   // f16 = 0: dibujo «Conmutador 1».
   selector: { type: 3, name: 'Selector', area: 'I', size: [30, 30], fields: ({ byte, bit, n }) => [0, byte, 0, bit, 0, n, 0, 0, 0, 0, 0, 0, 0, 0] },
+  // Teclado (tipo 4): f10 filas × f11 columnas de teclas, cada una una entrada, seguidas desde f5.f7 (f16 = 0).
+  keypad: { type: 4, name: 'Teclado', area: 'I', size: [75, 100], fields: ({ byte, bit, rows, cols }) => [0, byte, 0, bit, 0, 0, rows, cols, 0, 0, 0, 0, 0, 0] },
+  // Preselector (tipo 5): f11 cifras en BCD, cuatro entradas por cifra desde f5.f7 (las unidades primero).
+  thumbwheel: { type: 5, name: 'Preselector', area: 'I', size: [60, 40], fields: ({ byte, digits }) => [0, byte, 0, 0, 0, 0, 1, digits, 0, 0, 0, 0, 0, 0] },
+  // Potenciómetro numérico (tipo 17, f9 = 3): la entrada analógica AIW f5, de f7 a f4 en bruto, mostrada de f13 a f12.
+  numeric: { type: 17, name: 'Potenciómetro', area: 'I', size: [60, 30], fields: ({ ai, r0, r1, min, max }) => [r1, ai, 0, r0, 0, 3, 0, 0, max, min, 0, 0, 0, 0] },
   // Barra (tipo 16): la salida analógica AQW f5, de f7 a f4 en bruto, mostrada de f13 a f12; f9: 0 vertical,
   // 1 horizontal; f16 = 0 unipolar.
   bar: {
@@ -241,6 +247,8 @@ export function exportPcSimu(project, { reserved = [], addressOf } = {}) {
   const skipped = new Map()
   const rows = [[], [], []]
   const inverts = [] // entradas que el programa lee invertidas (el captador de vacío de un depósito)
+  const thumbwheels = [] // preselectores sobre una palabra: en BCD, en bytes de entrada libres
+  const rows1 = rows[1]
   const typeName = (e) => tr(SCENE_TYPES[e.type]?.label ?? e.type)
   // Una pata (variable) del elemento -> { byte, bit } si tiene una dirección de bit del área pedida.
   // Pulsadores solo de la planta (sueltan una pieza sin pasar por el autómata): en PC_SIMU el pulsador y el
@@ -461,6 +469,43 @@ export function exportPcSimu(project, { reserved = [], addressOf } = {}) {
       }
       continue
     }
+    if (e.type === 'keypad') {
+      const count = Math.min(12, Math.max(1, Math.round(Number(e.count) || 12)))
+      const cols = Math.min(count, Math.max(1, Math.round(Number(e.columns) || 3)))
+      const rows = Math.ceil(count / cols)
+      const vars = Array.from({ length: count }, (_, i) => e[`k${i + 1}`]?.trim() || '')
+      const at = vars.map((v) => (v ? bitOf(v, 'I') : null))
+      vars.forEach((v, i) => v && !at[i] && missing(e, v, 'I'))
+      // PC_SIMU: filas × columnas entradas seguidas; las teclas sin entrada (y las que faltan para completar la
+      // última fila), en bits libres.
+      const k = at.findIndex(Boolean)
+      const base = k < 0 ? -1 : at[k].byte * 8 + at[k].bit - k
+      const fits = base >= 0 && Array.from({ length: rows * cols }, (_, i) => (at[i] ? at[i].byte * 8 + at[i].bit === base + i : !vars[i] && !usedI.has(base + i))).every(Boolean)
+      const title = e.text?.trim() || typeName(e)
+      if (fits) rows1.push({ object: 'keypad', name: title, byte: Math.floor(base / 8), bit: base % 8, rows, cols })
+      else {
+        if (k >= 0) warnings.push(`${title}: en PC_SIMU un teclado usa entradas seguidas, una por tecla; sale como pulsadores sueltos.`)
+        vars.forEach((v, i) => at[i] && rows1.push({ object: 'button', name: v, ...at[i], nc: 0, color: PCSIMU_COLORS.black }))
+      }
+      continue
+    }
+    if (e.type === 'preselector') {
+      const name = e.variable?.trim()
+      const word = String(addr(name)).trim().toUpperCase()
+      const digits = Math.min(4, Math.max(1, Math.round(Number(e.digits) || 2)))
+      const title = e.text?.trim() || name
+      const ai = /^AIW(\d+)$/.exec(word)
+      if (ai) {
+        // Sobre una entrada analógica: el potenciómetro numérico de PC_SIMU, con su escala.
+        const { signal, min, max } = analogConfig(plc.variables?.[name])
+        const [r0, r1] = rawRange(signal, 's7200')
+        rows1.push({ object: 'numeric', name: title, ai: Number(ai[1]), r0, r1, min: Math.round(min), max: Math.round(max), byte: 900 + Number(ai[1]), bit: 0 })
+      } else if (/^([VM]W\d+|C\d+)$/.test(word)) {
+        // Sobre una palabra: el preselector de PC_SIMU en BCD, en entradas libres que el .awl pasa a la palabra.
+        thumbwheels.push({ object: 'thumbwheel', name: title, word, digits })
+      } else warnings.push(`${name || typeName(e)}: sin una entrada analógica AIW ni una palabra VW / MW; no se exporta.`)
+      continue
+    }
     if (e.type === 'bargraph') {
       const name = e.variable?.trim()
       const word = String(addr(name)).trim().toUpperCase()
@@ -581,6 +626,17 @@ export function exportPcSimu(project, { reserved = [], addressOf } = {}) {
   // - un cilindro que empieza dentro solo vuelve con su salida «contraer» (y la de expandir a 0): no tiene
   //   vuelta por muelle; a los que no tienen A−, una salida que el .awl pone a NOT A+;
   // - un visualizador muestra salidas en BCD: dos bytes enteros con su valor.
+  // Preselectores sobre una palabra: uno o dos bytes de entrada enteros libres (las unidades en el primero).
+  for (const item of thumbwheels) {
+    const bytes = item.digits > 2 ? 2 : 1
+    let b = 0
+    const free = (byte) => [0, 1, 2, 3, 4, 5, 6, 7].every((bit) => !usedI.has(byte * 8 + bit))
+    while (!free(b) || (bytes === 2 && !free(b + 1))) b++
+    for (let i = 0; i < bytes * 8; i++) usedI.add(b * 8 + i)
+    rows1.push({ ...item, byte: b, bit: 0 })
+    inverts.push({ kind: 'bcdIn', bytes: bytes === 2 ? [b, b + 1] : [b], word: item.word, name: item.name })
+    warnings.push(`${item.name}: PC_SIMU lo da en BCD en IB${b}${bytes === 2 ? ` e IB${b + 1}` : ''}; el .awl lo pasa a ${item.word}.`)
+  }
   const aux = [...inverts]
   const springs = [...rows[0], ...machine].filter((item) => item.spring)
   const displays = rows[0].filter((item) => item.object === 'display')
@@ -681,13 +737,15 @@ export function exportPcSimu(project, { reserved = [], addressOf } = {}) {
   return { text, bytes: encodeAnsi(text), warnings, aux, machine: machine.length > 0, count: objects.filter((o) => o.type !== PCSIMU_TYPES.text).length }
 }
 
-// Las salidas auxiliares de exportPcSimu, como redes al final del OB1 del programa del S7-200 (toS7200):
-// «aux = NOT A+» (cilindros con vuelta por muelle) y el valor de un visualizador en BCD.
+// Lo que exportPcSimu necesita en el programa del S7-200 (toS7200), como redes del OB1: al final, «aux = NOT
+// A+» (cilindros con vuelta por muelle) y el valor de un visualizador en BCD; al principio, las entradas que
+// se leen invertidas y los preselectores en BCD.
 export function withAuxOutputs(awl, aux = []) {
   if (!aux.length) return awl
   const end = awl.indexOf('\r\nEND_ORGANIZATION_BLOCK')
   let n = Math.max(0, ...[...awl.slice(0, end).matchAll(/^Network (\d+)/gm)].map((m) => Number(m[1])))
-  const nets = aux.filter((x) => x.kind !== 'invert').map(({ kind, from, to, name, word, qb, scale }) =>
+  const FIRST = ['invert', 'bcdIn'] // las que van al principio del OB1
+  const nets = aux.filter((x) => !FIRST.includes(x.kind)).map(({ kind, from, to, name, word, qb, scale }) =>
     kind === 'display'
       ? // El valor en BCD (en VW1010, fuera de lo que usa el programa): unidades y decenas en el primer byte. Una
         // analógica, antes en sus unidades, con reales (como el resto del programa; el simulador S7_200 no hace
@@ -722,20 +780,33 @@ export function withAuxOutputs(awl, aux = []) {
       : [`Network ${++n} // PC_SIMU: ${to} recoge ${clean(name)} (vuelta por muelle)`, `LDN    ${from}`, `=      ${to}`].join('\r\n'),
   )
   let text = `${awl.slice(0, end)}${nets.length ? `\r\n${nets.join('\r\n')}` : ''}${awl.slice(end)}`
-  // Entradas que el programa lee invertidas: en el OB1 la entrada se cambia por una marca, que una red nueva,
-  // la primera, pone a NOT entrada (y las demás redes se renumeran).
-  const inverts = aux.filter((x) => x.kind === 'invert')
-  if (inverts.length) {
+  // Al principio del OB1 (las demás redes se renumeran):
+  // - entradas que el programa lee invertidas: en el OB1 la entrada se cambia por una marca, que una red nueva
+  //   pone a NOT entrada;
+  // - preselectores en BCD: sus bytes de entrada, pasados a la palabra (las unidades en el primero; VW1016).
+  const first = aux.filter((x) => FIRST.includes(x.kind))
+  if (first.length) {
     const ob1End = text.indexOf('\r\nEND_ORGANIZATION_BLOCK')
     const begin = text.indexOf('BEGIN\r\n') + 'BEGIN\r\n'.length
     let body = text.slice(begin, ob1End)
-    for (const { input, mem } of inverts) {
-      const re = new RegExp(`(?<![\\w.])${input.replace('.', '\\.')}(?![\\w.])`, 'g')
+    for (const { input, mem } of first.filter((x) => x.kind === 'invert')) {
+      const re = new RegExp(`(?<![\w.])${input.replace('.', '\.')}(?![\w.])`, 'g')
       body = body.split('\r\n').map((line) => (line.startsWith('Network') || line.startsWith('//') ? line : line.replace(re, mem))).join('\r\n')
     }
-    body = body.replace(/^Network (\d+)/gm, (_, k) => `Network ${Number(k) + inverts.length}`)
-    const first = inverts.map(({ input, mem, name }, i) => [`Network ${i + 1} // PC_SIMU: ${clean(name)} (${input}) invertida en ${mem}`, `LDN    ${input}`, `=      ${mem}`].join('\r\n'))
-    text = `${text.slice(0, begin)}${first.join('\r\n')}\r\n${body}${text.slice(ob1End)}`
+    body = body.replace(/^Network (\d+)/gm, (_, k) => `Network ${Number(k) + first.length}`)
+    const nets0 = first.map((x, i) =>
+      x.kind === 'invert'
+        ? [`Network ${i + 1} // PC_SIMU: ${clean(x.name)} (${x.input}) invertida en ${x.mem}`, `LDN    ${x.input}`, `=      ${x.mem}`].join('\r\n')
+        : [
+            `Network ${i + 1} // PC_SIMU: ${clean(x.name)} (preselector en BCD en IB${x.bytes.join(', IB')}) a ${x.word}`,
+            'LD     SM0.0',
+            `MOVB   IB${x.bytes[0]}, VB1017`,
+            x.bytes[1] === undefined ? 'MOVB   0, VB1016' : `MOVB   IB${x.bytes[1]}, VB1016`,
+            'BCDI   VW1016',
+            `MOVW   VW1016, ${x.word}`,
+          ].join('\r\n'),
+    )
+    text = `${text.slice(0, begin)}${nets0.join('\r\n')}\r\n${body}${text.slice(ob1End)}`
   }
   return text
 }

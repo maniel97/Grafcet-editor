@@ -372,6 +372,45 @@ describe('PC_SIMU (.sim)', () => {
     expect(aux.filter((x) => x.kind === 'display').map((x) => x.word)).toEqual(['C1'])
   })
 
+  it('teclado: con entradas seguidas, el de PC_SIMU (filas × columnas); si no, pulsadores', () => {
+    const variables = Object.fromEntries(Array.from({ length: 6 }, (_, i) => [`T${i}`, { address: `I1.${i}` }]))
+    const keypad = (keys) => ({ id: 'k', type: 'keypad', x: 0, y: 0, count: 6, columns: 3, ...keys, text: 'Teclado' })
+    const ok = exportPcSimu({ plc: { variables, scene: { elements: [keypad(Object.fromEntries(Array.from({ length: 6 }, (_, i) => [`k${i + 1}`, `T${i}`])))] } } })
+    const [k] = parsePcSimu(ok.text).filter((o) => o.type === 4)
+    expect([k.fields[1], k.fields[3], k.fields[6], k.fields[7]]).toEqual([1, 0, 2, 3]) // I1.0, 2 filas × 3 columnas
+    const no = exportPcSimu({ plc: { variables, scene: { elements: [keypad({ k1: 'T5', k2: 'T0' })] } } })
+    expect(parsePcSimu(no.text).filter((o) => o.type === 2)).toHaveLength(2)
+    expect(no.warnings[0]).toMatch(/Teclado: en PC_SIMU un teclado usa entradas seguidas/)
+  })
+
+  it('preselector: sobre una analógica, el potenciómetro numérico; sobre una palabra, en BCD en un byte libre que el .awl pasa a ella', () => {
+    const variables = {
+      Consigna: { address: 'AIW2', type: 'analogIn', signal: '0-10V', min: 0, max: 80 },
+      Lote: { address: 'VW50', type: 'memory' },
+      M: { address: 'I0.0' },
+    }
+    const elements = [
+      { id: 'a', type: 'preselector', x: 0, y: 0, variable: 'Consigna', digits: 2 },
+      { id: 'b', type: 'preselector', x: 0, y: 0, variable: 'Lote', digits: 2, text: 'Lote' },
+    ]
+    const sim = exportPcSimu({ plc: { variables, scene: { elements } } })
+    const objects = parsePcSimu(sim.text)
+    const num = objects.find((o) => o.type === 17)
+    expect([num.fields[1], num.fields[5], num.fields[3], num.fields[0], num.fields[9], num.fields[8]]).toEqual([2, 3, 0, 32000, 0, 80])
+    const th = objects.find((o) => o.type === 5)
+    expect([th.fields[1], th.fields[3], th.fields[7]]).toEqual([1, 0, 2]) // IB1 (IB0 la usa M), 2 cifras
+    expect(sim.aux).toContainEqual({ kind: 'bcdIn', bytes: [1], word: 'VW50', name: 'Lote' })
+    // La red, la primera del OB1, ejecutada: 0x47 en BCD en IB1 -> 47 en VW50.
+    const awl = withAuxOutputs(['ORGANIZATION_BLOCK MAIN:OB1', 'TITLE=', 'BEGIN', 'Network 1 // x', 'LD     I0.0', '=      Q0.0', 'END_ORGANIZATION_BLOCK'].join('\r\n'), sim.aux)
+    expect(awl).toMatch(/BEGIN\r\nNetwork 1 \/\/ PC_SIMU: Lote[^\r]*\r\nLD     SM0\.0\r\nMOVB   IB1, VB1017\r\nMOVB   0, VB1016\r\nBCDI   VW1016\r\nMOVW   VW1016, VW50\r\nNetwork 2 \/\/ x/)
+    const { blocks, errors } = parseProgram(awl)
+    expect(errors).toEqual([])
+    const cpu = createCpu({ blocks })
+    cpu.words.set('IB1', 0x47)
+    cpu.scan(0.01)
+    expect(cpu.words.get('VW50')).toBe(47)
+  })
+
   it('todos los ejemplos del editor se exportan sin pisarse', () => {
     for (const example of EXAMPLES) {
       const objects = parsePcSimu(exportPcSimu(example.build()).text)

@@ -262,6 +262,29 @@ describe('escena: detectores típicos y sensores analógicos', () => {
     expect(sceneInputs(two, sceneInit(two))).toEqual({ A: 1, B: 0 })
   })
 
+  it('teclado: cada tecla, su entrada, a 1 mientras se mantiene pulsada', () => {
+    const scene = { elements: [{ id: 't', type: 'keypad', x: 0, y: 0, count: 3, k1: 'T1', k2: '', k3: 'T3', k4: 'T4' }] }
+    let s = sceneInit(scene)
+    expect(sceneInputs(scene, s)).toEqual({ T1: 0, T3: 0 }) // la 4.ª no cuenta: solo hay 3 teclas
+    s = sceneAction(scene, s, 't', 'press:2')
+    expect(sceneInputs(scene, s)).toEqual({ T1: 0, T3: 1 })
+    s = sceneAction(scene, s, 't', 'release:2')
+    expect(sceneInputs(scene, s)).toEqual({ T1: 0, T3: 0 })
+  })
+
+  it('preselector: un número de sus cifras (de 0 a 99 con 2), que sube y baja cifra a cifra', () => {
+    const scene = { elements: [{ id: 'p', type: 'preselector', x: 0, y: 0, variable: 'Lote', digits: 2, initial: 12 }] }
+    let s = sceneInit(scene)
+    expect(sceneInputs(scene, s)).toEqual({ Lote: 12 })
+    s = sceneAction(scene, s, 'p', 'add:10')
+    s = sceneAction(scene, s, 'p', 'add:-1')
+    expect(sceneInputs(scene, s)).toEqual({ Lote: 21 })
+    s = sceneAction(scene, s, 'p', 'add:100') // no pasa de 99
+    expect(sceneInputs(scene, s)).toEqual({ Lote: 99 })
+    s = sceneAction(scene, s, 'p', 'set:-5')
+    expect(sceneInputs(scene, s)).toEqual({ Lote: 0 })
+  })
+
   it('calentador: la temperatura sube con la resistencia y el termostato salta en la consigna', () => {
     const scene = { elements: [{ id: 'h', type: 'heater', x: 0, y: 0, heat: 'R', temperature: 'T', thermostat: 'TS', setpoint: 60, ambient: 20, maxTemp: 120, tau: 10 }] }
     let s = sceneInit(scene)

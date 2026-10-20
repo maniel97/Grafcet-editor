@@ -23,6 +23,11 @@ export const SCENE_TYPES = {
   // Selector de 2 a 4 posiciones (Manual / 0 / Auto…): cada posición, su entrada (o ninguna); initial: la de
   // empezar (0, la primera).
   selector: { label: N_('Selector'), group: N_('Mandos'), defaults: { positions: 3, pos1: '', pos2: '', pos3: '', pos4: '', initial: 0, text: '' } },
+  // Teclado: de 1 a 12 teclas en filas de `columns`, cada una un pulsador con su entrada (keyN) y su rótulo
+  // (labels: los rótulos separados por comas; vacío: 1, 2, 3…).
+  keypad: { label: N_('Teclado'), group: N_('Mandos'), defaults: { count: 12, columns: 3, labels: '1,2,3,4,5,6,7,8,9,*,0,#', k1: '', k2: '', k3: '', k4: '', k5: '', k6: '', k7: '', k8: '', k9: '', k10: '', k11: '', k12: '', text: '' } },
+  // Preselector: de 1 a 4 cifras que dejan un número en su variable; initial: el número al empezar.
+  preselector: { label: N_('Preselector'), group: N_('Mandos'), defaults: { variable: '', digits: 2, initial: 0, text: '' } },
   lamp: { label: N_('Piloto'), group: N_('Señalización'), defaults: { variable: '', color: 'green', text: '' } },
   cylinder: {
     label: N_('Cilindro'),
@@ -72,6 +77,21 @@ export const SCENE_VARS = {
   button: [['variable', 'Entrada', 'in']],
   switch: [['variable', 'Entrada', 'in']],
   emergency: [['variable', 'Entrada', 'in']],
+  keypad: [
+    ['k1', N_('Tecla 1 (entrada)'), 'in'],
+    ['k2', N_('Tecla 2 (entrada)'), 'in'],
+    ['k3', N_('Tecla 3 (entrada)'), 'in'],
+    ['k4', N_('Tecla 4 (entrada)'), 'in'],
+    ['k5', N_('Tecla 5 (entrada)'), 'in'],
+    ['k6', N_('Tecla 6 (entrada)'), 'in'],
+    ['k7', N_('Tecla 7 (entrada)'), 'in'],
+    ['k8', N_('Tecla 8 (entrada)'), 'in'],
+    ['k9', N_('Tecla 9 (entrada)'), 'in'],
+    ['k10', N_('Tecla 10 (entrada)'), 'in'],
+    ['k11', N_('Tecla 11 (entrada)'), 'in'],
+    ['k12', N_('Tecla 12 (entrada)'), 'in'],
+  ],
+  preselector: [['variable', N_('Valor (número)'), 'any']],
   selector: [
     ['pos1', N_('Posición 1 (entrada)'), 'in'],
     ['pos2', N_('Posición 2 (entrada)'), 'in'],
@@ -336,6 +356,12 @@ const elementsOf = (scene) => scene?.elements ?? []
 
 // Selector: cuántas posiciones tiene (de 2 a 4) y en cuál empieza.
 export const selectorPositions = (e) => Math.min(4, Math.max(2, Math.round(Number(e.positions) || 3)))
+// Teclado: cuántas teclas (de 1 a 12) y cuántas columnas; preselector: cuántas cifras (de 1 a 4).
+export const keypadCount = (e) => Math.min(12, Math.max(1, Math.round(Number(e.count) || 12)))
+export const keypadColumns = (e) => Math.min(keypadCount(e), Math.max(1, Math.round(Number(e.columns) || 3)))
+export const keypadLabel = (e, i) => String(e.labels ?? '').split(',')[i]?.trim() || String(i + 1)
+export const presetDigits = (e) => Math.min(4, Math.max(1, Math.round(Number(e.digits) || 2)))
+const presetClamp = (e, v) => Math.min(10 ** presetDigits(e) - 1, Math.max(0, Math.round(v)))
 const selectorStart = (e) => Math.min(selectorPositions(e) - 1, Math.max(0, Math.round(Number(e.initial) || 0)))
 
 export function sceneInit(scene) {
@@ -345,6 +371,7 @@ export function sceneInit(scene) {
   const knob = {}
   const temp = {}
   const selected = {}
+  const preset = {}
   for (const e of elementsOf(scene)) {
     // initial: 1 si el cilindro empieza con el vástago fuera.
     if (e.type === 'cylinder') pos[e.id] = Number(e.initial) ? 1 : 0
@@ -354,9 +381,10 @@ export function sceneInit(scene) {
     if (e.type === 'tank') level[e.id] = clamp(Number(e.initial) || 0)
     if (e.type === 'potentiometer') knob[e.id] = clamp(Number(e.initial ?? 0.5))
     if (e.type === 'selector') selected[e.id] = selectorStart(e)
+    if (e.type === 'preselector') preset[e.id] = presetClamp(e, Number(e.initial) || 0)
     if (e.type === 'heater') temp[e.id] = Number(e.ambient ?? 20)
   }
-  return { pos, pressed, level, knob, temp, selected, angle: {}, faults: {}, held: {}, pieces: [], counts: {}, nextPiece: 1, fed: {} }
+  return { pos, pressed, level, knob, temp, selected, preset, angle: {}, faults: {}, held: {}, pieces: [], counts: {}, nextPiece: 1, fed: {} }
 }
 
 // Pieza nueva en un alimentador (si su sitio está libre; con `gap`, también ese margen alrededor:
@@ -626,6 +654,8 @@ export function sceneInputs(scene, state, analogRange = () => null) {
       if (e.closed) inputs[e.closed] = pos <= 0.001 && fault(e) !== 'sensor:closed' ? 1 : 0
     }
     if (e.type === 'potentiometer' && e.variable) scaled(e.variable, state.knob?.[e.id] ?? 0.5)
+    if (e.type === 'keypad') for (let i = 0; i < keypadCount(e); i++) if (e[`k${i + 1}`]) inputs[e[`k${i + 1}`]] = state.pressed?.[`${e.id}:${i}`] ? 1 : 0
+    if (e.type === 'preselector' && e.variable) inputs[e.variable] = state.preset?.[e.id] ?? presetClamp(e, Number(e.initial) || 0)
     if (e.type === 'selector') {
       const at = state.selected?.[e.id] ?? selectorStart(e)
       for (let i = 0; i < selectorPositions(e); i++) if (e[`pos${i + 1}`]) inputs[e[`pos${i + 1}`]] = at === i ? 1 : 0
@@ -710,6 +740,15 @@ export function sceneAction(scene, state, id, action) {
   if (action === 'toggle') return { ...state, pressed: { ...state.pressed, [id]: !state.pressed[id] } }
   if (action === 'feed' && e.type === 'feeder') return feed(state, e)
   if (action.startsWith('set:') && e.type === 'potentiometer') return { ...state, knob: { ...state.knob, [id]: clamp(Number(action.slice(4))) } }
+  if (e.type === 'keypad' && /^(press|release):\d+$/.test(action)) {
+    const [what, i] = action.split(':')
+    return { ...state, pressed: { ...state.pressed, [`${id}:${i}`]: what === 'press' } }
+  }
+  if (e.type === 'preselector' && (action.startsWith('add:') || action.startsWith('set:'))) {
+    const now = state.preset?.[id] ?? presetClamp(e, Number(e.initial) || 0)
+    const v = action.startsWith('add:') ? now + Number(action.slice(4)) : Number(action.slice(4))
+    return { ...state, preset: { ...state.preset, [id]: presetClamp(e, v) } }
+  }
   if (e.type === 'selector' && (action === 'next' || action.startsWith('set:'))) {
     const n = selectorPositions(e)
     const at = action === 'next' ? ((state.selected?.[id] ?? selectorStart(e)) + 1) % n : Math.min(n - 1, Math.max(0, Math.round(Number(action.slice(4)))))
@@ -800,6 +839,8 @@ const REQUIRED = {
   display: ['variable'],
   bargraph: ['variable'],
   selector: ['pos1', 'pos2', 'pos3', 'pos4'],
+  keypad: ['k1', 'k2', 'k3', 'k4', 'k5', 'k6', 'k7', 'k8', 'k9', 'k10', 'k11', 'k12'],
+  preselector: ['variable'],
   diverter: ['gate'],
   siren: ['variable'],
   valve: ['variable'],

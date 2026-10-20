@@ -27,6 +27,10 @@ import {
   platformRect,
   SCENE_FLOOR,
   selectorPositions,
+  keypadColumns,
+  keypadCount,
+  keypadLabel,
+  presetDigits,
 } from '../lib/sim/scene'
 import { copyToClipboard, pasteFromClipboard } from '../lib/sim/sceneClipboard'
 import { faces, pieceBox, reliefBoxes, reliefOrder } from '../lib/sim/relief'
@@ -243,6 +247,67 @@ function SelectorShape({ e, at }) {
       <circle r="17" fill="#e2e8f0" stroke={INK} />
       <rect x="-4" y="-15" width="8" height="30" rx="3" fill="#334155" transform={`rotate(${angle(at)})`} />
       <circle r="3" cy="-10" fill="white" transform={`rotate(${angle(at)})`} />
+    </g>
+  )
+}
+// Teclado: las teclas en filas de `columns`, cada una con su rótulo; data-key: cuál se pulsa.
+const KEY = 22
+const KEY_GAP = 4
+function keypadSize(e) {
+  const cols = keypadColumns(e)
+  const rows = Math.ceil(keypadCount(e) / cols)
+  return { cols, rows, w: cols * (KEY + KEY_GAP) - KEY_GAP, h: rows * (KEY + KEY_GAP) - KEY_GAP }
+}
+function KeypadShape({ e, pressed = () => false }) {
+  const { cols, w, h } = keypadSize(e)
+  return (
+    <g>
+      <rect x={-w / 2 - 4} y={-h / 2 - 4} width={w + 8} height={h + 8} rx="4" fill="#cbd5e1" stroke={INK} />
+      {Array.from({ length: keypadCount(e) }, (_, i) => {
+        const x = -w / 2 + (i % cols) * (KEY + KEY_GAP)
+        const y = -h / 2 + Math.floor(i / cols) * (KEY + KEY_GAP)
+        const down = pressed(i)
+        return (
+          <g key={i} data-key={i}>
+            <rect x={x} y={y} width={KEY} height={KEY} rx="3" fill={down ? '#93c5fd' : '#f8fafc'} stroke="#475569" />
+            <text x={x + KEY / 2} y={y + KEY / 2 + 4} textAnchor="middle" fontSize="11" fontWeight="600" fill={INK} style={{ pointerEvents: 'none' }}>
+              {keypadLabel(e, i)}
+            </text>
+          </g>
+        )
+      })}
+    </g>
+  )
+}
+// Preselector: una rueda por cifra; la mitad de arriba suma 1 a esa cifra y la de abajo resta (data-step).
+const DIGIT_W = 18
+function PreselectorShape({ e, value }) {
+  const n = presetDigits(e)
+  const w = n * (DIGIT_W + 3) - 3
+  const text = String(Math.max(0, Math.round(Number(value) || 0))).padStart(n, '0').slice(-n)
+  return (
+    <g>
+      <rect x={-w / 2 - 4} y="-21" width={w + 8} height="42" rx="4" fill="#cbd5e1" stroke={INK} />
+      {Array.from({ length: n }, (_, i) => {
+        const x = -w / 2 + i * (DIGIT_W + 3)
+        const step = 10 ** (n - 1 - i)
+        return (
+          <g key={i}>
+            <rect x={x} y="-17" width={DIGIT_W} height="34" rx="2" fill="#f8fafc" stroke="#475569" />
+            <rect x={x} y="-17" width={DIGIT_W} height="17" fill="transparent" data-step={step} />
+            <rect x={x} y="0" width={DIGIT_W} height="17" fill="transparent" data-step={-step} />
+            <text x={x + DIGIT_W / 2} y="6" textAnchor="middle" fontSize="15" fontWeight="700" fontFamily="ui-monospace, Consolas, monospace" fill={INK} style={{ pointerEvents: 'none' }}>
+              {text[i]}
+            </text>
+            <text x={x + DIGIT_W / 2} y="-9" textAnchor="middle" fontSize="7" fill="#64748b" style={{ pointerEvents: 'none' }}>
+              ▲
+            </text>
+            <text x={x + DIGIT_W / 2} y="15" textAnchor="middle" fontSize="7" fill="#64748b" style={{ pointerEvents: 'none' }}>
+              ▼
+            </text>
+          </g>
+        )
+      })}
     </g>
   )
 }
@@ -655,6 +720,14 @@ function boundsOf(e, pos = 0) {
       return r(-22, -22, 44, 60)
     case 'selector':
       return r(-32, -36, 64, 56)
+    case 'keypad': {
+      const { w, h } = keypadSize(e)
+      return r(-w / 2 - 4, -h / 2 - 4, w + 8, h + 8)
+    }
+    case 'preselector': {
+      const w = presetDigits(e) * (DIGIT_W + 3) - 3
+      return r(-w / 2 - 4, -21, w + 8, 42)
+    }
     case 'bargraph':
       return e.vertical === false ? r(-40, -10, 80, 40) : r(-12, -40, 24, 100)
     case 'heater':
@@ -1211,6 +1284,22 @@ function Properties({ element, variables, onChange, onDelete, onRotate, onCreate
           </label>
         </>
       )}
+      {element.type === 'keypad' && (
+        <>
+          {number('count', tr('Teclas (de 1 a 12)'), 1, 1)}
+          {number('columns', tr('Columnas'), 1, 1)}
+          <label className="block">
+            <span className="text-slate-500">{tr('Rótulos de las teclas (separados por comas)')}</span>
+            <input type="text" value={element.labels ?? ''} onChange={(ev) => set({ labels: ev.target.value })} className={field} />
+          </label>
+        </>
+      )}
+      {element.type === 'preselector' && (
+        <>
+          {number('digits', tr('Cifras (de 1 a 4)'), 1, 1)}
+          {number('initial', tr('Valor al empezar'), 0, 1)}
+        </>
+      )}
       {element.type === 'bargraph' && (
         <>
           {number('min', tr('Mínimo'), -1e6, 1)}
@@ -1383,6 +1472,8 @@ const HINTS = {
   scale: N_('Báscula: valor analógico con el peso (kg) de las piezas que tiene encima; el metal pesa el triple.'),
   potentiometer: N_('Potenciómetro: entrada analógica manual (consignas, velocidades…). En modo Usar, arrastra a izquierda o derecha.'),
   selector: N_('Selector: de 2 a 4 posiciones (Manual / 0 / Automático…), cada una con su entrada, que está a 1 mientras el selector está en ella. En modo Usar, pulsa para pasar a la siguiente.'),
+  keypad: N_('Teclado: de 1 a 12 teclas, cada una un pulsador con su entrada (a 1 mientras se mantiene pulsada). En modo Usar, pulsa las teclas.'),
+  preselector: N_('Preselector: de 1 a 4 cifras que dan un número a su variable (piezas por lote, una consigna…). En modo Usar, pulsa encima de una cifra para subirla y debajo para bajarla.'),
   bargraph: N_('Barra: muestra el valor de una variable (analógica o numérica) entre un mínimo y un máximo.'),
   heater: N_('Calentador: la resistencia sube la temperatura (analógica, °C) con inercia; termostato digital opcional.'),
   feeder: N_('Alimentador: suelta piezas solo, con una salida del grafcet o al pulsarlo en modo Usar.'),
@@ -1431,6 +1522,8 @@ function ModulePreview({ item }) {
     potentiometer: <PotentiometerShape value={0.65} />,
     selector: <SelectorShape e={{ ...e, pos1: tr('Manual'), pos3: tr('Automático') }} at={2} />,
     bargraph: <BargraphShape e={e} value={65} />,
+    keypad: <KeypadShape e={e} pressed={(i) => i === 4} />,
+    preselector: <PreselectorShape e={e} value={25} />,
     heater: <HeaterShape e={e} temp={85} heating />,
     diverter: <DiverterShape e={e} active />,
     ramp: <RampShape e={e} />,
@@ -1519,7 +1612,7 @@ const UNDER = ['image', 'pipe', 'conveyor', 'sink', 'ramp', 'diverter', 'platfor
 // mecanismo (como el cuadro eléctrico real). e.place: 'desk' | 'machine' (por defecto, máquina).
 // En la isométrica, los rótulos esquivan los volúmenes salvo los alargados (van en el suelo delante).
 const ISO_LONG = ['conveyor', 'platform', 'ramp', 'pipe', 'image']
-const DESK_TYPES = ['button', 'switch', 'emergency', 'selector', 'potentiometer', 'lamp', 'display', 'bargraph']
+const DESK_TYPES = ['button', 'switch', 'emergency', 'selector', 'keypad', 'preselector', 'potentiometer', 'lamp', 'display', 'bargraph']
 const isDesk = (e) => DESK_TYPES.includes(e.type) && e.place === 'desk'
 
 
@@ -1583,6 +1676,10 @@ function drawElement(e, { scene, state, values, time, signals, iso = false }) {
       return <SelectorShape e={e} at={state.selected?.[e.id] ?? (Number(e.initial) || 0)} />
     case 'bargraph':
       return <BargraphShape e={e} value={values[e.variable]} />
+    case 'keypad':
+      return <KeypadShape e={e} pressed={(i) => Boolean(state.pressed?.[`${e.id}:${i}`])} />
+    case 'preselector':
+      return <PreselectorShape e={e} value={state.preset?.[e.id] ?? (Number(e.initial) || 0)} />
     case 'heater':
       return <HeaterShape e={e} temp={state.temp?.[e.id] ?? Number(e.ambient ?? 20)} heating={isOn(values, e.heat)} />
     default:
@@ -1608,7 +1705,7 @@ export function SceneStatic({ scene, variables = [] }) {
     for (let i = 0; i < items.length; i += 2) lines.push(items.slice(i, i + 2).join(' · '))
     return lines
   }
-  const turns = (e) => !['button', 'switch', 'emergency', 'lamp', 'sink', 'feeder', 'tank', 'motor', 'display', 'scale', 'potentiometer', 'selector', 'bargraph', 'heater', 'siren', 'trafficlight', 'label', 'image'].includes(e.type)
+  const turns = (e) => !['button', 'switch', 'emergency', 'lamp', 'sink', 'feeder', 'tank', 'motor', 'display', 'scale', 'potentiometer', 'selector', 'keypad', 'preselector', 'bargraph', 'heater', 'siren', 'trafficlight', 'label', 'image'].includes(e.type)
   const desk = elements.filter((e) => DESK_TYPES.includes(e.type) && e.place === 'desk')
   const machine = elements.filter((e) => !desk.includes(e))
   const boxes = machine.map((e) => boundsOf(placed(scene, state, e), 1))
@@ -2187,7 +2284,7 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
           setDeskKnob({ id: e.id })
           turnDeskKnob(ev, e)
         }
-      } else if (operable(e)) operate(e, 'down')
+      } else if (operable(e)) operate(e, 'down', ev)
       else setSelected(e.id)
       return
     }
@@ -2278,7 +2375,26 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
   const turnKnob = (ev, e) => onAction(e.id, `set:${Math.min(1, Math.max(0, (toScene(ev).x - e.x + 30) / 60))}`)
 
   // Accionar un mando (modo «Usar»).
-  const operate = (e, phase) => {
+  const keyDown = useRef(null) // la tecla pulsada de un teclado, para soltarla
+  const operate = (e, phase, ev) => {
+    if (e.type === 'keypad') {
+      if (phase === 'down') {
+        const key = ev?.target?.closest?.('[data-key]')?.dataset.key
+        if (key !== undefined) {
+          keyDown.current = key
+          onAction(e.id, `press:${key}`)
+        }
+      } else if (keyDown.current !== null) {
+        onAction(e.id, `release:${keyDown.current}`)
+        keyDown.current = null
+      }
+      return
+    }
+    if (e.type === 'preselector') {
+      const step = ev?.target?.closest?.('[data-step]')?.dataset.step
+      if (phase === 'down' && step) onAction(e.id, `add:${step}`)
+      return
+    }
     if (e.type === 'button') onAction(e.id, phase === 'down' ? 'press' : 'release')
     else if (phase === 'down' && (e.type === 'switch' || e.type === 'emergency')) onAction(e.id, 'toggle')
     else if (phase === 'down' && e.type === 'feeder') onAction(e.id, 'feed')
@@ -2293,7 +2409,7 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
       if (e.type === 'potentiometer') {
         setKnobDrag(e)
         turnKnob(ev, e)
-      } else if (operable(e)) operate(e, 'down')
+      } else if (operable(e)) operate(e, 'down', ev)
       else setSelected(e.id)
       return
     }
@@ -2374,8 +2490,8 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
   const deskItems = elements.filter(isDesk)
   const draw = (e) => drawElement(e, { scene, state, values, time, signals, iso })
   // Los mandos y pilotos no se giran (su rótulo se lee siempre).
-  const turns = (e) => !['button', 'switch', 'emergency', 'lamp', 'sink', 'feeder', 'tank', 'motor', 'display', 'scale', 'potentiometer', 'selector', 'bargraph', 'heater', 'siren', 'trafficlight', 'label', 'image'].includes(e.type)
-  const operable = (e) => ['button', 'switch', 'emergency', 'selector', 'feeder', 'potentiometer'].includes(e.type)
+  const turns = (e) => !['button', 'switch', 'emergency', 'lamp', 'sink', 'feeder', 'tank', 'motor', 'display', 'scale', 'potentiometer', 'selector', 'keypad', 'preselector', 'bargraph', 'heater', 'siren', 'trafficlight', 'label', 'image'].includes(e.type)
+  const operable = (e) => ['button', 'switch', 'emergency', 'selector', 'keypad', 'preselector', 'feeder', 'potentiometer'].includes(e.type)
   const underRank = (e) => (e.type === 'image' ? -2 : UNDER.includes(e.type) ? -1 : 0)
   // Elementos y piezas en orden de dibujo: lo de debajo primero (las piezas van encima). En la
   // isométrica, además, del fondo hacia delante, con las piezas entre los demás elementos.
