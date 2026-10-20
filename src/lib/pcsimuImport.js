@@ -88,7 +88,6 @@ export function importPcSimu(text, images = {}) {
   // Actuadores (tipo 19) por su nombre, para colgarles las ventosas y pinzas de su grupo.
   const carriers = []
   const tools = []
-  let electric = 0
   const paints = []
   // Las imágenes del .sim van aparte, con su nombre (a veces con la ruta del ordenador en que se hizo).
   const missing = new Set()
@@ -252,6 +251,12 @@ export function importPcSimu(text, images = {}) {
         }
         const rot = ROT[f(o, 14)] ?? 0
         const L = rot === 90 || rot === 270 ? H : W
+        // El mismo actuador repetido (en el mismo sitio, con lo mismo) solo para llevar otro grupo: uno, con los dos.
+        const twin = carriers.find((c) => c.o.rect.join() === o.rect.join() && c.o.fields.join() === o.fields.join() && c.o.type === o.type)
+        if (twin) {
+          if (o.group?.trim()) twin.groups.add(o.group.trim())
+          break
+        }
         const main = output(o, f(o, 5), f(o, 7)) // la primera: se queda el rótulo
         // Salida de recoger y captadores (solo en los cilindros y en el actuador de giro: en las herramientas, esos
         // campos son otra cosa).
@@ -266,7 +271,7 @@ export function importPcSimu(text, images = {}) {
           const long = g >= 230
           const r = (W / 2) * (parseFloat(o.text2) || 1)
           const e = add(o, 'rotary', { ...at(o), turn: main, back: legs.retract, start: legs.retracted, end: legs.extended, long, arm: Math.round(r), initial: g % 20 === 0 ? 1 : 0, vacuum: '', holding: '', tool: 'vacuum' })
-          carriers.push({ o, e })
+          carriers.push({ o, e, groups: new Set([o.group?.trim()].filter(Boolean)) })
           break
         }
         const odd = g % 10
@@ -275,8 +280,8 @@ export function importPcSimu(text, images = {}) {
         let lx
         let rodless = false
         if ([1, 3, 5].includes(odd) && g < 30) {
-          // Neumático: gráfico 1 sale 11/19 del largo; los 2 y 3, b·⌊L/20⌋/45 hasta 350.
-          stroke = odd === 1 ? (L * 11) / 19 : (350 * Math.floor(L / 20)) / 45
+          // Neumático: gráfico 1 sale 11/19 del largo; el 2, b·⌊L/20⌋/45, y el 3, b·⌊⌊0,26·L⌋/5⌋/45 (b hasta 350).
+          stroke = odd === 1 ? (L * 11) / 19 : odd === 3 ? (350 * Math.floor(L / 20)) / 45 : (350 * Math.floor(Math.floor((L * 260) / 1000) / 5)) / 45
           lx = odd === 1 ? 88 - L : 88 - L * 0.745
         } else if ([2, 4, 6, 7, 8].includes(odd) && g < 30) {
           // Sin vástago: el carro (de 60 a 88 en el editor) donde el de PC_SIMU.
@@ -294,11 +299,11 @@ export function importPcSimu(text, images = {}) {
             lx = 74 - 0.2 * L
           }
         } else if (g >= 30 && g <= 35) {
-          // Lineal eléctrico: las mismas salidas y captadores que el neumático; como un cilindro (sin su
-          // posicionado).
-          stroke = (L * 11) / 19
-          lx = 88 - L
-          electric++
+          // Lineal eléctrico: un eje con carro, como el sin vástago (las mismas salidas y captadores; sin su
+          // posicionado). El carro empieza a 0,205 del largo y corre b·⌊L/50⌋/10, b hasta 350.
+          rodless = true
+          stroke = 35 * Math.floor(L / 50)
+          lx = 74 - 0.205 * L - 0.05 * L
         } else if (g === 400) {
           // Herramienta: un motor con su dibujo (f14), que arranca con f5.f7 y, biestable (f4 = 1), para con f6.f8.
           add(o, 'motor', {
@@ -331,7 +336,7 @@ export function importPcSimu(text, images = {}) {
           time: 1,
           initial,
         })
-        carriers.push({ o, e })
+        carriers.push({ o, e, groups: new Set([o.group?.trim()].filter(Boolean)) })
         break
       }
       case 24: {
@@ -397,25 +402,37 @@ export function importPcSimu(text, images = {}) {
     }
   }
 
-  // Montajes: lo que se llama como el grupo de un actuador va con él (el cilindro sobre otro; la ventosa o la
-  // pinza, en su punta).
-  for (const { o, e } of carriers) {
-    if (!o.name?.trim()) continue
-    const by = carriers.find((c) => c.o !== o && c.o.group?.trim() && c.o.group.trim() === o.name.trim() && c.e.type === 'cylinder')
-    if (by && e.type === 'cylinder' && by.e.id !== e.id) e.mountedOn = by.e.id
+  // Montajes: lo que se llama como el grupo de un actuador va con él. Un objeto puede ir en varios grupos (una
+  // grúa: la herramienta va con el eje X y con el Y, que a su vez va con el X); en el editor, montado en el más
+  // profundo de la cadena (el que va a su vez en otro de ellos).
+  const carriersOf = (name, self, types = ['cylinder']) =>
+    name ? carriers.filter((c) => c.e !== self && types.includes(c.e.type) && c.groups.has(name)) : []
+  const deepest = (list) => {
+    let best = null
+    for (const c of list) {
+      const depth = list.filter((d) => d !== c && d.groups.has(c.o.name?.trim())).length
+      if (!best || depth > best.depth) best = { c, depth }
+    }
+    return best?.c
   }
-  // Los demás (motores y herramientas, imágenes…) que se llaman como el grupo de un cilindro: montados en él.
+  // Sin ciclos: no se monta en algo que (en cadena) va montado en él.
+  const chainHas = (start, id) => {
+    for (let e = start, k = 0; e && k < 10; k++) {
+      if (e.id === id) return true
+      e = elements.find((x) => x.id === e.mountedOn)
+    }
+    return false
+  }
   for (const e of elements) {
     const o = from.get(e)
-    if (!['motor', 'image'].includes(e.type) || !o?.name?.trim()) continue
-    const by = carriers.find((c) => c.e.type === 'cylinder' && c.o.group?.trim() === o.name.trim())
-    if (by) e.mountedOn = by.e.id
+    if (!['cylinder', 'motor', 'image'].includes(e.type) || !o?.name?.trim()) continue
+    const by = deepest(carriersOf(o.name.trim(), e))
+    if (by && !chainHas(by.e, e.id)) e.mountedOn = by.e.id
   }
   for (const o of tools.filter((t) => t.type === 19)) {
     const gripper = f(o, 15) === 300
-    const by = carriers.filter((c) => c.o.group?.trim() && c.o.group.trim() === o.name?.trim())
-    // Si varios lo llevan (una cadena comparte grupo), la punta es la del último de la cadena.
-    const carrier = by.find((c) => !by.some((d) => d.e.mountedOn === c.e.id)) ?? by[0]
+    // La ventosa o la pinza, en la punta del más profundo de los que la llevan (también un actuador de giro).
+    const carrier = deepest(carriersOf(o.name?.trim(), null, ['cylinder', 'rotary']))
     if (!carrier) {
       skip(gripper ? 'pinza suelta' : 'ventosa suelta')
       continue
@@ -463,7 +480,6 @@ export function importPcSimu(text, images = {}) {
     Object.assign(e, { x: 0, y: 0 })
   }
   if (missing.size) warnings.push(`Faltan ${missing.size} imágenes (elígelas junto al .sim, en la misma ventana): ${[...missing].join(', ')}.`)
-  if (electric) warnings.push(`${electric > 1 ? `${electric} × ` : ''}actuador lineal eléctrico: como un cilindro (sin su posicionado).`)
   const plant = [...elements.filter((e) => e.place !== 'desk'), ...desk]
   return {
     project: { nodes: [], edges: [], plc: { variables, scene: { gravity: true, elements: plant } } },
