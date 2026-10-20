@@ -479,6 +479,27 @@ describe('PC_SIMU (.sim)', () => {
     expect([gripper.fields[1], gripper.fields[3], gripper.fields[6], gripper.fields[8], gripper.a]).toEqual([0, 2, 1, 0, 3]) // cierra Q0.2; cerrada I0.3
   })
 
+  it('actuador de giro (f15 = 230): su ventosa en su grupo, donde la pone PC_SIMU a 180° con el radio del brazo', () => {
+    const v = (address) => ({ address })
+    const variables = { G: v('Q0.0'), V: v('Q0.1'), G0: v('I0.0'), G1: v('I0.1') }
+    const elements = [{ id: 'g', type: 'rotary', x: 200, y: 200, turn: 'G', start: 'G0', end: 'G1', vacuum: 'V', long: true, arm: 80 }]
+    const { text, aux } = exportPcSimu({ plc: { variables, scene: { gravity: true, elements } } })
+    const objects = parsePcSimu(text).filter((o) => o.type === 19)
+    const g = objects.find((o) => o.fields[11] === 230)
+    const s = objects.find((o) => o.fields[11] === 100)
+    expect([g.group, s.name, g.text2]).toEqual(['Grupo_1', 'Grupo_1', '3.200000']) // 80 = (50 / 2) · 3,2
+    expect([g.fields[1], g.fields[3], g.fields[5], g.fields[6], g.fields[9], g.a]).toEqual([0, 0, 1, 1, 0, 1])
+    // PC_SIMU, en b: esquina = (x0 + R + R·cos θ, y0 + R·sen θ + 50/21), θ = b − 175: el centro, en el círculo del brazo.
+    const pivot = [(g.rect[0] + g.rect[2]) / 2, (g.rect[1] + g.rect[3]) / 2]
+    for (const b of [0, 80, 160]) {
+      const t = ((b - 175) * Math.PI) / 180
+      const cx = s.rect[0] + 80 + 80 * Math.cos(t) + 10
+      const cy = s.rect[1] + 80 * Math.sin(t) + 2 + 10
+      expect(Math.hypot(cx - pivot[0], cy - pivot[1])).toBeCloseTo(80, 0)
+    }
+    expect(aux).toContainEqual({ from: 'Q0.0', to: 'Q0.2', name: 'G' }) // vuelve por muelle
+  })
+
   it('todos los ejemplos del editor se exportan sin pisarse', () => {
     for (const example of EXAMPLES) {
       const objects = parsePcSimu(exportPcSimu(example.build()).text)

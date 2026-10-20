@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { compile, evolve, initialState } from '../../src/lib/sim/engine'
 import { buildPlcModel } from '../../src/lib/plcModel'
 import { EMPTY_PLC } from '../../src/lib/addressing'
-import { SCENE_FLOOR, detectScene, measuredDistance, rotate, sceneAction, sceneFaults, sceneFromPlant, sceneInit, sceneInputNames, sceneInputs, sceneStep, worldRect } from '../../src/lib/sim/scene'
+import { SCENE_FLOOR, detectScene, measuredDistance, rotaryTip, rotate, sceneAction, sceneFaults, sceneFromPlant, sceneInit, sceneInputNames, sceneInputs, sceneStep, worldRect } from '../../src/lib/sim/scene'
 import { normalizeProject } from '../../src/lib/projectFile'
 import { advanceWorld, makeWorld } from '../../src/lib/sim/world'
 import { links, step, transition } from './helpers'
@@ -306,6 +306,24 @@ describe('escena: detectores típicos y sensores analógicos', () => {
     s = run(scene, s, { B: 1 }, 1) // entre plantas, la puerta no se abre
     s = run(scene, s, { AP: 1 }, 1)
     expect(sceneInputs(scene, s)).toMatchObject({ P1: 0, P2: 0, PA: 0, PC: 1 })
+  })
+
+  it('actuador giratorio: gira 160° por arriba, coge con la ventosa en la punta y la lleva al volver', () => {
+    const e = { id: 'g', type: 'rotary', x: 100, y: 100, turn: 'G', start: 'G0', end: 'G1', vacuum: 'V', holding: 'VH', long: true, arm: 80, time: 1 }
+    const scene = { elements: [e] }
+    let s = sceneInit(scene)
+    expect(sceneInputs(scene, s)).toEqual({ G0: 1, G1: 0, VH: 0 })
+    s = run(scene, s, { G: 1 }, 1.5)
+    expect(sceneInputs(scene, s)).toEqual({ G0: 0, G1: 1, VH: 0 })
+    const tip = rotaryTip(e, 1) // −15°: a la derecha, algo por encima
+    expect([Math.round(tip.x), Math.round(tip.y)]).toEqual([177, 79])
+    s = { ...s, pieces: [{ id: 1, x: tip.x - 10, y: tip.y - 10, w: 20, h: 20 }] }
+    s = run(scene, s, { G: 1, V: 1 }, 0.1)
+    expect(sceneInputs(scene, s).VH).toBe(1)
+    s = run(scene, s, { V: 1 }, 1.5) // vuelve por muelle, con la pieza
+    const back = rotaryTip(e, 0)
+    expect(Math.round(s.pieces[0].x + 10)).toBe(Math.round(back.x))
+    expect(sceneInputs(scene, s)).toEqual({ G0: 1, G1: 0, VH: 1 })
   })
 
   it('calentador: la temperatura sube con la resistencia y el termostato salta en la consigna', () => {

@@ -28,6 +28,7 @@ import {
   SCENE_FLOOR,
   selectorPositions,
   elevatorFloors,
+  rotaryAngle,
   keypadColumns,
   keypadCount,
   keypadLabel,
@@ -168,6 +169,37 @@ function CylinderShape({ e, pos, values }) {
           strokeWidth="0.75"
         />
       )}
+    </g>
+  )
+}
+// Actuador giratorio: el cuerpo en el pivote, el brazo (con su arco de giro, discontinuo) y la ventosa o la pinza
+// en la punta.
+function RotaryShape({ e, pos, values }) {
+  const arm = Number(e.arm) || 80
+  const at = (p) => {
+    const a = (rotaryAngle(e, p) * Math.PI) / 180
+    return [arm * Math.cos(a), arm * Math.sin(a)]
+  }
+  const [tx, ty] = at(pos)
+  const [x0, y0] = at(0)
+  const [x1, y1] = at(1)
+  const grip = isOn(values, e.vacuum)
+  return (
+    <g>
+      <path d={`M ${x0} ${y0} A ${arm} ${arm} 0 0 1 ${x1} ${y1}`} fill="none" stroke="#94a3b8" strokeDasharray="3 3" />
+      <line x1="0" y1="0" x2={tx} y2={ty} stroke="#475569" strokeWidth="6" strokeLinecap="round" />
+      <rect x="-14" y="-14" width="28" height="28" rx="4" fill="#e2e8f0" stroke={INK} strokeWidth="1.5" />
+      <circle r="5" fill={INK} />
+      {e.start && <circle cx="-20" cy="10" r="3" fill={pos <= 0.001 ? ON : OFF} stroke={INK} strokeWidth="0.5" />}
+      {e.end && <circle cx="20" cy="10" r="3" fill={pos >= 0.999 ? ON : OFF} stroke={INK} strokeWidth="0.5" />}
+      {e.vacuum && (e.tool === 'gripper' ? (
+        <g fill={grip ? ON : '#94a3b8'} stroke={INK} strokeWidth="0.75">
+          <rect x={tx - (grip ? 5 : 8)} y={ty - 8} width="3" height="16" />
+          <rect x={tx + (grip ? 2 : 5)} y={ty - 8} width="3" height="16" />
+        </g>
+      ) : (
+        <circle cx={tx} cy={ty} r="7" fill={grip ? ON : '#94a3b8'} stroke={INK} strokeWidth="0.75" />
+      ))}
     </g>
   )
 }
@@ -711,6 +743,10 @@ function boundsOf(e, pos = 0) {
     case 'button':
     case 'switch':
       return r(-20, -20, 40, 40)
+    case 'rotary': {
+      const arm = (Number(e.arm) || 80) + 10
+      return worldRect(e, -arm, -arm, 2 * arm, arm + 20)
+    }
     case 'cylinder': {
       const body = { ...e }
       // Cuerpo y carrera completa (la guía discontinua): así se puede pulsar en cualquier punto.
@@ -1247,6 +1283,29 @@ function Properties({ element, variables, onChange, onDelete, onRotate, onCreate
           {number('time', tr('Tiempo de carrera (s)'), 0.1, 0.1)}
         </>
       )}
+      {element.type === 'rotary' && (
+        <>
+          <label className="flex items-center gap-1">
+            <input type="checkbox" checked={Boolean(element.long)} onChange={(ev) => set({ long: ev.target.checked })} />
+            {tr('Giro largo (160°; si no, 80°)')}
+          </label>
+          <label className="flex items-center gap-1">
+            <input type="checkbox" checked={Number(element.initial) === 1} onChange={(ev) => set({ initial: ev.target.checked ? 1 : 0 })} />
+            {tr('Empieza girado')}
+          </label>
+          {element.vacuum?.trim() && (
+            <label className="block">
+              <span className="text-slate-500">{tr('Herramienta')}</span>
+              <select value={element.tool ?? 'vacuum'} onChange={(ev) => set({ tool: ev.target.value })} className={field}>
+                <option value="vacuum">{tr('Ventosa')}</option>
+                <option value="gripper">{tr('Pinza')}</option>
+              </select>
+            </label>
+          )}
+          {number('arm', tr('Largo del brazo (px)'), 30, 10)}
+          {number('time', tr('Tiempo de giro (s)'), 0.1, 0.1)}
+        </>
+      )}
       {element.type === 'conveyor' && (
         <>
           {number('length', tr('Largo (px)'), 60, 10)}
@@ -1524,6 +1583,7 @@ const HINTS = {
   switch: N_('Interruptor: se queda en la posición elegida. Para selectores Manual/Automático, pieza colocada…'),
   emergency: N_('Seta de emergencia: contacto NC enclavado; al pulsarla da 0 hasta que se rearma.'),
   lamp: N_('Piloto: se enciende con una salida del grafcet.'),
+  rotary: N_('Actuador giratorio: un brazo que gira desde la izquierda por arriba, 80° o 160° (como el de PC_SIMU), con una ventosa o una pinza en la punta que coge y lleva las piezas. Detectores al inicio y al final del giro.'),
   cylinder: N_('Cilindro: sale con A+ y entra con A− (o con muelle). Lleva detectores a0/a1 o pisa finales de carrera; empuja las piezas.'),
   conveyor: N_('Cinta: con su motor en marcha lleva las piezas que tiene encima.'),
   limit: N_('Final de carrera: se acciona cuando lo pisa el vástago de un cilindro o una pieza.'),
@@ -1586,6 +1646,7 @@ function ModulePreview({ item }) {
     emergency: <EmergencyShape pressed={false} />,
     lamp: <LampShape e={e} lit />,
     cylinder: <CylinderShape e={{ ...e, ...demo, retracted: 'a0', extended: 'a1' }} pos={0.6} values={values} />,
+    rotary: <RotaryShape e={{ ...e, arm: 40, vacuum: 'V' }} pos={0.5} values={values} />,
     conveyor: <ConveyorShape e={{ ...e, length: 160 }} running t={0} />,
     limit: <LimitShape active />,
     sensor: <SensorShape e={e} active />,
@@ -1708,6 +1769,8 @@ function drawElement(e, { scene, state, values, time, signals, iso = false }) {
       return <LampShape e={e} lit={isOn(values, e.variable)} />
     case 'cylinder':
       return <CylinderShape e={e} pos={pos} values={values} />
+    case 'rotary':
+      return <RotaryShape e={e} pos={pos} values={values} />
     case 'conveyor':
       return <ConveyorShape e={e} running={isOn(values, e.motor)} t={time} />
     case 'limit':

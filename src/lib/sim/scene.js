@@ -34,6 +34,13 @@ export const SCENE_TYPES = {
     group: N_('Actuadores'),
     defaults: { extend: '', retract: '', retracted: '', extended: '', position: '', vacuum: '', holding: '', mountedOn: '', rodless: false, tool: 'vacuum', stroke: 100, time: 1, text: '' },
   },
+  // Actuador giratorio: un brazo de `arm` px que gira desde la izquierda por arriba, 80° (giro corto) o 160°
+  // (largo), como el de PC_SIMU; en la punta, una ventosa o una pinza (vacuum, como la del cilindro).
+  rotary: {
+    label: N_('Actuador giratorio'),
+    group: N_('Actuadores'),
+    defaults: { turn: '', back: '', start: '', end: '', vacuum: '', holding: '', tool: 'vacuum', long: false, arm: 80, time: 1, initial: 0, text: '' },
+  },
   conveyor: { label: N_('Cinta'), group: N_('Actuadores'), defaults: { motor: '', reverse: '', length: 240, time: 4, text: '' } },
   limit: { label: N_('Final de carrera'), group: N_('Detectores'), defaults: { variable: '', contact: 'NO' } },
   sensor: { label: N_('Detector de presencia'), group: N_('Detectores'), defaults: { variable: '', contact: 'NO', range: 60, kind: 'optical', color: 'amber' } },
@@ -113,6 +120,14 @@ export const SCENE_VARS = {
     ['retracted', 'Detector dentro (a0)', 'in'],
     ['extended', 'Detector fuera (a1)', 'in'],
     ['position', N_('Posición (analógica, opcional)'), 'analog'],
+    ['vacuum', N_('Ventosa o pinza: coge (opcional)'), 'out'],
+    ['holding', N_('Ventosa o pinza: pieza cogida (opcional)'), 'in'],
+  ],
+  rotary: [
+    ['turn', N_('Gira (salida)'), 'out'],
+    ['back', N_('Vuelve (salida; vacío = muelle)'), 'out'],
+    ['start', N_('Detector al inicio del giro'), 'in'],
+    ['end', N_('Detector al final del giro'), 'in'],
     ['vacuum', N_('Ventosa o pinza: coge (opcional)'), 'out'],
     ['holding', N_('Ventosa o pinza: pieza cogida (opcional)'), 'in'],
   ],
@@ -264,6 +279,22 @@ export function placed(scene, state, e, depth = 0) {
 }
 // Placa del vástago de un cilindro donde está ahora (con su montaje).
 export const platePlaced = (scene, state, c) => cylinderPlate(placed(scene, state, c), state.pos?.[c.id] ?? 0)
+// Actuador giratorio: el ángulo del brazo (en grados, con y hacia abajo, antes del giro del elemento): de −175°
+// (a la izquierda) a −95° o −15°, como el de PC_SIMU.
+export const rotarySweep = (e) => (e.long ? 160 : 80)
+export const rotaryAngle = (e, pos) => -175 + rotarySweep(e) * pos
+export function rotaryTip(e, pos) {
+  const a = (rotaryAngle(e, pos) * Math.PI) / 180
+  const arm = Number(e.arm) || 80
+  const [dx, dy] = rotate(arm * Math.cos(a), arm * Math.sin(a), e.rot)
+  return { x: e.x + dx, y: e.y + dy }
+}
+// La herramienta (ventosa o pinza) de un cilindro o de un actuador giratorio, donde está ahora.
+export function toolRect(scene, state, e) {
+  if (e.type === 'cylinder') return platePlaced(scene, state, e)
+  const t = rotaryTip(e, state.pos?.[e.id] ?? 0)
+  return { x: t.x - 8, y: t.y - 8, w: 16, h: 16 }
+}
 
 // --- Simulación ----------------------------------------------------------------------------
 
@@ -397,7 +428,7 @@ export function sceneInit(scene) {
   const lift = {}
   for (const e of elementsOf(scene)) {
     // initial: 1 si el cilindro empieza con el vástago fuera.
-    if (e.type === 'cylinder') pos[e.id] = Number(e.initial) ? 1 : 0
+    if (e.type === 'cylinder' || e.type === 'rotary') pos[e.id] = Number(e.initial) ? 1 : 0
     if (e.type === 'barrier') pos[e.id] = 0 // cerrada
     // La seta de emergencia está sin pulsar (contacto cerrado) al empezar.
     if (e.type === 'button' || e.type === 'switch' || e.type === 'emergency') pressed[e.id] = false
@@ -506,18 +537,30 @@ export function sceneStep(scene, state, values, dt) {
     } else next.pos[e.id] = before
   }
 
+  // Actuadores giratorios: el brazo gira con su orden y vuelve con la suya (o por muelle).
+  for (const e of elements) {
+    if (e.type !== 'rotary' || stuck(e)) continue
+    const go = on(values, e.turn)
+    const back = e.back ? on(values, e.back) : !go
+    const dir = go && !back ? 1 : back && !go ? -1 : 0
+    if (!dir) continue
+    const pos = Math.round(clamp(next.pos[e.id] + (dir * dt) / Math.max(0.05, Number(e.time) || 1)) * 1e6) / 1e6
+    next.pos[e.id] = pos
+    if (pos > 0 && pos < 1) extending.add(e.id) // girando: no coge hasta parar
+  }
+
   // Ventosas: con vacío cogen la pieza que tocan y la llevan con el vástago; sin vacío, la sueltan
   // donde esté (y vuelve a moverla lo que tenga debajo: una cinta, una rampa…).
   const held = { ...(state.held ?? {}) }
   for (const e of elements) {
-    if (e.type !== 'cylinder' || !e.vacuum) continue
+    if ((e.type !== 'cylinder' && e.type !== 'rotary') || !e.vacuum) continue
     if (!on(values, e.vacuum) || faults[e.id] === 'vacuum') {
       delete held[e.id]
       continue
     }
     // Coge al llegar (vástago parado o al final), no al rozar mientras sale: así no la hunde.
     if (held[e.id] || extending.has(e.id)) continue
-    const plate = platePlaced(scene, next, e)
+    const plate = toolRect(scene, next, e)
     const grip = { x: plate.x - 4, y: plate.y - 4, w: plate.w + 8, h: plate.h + 8 }
     const taken = new Set(Object.values(held).map((h) => h.id))
     const p = next.pieces.find((q) => !taken.has(q.id) && overlaps(grip, q))
@@ -530,7 +573,7 @@ export function sceneStep(scene, state, values, dt) {
       delete held[id]
       continue
     }
-    const plate = platePlaced(scene, next, c)
+    const plate = toolRect(scene, next, c)
     p.x = plate.x + h.dx
     p.y = plate.y + h.dy
   }
@@ -685,7 +728,12 @@ export function sceneInputs(scene, state, analogRange = () => null) {
       inputs[name] = Math.round((range.min + clamp(fraction) * (range.max - range.min)) * 100) / 100
     }
     if (e.type === 'cylinder' && e.position) scaled(e.position, state.pos[e.id] ?? 0)
-    if (e.type === 'cylinder' && e.holding) inputs[e.holding] = state.held?.[e.id] ? 1 : 0
+    if ((e.type === 'cylinder' || e.type === 'rotary') && e.holding) inputs[e.holding] = state.held?.[e.id] ? 1 : 0
+    if (e.type === 'rotary') {
+      const pos = state.pos[e.id] ?? 0
+      if (e.start) inputs[e.start] = pos <= 0.001 ? 1 : 0
+      if (e.end) inputs[e.end] = pos >= 0.999 ? 1 : 0
+    }
     if (e.type === 'barrier') {
       const pos = state.pos[e.id] ?? 0
       if (e.opened) inputs[e.opened] = pos >= 0.999 && fault(e) !== 'sensor:opened' ? 1 : 0
@@ -889,6 +937,7 @@ const REQUIRED = {
   siren: ['variable'],
   valve: ['variable'],
   barrier: ['open'],
+  rotary: ['turn'],
   elevator: ['up', 'down'],
   trafficlight: ['red', 'amber', 'green'],
 }

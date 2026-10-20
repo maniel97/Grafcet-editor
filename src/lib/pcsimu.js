@@ -113,6 +113,22 @@ const OBJECTS = {
     fields: ({ byte, bit, holding, orientation }) => [0, byte, 0, bit, 0, holding ? 1 : 0, 0, holding?.byte ?? 0, 0, holding?.bit ?? 0, orientation, 100, 1, CYLINDER_SPEED],
     text: () => `.${pad(CYLINDER_SPEED)}.${pad(0)}.${pad(0)}.0.${pad(0)}.0.0`,
   },
+  // Actuador de giro (tipo 19, f15 = 210 giro corto, 230 largo; +10 empieza girado), con los campos del
+  // cilindro. Lo de su grupo gira por arriba desde la izquierda, en (b − 175)°, b de 0 a 80 o 160, alrededor de
+  // un pivote a R = (ancho / 2) · texto2 a la derecha de su sitio en el archivo (y alto/21 más abajo).
+  rotary: {
+    type: 19,
+    name: 'Actuador de giro',
+    size: [50, 50],
+    fields: ({ byte, bit, retract, a0, a1, extended, long }) => [
+      retract ? 1 : 0, byte, retract?.byte ?? 0, bit, retract?.bit ?? 0,
+      a0 ? 1 : 0, a1 ? 1 : 0, a0?.byte ?? 0, a1?.byte ?? 0, a0?.bit ?? 0,
+      0, (long ? 230 : 210) + (extended ? 10 : 0), retract ? 11 : 1, 20,
+    ],
+    text: () => `.${pad(30)}.${pad(0)}.${pad(0)}.0.${pad(0)}.0.0`,
+    text2: ({ radius }) => (radius / 25).toFixed(6),
+    a: ({ a1 }) => a1?.bit ?? 0,
+  },
   // Pinza (tipo 19, f15 = 300): f4 = 0 monoestable, la cierra f5.f7; f10 = 1 con detector de pinza cerrada
   // (entrada f12.a); f9 el de abierta (f11.f13). Va con el cilindro que la lleva por su grupo, como la ventosa.
   gripper: {
@@ -510,6 +526,41 @@ export function exportPcSimu(project, { reserved = [], addressOf } = {}) {
       }
       continue
     }
+    if (e.type === 'rotary') {
+      const title = e.text?.trim() || e.turn?.trim() || typeName(e)
+      if (e.place === 'desk' || !front || rotOf(e) !== 0) {
+        warnings.push(`${title}: el actuador de giro pasa a PC_SIMU solo en la planta vista de frente y sin girar; no se exporta.`)
+        continue
+      }
+      const bit = (key, area) => {
+        const v = e[key]?.trim()
+        if (!v) return null
+        const at = bitOf(v, area)
+        if (!at) missing(e, v, area)
+        return at
+      }
+      const turn = bit('turn', 'Q')
+      if (!turn) {
+        if (!e.turn?.trim()) warnings.push(`${title}: sin su salida de girar; no se exporta.`)
+        continue
+      }
+      const radius = Number(e.arm) || 80
+      machine.push({ object: 'rotary', id: e.id, name: e.turn.trim(), ...turn, retract: bit('back', 'Q'), spring: !e.back?.trim(), a0: bit('start', 'I'), a1: bit('end', 'I'), extended: Number(e.initial) === 1, long: Boolean(e.long), radius, rect: [e.x - 25, e.y - 25, e.x + 25, e.y + 25] })
+      const vacuum = e.vacuum?.trim()
+      if (vacuum) {
+        const at = bitOf(vacuum, 'Q')
+        if (!at) missing(e, vacuum, 'Q')
+        else {
+          // La herramienta, donde la pone PC_SIMU a 180°: su esquina a R a la izquierda del pivote (y 50/21 arriba).
+          const gripper = e.tool === 'gripper'
+          const [tw, th] = gripper ? [20, 30] : [20, 20]
+          const x0 = e.x - tw / 2 - radius
+          const y0 = e.y - th / 2 - 2
+          machine.push({ object: gripper ? 'gripper' : 'suction', name: vacuum, ...at, holding: bit('holding', 'I'), orientation: 3, rect: [x0, y0, x0 + tw, y0 + th], carrier: e.id })
+        }
+      }
+      continue
+    }
     if (e.type === 'elevator') {
       const title = e.text?.trim() || typeName(e)
       const out = (key) => (e[key]?.trim() ? bitOf(e[key].trim(), 'Q') : null)
@@ -799,16 +850,16 @@ export function exportPcSimu(project, { reserved = [], addressOf } = {}) {
     // eje en que este se mueve, así que no encadena (lo que va en Z no sigue a la X que lleva a Z). Por eso
     // toda una cadena comparte un grupo: lo que va encima se llama como él, y cada cilindro que lleva algo lo
     // tiene de grupo (a sí mismo no se mueve).
-    const byId = new Map(machine.filter((m) => m.object === 'cylinder').map((m) => [m.id, m]))
+    const byId = new Map(machine.filter((m) => m.object === 'cylinder' || m.object === 'rotary').map((m) => [m.id, m]))
     const rootOf = (item, depth = 0) => (item.carrier && byId.has(item.carrier) && depth < 8 ? rootOf(byId.get(item.carrier), depth + 1) : item.id)
     const chains = new Map()
     for (const c of byId.values()) if (machine.some((m) => m.carrier === c.id) && !chains.has(rootOf(c))) chains.set(rootOf(c), `Grupo_${chains.size + 1}`)
     const groupName = (item) => (item.carrier && byId.has(item.carrier) ? chains.get(rootOf(item)) : undefined)
     const groupOf = (item) => (item.id && machine.some((m) => m.carrier === item.id) ? chains.get(rootOf(item)) : undefined)
     for (const item of machine) {
-      const { type, name, fields, text, a } = OBJECTS[item.object]
+      const { type, name, fields, text, text2, a } = OBJECTS[item.object]
       const rect = shift(item.rect)
-      objects.push({ type, name: groupName(item) ?? name, rect, fields: fields(item), text: text?.(item) ?? '', group: groupOf(item) ?? '', a: a?.(item) ?? 0 })
+      objects.push({ type, name: groupName(item) ?? name, rect, fields: fields(item), text: text?.(item) ?? '', text2: text2?.(item) ?? '', group: groupOf(item) ?? '', a: a?.(item) ?? 0 })
       // Su nombre debajo, o encima, solo si no pisa nada.
       const cx = (rect[0] + rect[2]) / 2
       const spot = item.name && [label(item.name, cx, rect[3] + 4), label(item.name, cx, rect[1] - 21)].find((l) => !taken.some((r) => overlapsRect(r, l.rect)))
