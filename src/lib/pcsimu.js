@@ -200,7 +200,8 @@ const OBJECTS = {
   // f16 = 0: dibujo «Conmutador 1».
   selector: { type: 3, name: 'Selector', area: 'I', size: [30, 30], fields: ({ byte, bit, n }) => [0, byte, 0, bit, 0, n, 0, 0, 0, 0, 0, 0, 0, 0] },
   // Ascensor (tipo 27), de 4 plantas (B, 1, 2, 3): sube f5.f7, baja f6.f8, abre la puerta f4.f14, la cierra
-  // f12.f16; f17 velocidad. Las entradas, de 4 en 4 bits (byte y bit de cada una, hasta IB15): en f10, puerta
+  // f12.f16; f17 velocidad (f17 / 10 por paso; las plantas, cada 240, con 10 de ventana para el detector: a 20,
+  // despacio para que el autómata la pare a tiempo). Las entradas, de 4 en 4 bits (byte y bit de cada una, hasta IB15): en f10, puerta
   // abierta, puerta cerrada, modo (1: un detector por planta; 0: uno solo en la cabina, que se enciende en todas),
   // detector en cabina y el byte de la planta B; en
   // f11, el bit de la B y las plantas 1, 2 y 3; en f9, las condiciones de seguridad (sin usar).
@@ -212,7 +213,7 @@ const OBJECTS = {
       const nib = (list) => list.reduce((v, x, i) => v + (x & 15) * 16 ** i, 0)
       const f10 = nib([doorOpen.byte, doorOpen.bit, doorClosed.byte, doorClosed.bit, 1, 0, 0, floors[0].byte])
       const f11 = nib([floors[0].bit, floors[1].byte, floors[1].bit, floors[2].byte, floors[2].bit, floors[3].byte, floors[3].bit, 0])
-      return [open.byte, byte, down.byte, bit, down.bit, 0, f10, f11, close.byte, 0, open.bit, 0, close.bit, 50]
+      return [open.byte, byte, down.byte, bit, down.bit, 0, f10, f11, close.byte, 0, open.bit, 0, close.bit, 20]
     },
   },
   // Teclado (tipo 4): f10 filas × f11 columnas de teclas, cada una una entrada, seguidas desde f5.f7 (f16 = 0).
@@ -764,13 +765,20 @@ export function exportPcSimu(project, { reserved = [], addressOf } = {}) {
       const zones = [[[r[2], r[1], r[2] + d, r[3]]], [[r[0] - d, r[1], r[0], r[3]]], [up, down], [up, down]][m.orientation ?? 0]
       return [r, ...zones]
     })
-    // Grupos: cada cilindro que lleva algo, el suyo; lo que lleva se llama como él.
-    const groups = new Map()
-    for (const c of machine) if (c.object === 'cylinder' && machine.some((m) => m.carrier === c.id)) groups.set(c.id, `Grupo_${groups.size + 1}`)
+    // Grupos: PC_SIMU coloca lo de un grupo respecto a su sitio al empezar y al del que lo lleva, y solo en el
+    // eje en que este se mueve, así que no encadena (lo que va en Z no sigue a la X que lleva a Z). Por eso
+    // toda una cadena comparte un grupo: lo que va encima se llama como él, y cada cilindro que lleva algo lo
+    // tiene de grupo (a sí mismo no se mueve).
+    const byId = new Map(machine.filter((m) => m.object === 'cylinder').map((m) => [m.id, m]))
+    const rootOf = (item, depth = 0) => (item.carrier && byId.has(item.carrier) && depth < 8 ? rootOf(byId.get(item.carrier), depth + 1) : item.id)
+    const chains = new Map()
+    for (const c of byId.values()) if (machine.some((m) => m.carrier === c.id) && !chains.has(rootOf(c))) chains.set(rootOf(c), `Grupo_${chains.size + 1}`)
+    const groupName = (item) => (item.carrier && byId.has(item.carrier) ? chains.get(rootOf(item)) : undefined)
+    const groupOf = (item) => (item.id && machine.some((m) => m.carrier === item.id) ? chains.get(rootOf(item)) : undefined)
     for (const item of machine) {
       const { type, name, fields, text, a } = OBJECTS[item.object]
       const rect = shift(item.rect)
-      objects.push({ type, name: groups.get(item.carrier) ?? name, rect, fields: fields(item), text: text?.(item) ?? '', group: groups.get(item.id) ?? '', a: a?.(item) ?? 0 })
+      objects.push({ type, name: groupName(item) ?? name, rect, fields: fields(item), text: text?.(item) ?? '', group: groupOf(item) ?? '', a: a?.(item) ?? 0 })
       // Su nombre debajo, o encima, solo si no pisa nada.
       const cx = (rect[0] + rect[2]) / 2
       const spot = item.name && [label(item.name, cx, rect[3] + 4), label(item.name, cx, rect[1] - 21)].find((l) => !taken.some((r) => overlapsRect(r, l.rect)))

@@ -439,10 +439,12 @@ describe('PC_SIMU (.sim)', () => {
     // Los dos llevan algo: gráfico 2 (f15 = 13), el único (con el 3) que mueve su grupo.
     const [x, z] = [0, 1].map((bit) => objects.find((o) => o.fields[11] === 13 && o.fields[3] === bit && o.fields[1] === 0))
     const suction = objects.find((o) => o.fields[11] === 100)
+    // Un grupo para toda la cadena: X lleva a Z y a la ventosa (en horizontal), Z a la ventosa (en vertical).
     expect(x.group).toBe('Grupo_1')
-    expect(z.name).toBe('Grupo_1') // va con X
-    expect(z.group).toBe('Grupo_2')
-    expect(suction.name).toBe('Grupo_2') // va con Z
+    expect(z.name).toBe('Grupo_1')
+    expect(z.group).toBe('Grupo_1')
+    expect(suction.name).toBe('Grupo_1')
+    expect(suction.group).toBe('')
     expect([suction.fields[1], suction.fields[3], suction.fields[5], suction.fields[7], suction.fields[9], suction.fields[10]]).toEqual([0, 2, 1, 0, 0, 3]) // Q0.2, vacuostato I0.0, hacia abajo
     expect(warnings.join(' ')).not.toMatch(/montado|ventosa/)
   })
