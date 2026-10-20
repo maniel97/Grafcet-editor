@@ -102,6 +102,15 @@ const OBJECTS = {
     text: ({ speed }) => `.${pad(speed ?? CYLINDER_SPEED)}.${pad(0)}.${pad(0)}.0.${pad(0)}.0.0`,
     a: ({ a1 }) => a1?.bit ?? 0,
   },
+  // Ventosa (tipo 19, f15 = 100): f4 = 0 monoestable, la activa f5.f7; f9 = 1 con vacuostato (entrada f11.f13);
+  // f14 orientación (como la del cilindro). Va con el cilindro que la lleva por su grupo (ver «grupo»).
+  suction: {
+    type: 19,
+    name: 'Ventosa',
+    size: [20, 20],
+    fields: ({ byte, bit, holding, orientation }) => [0, byte, 0, bit, 0, holding ? 1 : 0, 0, holding?.byte ?? 0, 0, holding?.bit ?? 0, orientation, 100, 1, CYLINDER_SPEED],
+    text: () => `.${pad(CYLINDER_SPEED)}.${pad(0)}.${pad(0)}.0.${pad(0)}.0.0`,
+  },
   // Cinta: mueve a la derecha con f5.f7 (si f16 = 1) y a la izquierda con f6.f8 (si f15 = 1); f17 velocidad
   // (f17 / 12 px por paso); f14 = 0: dibujo «Cinta (V1.0)», horizontal.
   conveyor: {
@@ -629,9 +638,21 @@ export function exportPcSimu(project, { reserved = [], addressOf } = {}) {
         Object.assign(extra, { rect: placed(e, 88 - W, -14, W, 28), speed: cylinderSpeed(e) })
       }
       extra.extended = Number(e.initial) === 1
-      const lost = ['position', 'vacuum', 'holding'].filter((k) => e[k]?.trim()).map((k) => e[k].trim())
+      if (onMachine) {
+        // Lo que lleva encima (otro cilindro montado en su vástago, su ventosa) va con él en PC_SIMU por el
+        // grupo: el actuador mueve los objetos que se llaman como su grupo (más abajo).
+        extra.id = e.id
+        if (e.mountedOn) extra.carrier = e.mountedOn
+        const vacuum = e.vacuum?.trim()
+        if (vacuum) {
+          const at = bitOf(vacuum, 'Q')
+          if (!at) missing(e, vacuum, 'Q')
+          else machine.push({ object: 'suction', name: vacuum, ...at, holding: leg('holding', 'I'), orientation: extra.orientation, rect: placed(e, 88, -10, 20, 20), carrier: e.id })
+        }
+      }
+      const lost = (onMachine ? ['position'] : ['position', 'vacuum', 'holding']).filter((k) => e[k]?.trim()).map((k) => e[k].trim())
       if (lost.length) warnings.push(`${name || typeName(e)}: ${lost.join(', ')} no pasa${lost.length > 1 ? 'n' : ''} a PC_SIMU (posición analógica y ventosa).`)
-      if (e.mountedOn) warnings.push(`${name || typeName(e)}: en PC_SIMU no va montado sobre otro cilindro.`)
+      if (e.mountedOn && !onMachine) warnings.push(`${name || typeName(e)}: en PC_SIMU no va montado sobre otro cilindro.`)
     }
     if (onMachine && e.type === 'sensor') Object.assign(extra, { rect: placed(e, -10, -5, 20, 10), orientation: ORIENTATION[rot] ?? 0, range: Math.round(Number(e.range) || 60) })
     if (onMachine && e.type === 'sensor' && !front) {
@@ -734,10 +755,13 @@ export function exportPcSimu(project, { reserved = [], addressOf } = {}) {
       const zones = [[[r[2], r[1], r[2] + d, r[3]]], [[r[0] - d, r[1], r[0], r[3]]], [up, down], [up, down]][m.orientation ?? 0]
       return [r, ...zones]
     })
+    // Grupos: cada cilindro que lleva algo, el suyo; lo que lleva se llama como él.
+    const groups = new Map()
+    for (const c of machine) if (c.object === 'cylinder' && machine.some((m) => m.carrier === c.id)) groups.set(c.id, `Grupo_${groups.size + 1}`)
     for (const item of machine) {
       const { type, name, fields, text, a } = OBJECTS[item.object]
       const rect = shift(item.rect)
-      objects.push({ type, name, rect, fields: fields(item), text: text?.(item) ?? '', a: a?.(item) ?? 0 })
+      objects.push({ type, name: groups.get(item.carrier) ?? name, rect, fields: fields(item), text: text?.(item) ?? '', group: groups.get(item.id) ?? '', a: a?.(item) ?? 0 })
       // Su nombre debajo, o encima, solo si no pisa nada.
       const cx = (rect[0] + rect[2]) / 2
       const spot = item.name && [label(item.name, cx, rect[3] + 4), label(item.name, cx, rect[1] - 21)].find((l) => !taken.some((r) => overlapsRect(r, l.rect)))

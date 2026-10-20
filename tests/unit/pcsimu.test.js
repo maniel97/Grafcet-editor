@@ -427,6 +427,25 @@ describe('PC_SIMU (.sim)', () => {
     expect(warnings).toEqual(['Ascensor: el ascensor de PC_SIMU tiene 4 plantas (B, 1, 2 y 3); las que sobran, con detectores en entradas libres.'])
   })
 
+  it('cilindro montado en otro y ventosa: van con el que los lleva por su grupo', () => {
+    const v = (address) => ({ address })
+    const variables = { 'X+': v('Q0.0'), 'Z+': v('Q0.1'), V: v('Q0.2'), VH: v('I0.0') }
+    const elements = [
+      { id: 'x', type: 'cylinder', x: 100, y: 100, extend: 'X+', stroke: 100 },
+      { id: 'z', type: 'cylinder', x: 188, y: 100, rot: 90, extend: 'Z+', vacuum: 'V', holding: 'VH', mountedOn: 'x', stroke: 60 },
+    ]
+    const { text, warnings } = exportPcSimu({ plc: { variables, scene: { gravity: true, elements } } })
+    const objects = parsePcSimu(text).filter((o) => o.type === 19)
+    const [x, z] = [0, 1].map((bit) => objects.find((o) => o.fields[11] === 11 && o.fields[3] === bit && o.fields[1] === 0))
+    const suction = objects.find((o) => o.fields[11] === 100)
+    expect(x.group).toBe('Grupo_1')
+    expect(z.name).toBe('Grupo_1') // va con X
+    expect(z.group).toBe('Grupo_2')
+    expect(suction.name).toBe('Grupo_2') // va con Z
+    expect([suction.fields[1], suction.fields[3], suction.fields[5], suction.fields[7], suction.fields[9], suction.fields[10]]).toEqual([0, 2, 1, 0, 0, 3]) // Q0.2, vacuostato I0.0, hacia abajo
+    expect(warnings.join(' ')).not.toMatch(/montado|ventosa/)
+  })
+
   it('todos los ejemplos del editor se exportan sin pisarse', () => {
     for (const example of EXAMPLES) {
       const objects = parsePcSimu(exportPcSimu(example.build()).text)
