@@ -136,4 +136,20 @@ describe('Importar de PC_SIMU (.sim)', () => {
     const motor = importPcSimu(sim.text).project.plc.scene.elements.find((e) => e.type === 'motor')
     expect(motor).toMatchObject({ look: 'valvePneumatic1', variable: 'Y1' })
   })
+
+  it('depósito con nivel medio y ascensor con un solo detector en la cabina, de ida y vuelta', () => {
+    const v = (address) => ({ address })
+    const variables = { LL: v('Q0.0'), VA: v('Q0.1'), A: v('I0.0'), M: v('I0.1'), B: v('I0.2'), S: v('Q1.0'), Ba: v('Q1.1'), C: v('I1.0') }
+    const elements = [
+      { id: 't', type: 'tank', x: 100, y: 100, fill: 'LL', drain: 'VA', high: 'A', mid: 'M', low: 'B' },
+      { id: 'a', type: 'elevator', x: 400, y: 300, floors: 4, up: 'S', down: 'Ba', cabin: 'C' },
+    ]
+    const { project } = importPcSimu(exportPcSimu({ plc: { variables, scene: { gravity: true, elements } } }).text)
+    const tank = project.plc.scene.elements.find((e) => e.type === 'tank')
+    const lift = project.plc.scene.elements.find((e) => e.type === 'elevator')
+    const name = (addr) => Object.entries(project.plc.variables).find(([, x]) => x.address === addr)?.[0]
+    expect([tank.high, tank.mid, tank.low].map((n) => project.plc.variables[n].address)).toEqual(['I0.0', 'I0.1', 'I0.2'])
+    expect(lift.cabin).toBe(name('I1.0'))
+    expect([lift.f1, lift.f2, lift.f3, lift.f4]).toEqual(['', '', '', ''])
+  })
 })

@@ -208,11 +208,11 @@ export function importPcSimu(text, images = {}) {
           x: o.rect[0],
           y: o.rect[1],
           high: f(o, 15) ? input(o, f(o, 5), f(o, 7)) : '',
+          mid: f(o, 17) ? input(o, f(o, 6), f(o, 8)) : '',
           low: f(o, 9) ? input(o, f(o, 10), f(o, 11)) : '',
           level: f(o, 4) ? variable(o, 'AI', `AIW${f(o, 12)}`, 'analogIn') : '',
           initial: 0,
         })
-        if (f(o, 17)) warnings.push('Depósito: el captador de nivel medio no tiene equivalente en el editor.')
         tank.rect = o.rect
         break
       }
@@ -223,7 +223,7 @@ export function importPcSimu(text, images = {}) {
         const nib = (v, i) => (v >>> (4 * i)) & 15
         const f10 = f(o, 10)
         const f11 = f(o, 11)
-        if (nib(f10, 4) === 0) warnings.push('Ascensor: con un solo detector en la cabina; en el editor, uno por planta.')
+        const cabin = nib(f10, 4) === 0 // un solo detector, en la cabina (f10: byte y bit en sus 4 bits 5 y 6)
         add(o, 'elevator', {
           ...at(o),
           floors: 4,
@@ -233,10 +233,9 @@ export function importPcSimu(text, images = {}) {
           close: output(o, f(o, 12), f(o, 16)),
           doorOpen: input(o, nib(f10, 0), nib(f10, 1)),
           doorClosed: input(o, nib(f10, 2), nib(f10, 3)),
-          f1: input(o, nib(f10, 7), nib(f11, 0)),
-          f2: input(o, nib(f11, 1), nib(f11, 2)),
-          f3: input(o, nib(f11, 3), nib(f11, 4)),
-          f4: input(o, nib(f11, 5), nib(f11, 6)),
+          ...(cabin
+            ? { cabin: input(o, nib(f10, 5), nib(f10, 6)), f1: '', f2: '', f3: '', f4: '' }
+            : { f1: input(o, nib(f10, 7), nib(f11, 0)), f2: input(o, nib(f11, 1), nib(f11, 2)), f3: input(o, nib(f11, 3), nib(f11, 4)), f4: input(o, nib(f11, 5), nib(f11, 6)) }),
           floorTime: 4,
           doorTime: 1,
           initial: 0,

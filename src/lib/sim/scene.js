@@ -166,6 +166,7 @@ export const SCENE_VARS = {
     ['fillFine', N_('Llenado fino (opcional, 5 veces más lento)'), 'out'],
     ['drain', N_('Válvula de vaciado'), 'out'],
     ['low', 'Sensor nivel bajo', 'in'],
+    ['mid', N_('Sensor nivel medio (opcional)'), 'in'],
     ['high', 'Sensor nivel alto', 'in'],
     ['empty', N_('Sensor de vacío (opcional)'), 'in'],
     ['level', N_('Nivel (analógica)'), 'analog'],
@@ -197,6 +198,7 @@ export const SCENE_VARS = {
     ['f2', N_('En la planta 1 (entrada)'), 'in'],
     ['f3', N_('En la planta 2 (entrada)'), 'in'],
     ['f4', N_('En la planta 3 (entrada)'), 'in'],
+    ['cabin', N_('En una planta, cualquiera (entrada: detector en la cabina)'), 'in'],
     ['doorOpen', N_('Puerta abierta (entrada)'), 'in'],
     ['doorClosed', N_('Puerta cerrada (entrada)'), 'in'],
   ],
@@ -216,7 +218,7 @@ export const SCENE_VARS = {
 }
 
 // Tamaño del depósito (anclaje: esquina superior izquierda) y de sus sensores de nivel.
-export const TANK = { w: 90, h: 130, low: 0.1, high: 0.9 }
+export const TANK = { w: 90, h: 130, low: 0.1, mid: 0.5, high: 0.9 }
 
 // Dibujos del motor: el suyo, las herramientas de PC_SIMU (en el orden de su f14, de 0 a 15) y sus «Salidas».
 export const MOTOR_LOOKS = [
@@ -773,6 +775,7 @@ export function sceneInputs(scene, state, analogRange = () => null) {
     if (e.type === 'tank') {
       const level = state.level?.[e.id] ?? 0
       if (e.low) inputs[e.low] = level >= TANK.low && fault(e) !== 'sensor:low' ? 1 : 0
+      if (e.mid) inputs[e.mid] = level >= TANK.mid ? 1 : 0
       if (e.high) inputs[e.high] = level >= TANK.high && fault(e) !== 'sensor:high' ? 1 : 0
       if (e.empty) inputs[e.empty] = level <= 0.02 && fault(e) !== 'sensor:empty' ? 1 : 0
       if (e.level) {
@@ -801,6 +804,7 @@ export function sceneInputs(scene, state, analogRange = () => null) {
     if (e.type === 'elevator') {
       const { at, door } = state.lift?.[e.id] ?? { at: 0, door: 0 }
       for (let k = 0; k < elevatorFloors(e); k++) if (e[`f${k + 1}`]) inputs[e[`f${k + 1}`]] = Math.abs(at - k) < 0.02 ? 1 : 0
+      if (e.cabin) inputs[e.cabin] = Math.abs(at - Math.round(at)) < 0.02 ? 1 : 0
       if (e.doorOpen) inputs[e.doorOpen] = door >= 0.999 ? 1 : 0
       if (e.doorClosed) inputs[e.doorClosed] = door <= 0.001 ? 1 : 0
     }

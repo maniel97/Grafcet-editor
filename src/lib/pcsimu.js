@@ -252,9 +252,9 @@ const OBJECTS = {
     type: 27,
     name: 'Ascensor',
     size: [226, 610],
-    fields: ({ byte, bit, down, open, close, floors, doorOpen, doorClosed }) => {
+    fields: ({ byte, bit, down, open, close, floors, doorOpen, doorClosed, cabin }) => {
       const nib = (list) => list.reduce((v, x, i) => v + (x & 15) * 16 ** i, 0)
-      const f10 = nib([doorOpen.byte, doorOpen.bit, doorClosed.byte, doorClosed.bit, 1, 0, 0, floors[0].byte])
+      const f10 = nib([doorOpen.byte, doorOpen.bit, doorClosed.byte, doorClosed.bit, cabin ? 0 : 1, cabin?.byte ?? 0, cabin?.bit ?? 0, floors[0].byte])
       const f11 = nib([floors[0].bit, floors[1].byte, floors[1].bit, floors[2].byte, floors[2].bit, floors[3].byte, floors[3].bit, 0])
       return [open.byte, byte, down.byte, bit, down.bit, 0, f10, f11, close.byte, 0, open.bit, 0, close.bit, 10]
     },
@@ -487,7 +487,7 @@ export function exportPcSimu(project, { reserved = [], addressOf } = {}) {
         return at
       }
       const [fill, fine, drain] = ['fill', 'fillFine', 'drain'].map((k) => leg(k, 'Q'))
-      const [high, low, empty] = ['high', 'low', 'empty'].map((k) => leg(k, 'I'))
+      const [high, mid, low, empty] = ['high', 'mid', 'low', 'empty'].map((k) => leg(k, 'I'))
       const level = e.level?.trim()
       const ai = level ? /^AIW(\d+)$/i.exec(addr(level)) : null
       if (level && !ai) warnings.push(`${level}: sin una entrada analógica AIW; el nivel analógico no pasa a PC_SIMU.`)
@@ -508,9 +508,10 @@ export function exportPcSimu(project, { reserved = [], addressOf } = {}) {
         fill,
         fine,
         drain,
-        // Tres captadores en PC_SIMU (máximo, medio y mínimo): el alto, el bajo y el de vacío del editor.
+        // Tres captadores en PC_SIMU (máximo, medio y mínimo): el alto, el medio (o, sin él, el bajo si hay de
+        // vacío) y el de vacío o el bajo del editor.
         max: high,
-        mid: empty ? low : null,
+        mid: mid ?? (empty ? low : null),
         min: empty ?? low,
         ai: ai ? Number(ai[1]) : null,
         initial: Math.max(0, Math.min(1, Number(e.initial) || 0)),
@@ -627,10 +628,12 @@ export function exportPcSimu(project, { reserved = [], addressOf } = {}) {
         usedI.add(i)
         return { byte: Math.floor(i / 8), bit: i % 8 }
       }
+      // Con un solo detector en la cabina (y sin los de planta), el modo 0 de PC_SIMU.
+      const cabin = !['f1', 'f2', 'f3', 'f4'].some((k) => e[k]?.trim()) ? inp('cabin') : null
       const floors = [0, 1, 2, 3].map((k) => inp(`f${k + 1}`) ?? spare())
       const doorOpen = inp('doorOpen') ?? spare()
       const doorClosed = inp('doorClosed') ?? spare()
-      const all = [up, down, open, close, ...floors, doorOpen, doorClosed].filter(Boolean)
+      const all = [up, down, open, close, ...floors, doorOpen, doorClosed, cabin].filter(Boolean)
       if (all.some((a) => a.byte > 15)) {
         warnings.push(`${title}: el ascensor de PC_SIMU guarda sus direcciones en 4 bits (hasta el byte 15); no se exporta.`)
         continue
@@ -639,7 +642,7 @@ export function exportPcSimu(project, { reserved = [], addressOf } = {}) {
       // Con la máquina (no en el panel: es tan alto que bajaría los mandos fuera de la pantalla, y PC_SIMU no
       // deja reducir la vista); el panel, a su derecha.
       const [w, h] = OBJECTS.elevator.size
-      machine.push({ object: 'elevator', name: title, ...up, down, open: open ?? zero, close: close ?? zero, floors, doorOpen, doorClosed, rect: [e.x - w / 2, e.y - h / 2, e.x + w / 2, e.y + h / 2] })
+      machine.push({ object: 'elevator', name: title, ...up, down, open: open ?? zero, close: close ?? zero, floors, doorOpen, doorClosed, cabin, rect: [e.x - w / 2, e.y - h / 2, e.x + w / 2, e.y + h / 2] })
       if (!open || !close) warnings.push(`${title}: sin salidas para la puerta, en PC_SIMU no se abre.`)
       if (Math.round(Number(e.floors) || 3) < 4) warnings.push(`${title}: el ascensor de PC_SIMU tiene 4 plantas (B, 1, 2 y 3); las que sobran, con detectores en entradas libres.`)
       continue

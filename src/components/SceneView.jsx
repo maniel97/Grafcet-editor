@@ -713,6 +713,7 @@ function TankShape({ e, level, values, iso = false }) {
       {fill && <line x1={w / 2} y1="-4" x2={w / 2} y2={(h - 2) * (1 - level)} stroke="#3b82f6" strokeWidth="3" opacity="0.6" />}
       {e.high && <circle cx={w + 8} cy={h * (1 - TANK.high)} r="4" fill={level >= TANK.high ? ON : OFF} stroke={INK} strokeWidth="0.75" />}
       {e.low && <circle cx={w + 8} cy={h * (1 - TANK.low)} r="4" fill={level >= TANK.low ? ON : OFF} stroke={INK} strokeWidth="0.75" />}
+      {e.mid && <circle cx={w + 8} cy={h * (1 - TANK.mid)} r="4" fill={level >= TANK.mid ? ON : OFF} stroke={INK} strokeWidth="0.75" />}
       <text x={w / 2} y={h / 2 + 4} textAnchor="middle" fontSize="12" fontWeight="600" fill={INK}>
         {Math.round(level * 100)} %
       </text>
