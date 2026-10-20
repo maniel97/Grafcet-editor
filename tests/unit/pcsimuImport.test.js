@@ -28,6 +28,12 @@ describe('Importar de PC_SIMU (.sim)', () => {
     }
   })
 
+  it('lo que no tiene equivalente, contado aparte (para el aviso)', () => {
+    const p = EXAMPLES.find((e) => /Contar pulsaciones/.test(e.title)).build()
+    const { skipped } = importPcSimu(exportPcSimu(p).text)
+    expect(skipped).toEqual([{ what: 'display', count: 4 }])
+  })
+
   it('las variables, con el nombre del rótulo de al lado (y su dirección)', () => {
     const p = EXAMPLES.find((e) => /Marcha y paro de un motor/.test(e.title)).build()
     const { project } = importPcSimu(exportPcSimu(p).text)

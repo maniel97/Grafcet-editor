@@ -391,11 +391,12 @@ export function importPcSimu(text) {
     Object.assign(e, { x: 0, y: 0 })
   }
   if (electric) warnings.push(`${electric > 1 ? `${electric} × ` : ''}actuador lineal eléctrico: como un cilindro (sin su posicionado).`)
-  for (const [what, count] of skipped) warnings.push(`${count > 1 ? `${count} × ` : ''}${what}: sin equivalente en el editor; no se importa.`)
   const plant = [...elements.filter((e) => e.place !== 'desk'), ...desk]
   return {
     project: { nodes: [], edges: [], plc: { variables, scene: { gravity: true, elements: plant } } },
     warnings,
+    // Lo que no tiene equivalente en el editor: [{ what, count }].
+    skipped: [...skipped].map(([what, count]) => ({ what, count })),
     count: plant.length,
   }
 }

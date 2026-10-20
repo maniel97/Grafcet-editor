@@ -37,8 +37,8 @@ export async function loadProjects(file) {
   const bytes = new Uint8Array(await file.arrayBuffer())
   // Un panel o una planta de PC_SIMU: la planta virtual, con su tabla de variables (lib/pcsimuImport.js).
   if (isPcSimu(bytes)) {
-    const { project, warnings } = importPcSimu(new TextDecoder('windows-1252').decode(bytes))
-    return [{ file: file.name, project: normalizeProject(project), warnings }]
+    const { project, warnings, skipped } = importPcSimu(new TextDecoder('windows-1252').decode(bytes))
+    return [{ file: file.name, project: normalizeProject(project), pcsimu: { warnings, skipped } }]
   }
   let raw
   if (isPdf(bytes)) {

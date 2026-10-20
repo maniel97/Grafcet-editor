@@ -51,7 +51,7 @@ import { applySymbols } from '../lib/plc/symbolTable'
 import { buildPlcModel } from '../lib/plcModel'
 import { t } from '../lib/i18n'
 import { PanelStack, PanelTabs } from './PanelDock'
-import { ErrorNotice, FirstVisitOffer, SharedProjectBanner } from './CanvasNotices'
+import { ErrorNotice, FirstVisitOffer, ImportNotice, SharedProjectBanner } from './CanvasNotices'
 import { ExportDialogs, ProjectDialogs } from './CanvasDialogs'
 import { useDockLayout } from '../hooks/useDockLayout'
 import { FIRST_TOUR, markTourSeen, tourSeen } from '../lib/tours'
@@ -655,6 +655,7 @@ export default function GrafcetCanvas() {
   // Aviso de error (abrir un archivo que no es un proyecto, de un formato más nuevo…), en vez de un
   // alert() del navegador: se queda hasta cerrarlo o abrir otra cosa.
   const [notice, setNotice] = useState(null)
+  const [importReport, setImportReport] = useState(null) // lo que no ha pasado al importar un .sim
 
   // Sustituye el diagrama (abrir archivo, ejemplo o trabajo anterior). Lo que había se guarda
   // antes como trabajo anterior (lib/recent.js) y además se puede deshacer con Ctrl+Z.
@@ -698,7 +699,7 @@ export default function GrafcetCanvas() {
         if (items.length > 1) setChoosing({ fileName: file.name, items })
         else openLoaded(items[0].project, file.name)
         // Importado de PC_SIMU: lo que no tiene equivalente en el editor.
-        if (items[0].warnings?.length) setNotice(`${t('Importado de PC_SIMU. No se ha podido pasar:')} ${items[0].warnings.join(' · ')}`)
+        setImportReport(items[0].pcsimu ?? null)
       } catch (err) {
         setNotice(err.message)
       }
@@ -1046,6 +1047,7 @@ export default function GrafcetCanvas() {
           </Suspense>
         )}
         <ErrorNotice message={notice} onClose={() => setNotice(null)} />
+        <ImportNotice report={notice ? null : importReport} onClose={() => setImportReport(null)} />
         <SharedProjectBanner
           incoming={incoming}
           onOpen={(raw) => {
