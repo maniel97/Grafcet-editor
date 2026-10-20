@@ -523,7 +523,10 @@ export function exportPcSimu(project, { reserved = [], addressOf } = {}) {
         continue
       }
       const zero = { byte: 0, bit: 0 }
-      rows[0].push({ object: 'elevator', name: title, ...up, down, open: open ?? zero, close: close ?? zero, floors, doorOpen, doorClosed })
+      // Con la máquina (no en el panel: es tan alto que bajaría los mandos fuera de la pantalla, y PC_SIMU no
+      // deja reducir la vista); el panel, a su derecha.
+      const [w, h] = OBJECTS.elevator.size
+      machine.push({ object: 'elevator', name: title, ...up, down, open: open ?? zero, close: close ?? zero, floors, doorOpen, doorClosed, rect: [e.x - w / 2, e.y - h / 2, e.x + w / 2, e.y + h / 2] })
       if (!open || !close) warnings.push(`${title}: sin salidas para la puerta, en PC_SIMU no se abre.`)
       if (Math.round(Number(e.floors) || 3) < 4) warnings.push(`${title}: el ascensor de PC_SIMU tiene 4 plantas (B, 1, 2 y 3); las que sobran, con detectores en entradas libres.`)
       continue
