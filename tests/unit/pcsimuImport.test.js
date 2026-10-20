@@ -95,4 +95,20 @@ describe('Importar de PC_SIMU (.sim)', () => {
     const types = parsePcSimu(exportPcSimu(project).text).map((o) => o.type).sort()
     expect(types).toEqual([1001, 1002, 1004, 1005])
   })
+
+  it('imágenes: fijas, con dos dibujos (salida o entrada al pulsarlas) y las que faltan, avisadas', () => {
+    const fields = (set) => Array.from({ length: 14 }, (_, i) => set[i + 4] ?? 0)
+    const text = pcsimuText([
+      { type: 14, rect: [0, 0, 200, 100], fields: fields({ 15: 1 }), text2: String.raw`C:\Users\otro\Pupitre.bmp` },
+      { type: 14, rect: [300, 0, 330, 50], fields: fields({ 4: 1, 5: 0, 7: 6, 11: 0, 12: 5 }), text2: 'Baliza_off.bmp', group: 'Baliza_on.bmp' },
+      { type: 14, rect: [400, 0, 440, 40], fields: fields({ 4: 0, 5: 1, 7: 2, 13: 1, 14: 1 }), text2: 'Termico_off.bmp', group: 'Termico_on.bmp' },
+    ])
+    const images = { 'pupitre.bmp': 'data:p', 'baliza_off.bmp': 'data:b0', 'baliza_on.bmp': 'data:b1' }
+    const { project, warnings } = importPcSimu(text, images)
+    const [still, lamp, thermal] = project.plc.scene.elements
+    expect(still).toMatchObject({ type: 'image', src: 'data:p', srcOn: '', width: 200, height: 100 })
+    expect(lamp).toMatchObject({ src: 'data:b0', srcOn: 'data:b1', show: 'Q0_6', dy: 5 })
+    expect(thermal).toMatchObject({ src: '', press: 'I1_2', contact: 'NC', latch: true })
+    expect(warnings).toContain('Faltan 2 imágenes (elígelas junto al .sim, en la misma ventana): termico_off.bmp, termico_on.bmp.')
+  })
 })

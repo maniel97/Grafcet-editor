@@ -31,7 +31,8 @@ const cleanName = (text) => {
   return !s ? '' : /^\p{N}/u.test(s) ? `_${s}` : s
 }
 
-export function importPcSimu(text) {
+// images: { [nombre del archivo, en minúsculas]: data URL } — las imágenes elegidas junto al .sim.
+export function importPcSimu(text, images = {}) {
   const objects = parsePcSimu(text)
   if (!objects.length && !/^PC_SIMU\*/.test(text)) throw new Error('No es un archivo de PC_SIMU.')
   const warnings = []
@@ -85,6 +86,15 @@ export function importPcSimu(text) {
   const tools = []
   let electric = 0
   const paints = []
+  // Las imágenes del .sim van aparte, con su nombre (a veces con la ruta del ordenador en que se hizo).
+  const missing = new Set()
+  const bitmap = (path) => {
+    const name = String(path ?? '').trim().split(/[\\/]/).pop().toLowerCase()
+    if (!name) return ''
+    if (images[name]) return images[name]
+    missing.add(name)
+    return ''
+  }
   for (const o of objects) {
     const W = o.rect[2] - o.rect[0]
     const H = o.rect[3] - o.rect[1]
@@ -351,9 +361,17 @@ export function importPcSimu(text) {
       case 5:
         skip('preselector')
         break
-      case 14:
-        skip('imagen')
+      case 14: {
+        // Imagen: fija (f15 = 1) o con dos dibujos, apagado (texto2) y encendido (grupo), que cambia con una
+        // salida (f4 = 1) o al pulsarla (entrada; NC f13, se queda pulsada f14), desplazada f11, f12 al
+        // activarse. f9: 1 o 2, transparente (el color de su esquina).
+        const still = f(o, 15) === 1
+        const src = bitmap(o.text2)
+        const srcOn = still ? '' : bitmap(o.group)
+        const io = !still && o.text2?.trim() ? (f(o, 4) === 1 ? { show: output(o, f(o, 5), f(o, 7)) } : { press: input(o, f(o, 5), f(o, 7)), contact: f(o, 13) ? 'NC' : 'NO', latch: f(o, 14) === 1 }) : {}
+        add(o, 'image', { x: o.rect[0], y: o.rect[1], width: W, height: H, src, srcOn, dx: still ? 0 : f(o, 11), dy: still ? 0 : f(o, 12), ...io, ...(f(o, 9) ? { transparentKey: true } : {}) })
         break
+      }
       default:
         skip(`objeto de tipo ${o.type}`)
     }
@@ -417,6 +435,7 @@ export function importPcSimu(text) {
     delete e.order
     Object.assign(e, { x: 0, y: 0 })
   }
+  if (missing.size) warnings.push(`Faltan ${missing.size} imágenes (elígelas junto al .sim, en la misma ventana): ${[...missing].join(', ')}.`)
   if (electric) warnings.push(`${electric > 1 ? `${electric} × ` : ''}actuador lineal eléctrico: como un cilindro (sin su posicionado).`)
   const plant = [...elements.filter((e) => e.place !== 'desk'), ...desk]
   return {

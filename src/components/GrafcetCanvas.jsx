@@ -20,6 +20,7 @@ import { useFloating } from './useFloating'
 import { initialNodes, initialEdges, defaultEdgeOptions } from '../lib/initialDiagram'
 import { downloadFile, saveProject, loadProjects, normalizeProject } from '../lib/projectFile'
 import { importPcSimu, withPcSimuPlant } from '../lib/pcsimuImport'
+import { pictureFromFile, withTransparentCorner } from '../lib/pictureFiles'
 import { pushRecent } from '../lib/recent'
 import { EMPTY_PLC } from '../lib/addressing'
 import { nextStepLabel, nextTransitionLabel, findFreePosition } from '../lib/layout'
@@ -1336,9 +1337,27 @@ export default function GrafcetCanvas() {
                 cpuConfig={plc.cpu}
                 onCpuChange={(cpu) => setPlc((p) => ({ ...p, cpu }))}
                 onApplySymbols={(symbols) => setPlc((p) => ({ ...p, variables: applySymbols(p.variables, symbols) }))}
-                onImportPlant={async (file) => {
+                onImportPlant={async (files) => {
                   try {
-                    const imported = importPcSimu(new TextDecoder('windows-1252').decode(await file.arrayBuffer()))
+                    const file = files.find((f) => /\.sim$/i.test(f.name))
+                    if (!file) throw new Error(t('Elige el archivo .sim (y, si las tiene, sus imágenes a la vez).'))
+                    // Las imágenes que lo acompañan, por su nombre (el .sim las nombra, no las lleva dentro).
+                    const images = {}
+                    for (const f of files) {
+                      if (f === file) continue
+                      try {
+                        images[f.name.toLowerCase()] = await pictureFromFile(f)
+                      } catch {
+                        // una imagen que el navegador no lee: queda como «falta»
+                      }
+                    }
+                    const imported = importPcSimu(new TextDecoder('windows-1252').decode(await file.arrayBuffer()), images)
+                    for (const e of imported.project.plc.scene.elements) {
+                      if (!e.transparentKey) continue
+                      delete e.transparentKey
+                      e.src = await withTransparentCorner(e.src)
+                      e.srcOn = await withTransparentCorner(e.srcOn)
+                    }
                     setPlc((p) => withPcSimuPlant(p, imported.project))
                     setImportReport({ warnings: imported.warnings, skipped: imported.skipped })
                   } catch (err) {

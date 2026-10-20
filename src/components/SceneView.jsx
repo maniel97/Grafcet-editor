@@ -566,11 +566,14 @@ function LabelShape({ e }) {
     </text>
   )
 }
-function ImageShape({ e }) {
+function ImageShape({ e, active = false }) {
   const w = Number(e.width) || 300
   const h = Number(e.height) || 200
-  return e.src ? (
-    <image href={e.src} x="0" y="0" width={w} height={h} preserveAspectRatio="xMidYMid meet" opacity="0.9" />
+  // Activa (con su salida o pulsada): su segundo dibujo, desplazado (dx, dy).
+  const href = active && e.srcOn ? e.srcOn : e.src
+  const shift = active ? `translate(${Number(e.dx) || 0} ${Number(e.dy) || 0})` : undefined
+  return href ? (
+    <image href={href} x="0" y="0" width={w} height={h} preserveAspectRatio="xMidYMid meet" opacity={e.show || e.press ? 1 : 0.9} transform={shift} />
   ) : (
     <g>
       <rect x="0" y="0" width={w} height={h} fill="#f8fafc" stroke="#94a3b8" strokeDasharray="6 4" />
@@ -1416,8 +1419,37 @@ function Properties({ element, variables, onChange, onDelete, onRotate, onCreate
               className="block w-full text-[11px]"
             />
           </label>
+          <label className="block">
+            <span className="text-slate-500">{tr('Imagen activa (opcional: con su salida o al pulsarla)')}</span>
+            <input
+              type="file"
+              accept="image/*"
+              aria-label={tr('Imagen activa: elegir archivo')}
+              onChange={async (ev) => {
+                const file = ev.target.files?.[0]
+                ev.target.value = ''
+                if (!file) return
+                set({ srcOn: (await loadImage(file)).src })
+              }}
+              className="block w-full text-[11px]"
+            />
+          </label>
           {number('width', tr('Ancho (px)'), 20, 10)}
           {number('height', tr('Alto (px)'), 20, 10)}
+          {element.press?.trim() && (
+            <>
+              <label className="flex items-center gap-1">
+                <input type="checkbox" checked={Boolean(element.latch)} onChange={(ev) => set({ latch: ev.target.checked })} />
+                {tr('Se queda pulsada (como un interruptor)')}
+              </label>
+              <label className="flex items-center gap-1">
+                <input type="checkbox" checked={element.contact === 'NC'} onChange={(ev) => set({ contact: ev.target.checked ? 'NC' : 'NO' })} />
+                {tr('Contacto NC (a 1 sin pulsar)')}
+              </label>
+            </>
+          )}
+          {number('dx', tr('Activa: se desplaza en X (px)'), -1000, 1)}
+          {number('dy', tr('Activa: se desplaza en Y (px)'), -1000, 1)}
         </>
       )}
       {element.type === 'platform' && number('length', tr('Largo (px)'), 30, 10)}
@@ -1850,7 +1882,7 @@ function drawElement(e, { scene, state, values, time, signals, iso = false }) {
     case 'label':
       return <LabelShape e={e} />
     case 'image':
-      return <ImageShape e={e} />
+      return <ImageShape e={e} active={isOn(values, e.show) || Boolean(state.pressed?.[e.id])} />
     case 'shape':
       return <DrawingShape e={e} />
     case 'scale':
@@ -2584,6 +2616,12 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
     }
     if (e.type === 'button') onAction(e.id, phase === 'down' ? 'press' : 'release')
     else if (phase === 'down' && (e.type === 'switch' || e.type === 'emergency')) onAction(e.id, 'toggle')
+    else if (e.type === 'image' && e.press) {
+      if (e.latch) {
+        if (phase === 'down') onAction(e.id, 'toggle')
+      }
+      else onAction(e.id, phase === 'down' ? 'press' : 'release')
+    }
     else if (phase === 'down' && e.type === 'feeder') onAction(e.id, 'feed')
     else if (phase === 'down' && e.type === 'selector') onAction(e.id, 'next')
   }
@@ -2678,7 +2716,7 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
   const draw = (e) => drawElement(e, { scene, state, values, time, signals, iso })
   // Los mandos y pilotos no se giran (su rótulo se lee siempre).
   const turns = (e) => !['button', 'switch', 'emergency', 'lamp', 'sink', 'feeder', 'tank', 'motor', 'display', 'scale', 'potentiometer', 'selector', 'keypad', 'preselector', 'bargraph', 'elevator', 'heater', 'siren', 'trafficlight', 'label', 'image', 'shape'].includes(e.type)
-  const operable = (e) => ['button', 'switch', 'emergency', 'selector', 'keypad', 'preselector', 'feeder', 'potentiometer'].includes(e.type)
+  const operable = (e) => ['button', 'switch', 'emergency', 'selector', 'keypad', 'preselector', 'feeder', 'potentiometer'].includes(e.type) || (e.type === 'image' && Boolean(e.press))
   const underRank = (e) => (e.type === 'image' ? -2 : UNDER.includes(e.type) ? -1 : 0)
   // Elementos y piezas en orden de dibujo: lo de debajo primero (las piezas van encima). En la
   // isométrica, además, del fondo hacia delante, con las piezas entre los demás elementos.

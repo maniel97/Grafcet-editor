@@ -56,7 +56,7 @@ export default function CpuControls({ config = {}, status, onChange, onApplySymb
               <button
                 type="button"
                 onClick={() => simRef.current?.click()}
-                title={t('La planta de un .sim de PC_SIMU (panel y máquina), con sus variables; el grafcet y el programa no cambian')}
+                title={t('La planta de un .sim de PC_SIMU (panel y máquina), con sus variables; el grafcet y el programa no cambian. Elige el .sim y, a la vez, sus imágenes (.bmp)')}
                 className="flex items-center gap-1 rounded border border-slate-300 px-2 py-0.5 hover:bg-slate-100"
               >
                 <MonitorPlay size={12} />{' '}{t('Cargar planta .sim')}
@@ -68,13 +68,14 @@ export default function CpuControls({ config = {}, status, onChange, onApplySymb
             <input
               ref={simRef}
               type="file"
-              accept=".sim"
+              accept=".sim,.bmp,.png,.jpg,.jpeg,.gif"
+              multiple
               className="hidden"
               aria-label={t('Planta de PC_SIMU')}
               onChange={(e) => {
-                const file = e.target.files?.[0]
+                const files = [...(e.target.files ?? [])]
                 e.target.value = ''
-                if (file) onImportPlant(file)
+                if (files.length) onImportPlant(files)
               }}
             />
             <input

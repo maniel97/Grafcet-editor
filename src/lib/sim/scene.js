@@ -87,7 +87,14 @@ export const SCENE_TYPES = {
   // Dibujo: una línea, un rectángulo o una elipse (con relleno, opcional), como los de PC_SIMU. La línea va de
   // (x, y) a (x + width, y + height).
   shape: { label: N_('Dibujo'), group: N_('Decoración'), defaults: { kind: 'rect', width: 100, height: 60, color: '#000000', fill: '' } },
-  image: { label: N_('Imagen'), group: N_('Decoración'), defaults: { src: '', width: 300, height: 200, text: '' } },
+  // Imagen: de fondo, o con dos dibujos (srcOn, «activa») como las de PC_SIMU: activa mientras la salida `show`
+  // esté a 1, o al pulsarla si tiene entrada (`press`: como pulsador o, con latch, como interruptor; NC
+  // invertida); activa, se desplaza (dx, dy).
+  image: {
+    label: N_('Imagen'),
+    group: N_('Decoración'),
+    defaults: { src: '', srcOn: '', width: 300, height: 200, show: '', press: '', latch: false, contact: 'NO', dx: 0, dy: 0, text: '' },
+  },
 }
 
 // Variables de cada tipo: [clave, etiqueta, 'in' (la escena la escribe) | 'out' (la lee)].
@@ -197,7 +204,10 @@ export const SCENE_VARS = {
   ],
   pipe: [['variable', 'Circula si… (opcional)', 'any']],
   label: [],
-  image: [],
+  image: [
+    ['show', N_('Activa con la salida (opcional)'), 'out'],
+    ['press', N_('Entrada al pulsarla (opcional)'), 'in'],
+  ],
   shape: [],
 }
 
@@ -435,7 +445,7 @@ export function sceneInit(scene) {
     if (e.type === 'cylinder' || e.type === 'rotary') pos[e.id] = Number(e.initial) ? 1 : 0
     if (e.type === 'barrier') pos[e.id] = 0 // cerrada
     // La seta de emergencia está sin pulsar (contacto cerrado) al empezar.
-    if (e.type === 'button' || e.type === 'switch' || e.type === 'emergency') pressed[e.id] = false
+    if (e.type === 'button' || e.type === 'switch' || e.type === 'emergency' || e.type === 'image') pressed[e.id] = false
     if (e.type === 'tank') level[e.id] = clamp(Number(e.initial) || 0)
     if (e.type === 'potentiometer') knob[e.id] = clamp(Number(e.initial ?? 0.5))
     if (e.type === 'selector') selected[e.id] = selectorStart(e)
@@ -771,6 +781,7 @@ export function sceneInputs(scene, state, analogRange = () => null) {
       const angle = (((state.angle?.[e.id] ?? 0) % 360) + 360) % 360
       inputs[e.pulses] = angle > 0 && angle < 180 ? 1 : 0
     }
+    if (e.type === 'image' && e.press) inputs[e.press] = Boolean(state.pressed?.[e.id]) !== (e.contact === 'NC') ? 1 : 0
     if (!(e.id in signals) || !e.variable) continue
     const nc = e.type === 'emergency' || e.contact === 'NC'
     inputs[e.variable] = signals[e.id] !== nc ? 1 : 0
