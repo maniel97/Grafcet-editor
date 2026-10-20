@@ -1,12 +1,13 @@
 import { useRef, useState } from 'react'
-import { AlertTriangle, CircleCheck, CircleX, Cpu, FileUp, Table2 } from 'lucide-react'
+import { AlertTriangle, CircleCheck, CircleX, Cpu, FileUp, MonitorPlay, Table2 } from 'lucide-react'
 import { parseSymbolTable } from '../lib/plc/symbolTable'
 import { t, N_ } from '../lib/i18n'
 
 // Lógica de la simulación: el grafcet del editor o un programa S7-200 en la CPU simulada
 // (lib/plc). config = plc.cpu: { enabled, source: 'generated' | 'file', text, name }.
-export default function CpuControls({ config = {}, status, onChange, onApplySymbols }) {
+export default function CpuControls({ config = {}, status, onChange, onApplySymbols, onImportPlant }) {
   const fileRef = useRef(null)
+  const simRef = useRef(null)
   const [pasting, setPasting] = useState(false)
   const [table, setTable] = useState('')
   const [tableMessage, setTableMessage] = useState(null)
@@ -51,9 +52,31 @@ export default function CpuControls({ config = {}, status, onChange, onApplySymb
             <button type="button" onClick={() => fileRef.current?.click()} className="flex items-center gap-1 rounded border border-slate-300 px-2 py-0.5 hover:bg-slate-100">
               <FileUp size={12} />{' '}{t('Cargar .awl')}
             </button>
+            {onImportPlant && (
+              <button
+                type="button"
+                onClick={() => simRef.current?.click()}
+                title={t('La planta de un .sim de PC_SIMU (panel y máquina), con sus variables; el grafcet y el programa no cambian')}
+                className="flex items-center gap-1 rounded border border-slate-300 px-2 py-0.5 hover:bg-slate-100"
+              >
+                <MonitorPlay size={12} />{' '}{t('Cargar planta .sim')}
+              </button>
+            )}
             <button type="button" onClick={() => setPasting((p) => !p)} aria-expanded={pasting} className="flex items-center gap-1 rounded border border-slate-300 px-2 py-0.5 hover:bg-slate-100">
               <Table2 size={12} />{' '}{t('Pegar tabla de símbolos')}
             </button>
+            <input
+              ref={simRef}
+              type="file"
+              accept=".sim"
+              className="hidden"
+              aria-label={t('Planta de PC_SIMU')}
+              onChange={(e) => {
+                const file = e.target.files?.[0]
+                e.target.value = ''
+                if (file) onImportPlant(file)
+              }}
+            />
             <input
               ref={fileRef}
               type="file"

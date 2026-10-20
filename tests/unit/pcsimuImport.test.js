@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { exportPcSimu, parsePcSimu } from '../../src/lib/pcsimu'
-import { importPcSimu, isPcSimu } from '../../src/lib/pcsimuImport'
+import { importPcSimu, isPcSimu, withPcSimuPlant } from '../../src/lib/pcsimuImport'
 import { EXAMPLES } from '../../src/lib/examples'
 
 // Los objetos de un .sim (sin los rótulos), para comparar: tipo y, en los actuadores, cuál.
@@ -60,5 +60,17 @@ describe('Importar de PC_SIMU (.sim)', () => {
     expect([z.vacuum, z.holding, z.tool]).toEqual(['Q0_2', 'I0_0', 'vacuum'])
     expect(Math.abs(x.stroke - 150)).toBeLessThan(5)
     expect(Math.abs(z.stroke - 80)).toBeLessThan(5)
+  })
+
+  it('cargar la planta en el proyecto abierto: las direcciones con variable conservan su nombre', () => {
+    const p = EXAMPLES.find((e) => /Marcha y paro de un motor/.test(e.title)).build()
+    const imported = importPcSimu(exportPcSimu(p).text).project
+    const plc = { variables: { Arranque: { type: 'input', address: 'I0.0' }, Otra: { type: 'memory', address: 'M0.0' } }, cpu: { enabled: true } }
+    const next = withPcSimuPlant(plc, imported)
+    expect(next.cpu).toEqual({ enabled: true })
+    expect(next.variables.Otra).toEqual(plc.variables.Otra)
+    const uses = JSON.stringify(next.scene.elements)
+    expect(uses).toContain('"Arranque"') // I0.0 se queda con su nombre
+    expect(Object.values(next.variables).filter((v) => v.address === 'I0.0')).toHaveLength(1)
   })
 })

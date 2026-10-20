@@ -231,7 +231,7 @@ const fmtTime = (v) => (v < 60 ? `${v.toFixed(1)} s` : `${Math.floor(v / 60)} mi
 
 // Panel de control de la simulación.
 // floating: paneles flotantes (lib/floating.js) que da el lienzo; sin él, nada se puede sacar.
-export default function SimulationPanel({ floating, simulation, scenarios = [], onScenariosChange, onEditScenario, expectedSequence = '', onExpectedSequenceChange, cpuConfig, onCpuChange, onApplySymbols, sceneOpen, onToggleScene, elecOpen, onToggleElec, exportProps, onFocusNode, onClose }) {
+export default function SimulationPanel({ floating, simulation, scenarios = [], onScenariosChange, onEditScenario, expectedSequence = '', onExpectedSequenceChange, cpuConfig, onCpuChange, onApplySymbols, onImportPlant, sceneOpen, onToggleScene, elecOpen, onToggleElec, exportProps, onFocusNode, onClose }) {
   const { compiled, sim, playing, setPlaying, speed, setSpeed, setInput, step, advance, reset } = simulation
 
   // Las entradas que gobierna la planta virtual no se cambian a mano.
@@ -400,7 +400,7 @@ export default function SimulationPanel({ floating, simulation, scenarios = [], 
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto">
-        <CpuControls config={cpuConfig} status={simulation.cpu} onChange={onCpuChange} onApplySymbols={onApplySymbols} />
+        <CpuControls config={cpuConfig} status={simulation.cpu} onChange={onCpuChange} onApplySymbols={onApplySymbols} onImportPlant={onImportPlant} />
         {!simulation.cpu && (
         <Section title={t('Qué espera el grafcet')} count={waiting.list.length}>
           {waiting.stuck && (

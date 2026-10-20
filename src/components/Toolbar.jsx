@@ -27,7 +27,6 @@ import {
   History,
   Workflow,
   Wind,
-  MonitorPlay,
   Search,
   FilePlus,
   Zap,
@@ -124,7 +123,6 @@ export default function Toolbar({
   exerciseOpen = false,
   onToggleExercise,
   onOpenPneumatic,
-  onImportPcSimu,
   onClear,
   onOpenSettings,
   onToggleVerify,
@@ -198,7 +196,6 @@ export default function Toolbar({
         items={[
           { id: 'new', label: N_('Nuevo'), hint: N_('Proyecto en blanco: título, autómata y tabla de variables'), icon: FilePlus, onSelect: onNew },
           { id: 'file', label: N_('Abrir archivo'), hint: N_('Proyecto .json, o la hoja PDF de un ejercicio (Ctrl+O)'), icon: FileJson, onSelect: onOpen },
-          { id: 'pcsimu', label: N_('Importar de PC_SIMU'), hint: N_('Un panel o una planta .sim de PC_SIMU, como planta virtual con su tabla de variables'), icon: MonitorPlay, onSelect: onImportPcSimu },
           { id: 'examples', label: N_('Ejemplos'), hint: N_('Grafcets típicos listos para usar'), icon: BookOpen, onSelect: onOpenExamples },
           ...(education ? [{ id: 'exercises', label: N_('Ejercicios'), hint: N_('Ejercicios con autocorrección, por niveles'), icon: GraduationCap, onSelect: onOpenExercises },
           { id: 'class', label: N_('Corregir entregas'), hint: N_('Las entregas de la clase (dossiers en PDF o .json), corregidas de nuevo en una tabla'), icon: ClipboardCheck, onSelect: onOpenClass }] : []),

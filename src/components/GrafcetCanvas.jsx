@@ -19,6 +19,7 @@ import { useSettings } from '../lib/settings'
 import { useFloating } from './useFloating'
 import { initialNodes, initialEdges, defaultEdgeOptions } from '../lib/initialDiagram'
 import { downloadFile, saveProject, loadProjects, normalizeProject } from '../lib/projectFile'
+import { importPcSimu, withPcSimuPlant } from '../lib/pcsimuImport'
 import { pushRecent } from '../lib/recent'
 import { EMPTY_PLC } from '../lib/addressing'
 import { nextStepLabel, nextTransitionLabel, findFreePosition } from '../lib/layout'
@@ -656,7 +657,6 @@ export default function GrafcetCanvas() {
   // alert() del navegador: se queda hasta cerrarlo o abrir otra cosa.
   const [notice, setNotice] = useState(null)
   const [importReport, setImportReport] = useState(null) // lo que no ha pasado al importar un .sim
-  const simInputRef = useRef(null)
 
   // Sustituye el diagrama (abrir archivo, ejemplo o trabajo anterior). Lo que había se guarda
   // antes como trabajo anterior (lib/recent.js) y además se puede deshacer con Ctrl+Z.
@@ -940,7 +940,6 @@ export default function GrafcetCanvas() {
           onOpenExamples={() => setProjectsTab('examples')}
           onOpenRecent={() => setProjectsTab('recent')}
           onOpenPneumatic={() => setPneumaticOpen(true)}
-          onImportPcSimu={() => simInputRef.current?.click()}
           onClear={clear}
           onOpenSettings={() => setSettingsOpen(true)}
           onToggleVerify={() => setVerifyOpen((v) => !v)}
@@ -981,18 +980,6 @@ export default function GrafcetCanvas() {
             />
           </Suspense>
         )}
-        <input
-          ref={simInputRef}
-          type="file"
-          accept=".sim"
-          className="hidden"
-          aria-label={t('Archivo de PC_SIMU')}
-          onChange={(e) => {
-            const file = e.target.files?.[0]
-            if (file) load(file)
-            e.target.value = ''
-          }}
-        />
         <input
           ref={fileInputRef}
           type="file"
@@ -1349,6 +1336,15 @@ export default function GrafcetCanvas() {
                 cpuConfig={plc.cpu}
                 onCpuChange={(cpu) => setPlc((p) => ({ ...p, cpu }))}
                 onApplySymbols={(symbols) => setPlc((p) => ({ ...p, variables: applySymbols(p.variables, symbols) }))}
+                onImportPlant={async (file) => {
+                  try {
+                    const imported = importPcSimu(new TextDecoder('windows-1252').decode(await file.arrayBuffer()))
+                    setPlc((p) => withPcSimuPlant(p, imported.project))
+                    setImportReport({ warnings: imported.warnings, skipped: imported.skipped })
+                  } catch (err) {
+                    setNotice(err.message)
+                  }
+                }}
                 exportProps={titleBlockProps}
                 onFocusNode={focusNode}
                 onClose={() => setSimulating(false)}

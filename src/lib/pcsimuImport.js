@@ -2,7 +2,7 @@
 // tabla de variables. Es lo contrario de exportPcSimu (lib/pcsimu.js): el formato y lo que hace cada campo,
 // en docs/formato-pcsimu.md. Lo que no tiene equivalente se cuenta en los avisos.
 import { parsePcSimu, PCSIMU_SETA } from './pcsimu'
-import { rotate } from './sim/scene'
+import { SCENE_VARS, rotate } from './sim/scene'
 
 const f = (o, k) => o.fields[k - 4] ?? 0
 const COLOR_OF = { 0: 'green', 1: 'black', 2: 'blue', 3: 'blue', 4: 'red', 5: 'red', 6: 'yellow', 7: 'white' }
@@ -402,3 +402,28 @@ export function importPcSimu(text) {
 }
 
 export const isPcSimu = (bytes) => new TextDecoder('latin1').decode(bytes.slice(0, 8)) === 'PC_SIMU*'
+
+// La planta de un .sim en el proyecto abierto (Simular > Autómata S7-200 > Cargar planta .sim): sustituye la
+// planta y añade sus variables, sin tocar el grafcet ni el programa cargado. Si una dirección ya tiene variable,
+// se queda su nombre (y la planta la usa con él); un nombre ya usado en otra dirección lleva _2, _3…
+export function withPcSimuPlant(plc, imported) {
+  const variables = { ...(plc.variables ?? {}) }
+  const byAddress = new Map(Object.entries(variables).filter(([, v]) => v.address).map(([n, v]) => [String(v.address).toUpperCase(), n]))
+  const rename = new Map()
+  for (const [name, v] of Object.entries(imported.plc.variables)) {
+    const existing = byAddress.get(v.address.toUpperCase())
+    if (existing) {
+      rename.set(name, existing)
+      continue
+    }
+    let free = name
+    for (let k = 2; variables[free]; k++) free = `${name}_${k}`
+    variables[free] = v
+    rename.set(name, free)
+  }
+  const elements = imported.plc.scene.elements.map((e) => {
+    const keys = (SCENE_VARS[e.type] ?? []).map(([key]) => key)
+    return Object.fromEntries(Object.entries(e).map(([k, val]) => [k, keys.includes(k) && rename.has(val) ? rename.get(val) : val]))
+  })
+  return { ...plc, variables, scene: { ...(plc.scene ?? {}), ...imported.plc.scene, elements } }
+}
