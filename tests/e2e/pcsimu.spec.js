@@ -48,7 +48,11 @@ test('importar de PC_SIMU: al abrir un .sim, su panel y su planta pasan a la pla
   const bytes = await readFile(await sim.path())
   await dialog.getByTitle('Cerrar').click()
 
-  await page.locator('input[type=file]').first().setInputFiles({ name: 'Practica.sim', mimeType: 'application/octet-stream', buffer: bytes })
+  // Abrir > Importar de PC_SIMU
+  const chooser = page.waitForEvent('filechooser')
+  await page.getByRole('button', { name: /^Abrir un proyecto/ }).click()
+  await page.getByRole('menuitem', { name: /Importar de PC_SIMU/ }).click()
+  await (await chooser).setFiles({ name: 'Practica.sim', mimeType: 'application/octet-stream', buffer: bytes })
   const report = page.getByRole('status', { name: 'Importado de PC_SIMU' })
   await expect(report).toContainText('El programa no va en el .sim')
   await report.getByRole('button', { name: 'Cerrar el aviso' }).click()
