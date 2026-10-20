@@ -5,6 +5,7 @@ import { fileName } from './fileNames'
 import { t } from './i18n'
 import { attachmentsOf, isPdf } from './pdfAttach'
 import { FORMAT, FORMAT_VERSION, checkFormat, migrateProject } from './projectFormat'
+import { importPcSimu, isPcSimu } from './pcsimuImport'
 import { VERSION as APP_VERSION } from './about'
 
 export function downloadFile(content, filename, type) {
@@ -34,6 +35,11 @@ export async function loadProject(file) {
 // Todos los proyectos de un archivo: [{ file (nombre del adjunto), project }] (un .json da uno).
 export async function loadProjects(file) {
   const bytes = new Uint8Array(await file.arrayBuffer())
+  // Un panel o una planta de PC_SIMU: la planta virtual, con su tabla de variables (lib/pcsimuImport.js).
+  if (isPcSimu(bytes)) {
+    const { project, warnings } = importPcSimu(new TextDecoder('windows-1252').decode(bytes))
+    return [{ file: file.name, project: normalizeProject(project), warnings }]
+  }
   let raw
   if (isPdf(bytes)) {
     raw = attachmentsOf(bytes)

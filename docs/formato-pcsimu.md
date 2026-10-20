@@ -301,6 +301,24 @@ El texto va en `texto`; el rectángulo, 8 px por letra y 17 de alto.
 - **El simulador S7_200** viene con una CPU 214, que no tiene `<`, `>`, `<>` (el editor los reescribe
   con `=`, `>=` y `<=`) ni las instrucciones de reales de las entradas analógicas escaladas.
 
+## Cómo importa el editor un .sim
+
+Abrir un `.sim` (Abrir proyecto) lo convierte en una planta virtual vista de frente, con su tabla de variables
+(`src/lib/pcsimuImport.js`, lo contrario de la exportación):
+
+- Pulsadores, setas, interruptores, selectores, teclados, pilotos, potenciómetros y barras van al pupitre, en el
+  orden del panel (de arriba abajo y de izquierda a derecha).
+- Lo demás, en su sitio: cilindros (neumáticos, sin vástago y lineales eléctricos, estos sin su posicionado),
+  actuadores de giro, cintas, detectores, finales de carrera, objetos (alimentadores), perfiles (plataformas y
+  recogidas), topes, barreras, depósitos con sus válvulas, tuberías, ascensores, motores, sirenas y balizas.
+- La ventosa o la pinza de un grupo, en la punta del actuador que la lleva; el cilindro que se llama como el
+  grupo de otro, montado en su vástago.
+- Cada variable toma el nombre del rótulo (texto suelto) que tiene al lado; si no lo hay, el de su dirección
+  (`I0_0`). Los rótulos que no nombran nada quedan como rótulos de la planta.
+- No pasan (y se avisa): displays y preselectores (BCD), dibujos, imágenes, herramientas, motores paso a paso,
+  teclados en matriz y topes inclinados. El programa no va en el `.sim`: se escribe en el editor o se carga su
+  `.awl` en Simular > Autómata S7-200.
+
 ## Cómo se ha averiguado
 
 1. El guardado es un único `sprintf` con el formato

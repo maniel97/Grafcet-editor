@@ -37,3 +37,20 @@ test('exportar a PC_SIMU: los cilindros con vuelta por muelle llevan su salida d
   expect(text).toContain('LDN    Q0.4\r\n=      Q0.7\r\nEND_ORGANIZATION_BLOCK')
   expectNoErrors(errors)
 })
+
+test('importar de PC_SIMU: al abrir un .sim, su panel y su planta pasan a la planta virtual, con sus variables', async ({ page }) => {
+  const errors = await openEditor(page)
+  await openExample(page, /Marcha y paro de un motor/)
+  await page.getByRole('button', { name: /Exportar/ }).click()
+  await page.getByRole('menuitem', { name: /Planta para PC_SIMU/ }).click()
+  const dialog = page.getByRole('dialog', { name: 'Planta para PC_SIMU' })
+  const sim = await download(page, () => dialog.getByRole('button', { name: 'Panel .sim' }).click())
+  const bytes = await readFile(await sim.path())
+  await dialog.getByTitle('Cerrar').click()
+
+  await page.locator('input[type=file]').first().setInputFiles({ name: 'Practica.sim', mimeType: 'application/octet-stream', buffer: bytes })
+  await page.getByRole('button', { name: /Simular/ }).click()
+  await expect(page.getByRole('button', { name: /Planta virtual/ })).toContainText('4 elementos')
+  await expect(page.getByRole('region', { name: 'Escena de la planta' }).getByRole('region', { name: 'Panel de control' }).locator('[aria-label="Pulsador Marcha"]')).toBeVisible()
+  expectNoErrors(errors)
+})

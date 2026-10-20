@@ -688,7 +688,7 @@ export default function GrafcetCanvas() {
   const openLoaded = useCallback(
     (project, fileName) =>
       // Proyectos guardados sin nombre: el del archivo, sin la extensión.
-      replaceProject({ ...project, name: project.name ?? fileName.replace(/\.(json|pdf)$/i, '') }, t('Antes de abrir «{archivo}»', { archivo: fileName })),
+      replaceProject({ ...project, name: project.name ?? fileName.replace(/\.(json|pdf|sim)$/i, '') }, t('Antes de abrir «{archivo}»', { archivo: fileName })),
     [replaceProject],
   )
   const load = useCallback(
@@ -697,6 +697,8 @@ export default function GrafcetCanvas() {
         const items = await loadProjects(file)
         if (items.length > 1) setChoosing({ fileName: file.name, items })
         else openLoaded(items[0].project, file.name)
+        // Importado de PC_SIMU: lo que no tiene equivalente en el editor.
+        if (items[0].warnings?.length) setNotice(`${t('Importado de PC_SIMU. No se ha podido pasar:')} ${items[0].warnings.join(' · ')}`)
       } catch (err) {
         setNotice(err.message)
       }
@@ -979,7 +981,7 @@ export default function GrafcetCanvas() {
         <input
           ref={fileInputRef}
           type="file"
-          accept=".json,.pdf,application/json,application/pdf"
+          accept=".json,.pdf,.sim,application/json,application/pdf"
           className="hidden"
           onChange={(e) => {
             const file = e.target.files?.[0]
