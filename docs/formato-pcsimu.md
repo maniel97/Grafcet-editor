@@ -35,7 +35,7 @@ n*tipo#nombre*x1*y1*x2*y2*f4*f5*f6*f7*f8*f9*f10*f11*f12*f13*f14*f15*f16*f17#text
 | `nombre` | nombre que se ve en su cuadro de propiedades |
 | `x1 y1 x2 y2` | rectángulo en la pantalla, en píxeles |
 | `f4` … `f17` | 14 enteros; su sentido depende del tipo |
-| `texto`, `texto2`, `grupo` | cadenas (rótulos, imágenes, grupo) |
+| `texto`, `texto2`, `grupo` | cadenas (rótulos, imágenes, grupo). En un actuador, `grupo` es el «objeto a desplazar»: lleva consigo los objetos que **se llaman** así (otro actuador, una ventosa, perfiles) |
 | `a`, `b` | dos enteros más (`a`: «mantener relación de aspecto» en pulsadores y leds) |
 
 En memoria, PC_SIMU guarda cada campo en una tabla de 100 enteros (un objeto por posición): como mucho
@@ -168,6 +168,19 @@ Cómo lo mueve la simulación (la posición del vástago va en `b`, de 0 a 110):
   con ella a 1 y sale por muelle con ella a 0. Biestable, como el anterior.
 - Velocidades: `f17` / 10 al salir y el primer número de `texto` / 10 al volver (como poco, 1 por paso).
 
+### 19 · Qué actuador es, según `f15`
+
+| `f15` | Actuador |
+|---|---|
+| 11 / 21, 13 / 23, 15 / 25 | neumático, gráficos 1, 2 y 3 (+10: empieza expandido) |
+| 12–18 / 22–28 | neumático sin vástago (gráficos y carreras) |
+| 50–61 | perfil de aluminio |
+| 100 | ventosa: `f4` 0 monoestable (activa `f5.f7`), 1 biestable (desactiva `f6.f8`); `f9` = 1 con vacuostato en la entrada `f11.f13`; `f14` orientación |
+| 200–299 | actuador de giro (210, 220, 230, 240) |
+| 300 | pinza |
+| 400 | herramientas |
+| 500 | «Salidas» (imagen) |
+
 ### 20 · Cinta
 
 | Campo | Valores |
@@ -220,6 +233,18 @@ dos bytes libres, que el `.awl` llena con el valor en BCD (`IBCD`).
 `f5`: n.º de la entrada analógica (`AIW f5`). `f9`: forma (0 lineal vertical, 1 horizontal, 2 redondo,
 3 numérico). `f12`, `f13`: escala del valor que muestra; `f10`, `f11`: su unidad (dos letras); `f16`: 0
 unipolar, 1 bipolar.
+
+### 27 · Ascensor
+
+Cuatro plantas (B, 1, 2, 3). Sube `f5.f7`, baja `f6.f8`, abre la puerta `f4.f14`, la cierra `f12.f16`; `f17`
+velocidad. Las entradas van empaquetadas de 4 en 4 bits (byte y bit, hasta el byte 15): en `f10`, puerta
+abierta, puerta cerrada, modo (0: un detector por planta; 1: detector en la cabina), el detector en cabina y el
+byte de la planta B; en `f11`, el bit de la B y las plantas 1, 2 y 3; en `f9`, las condiciones de seguridad.
+
+### 4 · Teclado, 5 · Preselector
+
+Teclado: `f10` filas × `f11` columnas, cada tecla una entrada, seguidas desde `f5.f7` (`f16` = 0; con 1, en
+matriz). Preselector: `f11` cifras en BCD, cuatro entradas por cifra desde `f5.f7` (las unidades primero).
 
 ### 22 · Depósito
 
