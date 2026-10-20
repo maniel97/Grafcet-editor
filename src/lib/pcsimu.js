@@ -12,7 +12,7 @@
 import { parseAddress } from './addressing'
 import { analogConfig, isAnalog, rawRange, realLiteral } from './analog'
 import { encodeAnsi } from './ladder/exportS7200'
-import { MOTOR_LOOKS, SCENE_TYPES, PIECE_SIZES, sensorZone, worldRect } from './sim/scene'
+import { MOTOR_LOOKS, TOOL_LOOKS, SCENE_TYPES, PIECE_SIZES, sensorZone, worldRect } from './sim/scene'
 import { t as tr } from './i18n'
 
 export const PCSIMU_HEADER = 'PC_SIMU*  1* 50*'
@@ -134,7 +134,7 @@ const OBJECTS = {
   tool: {
     type: 19,
     name: 'Herramienta',
-    fields: ({ byte, bit, stop, look }) => [stop ? 1 : 0, byte, stop?.byte ?? 0, bit, stop?.bit ?? 0, 0, 0, 0, 0, 0, look, 400, stop ? 11 : 1, 0],
+    fields: ({ byte, bit, stop, look, kind = 400 }) => [stop ? 1 : 0, byte, stop?.byte ?? 0, bit, stop?.bit ?? 0, 0, 0, 0, 0, 0, look, kind, stop ? 11 : 1, 0],
     text: () => `.${pad(0)}.000.000.0.000.0.0`,
   },
   // Pinza (tipo 19, f15 = 300): f4 = 0 monoestable, la cierra f5.f7; f10 = 1 con detector de pinza cerrada
@@ -553,7 +553,8 @@ export function exportPcSimu(project, { reserved = [], addressOf } = {}) {
       }
       const stop = e.stop?.trim() ? bitOf(e.stop.trim(), 'Q') : null
       const k = (Number(e.size) || 40) / 40
-      machine.push({ object: 'tool', id: e.id, name, ...at, stop, look: look - 1, carrier: e.mountedOn || undefined, rect: [e.x - 24 * k, e.y - 28 * k, e.x + 24 * k, e.y + 24 * k] })
+      const output = look >= TOOL_LOOKS // un dibujo de «Salidas» (500), no de herramienta (400)
+      machine.push({ object: 'tool', id: e.id, name, ...at, stop, look: output ? 20 + look - TOOL_LOOKS : look - 1, kind: output ? 500 : 400, carrier: e.mountedOn || undefined, rect: [e.x - 24 * k, e.y - 28 * k, e.x + 24 * k, e.y + 24 * k] })
       continue
     }
     if (e.type === 'shape') {

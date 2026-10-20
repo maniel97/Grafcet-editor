@@ -2,7 +2,7 @@
 // tabla de variables. Es lo contrario de exportPcSimu (lib/pcsimu.js): el formato y lo que hace cada campo,
 // en docs/formato-pcsimu.md. Lo que no tiene equivalente se cuenta en los avisos.
 import { parsePcSimu, PCSIMU_SETA } from './pcsimu'
-import { MOTOR_LOOKS, SCENE_VARS, rotate } from './sim/scene'
+import { MOTOR_LOOKS, SCENE_VARS, TOOL_LOOKS, rotate } from './sim/scene'
 
 const f = (o, k) => o.fields[k - 4] ?? 0
 const COLOR_OF = { 0: 'green', 1: 'black', 2: 'blue', 3: 'blue', 4: 'red', 5: 'red', 6: 'yellow', 7: 'white' }
@@ -89,6 +89,7 @@ export function importPcSimu(text, images = {}) {
   const carriers = []
   const tools = []
   const paints = []
+  let inclined = 0
   // Las imágenes del .sim van aparte, con su nombre (a veces con la ruta del ordenador en que se hizo).
   const missing = new Set()
   const bitmap = (path) => {
@@ -195,7 +196,12 @@ export function importPcSimu(text, images = {}) {
           const rot = f(o, 14) === 4 ? 180 : 0
           add(o, 'ramp', { ...anchor(o.rect, rot, 0, -20, W, 40), rot, length: W })
         } else if (f(o, 14) === 0) add(o, 'platform', { ...anchor(o.rect, 0, 0, 0, W, 14), length: W })
-        else skip('tope inclinado')
+        else if (f(o, 14) === 1 || f(o, 14) === 2) {
+          // Inclinado (1: «/», 2: «\»): en el editor, una rampa por la que las piezas bajan hacia su lado de abajo.
+          const rot = f(o, 14) === 1 ? 180 : 0
+          add(o, 'ramp', { ...anchor(o.rect, rot, 0, -20, W, 40), rot, length: W })
+          inclined++
+        } else skip('tope')
         break
       case 22: {
         const tank = add(o, 'tank', {
@@ -304,21 +310,22 @@ export function importPcSimu(text, images = {}) {
           rodless = true
           stroke = 35 * Math.floor(L / 50)
           lx = 74 - 0.205 * L - 0.05 * L
-        } else if (g === 400) {
-          // Herramienta: un motor con su dibujo (f14), que arranca con f5.f7 y, biestable (f4 = 1), para con f6.f8.
+        } else if (g === 400 || g === 500) {
+          // Herramienta (400) o «Salidas» (500): un motor con su dibujo (f14), que arranca con f5.f7 y, biestable
+          // (f4 = 1), para con f6.f8.
           add(o, 'motor', {
             ...at(o),
             variable: main,
             stop: f(o, 4) === 1 ? output(o, f(o, 6), f(o, 8)) : '',
             reverse: '',
             pulses: '',
-            look: MOTOR_LOOKS[f(o, 14) + 1]?.[0] ?? 'motor',
+            look: MOTOR_LOOKS[g === 400 ? f(o, 14) + 1 : TOOL_LOOKS + f(o, 14) - 20]?.[0] ?? 'motor',
             size: Math.round(Math.min(W, H)),
             mountedOn: '',
           })
           break
         } else {
-          skip({ 500: 'imagen de salidas' }[g] ?? `actuador (gráfico ${g})`)
+          skip(`actuador (gráfico ${g})`)
           break
         }
         const e = add(o, 'cylinder', {
@@ -479,6 +486,7 @@ export function importPcSimu(text, images = {}) {
     delete e.order
     Object.assign(e, { x: 0, y: 0 })
   }
+  if (inclined) warnings.push(`${inclined > 1 ? `${inclined} topes inclinados` : 'Un tope inclinado'}: como rampa por la que bajan las piezas (el editor no tiene superficies a 45°).`)
   if (missing.size) warnings.push(`Faltan ${missing.size} imágenes (elígelas junto al .sim, en la misma ventana): ${[...missing].join(', ')}.`)
   const plant = [...elements.filter((e) => e.place !== 'desk'), ...desk]
   return {

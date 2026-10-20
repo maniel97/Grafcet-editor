@@ -218,7 +218,7 @@ export const SCENE_VARS = {
 // Tamaño del depósito (anclaje: esquina superior izquierda) y de sus sensores de nivel.
 export const TANK = { w: 90, h: 130, low: 0.1, high: 0.9 }
 
-// Dibujos del motor: el suyo y las herramientas de PC_SIMU, en el orden de su f14 (0 a 15).
+// Dibujos del motor: el suyo, las herramientas de PC_SIMU (en el orden de su f14, de 0 a 15) y sus «Salidas».
 export const MOTOR_LOOKS = [
   ['motor', N_('Motor')],
   ['saw1', N_('Sierra circular 1')],
@@ -237,7 +237,22 @@ export const MOTOR_LOOKS = [
   ['capDispenser', N_('Dispensador de tapones')],
   ['capper', N_('Taponadora')],
   ['labeler', N_('Etiquetadora')],
+  // Y los de «Salidas» de PC_SIMU (f15 = 500, f14 de 20 a 31), que muestran una salida.
+  ['contactor', N_('Contactor')],
+  ['contactorTimer', N_('Contactor con temporizador')],
+  ['contactorModular', N_('Contactor modular')],
+  ['contactorModular2', N_('Contactor modular 2')],
+  ['relay', N_('Relé')],
+  ['solenoid', N_('Electroimán lineal')],
+  ['valvePneumatic1', N_('Electroválvula neumática 1')],
+  ['valvePneumatic2', N_('Electroválvula neumática 2')],
+  ['valveHydraulic1', N_('Electroválvula hidráulica 1')],
+  ['valveHydraulic2', N_('Electroválvula hidráulica 2')],
+  ['valveLiquid1', N_('Electroválvula de líquido 1')],
+  ['valveLiquid2', N_('Electroválvula de líquido 2')],
 ]
+// Los dibujos de herramienta (f15 = 400, f14 = índice − 1) y los de salida (f15 = 500, f14 = 20 + índice − 17).
+export const TOOL_LOOKS = 17
 // En marcha: con su salida o, si para con otra, desde que arranca hasta que para (state.pos).
 export const motorRunning = (e, state, values) => (e.stop ? (state.pos?.[e.id] ?? 0) === 1 : Boolean(Number(values?.[e.variable])))
 

@@ -838,6 +838,46 @@ function MotorShape({ angle, running, look = 'motor', size = 40 }) {
             )}
           </g>
         )
+      case 'contactor':
+      case 'contactorTimer':
+      case 'contactorModular':
+      case 'contactorModular2':
+      case 'relay':
+        return (
+          <g>
+            <rect x="-14" y="-20" width="28" height="40" rx="3" fill={look === 'relay' ? '#f8fafc' : '#e2e8f0'} stroke={edge} strokeWidth="1.5" />
+            <rect x="-9" y="-14" width="18" height="10" rx="1" fill={running ? ON : '#94a3b8'} />
+            {look === 'contactorTimer' && <circle cx="0" cy="8" r="5" fill="none" stroke={INK} />}
+            <text x="0" y={look === 'contactorTimer' ? 19 : 12} textAnchor="middle" fontSize="8" fontWeight="700" fill={INK}>
+              {look === 'relay' ? 'K' : 'KM'}
+            </text>
+          </g>
+        )
+      case 'solenoid':
+        return (
+          <g>
+            <rect x="-16" y="-9" width="22" height="18" rx="2" fill="#e2e8f0" stroke={edge} strokeWidth="1.5" />
+            {[-12, -8, -4, 0].map((x) => (
+              <line key={x} x1={x} y1="-9" x2={x + 2} y2="9" stroke={running ? ON : '#64748b'} />
+            ))}
+            <rect x={running ? 2 : 6} y="-3" width="16" height="6" fill="#475569" />
+          </g>
+        )
+      case 'valvePneumatic1':
+      case 'valvePneumatic2':
+      case 'valveHydraulic1':
+      case 'valveHydraulic2':
+      case 'valveLiquid1':
+      case 'valveLiquid2': {
+        const tint = look.startsWith('valveLiquid') ? '#2563eb' : look.startsWith('valveHydraulic') ? '#d97706' : '#64748b'
+        return (
+          <g>
+            <path d="M -18 -8 L 0 0 L -18 8 Z M 18 -8 L 0 0 L 18 8 Z" fill={running ? tint : '#f1f5f9'} stroke={edge} strokeWidth="1.5" />
+            <line x1="0" y1="0" x2="0" y2="-12" stroke={INK} />
+            <rect x="-7" y="-22" width="14" height="10" fill={running ? ON : '#e2e8f0'} stroke={INK} />
+          </g>
+        )
+      }
       default:
         return (
           <g>

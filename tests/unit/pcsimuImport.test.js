@@ -127,4 +127,13 @@ describe('Importar de PC_SIMU (.sim)', () => {
     const motor = project.plc.scene.elements.find((e) => e.type === 'motor')
     expect(motor).toMatchObject({ look: 'drill2', variable: 'T', stop: 'Q0_2', mountedOn: cyl.id }) // T: su rótulo
   })
+
+  it('«Salidas» (f15 = 500): el contactor o la electroválvula que muestra una salida, de ida y vuelta', () => {
+    const elements = [{ id: 'v', type: 'motor', x: 100, y: 100, variable: 'Y1', look: 'valvePneumatic1' }]
+    const sim = exportPcSimu({ plc: { variables: { Y1: { address: 'Q1.3' } }, scene: { gravity: true, elements } } })
+    const out = parsePcSimu(sim.text).find((o) => o.type === 19)
+    expect([out.fields[11], out.fields[10], out.fields[1], out.fields[3]]).toEqual([500, 26, 1, 3])
+    const motor = importPcSimu(sim.text).project.plc.scene.elements.find((e) => e.type === 'motor')
+    expect(motor).toMatchObject({ look: 'valvePneumatic1', variable: 'Y1' })
+  })
 })
