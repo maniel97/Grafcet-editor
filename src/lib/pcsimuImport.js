@@ -10,7 +10,7 @@ const COLOR_OF = { 0: 'green', 1: 'black', 2: 'blue', 3: 'blue', 4: 'red', 5: 'r
 const ROT = { 0: 0, 1: 180, 2: 270, 3: 90 }
 // Lado por el que se acciona un final de carrera -> giro del editor.
 const LIMIT_ROT = { 2: 0, 0: 90, 3: 180, 1: 270 }
-const DESK = new Set(['button', 'switch', 'emergency', 'selector', 'keypad', 'potentiometer', 'lamp', 'bargraph', 'digit', 'digitSwitch'])
+const DESK = new Set(['button', 'switch', 'emergency', 'selector', 'keypad', 'keypadMatrix', 'potentiometer', 'lamp', 'bargraph', 'digit', 'digitSwitch'])
 
 // Color de Windows (COLORREF: 0x00BBGGRR) -> #rrggbb.
 const colorOf = (c) => `#${[c & 255, (c >> 8) & 255, (c >> 16) & 255].map((v) => v.toString(16).padStart(2, '0')).join('')}`
@@ -89,6 +89,7 @@ export function importPcSimu(text, images = {}) {
   const carriers = []
   const tools = []
   const paints = []
+  const matrices = []
   let inclined = 0
   // Las imágenes del .sim van aparte, con su nombre (a veces con la ruta del ordenador en que se hizo).
   const missing = new Set()
@@ -133,7 +134,7 @@ export function importPcSimu(text, images = {}) {
       }
       case 4: {
         if (f(o, 16) === 1) {
-          skip('teclado en matriz')
+          matrices.push(o) // en matriz: los de los mismos bytes, juntos (abajo)
           break
         }
         const columns = Math.max(1, f(o, 11))
@@ -469,13 +470,39 @@ export function importPcSimu(text, images = {}) {
       if (d > -12 && d < 200 && (!best || d < best.d)) best = { e, d, drain: !below }
     }
     if (!best) {
-      skip('válvula sin depósito')
+      // Sin depósito (llena botes, riega…): una electroválvula.
+      const [x, y] = center(o.rect)
+      add(o, 'valve', { x: Math.round(x), y: Math.round(y + 7), variable: output(o, f(o, 5), f(o, 7)) })
       continue
     }
     const v = output(o, f(o, 5), f(o, 7))
     if (best.drain) best.e.drain = v
     else if (!best.e.fill) best.e.fill = v
     else best.e.fillFine = v
+  }
+  // Teclados en matriz: filas en salidas (byte f6, desde el bit f8), columnas en entradas (byte f5, desde f7); f10
+  // filas y f11 columnas. A veces cada tecla es un teclado de 1 × 1 (con su rótulo en «texto»): los que comparten
+  // bytes, un solo teclado.
+  const byBytes = new Map()
+  for (const o of matrices) {
+    const key = `${f(o, 5)}:${f(o, 6)}`
+    if (!byBytes.has(key)) byBytes.set(key, [])
+    byBytes.get(key).push(o)
+  }
+  for (const list of byBytes.values()) {
+    const c0 = Math.min(...list.map((o) => f(o, 7)))
+    const r0 = Math.min(...list.map((o) => f(o, 8)))
+    const columns = Math.min(4, Math.max(...list.map((o) => f(o, 7) + Math.max(1, f(o, 11)))) - c0)
+    const rows = Math.min(4, Math.max(...list.map((o) => f(o, 8) + Math.max(1, f(o, 10)))) - r0)
+    const labels = Array.from({ length: rows * columns }, (_, i) => String(i + 1))
+    for (const o of list) if (o.text?.trim() && f(o, 10) * f(o, 11) <= 1) labels[(f(o, 8) - r0) * columns + (f(o, 7) - c0)] = o.text.trim()
+    if (list.length === 1 && rows === 4 && columns === 3 && !list[0].text?.trim()) labels.splice(0, 12, ...'1,2,3,4,5,6,7,8,9,*,0,#'.split(','))
+    const first = list[0]
+    const rowsVars = Object.fromEntries(Array.from({ length: rows }, (_, r) => [`r${r + 1}`, output(first, f(first, 6), r0 + r)]))
+    const colsVars = Object.fromEntries(Array.from({ length: columns }, (_, c) => [`c${c + 1}`, input(first, f(first, 5), c0 + c)]))
+    const left = Math.min(...list.map((o) => o.rect[0]))
+    const top = Math.min(...list.map((o) => o.rect[1]))
+    add({ ...first, rect: [left, top, left + 1, top + 1] }, 'keypadMatrix', { rows, columns, labels: labels.join(','), ...rowsVars, ...colsVars })
   }
   // Bote de pintura (1006): rellena del color la figura más pequeña que contiene su punto.
   for (const o of paints) {

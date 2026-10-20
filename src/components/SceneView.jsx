@@ -1029,6 +1029,7 @@ function boundsOf(e, pos = 0) {
       return r(-13, -19, 26, 38)
     case 'digitSwitch':
       return r(-13, -24, 26, 48)
+    case 'keypadMatrix':
     case 'keypad': {
       const { w, h } = keypadSize(e)
       return r(-w / 2 - 4, -h / 2 - 4, w + 8, h + 8)
@@ -1721,6 +1722,16 @@ function Properties({ element, variables, onChange, onDelete, onRotate, onCreate
           {number('initial', tr('Planta al empezar (0: la baja)'), 0, 1)}
         </>
       )}
+      {element.type === 'keypadMatrix' && (
+        <>
+          {number('rows', tr('Filas (de 1 a 4)'), 1, 1)}
+          {number('columns', tr('Columnas (de 1 a 4)'), 1, 1)}
+          <label className="block">
+            <span className="text-slate-500">{tr('Rótulos de las teclas (separados por comas)')}</span>
+            <input type="text" value={element.labels ?? ''} onChange={(ev) => set({ labels: ev.target.value })} className={field} />
+          </label>
+        </>
+      )}
       {element.type === 'keypad' && (
         <>
           {number('count', tr('Teclas (de 1 a 12)'), 1, 1)}
@@ -1914,6 +1925,7 @@ const HINTS = {
   elevator: N_('Ascensor: cabina que sube y baja entre 2 y 4 plantas, con un detector en cada una, y puerta que se abre y se cierra con sus finales de carrera. Las llamadas, con pulsadores.'),
   digit: N_('Cifra BCD: una cifra de display, de 0 a 9, que el programa pone en 4 salidas (bits de peso 1, 2, 4 y 8), como los displays de PC_SIMU.'),
   digitSwitch: N_('Rueda BCD: una cifra de preselector, de 0 a 9, que pone 4 entradas (bits de peso 1, 2, 4 y 8). En modo Usar, arriba la sube y abajo la baja.'),
+  keypadMatrix: N_('Teclado en matriz, como el de PC_SIMU: el programa activa las filas una a una (salidas) y lee en las columnas (entradas) las teclas pulsadas de la fila activa.'),
   keypad: N_('Teclado: de 1 a 12 teclas, cada una un pulsador con su entrada (a 1 mientras se mantiene pulsada). En modo Usar, pulsa las teclas.'),
   preselector: N_('Preselector: de 1 a 4 cifras que dan un número a su variable (piezas por lote, una consigna…). En modo Usar, pulsa encima de una cifra para subirla y debajo para bajarla.'),
   bargraph: N_('Barra: muestra el valor de una variable (analógica o numérica) entre un mínimo y un máximo.'),
@@ -1966,6 +1978,7 @@ function ModulePreview({ item }) {
     selector: <SelectorShape e={{ ...e, pos1: tr('Manual'), pos3: tr('Automático') }} at={2} />,
     bargraph: <BargraphShape e={e} value={65} />,
     keypad: <KeypadShape e={e} pressed={(i) => i === 4} />,
+    keypadMatrix: <KeypadShape e={{ ...e, rows: 4, columns: 3 }} pressed={(i) => i === 4} />,
     digit: <DigitShape value={7} />,
     digitSwitch: <DigitSwitchShape value={3} />,
     elevator: <ElevatorShape e={e} at={1} door={0.6} />,
@@ -2059,7 +2072,7 @@ const UNDER = ['image', 'shape', 'pipe', 'conveyor', 'sink', 'ramp', 'diverter',
 // mecanismo (como el cuadro eléctrico real). e.place: 'desk' | 'machine' (por defecto, máquina).
 // En la isométrica, los rótulos esquivan los volúmenes salvo los alargados (van en el suelo delante).
 const ISO_LONG = ['conveyor', 'platform', 'ramp', 'pipe', 'image']
-const DESK_TYPES = ['button', 'switch', 'emergency', 'selector', 'keypad', 'preselector', 'digitSwitch', 'potentiometer', 'lamp', 'display', 'digit', 'bargraph']
+const DESK_TYPES = ['button', 'switch', 'emergency', 'selector', 'keypad', 'keypadMatrix', 'preselector', 'digitSwitch', 'potentiometer', 'lamp', 'display', 'digit', 'bargraph']
 const isDesk = (e) => DESK_TYPES.includes(e.type) && e.place === 'desk'
 
 
@@ -2133,6 +2146,7 @@ function drawElement(e, { scene, state, values, time, signals, iso = false }) {
       return <DigitShape value={digitValue(e, values)} />
     case 'digitSwitch':
       return <DigitSwitchShape value={state.preset?.[e.id] ?? (Number(e.initial) || 0)} />
+    case 'keypadMatrix':
     case 'keypad':
       return <KeypadShape e={e} pressed={(i) => Boolean(state.pressed?.[`${e.id}:${i}`])} />
     case 'preselector':
@@ -2162,7 +2176,7 @@ export function SceneStatic({ scene, variables = [] }) {
     for (let i = 0; i < items.length; i += 2) lines.push(items.slice(i, i + 2).join(' · '))
     return lines
   }
-  const turns = (e) => !['button', 'switch', 'emergency', 'lamp', 'sink', 'feeder', 'tank', 'motor', 'display', 'scale', 'potentiometer', 'selector', 'keypad', 'preselector', 'digit', 'digitSwitch', 'bargraph', 'elevator', 'heater', 'siren', 'trafficlight', 'label', 'image', 'shape'].includes(e.type)
+  const turns = (e) => !['button', 'switch', 'emergency', 'lamp', 'sink', 'feeder', 'tank', 'motor', 'display', 'scale', 'potentiometer', 'selector', 'keypad', 'keypadMatrix', 'preselector', 'digit', 'digitSwitch', 'bargraph', 'elevator', 'heater', 'siren', 'trafficlight', 'label', 'image', 'shape'].includes(e.type)
   const desk = elements.filter((e) => DESK_TYPES.includes(e.type) && e.place === 'desk')
   const machine = elements.filter((e) => !desk.includes(e))
   const boxes = machine.map((e) => boundsOf(placed(scene, state, e), 1))
@@ -2834,7 +2848,7 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
   // Accionar un mando (modo «Usar»).
   const keyDown = useRef(null) // la tecla pulsada de un teclado, para soltarla
   const operate = (e, phase, ev) => {
-    if (e.type === 'keypad') {
+    if (e.type === 'keypad' || e.type === 'keypadMatrix') {
       if (phase === 'down') {
         const key = ev?.target?.closest?.('[data-key]')?.dataset.key
         if (key !== undefined) {
@@ -2953,8 +2967,8 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
   const deskItems = elements.filter(isDesk)
   const draw = (e) => drawElement(e, { scene, state, values, time, signals, iso })
   // Los mandos y pilotos no se giran (su rótulo se lee siempre).
-  const turns = (e) => !['button', 'switch', 'emergency', 'lamp', 'sink', 'feeder', 'tank', 'motor', 'display', 'scale', 'potentiometer', 'selector', 'keypad', 'preselector', 'digit', 'digitSwitch', 'bargraph', 'elevator', 'heater', 'siren', 'trafficlight', 'label', 'image', 'shape'].includes(e.type)
-  const operable = (e) => ['button', 'switch', 'emergency', 'selector', 'keypad', 'preselector', 'digitSwitch', 'feeder', 'potentiometer'].includes(e.type) || (e.type === 'image' && Boolean(e.press))
+  const turns = (e) => !['button', 'switch', 'emergency', 'lamp', 'sink', 'feeder', 'tank', 'motor', 'display', 'scale', 'potentiometer', 'selector', 'keypad', 'keypadMatrix', 'preselector', 'digit', 'digitSwitch', 'bargraph', 'elevator', 'heater', 'siren', 'trafficlight', 'label', 'image', 'shape'].includes(e.type)
+  const operable = (e) => ['button', 'switch', 'emergency', 'selector', 'keypad', 'keypadMatrix', 'preselector', 'digitSwitch', 'feeder', 'potentiometer'].includes(e.type) || (e.type === 'image' && Boolean(e.press))
   const underRank = (e) => (e.type === 'image' ? -2 : UNDER.includes(e.type) ? -1 : 0)
   // Elementos y piezas en orden de dibujo: lo de debajo primero (las piezas van encima). En la
   // isométrica, además, del fondo hacia delante, con las piezas entre los demás elementos.

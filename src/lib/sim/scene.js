@@ -27,6 +27,13 @@ export const SCENE_TYPES = {
   // (labels: los rótulos separados por comas; vacío: 1, 2, 3…).
   keypad: { label: N_('Teclado'), group: N_('Mandos'), defaults: { count: 12, columns: 3, labels: '1,2,3,4,5,6,7,8,9,*,0,#', k1: '', k2: '', k3: '', k4: '', k5: '', k6: '', k7: '', k8: '', k9: '', k10: '', k11: '', k12: '', text: '' } },
   // Preselector: de 1 a 4 cifras que dejan un número en su variable; initial: el número al empezar.
+  // Teclado en matriz, como el de PC_SIMU: el programa activa una fila (salidas r1…) y lee en las columnas
+  // (entradas c1…) las teclas pulsadas de esa fila.
+  keypadMatrix: {
+    label: N_('Teclado en matriz'),
+    group: N_('Mandos'),
+    defaults: { rows: 4, columns: 3, labels: '1,2,3,4,5,6,7,8,9,*,0,#', r1: '', r2: '', r3: '', r4: '', c1: '', c2: '', c3: '', c4: '', text: '' },
+  },
   preselector: { label: N_('Preselector'), group: N_('Mandos'), defaults: { variable: '', digits: 2, initial: 0, text: '' } },
   // Cifra BCD: una cifra (0-9) de un display de PC_SIMU, en 4 salidas (pesos 1, 2, 4 y 8); rueda BCD: una del
   // preselector, que pone su cifra en 4 entradas.
@@ -124,6 +131,16 @@ export const SCENE_VARS = {
     ['k12', N_('Tecla 12 (entrada)'), 'in'],
   ],
   preselector: [['variable', N_('Valor (número)'), 'any']],
+  keypadMatrix: [
+    ['r1', N_('Fila 1 (salida)'), 'out'],
+    ['r2', N_('Fila 2 (salida)'), 'out'],
+    ['r3', N_('Fila 3 (salida)'), 'out'],
+    ['r4', N_('Fila 4 (salida)'), 'out'],
+    ['c1', N_('Columna 1 (entrada)'), 'in'],
+    ['c2', N_('Columna 2 (entrada)'), 'in'],
+    ['c3', N_('Columna 3 (entrada)'), 'in'],
+    ['c4', N_('Columna 4 (entrada)'), 'in'],
+  ],
   digit: [
     ['b1', N_('Bit de peso 1 (salida)'), 'out'],
     ['b2', N_('Bit de peso 2 (salida)'), 'out'],
@@ -486,8 +503,11 @@ export const digitValue = (e, values) => [1, 2, 4, 8].reduce((v, w) => v + (Numb
 // Ascensor: cuántas plantas (de 2 a 4).
 export const elevatorFloors = (e) => Math.min(4, Math.max(2, Math.round(Number(e.floors) || 3)))
 // Teclado: cuántas teclas (de 1 a 12) y cuántas columnas; preselector: cuántas cifras (de 1 a 4).
-export const keypadCount = (e) => Math.min(12, Math.max(1, Math.round(Number(e.count) || 12)))
-export const keypadColumns = (e) => Math.min(keypadCount(e), Math.max(1, Math.round(Number(e.columns) || 3)))
+// Teclado en matriz: filas y columnas (de 1 a 4).
+export const matrixRows = (e) => Math.min(4, Math.max(1, Math.round(Number(e.rows) || 4)))
+export const matrixColumns = (e) => Math.min(4, Math.max(1, Math.round(Number(e.columns) || 3)))
+export const keypadCount = (e) => (e.type === 'keypadMatrix' ? matrixRows(e) * matrixColumns(e) : Math.min(12, Math.max(1, Math.round(Number(e.count) || 12))))
+export const keypadColumns = (e) => (e.type === 'keypadMatrix' ? matrixColumns(e) : Math.min(keypadCount(e), Math.max(1, Math.round(Number(e.columns) || 3))))
 export const keypadLabel = (e, i) => String(e.labels ?? '').split(',')[i]?.trim() || String(i + 1)
 export const presetDigits = (e) => Math.min(4, Math.max(1, Math.round(Number(e.digits) || 2)))
 const presetClamp = (e, v) => Math.min(10 ** presetDigits(e) - 1, Math.max(0, Math.round(v)))
@@ -665,6 +685,12 @@ export function sceneStep(scene, state, values, dt) {
     if (dir) next.pos[e.id] = Math.round(clamp((next.pos[e.id] ?? 0) + (dir * dt) / Math.max(0.1, Number(e.time) || 2)) * 1e6) / 1e6
   }
 
+  // Teclados en matriz: las filas que el programa tiene activas (las entradas de sus columnas las leen).
+  for (const e of elements) {
+    if (e.type !== 'keypadMatrix') continue
+    next.matrixRows = { ...next.matrixRows, [e.id]: Array.from({ length: matrixRows(e) }, (_, r) => on(values, e[`r${r + 1}`])) }
+  }
+
   // Ascensores: la cabina sube o baja con su orden (no con las dos), entre la planta baja y la última, si la
   // puerta está cerrada; la puerta se abre y se cierra con las suyas, en una planta.
   for (const e of elements) {
@@ -827,6 +853,16 @@ export function sceneInputs(scene, state, analogRange = () => null) {
       if (e.doorOpen) inputs[e.doorOpen] = door >= 0.999 ? 1 : 0
       if (e.doorClosed) inputs[e.doorClosed] = door <= 0.001 ? 1 : 0
     }
+    if (e.type === 'keypadMatrix') {
+      const cols = matrixColumns(e)
+      const rows = state.matrixRows?.[e.id] ?? []
+      for (let c = 0; c < cols; c++) {
+        if (!e[`c${c + 1}`]) continue
+        let on = false
+        for (let r = 0; r < matrixRows(e); r++) if (rows[r] && state.pressed?.[`${e.id}:${r * cols + c}`]) on = true
+        inputs[e[`c${c + 1}`]] = on ? 1 : 0
+      }
+    }
     if (e.type === 'keypad') for (let i = 0; i < keypadCount(e); i++) if (e[`k${i + 1}`]) inputs[e[`k${i + 1}`]] = state.pressed?.[`${e.id}:${i}`] ? 1 : 0
     if (e.type === 'preselector' && e.variable) inputs[e.variable] = state.preset?.[e.id] ?? presetClamp(e, Number(e.initial) || 0)
     if (e.type === 'digitSwitch') {
@@ -918,7 +954,7 @@ export function sceneAction(scene, state, id, action) {
   if (action === 'toggle') return { ...state, pressed: { ...state.pressed, [id]: !state.pressed[id] } }
   if (action === 'feed' && e.type === 'feeder') return feed(state, e)
   if (action.startsWith('set:') && e.type === 'potentiometer') return { ...state, knob: { ...state.knob, [id]: clamp(Number(action.slice(4))) } }
-  if (e.type === 'keypad' && /^(press|release):\d+$/.test(action)) {
+  if ((e.type === 'keypad' || e.type === 'keypadMatrix') && /^(press|release):\d+$/.test(action)) {
     const [what, i] = action.split(':')
     return { ...state, pressed: { ...state.pressed, [`${id}:${i}`]: what === 'press' } }
   }
@@ -1024,6 +1060,7 @@ const REQUIRED = {
   selector: ['pos1', 'pos2', 'pos3', 'pos4'],
   keypad: ['k1', 'k2', 'k3', 'k4', 'k5', 'k6', 'k7', 'k8', 'k9', 'k10', 'k11', 'k12'],
   preselector: ['variable'],
+  keypadMatrix: ['c1'],
   digit: ['b1'],
   digitSwitch: ['b1'],
   diverter: ['gate'],

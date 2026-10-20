@@ -151,4 +151,14 @@ describe('Importar de PC_SIMU (.sim)', () => {
     expect(lift.cabin).toBe(name('I1.0'))
     expect([lift.f1, lift.f2, lift.f3, lift.f4]).toEqual(['', '', '', ''])
   })
+
+  it('teclado en matriz: las teclas sueltas de 1 × 1 de los mismos bytes, un solo teclado con sus rótulos; y de vuelta', () => {
+    const key = (row, col, label) => ({ type: 4, rect: [200 + 40 * col, 100 + 40 * row, 240 + 40 * col, 140 + 40 * row], fields: [0, 1, 4, col, row, 0, 1, 1, 0, 0, 0, 0, 1, 0], text: label })
+    const keys = [key(0, 0, '1'), key(0, 1, '2'), key(1, 0, '3'), key(1, 1, '4')]
+    const { project } = importPcSimu(pcsimuText(keys))
+    const [k] = project.plc.scene.elements
+    expect(k).toMatchObject({ type: 'keypadMatrix', rows: 2, columns: 2, labels: '1,2,3,4', r1: 'Q4_0', r2: 'Q4_1', c1: 'I1_0', c2: 'I1_1' })
+    const out = parsePcSimu(exportPcSimu(project).text).find((o) => o.type === 4)
+    expect([out.fields[1], out.fields[2], out.fields[3], out.fields[4], out.fields[6], out.fields[7], out.fields[12]]).toEqual([1, 4, 0, 0, 2, 2, 1])
+  })
 })

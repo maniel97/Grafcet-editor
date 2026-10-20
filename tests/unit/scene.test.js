@@ -336,6 +336,16 @@ describe('escena: detectores típicos y sensores analógicos', () => {
     expect(motorRunning(scene.elements[0], s, {})).toBe(false)
   })
 
+  it('teclado en matriz: la columna a 1 si hay una tecla pulsada en la fila que el programa tiene activa', () => {
+    const scene = { elements: [{ id: 'k', type: 'keypadMatrix', x: 0, y: 0, rows: 2, columns: 2, r1: 'F1', r2: 'F2', c1: 'C1', c2: 'C2' }] }
+    let s = sceneInit(scene)
+    s = sceneAction(scene, s, 'k', 'press:3') // fila 2, columna 2
+    s = run(scene, s, { F1: 1 }, 0.1)
+    expect(sceneInputs(scene, s)).toEqual({ C1: 0, C2: 0 })
+    s = run(scene, s, { F2: 1 }, 0.1)
+    expect(sceneInputs(scene, s)).toEqual({ C1: 0, C2: 1 })
+  })
+
   it('calentador: la temperatura sube con la resistencia y el termostato salta en la consigna', () => {
     const scene = { elements: [{ id: 'h', type: 'heater', x: 0, y: 0, heat: 'R', temperature: 'T', thermostat: 'TS', setpoint: 60, ambient: 20, maxTemp: 120, tau: 10 }] }
     let s = sceneInit(scene)

@@ -263,6 +263,9 @@ const OBJECTS = {
   },
   // Teclado (tipo 4): f10 filas × f11 columnas de teclas, cada una una entrada, seguidas desde f5.f7 (f16 = 0).
   keypad: { type: 4, name: 'Teclado', area: 'I', size: [75, 100], fields: ({ byte, bit, rows, cols }) => [0, byte, 0, bit, 0, 0, rows, cols, 0, 0, 0, 0, 0, 0] },
+  // Teclado en matriz (tipo 4, f16 = 1): columnas en entradas desde f5.f7, filas en salidas desde f6.f8; f10 filas,
+  // f11 columnas; «texto», el rótulo de la primera tecla.
+  keypadMatrix: { type: 4, name: 'Teclado', area: 'I', size: [75, 100], fields: ({ col, row, rows, cols }) => [0, col.byte, row.byte, col.bit, row.bit, 0, rows, cols, 0, 0, 0, 0, 1, 0] },
   // Preselector (tipo 5): f11 cifras en BCD, cuatro entradas por cifra desde f5.f7 (de izquierda a derecha: la
   // de más peso primero).
   thumbwheel: { type: 5, name: 'Preselector', area: 'I', size: [60, 40], fields: ({ byte, digits }) => [0, byte, 0, 0, 0, 0, 1, digits, 0, 0, 0, 0, 0, 0] },
@@ -524,8 +527,9 @@ export function exportPcSimu(project, { reserved = [], addressOf } = {}) {
       continue
     }
     if (e.type === 'valve') {
+      // Suelta (llena botes, riega…): en la planta de frente, en su sitio; si no, en el panel.
       const name = e.variable?.trim()
-      add(e, 'valve', 'Q', 0, name, {})
+      add(e, 'valve', 'Q', 0, name, front && e.place !== 'desk' ? { rect: [e.x - 20, e.y - 22, e.x + 20, e.y + 8] } : {})
       continue
     }
     if (e.type === 'selector') {
@@ -661,6 +665,22 @@ export function exportPcSimu(project, { reserved = [], addressOf } = {}) {
       }
       if (at.some((a, k) => !a || index(a) !== index(at[0]) + k)) warnings.push(`${title}: PC_SIMU lee una cifra en 4 bits seguidos desde el de peso 1; se exporta desde ${area}${at[0].byte}.${at[0].bit}.`)
       ;(area === 'Q' ? rows[0] : rows[1]).push({ object: e.type === 'digit' ? 'digit' : 'wheel', name: title, ...at[0] })
+      continue
+    }
+    if (e.type === 'keypadMatrix') {
+      const title = e.text?.trim() || typeName(e)
+      const rows = Math.min(4, Math.max(1, Math.round(Number(e.rows) || 4)))
+      const cols = Math.min(4, Math.max(1, Math.round(Number(e.columns) || 3)))
+      const list = (prefix, n, area) => Array.from({ length: n }, (_, i) => (e[`${prefix}${i + 1}`]?.trim() ? bitOf(e[`${prefix}${i + 1}`].trim(), area) : null))
+      const row = list('r', rows, 'Q')
+      const col = list('c', cols, 'I')
+      if (!row[0] || !col[0]) {
+        warnings.push(`${title}: sin su primera fila (salida) y su primera columna (entrada); no se exporta.`)
+        continue
+      }
+      const seguidas = (l) => l.every((a, i) => a && a.byte === l[0].byte && a.bit === l[0].bit + i)
+      if (!seguidas(row) || !seguidas(col)) warnings.push(`${title}: PC_SIMU usa filas y columnas seguidas, en un mismo byte; se exporta desde las primeras.`)
+      rows1.push({ object: 'keypadMatrix', name: title, ...col[0], row: row[0], col: col[0], rows, cols })
       continue
     }
     if (e.type === 'keypad') {
