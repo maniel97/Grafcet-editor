@@ -200,8 +200,8 @@ const OBJECTS = {
   // f16 = 0: dibujo «Conmutador 1».
   selector: { type: 3, name: 'Selector', area: 'I', size: [30, 30], fields: ({ byte, bit, n }) => [0, byte, 0, bit, 0, n, 0, 0, 0, 0, 0, 0, 0, 0] },
   // Ascensor (tipo 27), de 4 plantas (B, 1, 2, 3): sube f5.f7, baja f6.f8, abre la puerta f4.f14, la cierra
-  // f12.f16; f17 velocidad (f17 / 10 por paso; las plantas, cada 240, con 10 de ventana para el detector: a 20,
-  // despacio para que el autómata la pare a tiempo). Las entradas, de 4 en 4 bits (byte y bit de cada una, hasta IB15): en f10, puerta
+  // f12.f16; f17 velocidad (f17 / 10 por paso, al menos 1; las plantas, cada 240, con 10 de ventana para el
+  // detector: a 10, 1 por paso, para que el autómata, que ve las entradas con retraso, la pare a tiempo). Las entradas, de 4 en 4 bits (byte y bit de cada una, hasta IB15): en f10, puerta
   // abierta, puerta cerrada, modo (1: un detector por planta; 0: uno solo en la cabina, que se enciende en todas),
   // detector en cabina y el byte de la planta B; en
   // f11, el bit de la B y las plantas 1, 2 y 3; en f9, las condiciones de seguridad (sin usar).
@@ -213,7 +213,7 @@ const OBJECTS = {
       const nib = (list) => list.reduce((v, x, i) => v + (x & 15) * 16 ** i, 0)
       const f10 = nib([doorOpen.byte, doorOpen.bit, doorClosed.byte, doorClosed.bit, 1, 0, 0, floors[0].byte])
       const f11 = nib([floors[0].bit, floors[1].byte, floors[1].bit, floors[2].byte, floors[2].bit, floors[3].byte, floors[3].bit, 0])
-      return [open.byte, byte, down.byte, bit, down.bit, 0, f10, f11, close.byte, 0, open.bit, 0, close.bit, 20]
+      return [open.byte, byte, down.byte, bit, down.bit, 0, f10, f11, close.byte, 0, open.bit, 0, close.bit, 10]
     },
   },
   // Teclado (tipo 4): f10 filas × f11 columnas de teclas, cada una una entrada, seguidas desde f5.f7 (f16 = 0).
