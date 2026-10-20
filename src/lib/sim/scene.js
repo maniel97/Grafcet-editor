@@ -50,7 +50,7 @@ export const SCENE_TYPES = {
   rotary: {
     label: N_('Actuador giratorio'),
     group: N_('Actuadores'),
-    defaults: { turn: '', back: '', start: '', end: '', vacuum: '', holding: '', tool: 'vacuum', long: false, arm: 80, time: 1, initial: 0, text: '' },
+    defaults: { turn: '', back: '', start: '', end: '', vacuum: '', holding: '', tool: 'vacuum', long: false, flip: false, arm: 80, time: 1, initial: 0, text: '' },
   },
   conveyor: { label: N_('Cinta'), group: N_('Actuadores'), defaults: { motor: '', reverse: '', length: 240, time: 4, text: '' } },
   limit: { label: N_('Final de carrera'), group: N_('Detectores'), defaults: { variable: '', contact: 'NO' } },
@@ -388,7 +388,8 @@ export const platePlaced = (scene, state, c) => cylinderPlate(placed(scene, stat
 // Actuador giratorio: el ángulo del brazo (en grados, con y hacia abajo, antes del giro del elemento): de −175°
 // (a la izquierda) a −95° o −15°, como el de PC_SIMU.
 export const rotarySweep = (e) => (e.long ? 160 : 80)
-export const rotaryAngle = (e, pos) => -175 + rotarySweep(e) * pos
+// flip: simétrico (el giro al revés, de la derecha por arriba), como las orientaciones 2 y 3 de PC_SIMU.
+export const rotaryAngle = (e, pos) => (e.flip ? 180 - (-175 + rotarySweep(e) * pos) : -175 + rotarySweep(e) * pos)
 export function rotaryTip(e, pos) {
   const a = (rotaryAngle(e, pos) * Math.PI) / 180
   const arm = Number(e.arm) || 80

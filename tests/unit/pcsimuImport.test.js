@@ -172,4 +172,25 @@ describe('Importar de PC_SIMU (.sim)', () => {
     // Un rótulo por objeto: la primera salida recupera su nombre; las demás, el de su dirección.
     expect(stepper).toMatchObject({ drive: 'cwccw', steps: 24, o1: 'P', o2: 'Q0_1', zero: 'I0_3' })
   })
+
+  it('actuador de giro simétrico y girado 90° (orientación 2 de PC_SIMU): la ventosa en su círculo, y de vuelta igual', () => {
+    const v = (address) => ({ address })
+    const variables = { G: v('Q0.0'), V: v('Q0.1') }
+    const elements = [{ id: 'g', type: 'rotary', x: 300, y: 200, rot: 90, flip: true, turn: 'G', vacuum: 'V', arm: 75 }]
+    const sim = exportPcSimu({ plc: { variables, scene: { gravity: true, elements } } })
+    const objects = parsePcSimu(sim.text)
+    const g = objects.find((o) => o.type === 19 && o.fields[11] === 210)
+    const tool = objects.find((o) => o.type === 19 && o.fields[11] === 100)
+    expect(g.fields[10]).toBe(2)
+    // PC_SIMU (orientación 2): esquina = (x0 + R·cos θ − W/98, y0 − R − R·sen θ + H/98), θ = b + 271.
+    const pivot = [(g.rect[0] + g.rect[2]) / 2, (g.rect[1] + g.rect[3]) / 2]
+    for (const b of [0, 40, 80]) {
+      const t = ((b + 271) * Math.PI) / 180
+      const cx = tool.rect[0] + 75 * Math.cos(t) + 10
+      const cy = tool.rect[1] - 75 - 75 * Math.sin(t) + 10
+      expect(Math.hypot(cx - pivot[0], cy - pivot[1])).toBeCloseTo(75, 0)
+    }
+    const back = importPcSimu(sim.text).project.plc.scene.elements.find((e) => e.type === 'rotary')
+    expect(back).toMatchObject({ rot: 90, flip: true, arm: 75, vacuum: 'V' })
+  })
 })

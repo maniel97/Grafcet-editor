@@ -189,7 +189,7 @@ function RotaryShape({ e, pos, values }) {
   const grip = isOn(values, e.vacuum)
   return (
     <g>
-      <path d={`M ${x0} ${y0} A ${arm} ${arm} 0 0 1 ${x1} ${y1}`} fill="none" stroke="#94a3b8" strokeDasharray="3 3" />
+      <path d={`M ${x0} ${y0} A ${arm} ${arm} 0 0 ${e.flip ? 0 : 1} ${x1} ${y1}`} fill="none" stroke="#94a3b8" strokeDasharray="3 3" />
       <line x1="0" y1="0" x2={tx} y2={ty} stroke="#475569" strokeWidth="6" strokeLinecap="round" />
       <rect x="-14" y="-14" width="28" height="28" rx="4" fill="#e2e8f0" stroke={INK} strokeWidth="1.5" />
       <circle r="5" fill={INK} />
@@ -1526,6 +1526,10 @@ function Properties({ element, variables, onChange, onDelete, onRotate, onCreate
           <label className="flex items-center gap-1">
             <input type="checkbox" checked={Boolean(element.long)} onChange={(ev) => set({ long: ev.target.checked })} />
             {tr('Giro largo (160°; si no, 80°)')}
+          </label>
+          <label className="flex items-center gap-1">
+            <input type="checkbox" checked={Boolean(element.flip)} onChange={(ev) => set({ flip: ev.target.checked })} />
+            {tr('Simétrico (gira desde la derecha)')}
           </label>
           <label className="flex items-center gap-1">
             <input type="checkbox" checked={Number(element.initial) === 1} onChange={(ev) => set({ initial: ev.target.checked ? 1 : 0 })} />

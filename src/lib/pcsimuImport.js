@@ -275,10 +275,11 @@ export function importPcSimu(text, images = {}) {
         })
         if (g >= 200 && g < 300) {
           const legs = legsOf()
-          if (f(o, 14) !== 0) warnings.push('Actuador de giro: solo en su orientación normal; se importa sin girar.')
+          // Orientación: 0 tal cual; 1 girado 180°; 2 y 3, simétrico y girado 90° o 270°.
+          const turn = [{ rot: 0 }, { rot: 180 }, { rot: 90, flip: true }, { rot: 270, flip: true }][f(o, 14)] ?? { rot: 0 }
           const long = g >= 230
           const r = (W / 2) * (parseFloat(o.text2) || 1)
-          const e = add(o, 'rotary', { ...at(o), turn: main, back: legs.retract, start: legs.retracted, end: legs.extended, long, arm: Math.round(r), initial: g % 20 === 0 ? 1 : 0, vacuum: '', holding: '', tool: 'vacuum' })
+          const e = add(o, 'rotary', { ...at(o), ...turn, turn: main, back: legs.retract, start: legs.retracted, end: legs.extended, long, arm: Math.round(r), initial: g % 20 === 0 ? 1 : 0, vacuum: '', holding: '', tool: 'vacuum' })
           carriers.push({ o, e, groups: new Set([o.group?.trim()].filter(Boolean)) })
           break
         }

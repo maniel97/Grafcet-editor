@@ -120,10 +120,10 @@ const OBJECTS = {
     type: 19,
     name: 'Actuador de giro',
     size: [50, 50],
-    fields: ({ byte, bit, retract, a0, a1, extended, long }) => [
+    fields: ({ byte, bit, retract, a0, a1, extended, long, orientation }) => [
       retract ? 1 : 0, byte, retract?.byte ?? 0, bit, retract?.bit ?? 0,
       a0 ? 1 : 0, a1 ? 1 : 0, a0?.byte ?? 0, a1?.byte ?? 0, a0?.bit ?? 0,
-      0, (long ? 230 : 210) + (extended ? 10 : 0), retract ? 11 : 1, 20,
+      orientation ?? 0, (long ? 230 : 210) + (extended ? 10 : 0), retract ? 11 : 1, 20,
     ],
     text: () => `.${pad(30)}.${pad(0)}.${pad(0)}.0.${pad(0)}.0.0`,
     text2: ({ radius }) => (radius / 25).toFixed(6),
@@ -592,8 +592,10 @@ export function exportPcSimu(project, { reserved = [], addressOf } = {}) {
     }
     if (e.type === 'rotary') {
       const title = e.text?.trim() || e.turn?.trim() || typeName(e)
-      if (e.place === 'desk' || !front || rotOf(e) !== 0) {
-        warnings.push(`${title}: el actuador de giro pasa a PC_SIMU solo en la planta vista de frente y sin girar; no se exporta.`)
+      // Orientación de PC_SIMU: 0 tal cual, 1 girado 180°, 2 y 3 simétrico y girado 90° o 270°.
+      const orientation = { '0:': 0, '180:': 1, '90:1': 2, '270:1': 3 }[`${rotOf(e)}:${e.flip ? 1 : ''}`]
+      if (e.place === 'desk' || !front || orientation === undefined) {
+        warnings.push(`${title}: el actuador de giro pasa a PC_SIMU en la planta vista de frente, tal cual, girado 180° o simétrico y girado 90° o 270°; no se exporta.`)
         continue
       }
       const bit = (key, area) => {
@@ -609,17 +611,19 @@ export function exportPcSimu(project, { reserved = [], addressOf } = {}) {
         continue
       }
       const radius = Number(e.arm) || 80
-      machine.push({ object: 'rotary', id: e.id, name: e.turn.trim(), ...turn, retract: bit('back', 'Q'), spring: !e.back?.trim(), a0: bit('start', 'I'), a1: bit('end', 'I'), extended: Number(e.initial) === 1, long: Boolean(e.long), radius, rect: [e.x - 25, e.y - 25, e.x + 25, e.y + 25] })
+      machine.push({ object: 'rotary', id: e.id, name: e.turn.trim(), ...turn, retract: bit('back', 'Q'), spring: !e.back?.trim(), a0: bit('start', 'I'), a1: bit('end', 'I'), extended: Number(e.initial) === 1, long: Boolean(e.long), orientation, radius, rect: [e.x - 25, e.y - 25, e.x + 25, e.y + 25] })
       const vacuum = e.vacuum?.trim()
       if (vacuum) {
         const at = bitOf(vacuum, 'Q')
         if (!at) missing(e, vacuum, 'Q')
         else {
-          // La herramienta, donde la pone PC_SIMU a 180°: su esquina a R a la izquierda del pivote (y 50/21 arriba).
+          // La herramienta, donde la pone PC_SIMU al empezar: su esquina a R del pivote (a la izquierda, a la
+          // derecha, abajo o arriba según la orientación; y lo que se corre con el alto o el ancho del actuador).
           const gripper = e.tool === 'gripper'
           const [tw, th] = gripper ? [20, 30] : [20, 20]
-          const x0 = e.x - tw / 2 - radius
-          const y0 = e.y - th / 2 - 2
+          const [dx, dy] = [[-radius, -2], [radius, 2], [0, radius], [0, -radius]][orientation]
+          const x0 = e.x - tw / 2 + dx
+          const y0 = e.y - th / 2 + dy
           machine.push({ object: gripper ? 'gripper' : 'suction', name: vacuum, ...at, holding: bit('holding', 'I'), orientation: 3, rect: [x0, y0, x0 + tw, y0 + th], carrier: e.id })
         }
       }
