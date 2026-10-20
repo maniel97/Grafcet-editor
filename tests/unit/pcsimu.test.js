@@ -4,6 +4,8 @@ import { PRACTICE_GUIDES } from '../../src/lib/practiceGuides'
 import { EXAMPLES } from '../../src/lib/examples'
 import { generateLadder } from '../../src/lib/ladder/generate'
 import { toS7200 } from '../../src/lib/ladder/exportS7200'
+import { createCpu, parseProgram } from '../../src/lib/plc/s7200cpu'
+import { toRaw } from '../../src/lib/analog'
 
 const practice = (id) => PRACTICE_GUIDES[0].practices.find((p) => p.id === id).teacher()
 const overlap = (a, b) => a[0] < b[2] && b[0] < a[2] && a[1] < b[3] && b[1] < a[3]
@@ -230,15 +232,23 @@ describe('PC_SIMU (.sim)', () => {
     expect(row).toEqual([[first.qb[1], 4], [first.qb[1], 0], [first.qb[0], 4], [first.qb[0], 0]])
     // Las salidas de los displays, libres: ni de la tabla ni del programa.
     for (const qb of sim.aux.flatMap((x) => x.qb)) expect(program.text).not.toMatch(new RegExp(`\bQ${qb}\.`))
-    // Y su red en el .awl: la consigna (analógica, 0–10 V = 0–32000, 0–250 °C en la tabla) pasada a °C con enteros
-    // y en BCD, unidades y decenas en el primer byte.
+    // Y su red en el .awl, ejecutada en la CPU simulada: la consigna (analógica) en °C y en BCD, unidades y decenas
+    // en el primer byte; entre 0 y 9999.
     const awl = withAuxOutputs(program.text, sim.aux)
-    const { min, max } = p.plc.variables.Consigna
-    expect(awl).toContain([`MOVW   ${consigna}, VW986`, '-I     +0, VW986', 'MOVW   +0, VW984', `MUL    +${max - min}, VD984`, 'DIV    +32000, VD984', `+I     +${min}, VW986`, 'MOVW   VW986, VW990'].join('\r\n'))
-    // Entre 0 y 9999 (IBCD no convierte negativos ni más de 4 cifras), y a BCD.
-    expect(awl).toContain(['LDW<=  VW990, -1', 'MOVW   +0, VW990'].join('\r\n'))
-    expect(awl).toContain(['LDW>=  VW990, +10000', 'MOVW   +9999, VW990'].join('\r\n'))
-    expect(awl).toContain(['LD     SM0.0', 'IBCD   VW990', `MOVB   VB991, QB${first.qb[0]}`, `MOVB   VB990, QB${first.qb[1]}`].join('\r\n'))
+    const { blocks, errors } = parseProgram(awl)
+    expect(errors).toEqual([])
+    const cpu = createCpu({ blocks })
+    const shown = (raw) => {
+      cpu.words.set(consigna, raw)
+      for (let i = 0; i < 3; i++) cpu.scan(0.01)
+      const bcd = (b) => [(b >> 4) & 15, b & 15]
+      const [hi, lo] = [cpu.words.get(`QB${first.qb[1]}`), cpu.words.get(`QB${first.qb[0]}`)]
+      return Number([...bcd(hi), ...bcd(lo)].join(''))
+    }
+    const v = p.plc.variables.Consigna
+    expect(shown(toRaw(125, v, 's7200'))).toBe(125)
+    expect(shown(toRaw(v.max, v, 's7200'))).toBe(v.max)
+    expect(shown(0)).toBe(v.min) // 4-20 mA por debajo de 4 mA: no sale negativo
     objects.forEach((a, i) => objects.slice(i + 1).forEach((b) => expect(overlap(a.rect, b.rect)).toBe(false)))
   })
 
@@ -303,6 +313,30 @@ describe('PC_SIMU (.sim)', () => {
     const clasif = exportPcSimu(EXAMPLES.find((e) => e.title === 'Clasificadora por material').build())
     expect(parsePcSimu(clasif.text).find((o) => o.type === 7).fields[8]).toBe(0)
     expect(clasif.warnings.some((w) => /desviadores, rampas/.test(w))).toBe(true)
+  })
+
+  it('el captador de vacío de un depósito: el programa lee la entrada invertida (el de PC_SIMU se activa con líquido)', () => {
+    const p = EXAMPLES.find((e) => /Mezcladora/.test(e.title)).build()
+    const program = toS7200(generateLadder(p.nodes, p.edges, p.plc), p.plc, { title: 'Mezcladora' })
+    const sim = exportPcSimu(p, { reserved: program.text.match(/\bQ\d+\.\d\b/g) ?? [], addressOf: program.addressOf })
+    const vacio = program.addressOf({ kind: 'var', name: 'Vacio' })
+    expect(sim.aux).toContainEqual({ kind: 'invert', input: vacio, mem: 'V1012.0', name: 'Vacio' })
+    const awl = withAuxOutputs(program.text, sim.aux)
+    // La primera red la invierte; el programa ya no lee la entrada y las redes siguen numeradas.
+    const ob1 = awl.slice(0, awl.indexOf('END_ORGANIZATION_BLOCK'))
+    expect(ob1).toMatch(new RegExp(`BEGIN\r\nNetwork 1 // .*\r\nLDN    ${vacio.replace('.', '\.')}\r\n=      V1012\.0\r\nNetwork 2 `))
+    expect(ob1.split('\r\n').filter((l) => !l.startsWith('Network') && l.includes(vacio))).toEqual([`LDN    ${vacio}`])
+    const numbers = [...ob1.matchAll(/^Network (\d+)/gm)].map((m) => Number(m[1]))
+    expect(numbers).toEqual(numbers.map((_, i) => i + 1))
+    const { blocks, errors } = parseProgram(awl)
+    expect(errors).toEqual([])
+    const cpu = createCpu({ blocks })
+    cpu.bits.set(vacio, true) // con líquido
+    cpu.scan(0.01)
+    expect(cpu.bits.get('V1012.0')).toBe(false)
+    cpu.bits.set(vacio, false) // vacío
+    cpu.scan(0.01)
+    expect(cpu.bits.get('V1012.0')).toBe(true)
   })
 
   it('todos los ejemplos del editor se exportan sin pisarse', () => {

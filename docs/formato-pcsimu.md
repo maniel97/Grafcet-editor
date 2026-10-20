@@ -263,7 +263,13 @@ El texto va en `texto`; el rectángulo, 8 px por letra y 17 de alto.
   un lado de la cinta (desviadores, rampas) no tiene equivalente de frente.
 - **Lo que PC_SIMU necesita y el programa no tiene** se añade al `.awl` en salidas libres: la de recoger
   un cilindro con vuelta por muelle, la de cerrar una barrera que cierra por su peso y los dos bytes en
-  BCD de cada visualizador.
+  BCD de cada visualizador (una analógica, pasada antes a sus unidades con reales: el simulador S7_200 no
+  hace `MUL` / `DIV` como Micro/WIN; y entre 0 y 9999, lo que admite `IBCD`).
+- **El captador de vacío** de un depósito del editor vale 1 con el depósito vacío; el de mínimo de
+  PC_SIMU, cuando el líquido lo cubre. El programa lo lee invertido: su entrada se cambia por una marca
+  que una red nueva, la primera, pone a NOT entrada.
+- **El potenciómetro de PC_SIMU** sube mientras se mantiene pulsado (cada vez más deprisa), hasta 32768;
+  un clic suelto apenas lo mueve.
 - **El tiempo:** PC_SIMU mueve piezas, cintas y líquidos al ritmo con el que redibuja la pantalla (y de
   su «velocidad de simulación»), no al del autómata. Las velocidades se calculan para un paso de 100 ms
   (el de su velocidad por defecto), pero lo que se ve no coincide con los tiempos del programa.

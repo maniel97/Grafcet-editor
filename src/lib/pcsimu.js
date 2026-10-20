@@ -10,7 +10,7 @@
 // Lo que no se exporta todavía (cilindros, cintas, depósitos…) sale en los avisos, con su tipo (en
 // español, como los de la exportación a S7-200).
 import { parseAddress } from './addressing'
-import { analogConfig, isAnalog, rawRange } from './analog'
+import { analogConfig, isAnalog, rawRange, realLiteral } from './analog'
 import { encodeAnsi } from './ladder/exportS7200'
 import { SCENE_TYPES, PIECE_SIZES, sensorZone, worldRect } from './sim/scene'
 import { t as tr } from './i18n'
@@ -228,6 +228,7 @@ export function exportPcSimu(project, { reserved = [], addressOf } = {}) {
   const warnings = []
   const skipped = new Map()
   const rows = [[], [], []]
+  const inverts = [] // entradas que el programa lee invertidas (el captador de vacío de un depósito)
   const typeName = (e) => tr(SCENE_TYPES[e.type]?.label ?? e.type)
   // Una pata (variable) del elemento -> { byte, bit } si tiene una dirección de bit del área pedida.
   // Pulsadores solo de la planta (sueltan una pieza sin pasar por el autómata): en PC_SIMU el pulsador y el
@@ -399,6 +400,13 @@ export function exportPcSimu(project, { reserved = [], addressOf } = {}) {
       if (level && !ai) warnings.push(`${level}: sin una entrada analógica AIW; el nivel analógico no pasa a PC_SIMU.`)
       // Caudal: lo que sube el nivel (de la capacidad, 1000) en cada paso de PC_SIMU, que por defecto es de 100 ms.
       const rate = (t) => Math.max(1, Math.round((TANK_CAPACITY * 0.1) / (Number(t) || 10)))
+      // El de vacío del editor vale 1 con el depósito vacío; el de mínimo de PC_SIMU, cuando el líquido lo cubre:
+      // el programa lo lee invertido (withAuxOutputs).
+      if (empty) {
+        const mem = `V1012.${inverts.length}`
+        inverts.push({ kind: 'invert', input: `I${empty.byte}.${empty.bit}`, mem, name: e.empty.trim() })
+        warnings.push(`${e.empty.trim()}: el captador de mínimo de PC_SIMU se activa con líquido; el .awl lee I${empty.byte}.${empty.bit} invertida (en ${mem}).`)
+      }
       rows[0].push({
         object: 'tank',
         name: e.text?.trim() || typeName(e),
@@ -529,7 +537,7 @@ export function exportPcSimu(project, { reserved = [], addressOf } = {}) {
   // - un cilindro que empieza dentro solo vuelve con su salida «contraer» (y la de expandir a 0): no tiene
   //   vuelta por muelle; a los que no tienen A−, una salida que el .awl pone a NOT A+;
   // - un visualizador muestra salidas en BCD: dos bytes enteros con su valor.
-  const aux = []
+  const aux = [...inverts]
   const springs = [...rows[0], ...machine].filter((item) => item.spring)
   const displays = rows[0].filter((item) => item.object === 'display')
   if (springs.length || displays.length) {
@@ -635,31 +643,55 @@ export function withAuxOutputs(awl, aux = []) {
   if (!aux.length) return awl
   const end = awl.indexOf('\r\nEND_ORGANIZATION_BLOCK')
   let n = Math.max(0, ...[...awl.slice(0, end).matchAll(/^Network (\d+)/gm)].map((m) => Number(m[1])))
-  const sign = (v) => (v < 0 ? String(v) : `+${v}`)
-  const nets = aux.map(({ kind, from, to, name, word, qb, scale }) =>
+  const nets = aux.filter((x) => x.kind !== 'invert').map(({ kind, from, to, name, word, qb, scale }) =>
     kind === 'display'
-      ? // El valor en BCD (en VW990, fuera de lo que usa el programa): unidades y decenas en el primer byte. Una
-        // analógica, antes en sus unidades, con enteros (MUL da 32 bits en VD984; DIV deja el cociente en VW986).
+      ? // El valor en BCD (en VW1010, fuera de lo que usa el programa): unidades y decenas en el primer byte. Una
+        // analógica, antes en sus unidades, con reales (como el resto del programa; el simulador S7_200 no hace
+        // MUL / DIV como Micro/WIN): (bruto − r0) · (máx − mín) / (r1 − r0) + mín, redondeado.
         [
           `Network ${++n} // PC_SIMU: ${clean(name)} en los displays (QB${qb[0]}-QB${qb[1]}, BCD)`,
           'LD     SM0.0',
           ...(scale
-            ? [`MOVW   ${word}, VW986`, `-I     ${sign(scale.r0)}, VW986`, 'MOVW   +0, VW984', `MUL    ${sign(scale.span)}, VD984`, `DIV    ${sign(scale.rspan)}, VD984`, `+I     ${sign(scale.min)}, VW986`, 'MOVW   VW986, VW990']
-            : [`MOVW   ${word}, VW990`]),
+            ? [
+                `ITD    ${word}, VD1000`,
+                'DTR    VD1000, VD1000',
+                `-R     ${realLiteral(scale.r0)}, VD1000`,
+                `*R     ${realLiteral(scale.span / scale.rspan)}, VD1000`,
+                `+R     ${realLiteral(scale.min)}, VD1000`,
+                'ROUND  VD1000, VD1000',
+                'DTI    VD1000, VW1010',
+              ]
+            : [`MOVW   ${word}, VW1010`]),
           // Entre 0 y 9999 (IBCD no convierte otra cosa: saldrían cifras sin sentido).
           `Network ${++n} // (de 0 a 9999)`,
-          'LDW<=  VW990, -1',
-          'MOVW   +0, VW990',
+          'LDW<=  VW1010, -1',
+          'MOVW   +0, VW1010',
           `Network ${++n}`,
-          'LDW>=  VW990, +10000',
-          'MOVW   +9999, VW990',
+          'LDW>=  VW1010, +10000',
+          'MOVW   +9999, VW1010',
           `Network ${++n}`,
           'LD     SM0.0',
-          'IBCD   VW990',
-          `MOVB   VB991, QB${qb[0]}`,
-          `MOVB   VB990, QB${qb[1]}`,
+          'IBCD   VW1010',
+          `MOVB   VB1011, QB${qb[0]}`,
+          `MOVB   VB1010, QB${qb[1]}`,
         ].join('\r\n')
       : [`Network ${++n} // PC_SIMU: ${to} recoge ${clean(name)} (vuelta por muelle)`, `LDN    ${from}`, `=      ${to}`].join('\r\n'),
   )
-  return `${awl.slice(0, end)}\r\n${nets.join('\r\n')}${awl.slice(end)}`
+  let text = `${awl.slice(0, end)}${nets.length ? `\r\n${nets.join('\r\n')}` : ''}${awl.slice(end)}`
+  // Entradas que el programa lee invertidas: en el OB1 la entrada se cambia por una marca, que una red nueva,
+  // la primera, pone a NOT entrada (y las demás redes se renumeran).
+  const inverts = aux.filter((x) => x.kind === 'invert')
+  if (inverts.length) {
+    const ob1End = text.indexOf('\r\nEND_ORGANIZATION_BLOCK')
+    const begin = text.indexOf('BEGIN\r\n') + 'BEGIN\r\n'.length
+    let body = text.slice(begin, ob1End)
+    for (const { input, mem } of inverts) {
+      const re = new RegExp(`(?<![\\w.])${input.replace('.', '\\.')}(?![\\w.])`, 'g')
+      body = body.split('\r\n').map((line) => (line.startsWith('Network') || line.startsWith('//') ? line : line.replace(re, mem))).join('\r\n')
+    }
+    body = body.replace(/^Network (\d+)/gm, (_, k) => `Network ${Number(k) + inverts.length}`)
+    const first = inverts.map(({ input, mem, name }, i) => [`Network ${i + 1} // PC_SIMU: ${clean(name)} (${input}) invertida en ${mem}`, `LDN    ${input}`, `=      ${mem}`].join('\r\n'))
+    text = `${text.slice(0, begin)}${first.join('\r\n')}\r\n${body}${text.slice(ob1End)}`
+  }
+  return text
 }
