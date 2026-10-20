@@ -399,16 +399,27 @@ describe('PC_SIMU (.sim)', () => {
     expect([num.fields[1], num.fields[5], num.fields[3], num.fields[0], num.fields[9], num.fields[8]]).toEqual([2, 3, 0, 32000, 0, 80])
     const th = objects.find((o) => o.type === 5)
     expect([th.fields[1], th.fields[3], th.fields[7]]).toEqual([1, 0, 2]) // IB1 (IB0 la usa M), 2 cifras
-    expect(sim.aux).toContainEqual({ kind: 'bcdIn', bytes: [1], word: 'VW50', name: 'Lote' })
-    // La red, la primera del OB1, ejecutada: 0x47 en BCD en IB1 -> 47 en VW50.
+    expect(sim.aux).toContainEqual({ kind: 'bcdIn', bytes: [1], digits: 2, word: 'VW50', name: 'Lote' })
+    // La red, la primera del OB1, ejecutada. PC_SIMU da la cifra de la izquierda en los 4 bits bajos: «47»
+    // es 0x74 en IB1 -> 47 en VW50.
     const awl = withAuxOutputs(['ORGANIZATION_BLOCK MAIN:OB1', 'TITLE=', 'BEGIN', 'Network 1 // x', 'LD     I0.0', '=      Q0.0', 'END_ORGANIZATION_BLOCK'].join('\r\n'), sim.aux)
-    expect(awl).toMatch(/BEGIN\r\nNetwork 1 \/\/ PC_SIMU: Lote[^\r]*\r\nLD     SM0\.0\r\nMOVB   IB1, VB1017\r\nMOVB   0, VB1016\r\nBCDI   VW1016\r\nMOVW   VW1016, VW50\r\nNetwork 2 \/\/ x/)
+    expect(awl).toMatch(/BEGIN\r\nNetwork 1 \/\/ PC_SIMU: Lote[^\r]*\r\nLD {5}SM0.0\r\n/)
     const { blocks, errors } = parseProgram(awl)
     expect(errors).toEqual([])
     const cpu = createCpu({ blocks })
-    cpu.words.set('IB1', 0x47)
+    cpu.words.set('IB1', 0x74)
     cpu.scan(0.01)
     expect(cpu.words.get('VW50')).toBe(47)
+    // Con 3 y 4 cifras, en dos bytes: «123» y «1234».
+    for (const [digits, ib, value] of [[3, [0x21, 0x03], 123], [4, [0x21, 0x43], 1234]]) {
+      const big = exportPcSimu({ plc: { variables, scene: { elements: [{ ...elements[1], digits }] } } })
+      const prog = withAuxOutputs(['ORGANIZATION_BLOCK MAIN:OB1', 'TITLE=', 'BEGIN', 'Network 1 // x', 'LD     I0.0', '=      Q0.0', 'END_ORGANIZATION_BLOCK'].join('\r\n'), big.aux)
+      const c = createCpu(parseProgram(prog))
+      c.words.set('IB1', ib[0])
+      c.words.set('IB2', ib[1])
+      c.scan(0.01)
+      expect(c.words.get('VW50')).toBe(value)
+    }
   })
 
   it('ascensor: el de PC_SIMU, con sus salidas y sus entradas empaquetadas de 4 en 4 bits', () => {

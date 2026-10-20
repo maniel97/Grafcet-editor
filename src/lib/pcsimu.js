@@ -218,7 +218,8 @@ const OBJECTS = {
   },
   // Teclado (tipo 4): f10 filas × f11 columnas de teclas, cada una una entrada, seguidas desde f5.f7 (f16 = 0).
   keypad: { type: 4, name: 'Teclado', area: 'I', size: [75, 100], fields: ({ byte, bit, rows, cols }) => [0, byte, 0, bit, 0, 0, rows, cols, 0, 0, 0, 0, 0, 0] },
-  // Preselector (tipo 5): f11 cifras en BCD, cuatro entradas por cifra desde f5.f7 (las unidades primero).
+  // Preselector (tipo 5): f11 cifras en BCD, cuatro entradas por cifra desde f5.f7 (de izquierda a derecha: la
+  // de más peso primero).
   thumbwheel: { type: 5, name: 'Preselector', area: 'I', size: [60, 40], fields: ({ byte, digits }) => [0, byte, 0, 0, 0, 0, 1, digits, 0, 0, 0, 0, 0, 0] },
   // Potenciómetro numérico (tipo 17, f9 = 3): la entrada analógica AIW f5, de f7 a f4 en bruto, mostrada de f13 a f12.
   numeric: { type: 17, name: 'Potenciómetro', area: 'I', size: [60, 30], fields: ({ ai, r0, r1, min, max }) => [r1, ai, 0, r0, 0, 3, 0, 0, max, min, 0, 0, 0, 0] },
@@ -714,7 +715,7 @@ export function exportPcSimu(project, { reserved = [], addressOf } = {}) {
     while (!free(b) || (bytes === 2 && !free(b + 1))) b++
     for (let i = 0; i < bytes * 8; i++) usedI.add(b * 8 + i)
     rows1.push({ ...item, byte: b, bit: 0 })
-    inverts.push({ kind: 'bcdIn', bytes: bytes === 2 ? [b, b + 1] : [b], word: item.word, name: item.name })
+    inverts.push({ kind: 'bcdIn', bytes: bytes === 2 ? [b, b + 1] : [b], digits: item.digits, word: item.word, name: item.name })
     warnings.push(`${item.name}: PC_SIMU lo da en BCD en IB${b}${bytes === 2 ? ` e IB${b + 1}` : ''}; el .awl lo pasa a ${item.word}.`)
   }
   const aux = [...inverts]
@@ -890,8 +891,14 @@ export function withAuxOutputs(awl, aux = []) {
         : [
             `Network ${i + 1} // PC_SIMU: ${clean(x.name)} (preselector en BCD en IB${x.bytes.join(', IB')}) a ${x.word}`,
             'LD     SM0.0',
-            `MOVB   IB${x.bytes[0]}, VB1017`,
-            x.bytes[1] === undefined ? 'MOVB   0, VB1016' : `MOVB   IB${x.bytes[1]}, VB1016`,
+            // PC_SIMU da las cifras de izquierda a derecha, de 4 en 4 bits desde el bit 0 (la primera, la de
+            // más peso, en el medio byte bajo): cada byte con sus medios bytes cambiados, y la palabra
+            // desplazada hasta que las unidades queden a la derecha.
+            `MOVB   IB${x.bytes[0]}, VB1016`,
+            'RLB    VB1016, 4',
+            x.bytes[1] === undefined ? 'MOVB   0, VB1017' : `MOVB   IB${x.bytes[1]}, VB1017`,
+            'RLB    VB1017, 4',
+            ...(x.digits < 4 ? [`SRW    VW1016, ${4 * (4 - x.digits)}`] : []),
             'BCDI   VW1016',
             `MOVW   VW1016, ${x.word}`,
           ].join('\r\n'),
