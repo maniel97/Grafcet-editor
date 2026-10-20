@@ -460,6 +460,22 @@ describe('PC_SIMU (.sim)', () => {
     expect(warnings.join(' ')).not.toMatch(/montado|ventosa/)
   })
 
+  it('sin vástago (f15 = 18, el perfil a 9/7 de la carrera) y pinza (f15 = 300) en el que lleva', () => {
+    const v = (address) => ({ address })
+    const variables = { 'X+': v('Q0.0'), 'Z+': v('Q0.1'), P: v('Q0.2'), PC: v('I0.3') }
+    const elements = [
+      { id: 'x', type: 'cylinder', x: 100, y: 100, extend: 'X+', stroke: 140, rodless: true },
+      { id: 'z', type: 'cylinder', x: 174, y: 100, rot: 90, extend: 'Z+', vacuum: 'P', holding: 'PC', tool: 'gripper', mountedOn: 'x', stroke: 60 },
+    ]
+    const objects = parsePcSimu(exportPcSimu({ plc: { variables, scene: { gravity: true, elements } } }).text).filter((o) => o.type === 19)
+    const x = objects.find((o) => o.fields[11] === 18)
+    expect(x.rect[2] - x.rect[0]).toBe(180) // 140 · 9/7
+    expect(x.group).toBe('Grupo_1')
+    const gripper = objects.find((o) => o.fields[11] === 300)
+    expect(gripper.name).toBe('Grupo_1')
+    expect([gripper.fields[1], gripper.fields[3], gripper.fields[6], gripper.fields[8], gripper.a]).toEqual([0, 2, 1, 0, 3]) // cierra Q0.2; cerrada I0.3
+  })
+
   it('todos los ejemplos del editor se exportan sin pisarse', () => {
     for (const example of EXAMPLES) {
       const objects = parsePcSimu(exportPcSimu(example.build()).text)

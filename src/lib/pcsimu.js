@@ -92,12 +92,14 @@ const OBJECTS = {
   cylinder: {
     type: 19,
     name: 'Actuador neumático',
+    // Sin vástago (f15 = 18, gráfico 3 de carrera larga): el carro, de 0,2 del largo, empieza a 0,045 y corre
+    // b·(0,2·largo/10)/9, con b de 0 a 350 (7/9 del largo).
     size: [60, 20],
     sizeVertical: [20, 60],
-    fields: ({ byte, bit, retract, a0, a1, orientation, extended, speed, graphic2 }) => [
+    fields: ({ byte, bit, retract, a0, a1, orientation, extended, speed, graphic2, rodless }) => [
       retract ? 1 : 0, byte, retract?.byte ?? 0, bit, retract?.bit ?? 0,
       a0 ? 1 : 0, a1 ? 1 : 0, a0?.byte ?? 0, a1?.byte ?? 0, a0?.bit ?? 0,
-      orientation, (graphic2 ? 13 : 11) + (extended ? 10 : 0), retract ? 11 : 1, speed ?? CYLINDER_SPEED,
+      orientation, (rodless ? 18 : graphic2 ? 13 : 11) + (extended ? 10 : 0), retract ? 11 : 1, speed ?? CYLINDER_SPEED,
     ],
     text: ({ speed }) => `.${pad(speed ?? CYLINDER_SPEED)}.${pad(0)}.${pad(0)}.0.${pad(0)}.0.0`,
     a: ({ a1 }) => a1?.bit ?? 0,
@@ -110,6 +112,16 @@ const OBJECTS = {
     size: [20, 20],
     fields: ({ byte, bit, holding, orientation }) => [0, byte, 0, bit, 0, holding ? 1 : 0, 0, holding?.byte ?? 0, 0, holding?.bit ?? 0, orientation, 100, 1, CYLINDER_SPEED],
     text: () => `.${pad(CYLINDER_SPEED)}.${pad(0)}.${pad(0)}.0.${pad(0)}.0.0`,
+  },
+  // Pinza (tipo 19, f15 = 300): f4 = 0 monoestable, la cierra f5.f7; f10 = 1 con detector de pinza cerrada
+  // (entrada f12.a); f9 el de abierta (f11.f13). Va con el cilindro que la lleva por su grupo, como la ventosa.
+  gripper: {
+    type: 19,
+    name: 'Pinza',
+    size: [20, 30],
+    fields: ({ byte, bit, holding, orientation }) => [0, byte, 0, bit, 0, 0, holding ? 1 : 0, 0, holding?.byte ?? 0, 0, orientation, 300, 1, CYLINDER_SPEED],
+    text: () => `.${pad(CYLINDER_SPEED)}.${pad(0)}.${pad(0)}.0.${pad(0)}.0.0`,
+    a: ({ holding }) => holding?.bit ?? 0,
   },
   // Cinta: mueve a la derecha con f5.f7 (si f16 = 1) y a la izquierda con f6.f8 (si f15 = 1); f17 velocidad
   // (f17 / 12 px por paso); f14 = 0: dibujo «Cinta (V1.0)», horizontal.
@@ -644,7 +656,11 @@ export function exportPcSimu(project, { reserved = [], addressOf } = {}) {
         // editor tiene la placa, y tan ancho como ella (28 px) para alcanzar las mismas piezas.
         const W = Math.round(((Number(e.stroke) || 100) * 19) / 11)
         Object.assign(extra, { rect: placed(e, 88 - W, -14, W, 28), speed: cylinderSpeed(e) })
-        if (carriers.has(e.id)) {
+        if (e.rodless) {
+          // El carro del editor (de 60 a 88) donde el de PC_SIMU; lleva su grupo también.
+          const W3 = Math.round(((Number(e.stroke) || 100) * 9) / 7)
+          Object.assign(extra, { rect: placed(e, 74 - Math.round(W3 * 0.145), -14, W3, 28), rodless: true })
+        } else if (carriers.has(e.id)) {
           // Solo los gráficos 2 y 3 llevan su grupo; en el 2 el vástago sale 7/18 del largo (b de 0 a 350, a
           // W/20/45 por unidad), con la cara a 0,745 del largo.
           const W2 = Math.round(((Number(e.stroke) || 100) * 18) / 7)
@@ -661,7 +677,7 @@ export function exportPcSimu(project, { reserved = [], addressOf } = {}) {
         if (vacuum) {
           const at = bitOf(vacuum, 'Q')
           if (!at) missing(e, vacuum, 'Q')
-          else machine.push({ object: 'suction', name: vacuum, ...at, holding: leg('holding', 'I'), orientation: extra.orientation, rect: placed(e, 88, -10, 20, 20), carrier: e.id })
+          else machine.push({ object: e.tool === 'gripper' ? 'gripper' : 'suction', name: vacuum, ...at, holding: leg('holding', 'I'), orientation: extra.orientation, rect: e.tool === 'gripper' ? placed(e, 88, -15, 20, 30) : placed(e, 88, -10, 20, 20), carrier: e.id })
         }
       }
       const lost = (onMachine ? ['position'] : ['position', 'vacuum', 'holding']).filter((k) => e[k]?.trim()).map((k) => e[k].trim())

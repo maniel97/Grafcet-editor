@@ -125,12 +125,24 @@ function CylinderShape({ e, pos, values }) {
   const stroke = Number(e.stroke) || 100
   const out = isOn(values, e.extend)
   const back = e.retract ? isOn(values, e.retract) : !out
+  const tip = 88 + pos * stroke
   return (
     <g>
-      <rect x="0" y="-12" width="80" height="24" rx="3" fill="#e2e8f0" stroke={INK} strokeWidth="1.5" />
-      <rect x={6 + pos * 62} y="-10" width="6" height="20" fill={INK} />
-      <rect x={12 + pos * 62} y="-3" width={68 - pos * 62 + pos * stroke} height="6" fill="#64748b" />
-      <rect x={80 + pos * stroke} y="-14" width="8" height="28" rx="1" fill="#475569" />
+      {e.rodless ? (
+        // Sin vástago: un perfil a lo largo de toda la carrera y un carro que corre por él.
+        <>
+          <rect x="0" y="-7" width={96 + stroke} height="14" rx="3" fill="#e2e8f0" stroke={INK} strokeWidth="1.5" />
+          <line x1="4" x2={92 + stroke} y1="0" y2="0" stroke="#94a3b8" />
+          <rect x={60 + pos * stroke} y="-14" width="28" height="28" rx="2" fill="#475569" />
+        </>
+      ) : (
+        <>
+          <rect x="0" y="-12" width="80" height="24" rx="3" fill="#e2e8f0" stroke={INK} strokeWidth="1.5" />
+          <rect x={6 + pos * 62} y="-10" width="6" height="20" fill={INK} />
+          <rect x={12 + pos * 62} y="-3" width={68 - pos * 62 + pos * stroke} height="6" fill="#64748b" />
+          <rect x={80 + pos * stroke} y="-14" width="8" height="28" rx="1" fill="#475569" />
+        </>
+      )}
       {/* Tomas de aire: verde cuando llega la orden */}
       <circle cx="10" cy="-15" r="3" fill={back && !out ? ON : OFF} stroke={INK} strokeWidth="0.5" />
       <circle cx="70" cy="-15" r="3" fill={out && !back ? ON : OFF} stroke={INK} strokeWidth="0.5" />
@@ -138,8 +150,17 @@ function CylinderShape({ e, pos, values }) {
       {e.extended && <circle cx="68" cy="15" r="3" fill={pos >= 0.999 ? ON : OFF} stroke={INK} strokeWidth="0.5" />}
       {/* Carrera (guía discontinua) */}
       <line x1="88" y1="18" x2={88 + stroke} y2="18" stroke="#94a3b8" strokeDasharray="3 3" />
+      {/* Pinza: dos garras que se cierran (verdes) al coger */}
+      {e.vacuum && e.tool === 'gripper' && (
+        <g fill={isOn(values, e.vacuum) ? ON : '#94a3b8'} stroke={INK} strokeWidth="0.75">
+          <rect x={tip} y="-3" width="6" height="6" />
+          <path d={`M ${tip + 6} ${isOn(values, e.vacuum) ? -8 : -14} h 12 v 4 h -8 z`} />
+          <path d={`M ${tip + 6} ${isOn(values, e.vacuum) ? 8 : 14} h 12 v -4 h -8 z`} />
+          <line x1={tip + 6} x2={tip + 6} y1={isOn(values, e.vacuum) ? -8 : -14} y2={isOn(values, e.vacuum) ? 8 : 14} />
+        </g>
+      )}
       {/* Ventosa: verde con vacío */}
-      {e.vacuum && (
+      {e.vacuum && e.tool !== 'gripper' && (
         <path
           d={`M ${88 + pos * stroke} -9 L ${94 + pos * stroke} -13 L ${94 + pos * stroke} 13 L ${88 + pos * stroke} 9 Z`}
           fill={isOn(values, e.vacuum) ? ON : '#94a3b8'}
@@ -1209,6 +1230,19 @@ function Properties({ element, variables, onChange, onDelete, onRotate, onCreate
             <input type="checkbox" checked={Number(element.initial) === 1} onChange={(ev) => set({ initial: ev.target.checked ? 1 : 0 })} />
             {tr('Empieza con el vástago fuera')}
           </label>
+          <label className="flex items-center gap-1">
+            <input type="checkbox" checked={Boolean(element.rodless)} onChange={(ev) => set({ rodless: ev.target.checked })} />
+            {tr('Sin vástago (un carro corre por el perfil)')}
+          </label>
+          {element.vacuum?.trim() && (
+            <label className="block">
+              <span className="text-slate-500">{tr('Herramienta')}</span>
+              <select value={element.tool ?? 'vacuum'} onChange={(ev) => set({ tool: ev.target.value })} className={field}>
+                <option value="vacuum">{tr('Ventosa')}</option>
+                <option value="gripper">{tr('Pinza')}</option>
+              </select>
+            </label>
+          )}
           {number('stroke', tr('Carrera (px)'), 20, 10)}
           {number('time', tr('Tiempo de carrera (s)'), 0.1, 0.1)}
         </>

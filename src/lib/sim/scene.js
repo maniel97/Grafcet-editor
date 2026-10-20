@@ -32,7 +32,7 @@ export const SCENE_TYPES = {
   cylinder: {
     label: N_('Cilindro'),
     group: N_('Actuadores'),
-    defaults: { extend: '', retract: '', retracted: '', extended: '', position: '', vacuum: '', holding: '', mountedOn: '', stroke: 100, time: 1, text: '' },
+    defaults: { extend: '', retract: '', retracted: '', extended: '', position: '', vacuum: '', holding: '', mountedOn: '', rodless: false, tool: 'vacuum', stroke: 100, time: 1, text: '' },
   },
   conveyor: { label: N_('Cinta'), group: N_('Actuadores'), defaults: { motor: '', reverse: '', length: 240, time: 4, text: '' } },
   limit: { label: N_('Final de carrera'), group: N_('Detectores'), defaults: { variable: '', contact: 'NO' } },
@@ -113,8 +113,8 @@ export const SCENE_VARS = {
     ['retracted', 'Detector dentro (a0)', 'in'],
     ['extended', 'Detector fuera (a1)', 'in'],
     ['position', N_('Posición (analógica, opcional)'), 'analog'],
-    ['vacuum', N_('Ventosa: vacío (opcional)'), 'out'],
-    ['holding', 'Ventosa: pieza cogida (opcional)', 'in'],
+    ['vacuum', N_('Ventosa o pinza: coge (opcional)'), 'out'],
+    ['holding', N_('Ventosa o pinza: pieza cogida (opcional)'), 'in'],
   ],
   conveyor: [
     ['motor', 'Motor', 'out'],
