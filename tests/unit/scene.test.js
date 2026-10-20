@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { compile, evolve, initialState } from '../../src/lib/sim/engine'
 import { buildPlcModel } from '../../src/lib/plcModel'
 import { EMPTY_PLC } from '../../src/lib/addressing'
-import { SCENE_FLOOR, detectScene, measuredDistance, rotaryTip, rotate, sceneAction, sceneFaults, sceneFromPlant, sceneInit, sceneInputNames, sceneInputs, sceneStep, worldRect } from '../../src/lib/sim/scene'
+import { SCENE_FLOOR, detectScene, measuredDistance, motorRunning, rotaryTip, rotate, sceneAction, sceneFaults, sceneFromPlant, sceneInit, sceneInputNames, sceneInputs, sceneStep, worldRect } from '../../src/lib/sim/scene'
 import { normalizeProject } from '../../src/lib/projectFile'
 import { advanceWorld, makeWorld } from '../../src/lib/sim/world'
 import { links, step, transition } from './helpers'
@@ -324,6 +324,16 @@ describe('escena: detectores típicos y sensores analógicos', () => {
     const back = rotaryTip(e, 0)
     expect(Math.round(s.pieces[0].x + 10)).toBe(Math.round(back.x))
     expect(sceneInputs(scene, s)).toEqual({ G0: 1, G1: 0, VH: 1 })
+  })
+
+  it('motor con salida de parar: arranca con la de marcha y sigue hasta la de parar (biestable)', () => {
+    const scene = { elements: [{ id: 'm', type: 'motor', x: 0, y: 0, variable: 'A', stop: 'P', look: 'pump' }] }
+    let s = sceneInit(scene)
+    s = run(scene, s, { A: 1 }, 0.1)
+    s = run(scene, s, {}, 0.5)
+    expect(motorRunning(scene.elements[0], s, {})).toBe(true)
+    s = run(scene, s, { P: 1 }, 0.1)
+    expect(motorRunning(scene.elements[0], s, {})).toBe(false)
   })
 
   it('calentador: la temperatura sube con la resistencia y el termostato salta en la consigna', () => {

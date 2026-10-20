@@ -111,4 +111,20 @@ describe('Importar de PC_SIMU (.sim)', () => {
     expect(thermal).toMatchObject({ src: '', press: 'I1_2', contact: 'NC', latch: true })
     expect(warnings).toContain('Faltan 2 imágenes (elígelas junto al .sim, en la misma ventana): termico_off.bmp, termico_on.bmp.')
   })
+
+  it('herramienta: un motor con su dibujo (taladro…), su parada y montado en el cilindro que la lleva, de ida y vuelta', () => {
+    const v = (address) => ({ address })
+    const variables = { Z: v('Q0.0'), T: v('Q0.1'), TP: v('Q0.2') }
+    const elements = [
+      { id: 'z', type: 'cylinder', x: 200, y: 100, rot: 90, extend: 'Z', stroke: 80 },
+      { id: 't', type: 'motor', x: 200, y: 300, variable: 'T', stop: 'TP', look: 'drill2', size: 60, mountedOn: 'z' },
+    ]
+    const sim = exportPcSimu({ plc: { variables, scene: { gravity: true, elements } } })
+    const tool = parsePcSimu(sim.text).find((o) => o.type === 19 && o.fields[11] === 400)
+    expect([tool.fields[10], tool.fields[0], tool.fields[3], tool.fields[4], tool.name]).toEqual([12, 1, 1, 2, 'Grupo_1'])
+    const { project } = importPcSimu(sim.text)
+    const cyl = project.plc.scene.elements.find((e) => e.type === 'cylinder')
+    const motor = project.plc.scene.elements.find((e) => e.type === 'motor')
+    expect(motor).toMatchObject({ look: 'drill2', variable: 'T', stop: 'Q0_2', mountedOn: cyl.id }) // T: su rótulo
+  })
 })

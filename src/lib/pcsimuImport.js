@@ -2,7 +2,7 @@
 // tabla de variables. Es lo contrario de exportPcSimu (lib/pcsimu.js): el formato y lo que hace cada campo,
 // en docs/formato-pcsimu.md. Lo que no tiene equivalente se cuenta en los avisos.
 import { parsePcSimu, PCSIMU_SETA } from './pcsimu'
-import { SCENE_VARS, rotate } from './sim/scene'
+import { MOTOR_LOOKS, SCENE_VARS, rotate } from './sim/scene'
 
 const f = (o, k) => o.fields[k - 4] ?? 0
 const COLOR_OF = { 0: 'green', 1: 'black', 2: 'blue', 3: 'blue', 4: 'red', 5: 'red', 6: 'yellow', 7: 'white' }
@@ -38,6 +38,7 @@ export function importPcSimu(text, images = {}) {
   const warnings = []
   const variables = {}
   const elements = []
+  const from = new Map() // elemento -> el objeto del .sim de que sale (para los montajes por grupo)
   const byAddress = new Map()
   const skipped = new Map()
   const skip = (what) => skipped.set(what, (skipped.get(what) ?? 0) + 1)
@@ -67,11 +68,14 @@ export function importPcSimu(text, images = {}) {
     byAddress.set(address, name)
     return name
   }
-  const input = (o, byte, bit) => variable(o, 'I', `I${byte}.${bit}`, 'input')
-  const output = (o, byte, bit) => variable(o, 'Q', `Q${byte}.${bit}`, 'output')
+  // Un bit fuera de rango (un campo que en ese objeto quiere decir otra cosa): sin variable.
+  const bitOk = (byte, bit) => Number.isInteger(byte) && Number.isInteger(bit) && byte >= 0 && byte < 128 && bit >= 0 && bit <= 7
+  const input = (o, byte, bit) => (bitOk(byte, bit) ? variable(o, 'I', `I${byte}.${bit}`, 'input') : '')
+  const output = (o, byte, bit) => (bitOk(byte, bit) ? variable(o, 'Q', `Q${byte}.${bit}`, 'output') : '')
   let n = 0
   const add = (o, type, props) => {
     const e = { id: `pc${++n}`, type, rot: 0, text: '', ...props }
+    from.set(e, o)
     if (DESK.has(type)) {
       e.place = 'desk'
       e.order = o.rect[1] * 10000 + o.rect[0]
@@ -249,12 +253,15 @@ export function importPcSimu(text, images = {}) {
         const rot = ROT[f(o, 14)] ?? 0
         const L = rot === 90 || rot === 270 ? H : W
         const main = output(o, f(o, 5), f(o, 7)) // la primera: se queda el rótulo
-        const legs = {
+        // Salida de recoger y captadores (solo en los cilindros y en el actuador de giro: en las herramientas, esos
+        // campos son otra cosa).
+        const legsOf = () => ({
           retract: f(o, 4) === 1 && f(o, 16) === 11 ? output(o, f(o, 6), f(o, 8)) : '',
           retracted: f(o, 9) ? input(o, f(o, 11), f(o, 13)) : '',
           extended: f(o, 10) ? input(o, f(o, 12), o.a) : '',
-        }
+        })
         if (g >= 200 && g < 300) {
+          const legs = legsOf()
           if (f(o, 14) !== 0) warnings.push('Actuador de giro: solo en su orientación normal; se importa sin girar.')
           const long = g >= 230
           const r = (W / 2) * (parseFloat(o.text2) || 1)
@@ -292,15 +299,28 @@ export function importPcSimu(text, images = {}) {
           stroke = (L * 11) / 19
           lx = 88 - L
           electric++
+        } else if (g === 400) {
+          // Herramienta: un motor con su dibujo (f14), que arranca con f5.f7 y, biestable (f4 = 1), para con f6.f8.
+          add(o, 'motor', {
+            ...at(o),
+            variable: main,
+            stop: f(o, 4) === 1 ? output(o, f(o, 6), f(o, 8)) : '',
+            reverse: '',
+            pulses: '',
+            look: MOTOR_LOOKS[f(o, 14) + 1]?.[0] ?? 'motor',
+            size: Math.round(Math.min(W, H)),
+            mountedOn: '',
+          })
+          break
         } else {
-          skip({ 400: 'herramienta', 500: 'imagen de salidas' }[g] ?? `actuador (gráfico ${g})`)
+          skip({ 500: 'imagen de salidas' }[g] ?? `actuador (gráfico ${g})`)
           break
         }
         const e = add(o, 'cylinder', {
           ...anchor(o.rect, rot, lx, -14, L, 28),
           rot,
           extend: main,
-          ...legs,
+          ...legsOf(),
           position: '',
           vacuum: '',
           holding: '',
@@ -383,6 +403,13 @@ export function importPcSimu(text, images = {}) {
     if (!o.name?.trim()) continue
     const by = carriers.find((c) => c.o !== o && c.o.group?.trim() && c.o.group.trim() === o.name.trim() && c.e.type === 'cylinder')
     if (by && e.type === 'cylinder' && by.e.id !== e.id) e.mountedOn = by.e.id
+  }
+  // Los demás (motores y herramientas, imágenes…) que se llaman como el grupo de un cilindro: montados en él.
+  for (const e of elements) {
+    const o = from.get(e)
+    if (!['motor', 'image'].includes(e.type) || !o?.name?.trim()) continue
+    const by = carriers.find((c) => c.e.type === 'cylinder' && c.o.group?.trim() === o.name.trim())
+    if (by) e.mountedOn = by.e.id
   }
   for (const o of tools.filter((t) => t.type === 19)) {
     const gripper = f(o, 15) === 300

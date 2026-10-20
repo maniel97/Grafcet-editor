@@ -63,7 +63,10 @@ export const SCENE_TYPES = {
     group: N_('Proceso'),
     defaults: { fill: '', fillFine: '', drain: '', low: '', high: '', empty: '', level: '', fillTime: 10, drainTime: 10, initial: 0, text: '' },
   },
-  motor: { label: N_('Motor'), group: N_('Actuadores'), defaults: { variable: '', reverse: '', pulses: '', text: '' } },
+  // Motor: gira con su salida (con `stop`, arranca con ella y para con la de parar, como un biestable). look: su
+  // dibujo, como las herramientas de PC_SIMU (MOTOR_LOOKS); size: su tamaño (px); mountedOn: en el vástago de un
+  // cilindro.
+  motor: { label: N_('Motor'), group: N_('Actuadores'), defaults: { variable: '', reverse: '', pulses: '', stop: '', look: 'motor', size: 40, mountedOn: '', text: '' } },
   display: { label: N_('Visualizador'), group: N_('Señalización'), defaults: { variable: '', text: '' } },
   // Barra: el valor de una variable (analógica o numérica) entre un mínimo y un máximo.
   bargraph: { label: N_('Barra'), group: N_('Señalización'), defaults: { variable: '', min: 0, max: 100, vertical: true, text: '' } },
@@ -170,6 +173,7 @@ export const SCENE_VARS = {
   motor: [
     ['variable', 'Marcha', 'out'],
     ['reverse', 'Giro inverso (opcional)', 'out'],
+    ['stop', N_('Para (opcional; con ella, la marcha se queda puesta)'), 'out'],
     ['pulses', N_('Encoder: 1 impulso por vuelta (opcional)'), 'in'],
   ],
   display: [['variable', 'Valor', 'any']],
@@ -213,6 +217,29 @@ export const SCENE_VARS = {
 
 // Tamaño del depósito (anclaje: esquina superior izquierda) y de sus sensores de nivel.
 export const TANK = { w: 90, h: 130, low: 0.1, high: 0.9 }
+
+// Dibujos del motor: el suyo y las herramientas de PC_SIMU, en el orden de su f14 (0 a 15).
+export const MOTOR_LOOKS = [
+  ['motor', N_('Motor')],
+  ['saw1', N_('Sierra circular 1')],
+  ['saw2', N_('Sierra circular 2')],
+  ['drill1', N_('Taladro 1')],
+  ['agitator', N_('Agitador')],
+  ['pump', N_('Bomba de agua')],
+  ['fan', N_('Ventilador')],
+  ['compressor', N_('Compresor')],
+  ['hydraulic', N_('Grupo hidráulico')],
+  ['screen', N_('Criba')],
+  ['crusher', N_('Trituradora')],
+  ['heater', N_('Resistencia calefactora')],
+  ['burner', N_('Quemador de caldera')],
+  ['drill2', N_('Taladro 2')],
+  ['capDispenser', N_('Dispensador de tapones')],
+  ['capper', N_('Taponadora')],
+  ['labeler', N_('Etiquetadora')],
+]
+// En marcha: con su salida o, si para con otra, desde que arranca hasta que para (state.pos).
+export const motorRunning = (e, state, values) => (e.stop ? (state.pos?.[e.id] ?? 0) === 1 : Boolean(Number(values?.[e.variable])))
 
 const BODY = 80 // largo del cuerpo de un cilindro
 export const PIECE_SIZES = { small: [28, 28], large: [44, 44] }
@@ -281,10 +308,10 @@ export const GRAVITY = 900
 export const SCENE_FLOOR = 790
 const STEP_UP = 24
 
-// Cilindro montado en el vástago de otro (e.mountedOn): viaja con él. Su x, y son los de con el
+// Elemento montado en el vástago de un cilindro (e.mountedOn: otro cilindro, un motor, una imagen): viaja con él. Su x, y son los de con el
 // otro recogido; se le suma lo que haya salido el vástago del otro (y, en cadena, lo del suyo).
 export function placed(scene, state, e, depth = 0) {
-  if (e.type !== 'cylinder' || !e.mountedOn || depth > 4) return e
+  if (!e.mountedOn || depth > 4) return e
   const carrier = (scene?.elements ?? []).find((c) => c.id === e.mountedOn && c.type === 'cylinder' && c.id !== e.id)
   if (!carrier) return e
   const base = placed(scene, state, carrier, depth + 1)
@@ -638,8 +665,10 @@ export function sceneStep(scene, state, values, dt) {
   // Motores: solo giran (para verlo); una vuelta por segundo.
   for (const e of elements) {
     if (e.type !== 'motor' || stuck(e)) continue
-    const dir = on(values, e.variable) ? (on(values, e.reverse) ? -1 : 1) : 0
-    if (dir) next.angle[e.id] = ((next.angle[e.id] ?? 0) + dir * 360 * dt * fraction(values, e.variable)) % 360
+    if (e.stop) next.pos[e.id] = on(values, e.stop) ? 0 : on(values, e.variable) ? 1 : (next.pos[e.id] ?? 0)
+    const running = e.stop ? next.pos[e.id] === 1 : on(values, e.variable)
+    const dir = running ? (on(values, e.reverse) ? -1 : 1) : 0
+    if (dir) next.angle[e.id] = ((next.angle[e.id] ?? 0) + dir * 360 * dt * (e.stop ? 1 : fraction(values, e.variable))) % 360
   }
 
   if (scene?.gravity) fall(scene, next, new Set(Object.values(next.held).map((h) => h.id)), dt)

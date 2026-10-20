@@ -28,6 +28,8 @@ import {
   SCENE_FLOOR,
   selectorPositions,
   elevatorFloors,
+  MOTOR_LOOKS,
+  motorRunning,
   rotaryAngle,
   keypadColumns,
   keypadCount,
@@ -717,21 +719,143 @@ function TankShape({ e, level, values, iso = false }) {
     </g>
   )
 }
-function MotorShape({ angle, running }) {
-  return (
-    <g>
-      <circle r="20" fill="#e2e8f0" stroke={running ? ON : INK} strokeWidth="1.5" />
-      <g transform={`rotate(${angle})`}>
-        {[0, 120, 240].map((a) => (
-          <path key={a} d="M 0 0 L 16 -5 L 16 5 Z" fill="#475569" transform={`rotate(${a})`} />
-        ))}
-      </g>
-      <circle r="3" fill={INK} />
-      <text x="0" y="-24" textAnchor="middle" fontSize="9" fontWeight="700" fill={running ? ON : '#64748b'}>
-        M
-      </text>
-    </g>
-  )
+// Motor: el suyo, o una de las herramientas de PC_SIMU (look), a escala (size, en px; 40 el normal). Lo que
+// gira, gira con angle; en marcha, el borde verde.
+function MotorShape({ angle, running, look = 'motor', size = 40 }) {
+  const k = (Number(size) || 40) / 40
+  const edge = running ? ON : INK
+  const spin = `rotate(${angle})`
+  const body = (() => {
+    switch (look) {
+      case 'saw1':
+      case 'saw2':
+        return (
+          <g transform={spin}>
+            <circle r="18" fill="#cbd5e1" stroke={edge} strokeWidth="1.5" />
+            {Array.from({ length: 12 }, (_, i) => (
+              <path key={i} d="M 18 0 L 21 -3 L 17 -5 Z" fill="#475569" transform={`rotate(${i * 30})`} />
+            ))}
+            <circle r="4" fill={INK} />
+          </g>
+        )
+      case 'drill1':
+      case 'drill2':
+        return (
+          <g>
+            <rect x="-14" y="-20" width="28" height="22" rx="3" fill="#e2e8f0" stroke={edge} strokeWidth="1.5" />
+            <rect x="-4" y="2" width="8" height="5" fill="#475569" />
+            <path d={`M -2 7 L 2 7 L 1 20 L 0 22 L -1 20 Z`} fill="#64748b" stroke={INK} strokeWidth="0.5" />
+            <line x1="-2" y1={10 + (angle % 8)} x2="2" y2={12 + (angle % 8)} stroke={INK} strokeWidth="0.75" />
+          </g>
+        )
+      case 'agitator':
+        return (
+          <g>
+            <rect x="-10" y="-22" width="20" height="12" rx="2" fill="#e2e8f0" stroke={edge} strokeWidth="1.5" />
+            <line x1="0" y1="-10" x2="0" y2="16" stroke="#475569" strokeWidth="2" />
+            <g transform={`translate(0 16) scale(${Math.cos((angle * Math.PI) / 180)} 1)`}>
+              <rect x="-12" y="-3" width="24" height="6" rx="2" fill="#64748b" />
+            </g>
+          </g>
+        )
+      case 'pump':
+        return (
+          <g>
+            <rect x="-22" y="6" width="44" height="6" fill="#94a3b8" />
+            <circle r="15" fill="#dbeafe" stroke={edge} strokeWidth="1.5" />
+            <g transform={spin}>
+              {[0, 90, 180, 270].map((a) => (
+                <path key={a} d="M 0 0 Q 8 -2 12 -8" fill="none" stroke="#2563eb" strokeWidth="2" transform={`rotate(${a})`} />
+              ))}
+            </g>
+            <rect x="12" y="-4" width="10" height="8" fill="#94a3b8" stroke={INK} strokeWidth="0.5" />
+          </g>
+        )
+      case 'fan':
+        return (
+          <g>
+            <circle r="19" fill="#f1f5f9" stroke={edge} strokeWidth="1.5" />
+            <g transform={spin}>
+              {[0, 90, 180, 270].map((a) => (
+                <ellipse key={a} cx="9" cy="0" rx="9" ry="4" fill="#64748b" transform={`rotate(${a})`} />
+              ))}
+            </g>
+            <circle r="3" fill={INK} />
+          </g>
+        )
+      case 'compressor':
+      case 'hydraulic':
+        return (
+          <g>
+            <rect x="-20" y="-6" width="40" height="18" rx="9" fill={look === 'hydraulic' ? '#fde68a' : '#e2e8f0'} stroke={edge} strokeWidth="1.5" />
+            <circle cx="-8" cy="-12" r="8" fill="#cbd5e1" stroke={INK} />
+            <g transform={`translate(-8 -12) ${spin}`}>
+              <line x1="-5" y1="0" x2="5" y2="0" stroke={INK} strokeWidth="1.5" />
+            </g>
+            <rect x="6" y="-16" width="10" height="10" fill="#94a3b8" stroke={INK} strokeWidth="0.5" />
+          </g>
+        )
+      case 'screen':
+      case 'crusher':
+        return (
+          <g>
+            <path d="M -20 -18 L 20 -18 L 12 14 L -12 14 Z" fill="#e2e8f0" stroke={edge} strokeWidth="1.5" />
+            {[-6, 6].map((x) => (
+              <g key={x} transform={`translate(${x} 2) rotate(${x > 0 ? angle : -angle})`}>
+                <circle r="5" fill="#64748b" />
+                <path d="M 0 -6 L 2 -3 L -2 -3 Z" fill={INK} />
+              </g>
+            ))}
+            {look === 'screen' && <line x1="-14" y1="-8" x2="14" y2="-8" stroke="#475569" strokeDasharray="2 2" />}
+          </g>
+        )
+      case 'heater':
+        return (
+          <g>
+            <rect x="-20" y="-8" width="40" height="16" rx="3" fill="#f1f5f9" stroke={edge} strokeWidth="1.5" />
+            <path d="M -16 0 L -12 -5 L -6 5 L 0 -5 L 6 5 L 12 -5 L 16 0" fill="none" stroke={running ? '#dc2626' : '#64748b'} strokeWidth="2" />
+          </g>
+        )
+      case 'burner':
+        return (
+          <g>
+            <rect x="-18" y="6" width="36" height="10" rx="2" fill="#e2e8f0" stroke={edge} strokeWidth="1.5" />
+            {running && <path d="M 0 -18 C 10 -6 8 2 0 6 C -8 2 -10 -6 0 -18 Z" fill="#f97316" opacity={0.7 + 0.3 * Math.abs(Math.sin((angle * Math.PI) / 90))} />}
+          </g>
+        )
+      case 'capDispenser':
+      case 'capper':
+      case 'labeler':
+        return (
+          <g>
+            <rect x="-16" y="-20" width="32" height="26" rx="3" fill="#e2e8f0" stroke={edge} strokeWidth="1.5" />
+            {look === 'labeler' ? (
+              <g transform={`translate(8 -7) ${spin}`}>
+                <circle r="6" fill="#fef3c7" stroke={INK} strokeWidth="0.75" />
+              </g>
+            ) : (
+              <rect x="-6" y={6 + (running ? 4 * Math.abs(Math.sin((angle * Math.PI) / 180)) : 0)} width="12" height="6" rx="1" fill="#64748b" />
+            )}
+          </g>
+        )
+      default:
+        return (
+          <g>
+            <circle r="20" fill="#e2e8f0" stroke={edge} strokeWidth="1.5" />
+            <g transform={spin}>
+              {[0, 120, 240].map((a) => (
+                <path key={a} d="M 0 0 L 16 -5 L 16 5 Z" fill="#475569" transform={`rotate(${a})`} />
+              ))}
+            </g>
+            <circle r="3" fill={INK} />
+            <text x="0" y="-24" textAnchor="middle" fontSize="9" fontWeight="700" fill={running ? ON : '#64748b'}>
+              M
+            </text>
+          </g>
+        )
+    }
+  })()
+  return <g transform={k === 1 ? undefined : `scale(${k})`}>{body}</g>
 }
 function DisplayShape({ value }) {
   const text = Number.isFinite(Number(value)) ? String(Math.round(Number(value) * 100) / 100).replace('.', ',') : '—'
@@ -847,8 +971,10 @@ function boundsOf(e, pos = 0) {
       return sinkRect(e)
     case 'tank':
       return r(0, -24, TANK.w + 14, TANK.h + 40)
-    case 'motor':
-      return r(-20, -28, 40, 48)
+    case 'motor': {
+      const k = (Number(e.size) || 40) / 40
+      return r(-24 * k, -28 * k, 48 * k, 52 * k)
+    }
     case 'display':
       return r(-40, -16, 80, 32)
     default:
@@ -1323,6 +1449,34 @@ function Properties({ element, variables, onChange, onDelete, onRotate, onCreate
           {number('arm', tr('Largo del brazo (px)'), 30, 10)}
           {number('time', tr('Tiempo de giro (s)'), 0.1, 0.1)}
         </>
+      )}
+      {element.type === 'motor' && (
+        <>
+          <label className="block">
+            <span className="text-slate-500">{tr('Dibujo')}</span>
+            <select value={element.look ?? 'motor'} onChange={(ev) => set({ look: ev.target.value })} className={field}>
+              {MOTOR_LOOKS.map(([id, label]) => (
+                <option key={id} value={id}>
+                  {tr(label)}
+                </option>
+              ))}
+            </select>
+          </label>
+          {number('size', tr('Tamaño (px)'), 20, 5)}
+        </>
+      )}
+      {(element.type === 'motor' || element.type === 'image') && (
+        <label className="block">
+          <span className="text-slate-500">{tr('Montado en el vástago de')}</span>
+          <select value={element.mountedOn ?? ''} onChange={(ev) => set({ mountedOn: ev.target.value })} className={field}>
+            <option value="">{tr('— (fijo)')}</option>
+            {cylinders.map((c) => (
+              <option key={c.id} value={c.id}>
+                Cilindro {labelOf(c)}
+              </option>
+            ))}
+          </select>
+        </label>
       )}
       {element.type === 'conveyor' && (
         <>
@@ -1858,7 +2012,7 @@ function drawElement(e, { scene, state, values, time, signals, iso = false }) {
     case 'tank':
       return <TankShape e={e} level={state.level?.[e.id] ?? (Number(e.initial) || 0)} values={values} iso={iso} />
     case 'motor':
-      return <MotorShape angle={state.angle?.[e.id] ?? 0} running={isOn(values, e.variable)} />
+      return <MotorShape angle={state.angle?.[e.id] ?? 0} running={motorRunning(e, state, values)} look={e.look} size={e.size} />
     case 'display':
       return <DisplayShape value={values[e.variable]} />
     case 'distance':

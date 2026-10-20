@@ -12,7 +12,7 @@
 import { parseAddress } from './addressing'
 import { analogConfig, isAnalog, rawRange, realLiteral } from './analog'
 import { encodeAnsi } from './ladder/exportS7200'
-import { SCENE_TYPES, PIECE_SIZES, sensorZone, worldRect } from './sim/scene'
+import { MOTOR_LOOKS, SCENE_TYPES, PIECE_SIZES, sensorZone, worldRect } from './sim/scene'
 import { t as tr } from './i18n'
 
 export const PCSIMU_HEADER = 'PC_SIMU*  1* 50*'
@@ -128,6 +128,14 @@ const OBJECTS = {
     text: () => `.${pad(30)}.${pad(0)}.${pad(0)}.0.${pad(0)}.0.0`,
     text2: ({ radius }) => (radius / 25).toFixed(6),
     a: ({ a1 }) => a1?.bit ?? 0,
+  },
+  // Herramienta (tipo 19, f15 = 400): dibujo f14 (taladro, bomba, agitador…), arranca con f5.f7; biestable (f4 = 1,
+  // f16 = 11), para con f6.f8. El motor del editor con un dibujo de herramienta (MOTOR_LOOKS).
+  tool: {
+    type: 19,
+    name: 'Herramienta',
+    fields: ({ byte, bit, stop, look }) => [stop ? 1 : 0, byte, stop?.byte ?? 0, bit, stop?.bit ?? 0, 0, 0, 0, 0, 0, look, 400, stop ? 11 : 1, 0],
+    text: () => `.${pad(0)}.000.000.0.000.0.0`,
   },
   // Pinza (tipo 19, f15 = 300): f4 = 0 monoestable, la cierra f5.f7; f10 = 1 con detector de pinza cerrada
   // (entrada f12.a); f9 el de abierta (f11.f13). Va con el cilindro que la lleva por su grupo, como la ventosa.
@@ -359,8 +367,9 @@ export function exportPcSimu(project, { reserved = [], addressOf } = {}) {
   // (el alimentador) y los detectores cuyo haz la cruza, proyectados (beltUnder).
   const belts = front ? [] : elements.filter((e) => e.type === 'conveyor' && e.place !== 'desk' && (rotOf(e) === 0 || rotOf(e) === 180)).map((e) => placed(e, 0, -15, Number(e.length) || 240, 30))
   const beltUnder = (r) => belts.find((b) => overlapsRect(b, r))
-  // Cilindros que llevan algo (otro montado en su vástago, su ventosa): en PC_SIMU, con el gráfico 2.
-  const carriers = new Set(elements.filter((e) => e.type === 'cylinder' && e.place !== 'desk').flatMap((e) => [e.mountedOn, e.vacuum?.trim() ? e.id : null]).filter(Boolean))
+  // Cilindros que llevan algo (montado en su vástago: otro cilindro, una herramienta…; su ventosa): en PC_SIMU,
+  // con el gráfico 2.
+  const carriers = new Set(elements.filter((e) => e.place !== 'desk').flatMap((e) => [e.mountedOn, e.type === 'cylinder' && e.vacuum?.trim() ? e.id : null]).filter(Boolean))
   for (let e of elements) {
     const rot = rotOf(e)
     if (!front && e.place !== 'desk' && (e.type === 'ramp' || e.type === 'diverter' || e.type === 'sink')) {
@@ -531,6 +540,20 @@ export function exportPcSimu(project, { reserved = [], addressOf } = {}) {
         if (k >= 0) warnings.push(`${title}: en PC_SIMU un selector usa entradas seguidas, una por posición; sale como interruptores sueltos.`)
         vars.forEach((v, i) => at[i] && rows[1].push({ object: 'switch', name: v, ...at[i], nc: 0 }))
       }
+      continue
+    }
+    const look = e.type === 'motor' ? MOTOR_LOOKS.findIndex(([id]) => id === e.look) : -1
+    if (look > 0) {
+      const name = e.variable?.trim()
+      const at = name && bitOf(name, 'Q')
+      if (!at) {
+        if (name) missing(e, name, 'Q')
+        else warnings.push(`${e.text?.trim() || typeName(e)}: sin su salida de marcha; no se exporta.`)
+        continue
+      }
+      const stop = e.stop?.trim() ? bitOf(e.stop.trim(), 'Q') : null
+      const k = (Number(e.size) || 40) / 40
+      machine.push({ object: 'tool', id: e.id, name, ...at, stop, look: look - 1, carrier: e.mountedOn || undefined, rect: [e.x - 24 * k, e.y - 28 * k, e.x + 24 * k, e.y + 24 * k] })
       continue
     }
     if (e.type === 'shape') {
