@@ -65,20 +65,18 @@ test('importar de PC_SIMU: al abrir un .sim, su panel y su planta pasan a la pla
 
 test('importar de PC_SIMU: el aviso dice lo que no ha pasado y por qué (pospuesto, no olvidado)', async ({ page }) => {
   const errors = await openEditor(page)
-  await openExample(page, /Contar pulsaciones/)
-  await page.getByRole('button', { name: /Exportar/ }).click()
-  await page.getByRole('menuitem', { name: /Planta para PC_SIMU/ }).click()
-  const dialog = page.getByRole('dialog', { name: 'Planta para PC_SIMU' })
-  const sim = await download(page, () => dialog.getByRole('button', { name: 'Panel .sim' }).click())
-  const bytes = await readFile(await sim.path())
-  await dialog.getByTitle('Cerrar').click()
+  // Un .sim con un led y un motor paso a paso (que el editor no tiene).
+  const zeros = Array(14).fill(0).join('*')
+  const led = `0*11#*10*10*35*35*1*0*0*0*${Array(10).fill(0).join('*')}###*0*0`
+  const stepper = `1*30#*100*10*140*50*${zeros}###*0*0`
+  const bytes = Buffer.from(`PC_SIMU*  1* 50*${led}**${stepper}*$$$`, 'latin1')
   await page.getByRole('button', { name: /Simular/ }).click()
   await page.getByRole('radio', { name: /Autómata S7-200/ }).click()
   const chooser = page.waitForEvent('filechooser')
   await page.getByRole('button', { name: 'Cargar planta .sim' }).click()
-  await (await chooser).setFiles({ name: 'Contador.sim', mimeType: 'application/octet-stream', buffer: bytes })
+  await (await chooser).setFiles({ name: 'Paso.sim', mimeType: 'application/octet-stream', buffer: bytes })
   const report = page.getByRole('status', { name: 'Importado de PC_SIMU' })
-  await expect(report).toContainText('4 × display')
+  await expect(report).toContainText('motor paso a paso')
   await expect(report).toContainText('Si hay suficiente demanda, se implementará por completo.')
   expectNoErrors(errors)
 })

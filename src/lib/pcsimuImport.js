@@ -10,7 +10,7 @@ const COLOR_OF = { 0: 'green', 1: 'black', 2: 'blue', 3: 'blue', 4: 'red', 5: 'r
 const ROT = { 0: 0, 1: 180, 2: 270, 3: 90 }
 // Lado por el que se acciona un final de carrera -> giro del editor.
 const LIMIT_ROT = { 2: 0, 0: 90, 3: 180, 1: 270 }
-const DESK = new Set(['button', 'switch', 'emergency', 'selector', 'keypad', 'potentiometer', 'lamp', 'bargraph'])
+const DESK = new Set(['button', 'switch', 'emergency', 'selector', 'keypad', 'potentiometer', 'lamp', 'bargraph', 'digit', 'digitSwitch'])
 
 // Color de Windows (COLORREF: 0x00BBGGRR) -> #rrggbb.
 const colorOf = (c) => `#${[c & 255, (c >> 8) & 255, (c >> 16) & 255].map((v) => v.toString(16).padStart(2, '0')).join('')}`
@@ -387,11 +387,20 @@ export function importPcSimu(text, images = {}) {
         skip('motor paso a paso')
         break
       case 12:
-        skip('display')
+      case 5: {
+        // Display (12) o preselector (5) de f11 cifras: cada una, 4 bits seguidos desde f5.f7 (la primera, la de la
+        // izquierda); en el editor, una cifra BCD (salidas) o una rueda BCD (entradas) por cifra.
+        const digits = Math.max(1, f(o, 11))
+        const base = f(o, 5) * 8 + f(o, 7)
+        for (let i = 0; i < digits; i++) {
+          const bit = (k) => [Math.floor((base + 4 * i + k) / 8), (base + 4 * i + k) % 8]
+          const io = o.type === 12 ? output : input
+          const bits = { b1: io(o, ...bit(0)), b2: io(o, ...bit(1)), b4: io(o, ...bit(2)), b8: io(o, ...bit(3)) }
+          const e = add(o, o.type === 12 ? 'digit' : 'digitSwitch', { ...bits, ...(o.type === 5 ? { initial: 0 } : {}) })
+          e.order += i
+        }
         break
-      case 5:
-        skip('preselector')
-        break
+      }
       case 14: {
         // Imagen: fija (f15 = 1) o con dos dibujos, apagado (texto2) y encendido (grupo), que cambia con una
         // salida (f4 = 1) o al pulsarla (entrada; NC f13, se queda pulsada f14), desplazada f11, f12 al

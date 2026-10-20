@@ -174,7 +174,9 @@ const OBJECTS = {
     text: () => `.${pad(0)}.${pad(0)}.${pad(0)}.0.${pad(0)}.0.0`,
   },
   // Display: muestra en BCD 4 salidas seguidas a partir de f5.f7, una cifra por cada f11 (aquí, 1).
-  digit: { type: 12, name: 'Display', fields: ({ byte, bit }) => [1, byte, 0, bit, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0] },
+  digit: { type: 12, name: 'Display', size: [30, 36], fields: ({ byte, bit }) => [1, byte, 0, bit, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0] },
+  // Rueda de preselector de una cifra (la rueda BCD del editor): 4 entradas desde f5.f7.
+  wheel: { type: 5, name: 'Preselector', area: 'I', size: [30, 40], fields: ({ byte, bit }) => [0, byte, 0, bit, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0] },
   // Visualizador del editor: cuatro displays de una cifra (las unidades, a la derecha), en las dos salidas de
   // byte que el .awl llena con el valor en BCD (withAuxOutputs).
   display: {
@@ -645,6 +647,20 @@ export function exportPcSimu(project, { reserved = [], addressOf } = {}) {
       machine.push({ object: 'elevator', name: title, ...up, down, open: open ?? zero, close: close ?? zero, floors, doorOpen, doorClosed, cabin, rect: [e.x - w / 2, e.y - h / 2, e.x + w / 2, e.y + h / 2] })
       if (!open || !close) warnings.push(`${title}: sin salidas para la puerta, en PC_SIMU no se abre.`)
       if (Math.round(Number(e.floors) || 3) < 4) warnings.push(`${title}: el ascensor de PC_SIMU tiene 4 plantas (B, 1, 2 y 3); las que sobran, con detectores en entradas libres.`)
+      continue
+    }
+    if (e.type === 'digit' || e.type === 'digitSwitch') {
+      // Una cifra en BCD: sus 4 bits, seguidos desde el de peso 1 (como los lee PC_SIMU).
+      const area = e.type === 'digit' ? 'Q' : 'I'
+      const title = e.text?.trim() || e.b1?.trim() || typeName(e)
+      const at = [1, 2, 4, 8].map((w) => (e[`b${w}`]?.trim() ? bitOf(e[`b${w}`].trim(), area) : null))
+      const index = (a) => a.byte * 8 + a.bit
+      if (!at[0]) {
+        if (e.b1?.trim()) missing(e, e.b1.trim(), area)
+        continue
+      }
+      if (at.some((a, k) => !a || index(a) !== index(at[0]) + k)) warnings.push(`${title}: PC_SIMU lee una cifra en 4 bits seguidos desde el de peso 1; se exporta desde ${area}${at[0].byte}.${at[0].bit}.`)
+      ;(area === 'Q' ? rows[0] : rows[1]).push({ object: e.type === 'digit' ? 'digit' : 'wheel', name: title, ...at[0] })
       continue
     }
     if (e.type === 'keypad') {

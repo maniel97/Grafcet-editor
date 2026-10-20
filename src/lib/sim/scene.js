@@ -28,6 +28,10 @@ export const SCENE_TYPES = {
   keypad: { label: N_('Teclado'), group: N_('Mandos'), defaults: { count: 12, columns: 3, labels: '1,2,3,4,5,6,7,8,9,*,0,#', k1: '', k2: '', k3: '', k4: '', k5: '', k6: '', k7: '', k8: '', k9: '', k10: '', k11: '', k12: '', text: '' } },
   // Preselector: de 1 a 4 cifras que dejan un número en su variable; initial: el número al empezar.
   preselector: { label: N_('Preselector'), group: N_('Mandos'), defaults: { variable: '', digits: 2, initial: 0, text: '' } },
+  // Cifra BCD: una cifra (0-9) de un display de PC_SIMU, en 4 salidas (pesos 1, 2, 4 y 8); rueda BCD: una del
+  // preselector, que pone su cifra en 4 entradas.
+  digit: { label: N_('Cifra BCD'), group: N_('Señalización'), defaults: { b1: '', b2: '', b4: '', b8: '', text: '' } },
+  digitSwitch: { label: N_('Rueda BCD'), group: N_('Mandos'), defaults: { b1: '', b2: '', b4: '', b8: '', initial: 0, text: '' } },
   lamp: { label: N_('Piloto'), group: N_('Señalización'), defaults: { variable: '', color: 'green', text: '' } },
   cylinder: {
     label: N_('Cilindro'),
@@ -120,6 +124,18 @@ export const SCENE_VARS = {
     ['k12', N_('Tecla 12 (entrada)'), 'in'],
   ],
   preselector: [['variable', N_('Valor (número)'), 'any']],
+  digit: [
+    ['b1', N_('Bit de peso 1 (salida)'), 'out'],
+    ['b2', N_('Bit de peso 2 (salida)'), 'out'],
+    ['b4', N_('Bit de peso 4 (salida)'), 'out'],
+    ['b8', N_('Bit de peso 8 (salida)'), 'out'],
+  ],
+  digitSwitch: [
+    ['b1', N_('Bit de peso 1 (entrada)'), 'in'],
+    ['b2', N_('Bit de peso 2 (entrada)'), 'in'],
+    ['b4', N_('Bit de peso 4 (entrada)'), 'in'],
+    ['b8', N_('Bit de peso 8 (entrada)'), 'in'],
+  ],
   selector: [
     ['pos1', N_('Posición 1 (entrada)'), 'in'],
     ['pos2', N_('Posición 2 (entrada)'), 'in'],
@@ -465,6 +481,8 @@ const elementsOf = (scene) => scene?.elements ?? []
 
 // Selector: cuántas posiciones tiene (de 2 a 4) y en cuál empieza.
 export const selectorPositions = (e) => Math.min(4, Math.max(2, Math.round(Number(e.positions) || 3)))
+// Cifra BCD: el número de sus 4 bits (de 0 a 15; más de 9 no es una cifra).
+export const digitValue = (e, values) => [1, 2, 4, 8].reduce((v, w) => v + (Number(values?.[e[`b${w}`]]) ? w : 0), 0)
 // Ascensor: cuántas plantas (de 2 a 4).
 export const elevatorFloors = (e) => Math.min(4, Math.max(2, Math.round(Number(e.floors) || 3)))
 // Teclado: cuántas teclas (de 1 a 12) y cuántas columnas; preselector: cuántas cifras (de 1 a 4).
@@ -495,6 +513,7 @@ export function sceneInit(scene) {
     if (e.type === 'selector') selected[e.id] = selectorStart(e)
     if (e.type === 'elevator') lift[e.id] = { at: Math.min(elevatorFloors(e) - 1, Math.max(0, Math.round(Number(e.initial) || 0))), door: 0 }
     if (e.type === 'preselector') preset[e.id] = presetClamp(e, Number(e.initial) || 0)
+    if (e.type === 'digitSwitch') preset[e.id] = Math.min(9, Math.max(0, Math.round(Number(e.initial) || 0)))
     if (e.type === 'heater') temp[e.id] = Number(e.ambient ?? 20)
   }
   return { pos, pressed, level, knob, temp, selected, preset, lift, angle: {}, faults: {}, held: {}, pieces: [], counts: {}, nextPiece: 1, fed: {} }
@@ -810,6 +829,10 @@ export function sceneInputs(scene, state, analogRange = () => null) {
     }
     if (e.type === 'keypad') for (let i = 0; i < keypadCount(e); i++) if (e[`k${i + 1}`]) inputs[e[`k${i + 1}`]] = state.pressed?.[`${e.id}:${i}`] ? 1 : 0
     if (e.type === 'preselector' && e.variable) inputs[e.variable] = state.preset?.[e.id] ?? presetClamp(e, Number(e.initial) || 0)
+    if (e.type === 'digitSwitch') {
+      const v = state.preset?.[e.id] ?? (Number(e.initial) || 0)
+      for (const w of [1, 2, 4, 8]) if (e[`b${w}`]) inputs[e[`b${w}`]] = v & w ? 1 : 0
+    }
     if (e.type === 'selector') {
       const at = state.selected?.[e.id] ?? selectorStart(e)
       for (let i = 0; i < selectorPositions(e); i++) if (e[`pos${i + 1}`]) inputs[e[`pos${i + 1}`]] = at === i ? 1 : 0
@@ -898,6 +921,11 @@ export function sceneAction(scene, state, id, action) {
   if (e.type === 'keypad' && /^(press|release):\d+$/.test(action)) {
     const [what, i] = action.split(':')
     return { ...state, pressed: { ...state.pressed, [`${id}:${i}`]: what === 'press' } }
+  }
+  if (e.type === 'digitSwitch' && (action.startsWith('add:') || action.startsWith('set:'))) {
+    const now = state.preset?.[id] ?? (Number(e.initial) || 0)
+    const v = action.startsWith('add:') ? (now + Number(action.slice(4)) + 10) % 10 : Number(action.slice(4))
+    return { ...state, preset: { ...state.preset, [id]: Math.min(9, Math.max(0, Math.round(v))) } }
   }
   if (e.type === 'preselector' && (action.startsWith('add:') || action.startsWith('set:'))) {
     const now = state.preset?.[id] ?? presetClamp(e, Number(e.initial) || 0)
@@ -996,6 +1024,8 @@ const REQUIRED = {
   selector: ['pos1', 'pos2', 'pos3', 'pos4'],
   keypad: ['k1', 'k2', 'k3', 'k4', 'k5', 'k6', 'k7', 'k8', 'k9', 'k10', 'k11', 'k12'],
   preselector: ['variable'],
+  digit: ['b1'],
+  digitSwitch: ['b1'],
   diverter: ['gate'],
   siren: ['variable'],
   valve: ['variable'],

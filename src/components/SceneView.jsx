@@ -28,6 +28,7 @@ import {
   SCENE_FLOOR,
   selectorPositions,
   elevatorFloors,
+  digitValue,
   MOTOR_LOOKS,
   motorRunning,
   rotaryAngle,
@@ -342,6 +343,36 @@ function ElevatorShape({ e, at = 0, door = 0, values = {} }) {
       <rect x={SHAFT_W / 2 - 10 - leaf} y={cabinY + 4} width={leaf} height={FLOOR_H - 20} fill="#64748b" />
       {isOn(values, e.up) && <path d={`M ${SHAFT_W / 2 + 8} ${-6} l 6 -10 l 6 10 z`} fill={ON} />}
       {isOn(values, e.down) && <path d={`M ${SHAFT_W / 2 + 8} ${6} l 6 10 l 6 -10 z`} fill={ON} />}
+    </g>
+  )
+}
+// Cifra BCD: un display de 7 segmentos (rojo, como los de PC_SIMU); más de 9, apagado.
+const SEGS = { a: 'M 5 3 L 21 3', b: 'M 22 4 L 22 18', c: 'M 22 20 L 22 34', d: 'M 5 35 L 21 35', e: 'M 4 20 L 4 34', f: 'M 4 4 L 4 18', g: 'M 5 19 L 21 19' }
+const DIGIT_SEGS = ['abcdef', 'bc', 'abdeg', 'abcdg', 'bcfg', 'acdfg', 'acdefg', 'abc', 'abcdefg', 'abcdfg']
+function DigitShape({ value }) {
+  const lit = value <= 9 ? DIGIT_SEGS[value] : ''
+  return (
+    <g transform="translate(-13 -19)">
+      <rect x="0" y="0" width="26" height="38" rx="2" fill="#1e293b" stroke={INK} />
+      {Object.entries(SEGS).map(([k, d]) => (
+        <path key={k} d={d} stroke={lit.includes(k) ? '#ef4444' : '#3f1d1d'} strokeWidth="3" strokeLinecap="round" />
+      ))}
+    </g>
+  )
+}
+// Rueda BCD: su cifra, con un triángulo arriba (subir) y otro abajo (bajar); data-step: lo que suma al pulsar.
+function DigitSwitchShape({ value }) {
+  return (
+    <g>
+      <rect x="-13" y="-24" width="26" height="48" rx="3" fill="#cbd5e1" stroke={INK} />
+      <rect x="-10" y="-12" width="20" height="24" rx="2" fill="#f8fafc" stroke="#475569" />
+      <text x="0" y="6" textAnchor="middle" fontSize="16" fontWeight="700" fontFamily="ui-monospace, Consolas, monospace" fill={INK} style={{ pointerEvents: 'none' }}>
+        {value}
+      </text>
+      <path d="M -6 -15 L 0 -21 L 6 -15 Z" fill="#475569" />
+      <path d="M -6 15 L 0 21 L 6 15 Z" fill="#475569" />
+      <rect x="-13" y="-24" width="26" height="24" fill="transparent" data-step={1} />
+      <rect x="-13" y="0" width="26" height="24" fill="transparent" data-step={-1} />
     </g>
   )
 }
@@ -994,6 +1025,10 @@ function boundsOf(e, pos = 0) {
       const h = elevatorFloors(e) * FLOOR_H
       return r(-SHAFT_W / 2 - 16, -h / 2, SHAFT_W + 40, h)
     }
+    case 'digit':
+      return r(-13, -19, 26, 38)
+    case 'digitSwitch':
+      return r(-13, -24, 26, 48)
     case 'keypad': {
       const { w, h } = keypadSize(e)
       return r(-w / 2 - 4, -h / 2 - 4, w + 8, h + 8)
@@ -1877,6 +1912,8 @@ const HINTS = {
   potentiometer: N_('Potenciómetro: entrada analógica manual (consignas, velocidades…). En modo Usar, arrastra a izquierda o derecha.'),
   selector: N_('Selector: de 2 a 4 posiciones (Manual / 0 / Automático…), cada una con su entrada, que está a 1 mientras el selector está en ella. En modo Usar, pulsa para pasar a la siguiente.'),
   elevator: N_('Ascensor: cabina que sube y baja entre 2 y 4 plantas, con un detector en cada una, y puerta que se abre y se cierra con sus finales de carrera. Las llamadas, con pulsadores.'),
+  digit: N_('Cifra BCD: una cifra de display, de 0 a 9, que el programa pone en 4 salidas (bits de peso 1, 2, 4 y 8), como los displays de PC_SIMU.'),
+  digitSwitch: N_('Rueda BCD: una cifra de preselector, de 0 a 9, que pone 4 entradas (bits de peso 1, 2, 4 y 8). En modo Usar, arriba la sube y abajo la baja.'),
   keypad: N_('Teclado: de 1 a 12 teclas, cada una un pulsador con su entrada (a 1 mientras se mantiene pulsada). En modo Usar, pulsa las teclas.'),
   preselector: N_('Preselector: de 1 a 4 cifras que dan un número a su variable (piezas por lote, una consigna…). En modo Usar, pulsa encima de una cifra para subirla y debajo para bajarla.'),
   bargraph: N_('Barra: muestra el valor de una variable (analógica o numérica) entre un mínimo y un máximo.'),
@@ -1929,6 +1966,8 @@ function ModulePreview({ item }) {
     selector: <SelectorShape e={{ ...e, pos1: tr('Manual'), pos3: tr('Automático') }} at={2} />,
     bargraph: <BargraphShape e={e} value={65} />,
     keypad: <KeypadShape e={e} pressed={(i) => i === 4} />,
+    digit: <DigitShape value={7} />,
+    digitSwitch: <DigitSwitchShape value={3} />,
     elevator: <ElevatorShape e={e} at={1} door={0.6} />,
     preselector: <PreselectorShape e={e} value={25} />,
     heater: <HeaterShape e={e} temp={85} heating />,
@@ -2020,7 +2059,7 @@ const UNDER = ['image', 'shape', 'pipe', 'conveyor', 'sink', 'ramp', 'diverter',
 // mecanismo (como el cuadro eléctrico real). e.place: 'desk' | 'machine' (por defecto, máquina).
 // En la isométrica, los rótulos esquivan los volúmenes salvo los alargados (van en el suelo delante).
 const ISO_LONG = ['conveyor', 'platform', 'ramp', 'pipe', 'image']
-const DESK_TYPES = ['button', 'switch', 'emergency', 'selector', 'keypad', 'preselector', 'potentiometer', 'lamp', 'display', 'bargraph']
+const DESK_TYPES = ['button', 'switch', 'emergency', 'selector', 'keypad', 'preselector', 'digitSwitch', 'potentiometer', 'lamp', 'display', 'digit', 'bargraph']
 const isDesk = (e) => DESK_TYPES.includes(e.type) && e.place === 'desk'
 
 
@@ -2090,6 +2129,10 @@ function drawElement(e, { scene, state, values, time, signals, iso = false }) {
       return <BargraphShape e={e} value={values[e.variable]} />
     case 'elevator':
       return <ElevatorShape e={e} at={state.lift?.[e.id]?.at ?? (Number(e.initial) || 0)} door={state.lift?.[e.id]?.door ?? 0} values={values} />
+    case 'digit':
+      return <DigitShape value={digitValue(e, values)} />
+    case 'digitSwitch':
+      return <DigitSwitchShape value={state.preset?.[e.id] ?? (Number(e.initial) || 0)} />
     case 'keypad':
       return <KeypadShape e={e} pressed={(i) => Boolean(state.pressed?.[`${e.id}:${i}`])} />
     case 'preselector':
@@ -2119,7 +2162,7 @@ export function SceneStatic({ scene, variables = [] }) {
     for (let i = 0; i < items.length; i += 2) lines.push(items.slice(i, i + 2).join(' · '))
     return lines
   }
-  const turns = (e) => !['button', 'switch', 'emergency', 'lamp', 'sink', 'feeder', 'tank', 'motor', 'display', 'scale', 'potentiometer', 'selector', 'keypad', 'preselector', 'bargraph', 'elevator', 'heater', 'siren', 'trafficlight', 'label', 'image', 'shape'].includes(e.type)
+  const turns = (e) => !['button', 'switch', 'emergency', 'lamp', 'sink', 'feeder', 'tank', 'motor', 'display', 'scale', 'potentiometer', 'selector', 'keypad', 'preselector', 'digit', 'digitSwitch', 'bargraph', 'elevator', 'heater', 'siren', 'trafficlight', 'label', 'image', 'shape'].includes(e.type)
   const desk = elements.filter((e) => DESK_TYPES.includes(e.type) && e.place === 'desk')
   const machine = elements.filter((e) => !desk.includes(e))
   const boxes = machine.map((e) => boundsOf(placed(scene, state, e), 1))
@@ -2804,7 +2847,7 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
       }
       return
     }
-    if (e.type === 'preselector') {
+    if (e.type === 'preselector' || e.type === 'digitSwitch') {
       const step = ev?.target?.closest?.('[data-step]')?.dataset.step
       if (phase === 'down' && step) onAction(e.id, `add:${step}`)
       return
@@ -2910,8 +2953,8 @@ export default function SceneView({ scene, onChange, worldState, values, time, v
   const deskItems = elements.filter(isDesk)
   const draw = (e) => drawElement(e, { scene, state, values, time, signals, iso })
   // Los mandos y pilotos no se giran (su rótulo se lee siempre).
-  const turns = (e) => !['button', 'switch', 'emergency', 'lamp', 'sink', 'feeder', 'tank', 'motor', 'display', 'scale', 'potentiometer', 'selector', 'keypad', 'preselector', 'bargraph', 'elevator', 'heater', 'siren', 'trafficlight', 'label', 'image', 'shape'].includes(e.type)
-  const operable = (e) => ['button', 'switch', 'emergency', 'selector', 'keypad', 'preselector', 'feeder', 'potentiometer'].includes(e.type) || (e.type === 'image' && Boolean(e.press))
+  const turns = (e) => !['button', 'switch', 'emergency', 'lamp', 'sink', 'feeder', 'tank', 'motor', 'display', 'scale', 'potentiometer', 'selector', 'keypad', 'preselector', 'digit', 'digitSwitch', 'bargraph', 'elevator', 'heater', 'siren', 'trafficlight', 'label', 'image', 'shape'].includes(e.type)
+  const operable = (e) => ['button', 'switch', 'emergency', 'selector', 'keypad', 'preselector', 'digitSwitch', 'feeder', 'potentiometer'].includes(e.type) || (e.type === 'image' && Boolean(e.press))
   const underRank = (e) => (e.type === 'image' ? -2 : UNDER.includes(e.type) ? -1 : 0)
   // Elementos y piezas en orden de dibujo: lo de debajo primero (las piezas van encima). En la
   // isométrica, además, del fondo hacia delante, con las piezas entre los demás elementos.

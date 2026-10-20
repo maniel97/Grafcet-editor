@@ -16,22 +16,21 @@ describe('Importar de PC_SIMU (.sim)', () => {
     expect(isPcSimu(new TextEncoder().encode('{"format":'))).toBe(false)
   })
 
-  it('ida y vuelta: cada ejemplo exportado, importado y vuelto a exportar da los mismos objetos (salvo los displays)', () => {
+  it('ida y vuelta: cada ejemplo exportado, importado y vuelto a exportar da los mismos objetos', () => {
     for (const ex of EXAMPLES) {
       const p = ex.build()
       const a = exportPcSimu(p)
       if (!a.count) continue
       const imp = importPcSimu(a.text)
       const b = exportPcSimu(imp.project)
-      const noDisplays = (list) => list.filter((s) => !s.startsWith('12:'))
-      expect(noDisplays(signature(b.text)), ex.title).toEqual(noDisplays(signature(a.text)))
+      expect(signature(b.text), ex.title).toEqual(signature(a.text))
     }
   })
 
   it('lo que no tiene equivalente, contado aparte (para el aviso)', () => {
-    const p = EXAMPLES.find((e) => /Contar pulsaciones/.test(e.title)).build()
-    const { skipped } = importPcSimu(exportPcSimu(p).text)
-    expect(skipped).toEqual([{ what: 'display', count: 4 }])
+    const stepper = { type: 30, rect: [0, 0, 40, 40], fields: [] }
+    const { skipped } = importPcSimu(pcsimuText([stepper, stepper]))
+    expect(skipped).toEqual([{ what: 'motor paso a paso', count: 2 }])
   })
 
   it('las variables, con el nombre del rótulo de al lado (y su dirección)', () => {
