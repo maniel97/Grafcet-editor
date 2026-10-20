@@ -656,14 +656,24 @@ export function exportPcSimu(project, { reserved = [], addressOf } = {}) {
         // editor tiene la placa, y tan ancho como ella (28 px) para alcanzar las mismas piezas.
         const W = Math.round(((Number(e.stroke) || 100) * 19) / 11)
         Object.assign(extra, { rect: placed(e, 88 - W, -14, W, 28), speed: cylinderSpeed(e) })
+        // PC_SIMU mide el paso con divisiones enteras: el recorrido (b hasta 350) va a saltos. Se elige el largo
+        // que más se acerca a la carrera, y se avisa si aun así queda lejos.
+        const stroke = Number(e.stroke) || 100
+        const off = (travel) => Math.abs(travel - stroke) > 10 && warnings.push(`${name || typeName(e)}: en PC_SIMU recorre ${Math.round(travel)} px (en el editor, ${stroke}): solo puede hacerlo a saltos de ${e.rodless ? 39 : 8} px.`)
         if (e.rodless) {
-          // El carro del editor (de 60 a 88) donde el de PC_SIMU; lleva su grupo también.
-          const W3 = Math.round(((Number(e.stroke) || 100) * 9) / 7)
-          Object.assign(extra, { rect: placed(e, 74 - Math.round(W3 * 0.145), -14, W3, 28), rodless: true })
+          // Sin vástago (gráfico 3): carro de W·200/1000, que corre b·⌊carro/10⌋/9; con W = 50·u + 25, ⌊carro/10⌋ = u.
+          // El carro del editor (de 60 a 88) a medio camino de los dos errores: el de dentro y el de fuera.
+          const u = Math.max(1, Math.round((stroke * 9) / 350))
+          const W3 = 50 * u + 25
+          const travel = (350 * u) / 9
+          off(travel)
+          Object.assign(extra, { rect: placed(e, Math.round(74 + stroke / 2 - travel / 2 - 0.045 * W3 - (Math.floor(W3 / 5)) / 2), -14, W3, 28), rodless: true })
         } else if (carriers.has(e.id)) {
-          // Solo los gráficos 2 y 3 llevan su grupo; en el 2 el vástago sale 7/18 del largo (b de 0 a 350, a
-          // W/20/45 por unidad), con la cara a 0,745 del largo.
-          const W2 = Math.round(((Number(e.stroke) || 100) * 18) / 7)
+          // Solo los gráficos 2 y 3 llevan su grupo; en el 2 el vástago sale b·⌊W/20⌋/45 (b hasta 350), con la cara
+          // a 0,745 del largo; con W = 20·u + 10, ⌊W/20⌋ = u.
+          const u = Math.max(1, Math.round((stroke * 45) / 350))
+          const W2 = 20 * u + 10
+          off((350 * u) / 45)
           Object.assign(extra, { rect: placed(e, 88 - Math.round(W2 * 0.745), -14, W2, 28), graphic2: true })
         }
       }

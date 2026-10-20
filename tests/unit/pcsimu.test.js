@@ -460,7 +460,7 @@ describe('PC_SIMU (.sim)', () => {
     expect(warnings.join(' ')).not.toMatch(/montado|ventosa/)
   })
 
-  it('sin vástago (f15 = 18, el perfil a 9/7 de la carrera) y pinza (f15 = 300) en el que lleva', () => {
+  it('sin vástago (f15 = 18, el recorrido de PC_SIMU a saltos de 350/9) y pinza (f15 = 300) en el que lleva', () => {
     const v = (address) => ({ address })
     const variables = { 'X+': v('Q0.0'), 'Z+': v('Q0.1'), P: v('Q0.2'), PC: v('I0.3') }
     const elements = [
@@ -469,7 +469,10 @@ describe('PC_SIMU (.sim)', () => {
     ]
     const objects = parsePcSimu(exportPcSimu({ plc: { variables, scene: { gravity: true, elements } } }).text).filter((o) => o.type === 19)
     const x = objects.find((o) => o.fields[11] === 18)
-    expect(x.rect[2] - x.rect[0]).toBe(180) // 140 · 9/7
+    // PC_SIMU: carro de ⌊W/5⌋, que recorre 350·⌊carro/10⌋/9 (con 225, 155,6; lo más cerca de 140).
+    const W = x.rect[2] - x.rect[0]
+    expect(W).toBe(225)
+    expect(Math.abs((350 * Math.floor(Math.floor(W / 5) / 10)) / 9 - 140)).toBeLessThan(20)
     expect(x.group).toBe('Grupo_1')
     const gripper = objects.find((o) => o.fields[11] === 300)
     expect(gripper.name).toBe('Grupo_1')
