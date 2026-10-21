@@ -118,6 +118,21 @@ describe('cuaderno de prácticas: títulos y secciones', () => {
     }
   })
 
+  it('ladder más alto que una página: ni la cabecera de una sección sola al pie ni el título suelto', () => {
+    // Cabecera «Inicialización» (8 mm), un primer peldaño muy alto y varios más.
+    const blocks = [{ top: 0, bottom: 30 }, { top: 30, bottom: 700 }, ...Array.from({ length: 6 }, (_, i) => ({ top: 700 + i * 380, bottom: 1080 + i * 380 }))]
+    for (const rows of [4, 10, 16, 22, 28]) {
+      const p = withLadder(rows, 3000)
+      p.content.figures.ladder.blocks = blocks
+      const { pages } = buildNotebook({ today: '', compact: true, cover: {}, practices: [p] }, measure)
+      const head = pageOf(pages, (i) => i.t === 'text' && /^1\.\d+\. Ladder$/.test(i.text))
+      const pieces = pages.flatMap((pg, n) => pg.items.filter((i) => i.t === 'figure').map((i) => ({ ...i, page: n })))
+      expect(pieces[0].page, `${rows} filas`).toBe(head)
+      // Ningún trozo pequeño al pie, salvo el último del dibujo.
+      for (const piece of pieces.slice(0, -1)) expect(piece.h, `${rows} filas`).toBeGreaterThanOrEqual(30)
+    }
+  })
+
   it('un dibujo que casi cabe se reduce un poco en vez de saltar de página', () => {
     const place = (room) => {
       const w = pageWriter(measure)
@@ -139,5 +154,22 @@ describe('cuaderno de prácticas: títulos y secciones', () => {
     const all = buildNotebook({ ...content, sections: { ...dossierOptions().sections, verification: false } }, measure).pages.flatMap(texts)
     expect(all.some((s) => /Verificación IEC 60848$/.test(s) && /^\d+\.\d+\./.test(s))).toBe(false)
     expect(all).toEqual(expect.arrayContaining(['1.1. Enunciado', '2.2. Tabla de variables']))
+  })
+})
+
+describe('cuaderno de prácticas: índice y resumen opcionales', () => {
+  const content = { today: '', compact: true, cover: {}, practices: [practice('Práctica 1. A', 'Uno.'), practice('Práctica 2. B', 'Dos.')] }
+  it('sin resumen: el índice no lo lista y las prácticas empiezan antes', () => {
+    const all = buildNotebook(content, measure)
+    const none = buildNotebook({ ...content, summary: false }, measure)
+    expect(none.pages.length).toBe(all.pages.length - 1)
+    expect(texts(none.pages[1])).not.toContain('Resumen')
+    expect(texts(none.pages[1])).toContain(String(none.starts[0]))
+    expect(none.starts[0]).toBe(3)
+  })
+  it('sin índice ni resumen: la portada y, después, las prácticas', () => {
+    const bare = buildNotebook({ ...content, toc: false, summary: false }, measure)
+    expect(bare.starts[0]).toBe(2)
+    expect(bare.pages.flatMap(texts)).not.toContain('Índice')
   })
 })

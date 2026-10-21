@@ -19,6 +19,8 @@ const LINE = 1.35 // interlineado (× tamaño en mm)
 export const PT = 0.3528 // 1 pt en mm
 // Lo más que se reduce una figura para caber en lo que queda de página (en vez de saltar).
 export const SHRINK = 0.75
+// El trozo más pequeño (mm) de una figura troceada que se deja al pie de una página.
+export const MIN_PIECE = 30
 
 // Texto con formato (spans: [{ text, bold, code }]) en líneas de un ancho máximo.
 export function wrapSpans(spans, maxWidth, size, measure) {
@@ -142,7 +144,13 @@ export function pageWriter(measure, [PW, PH] = PAGES.a4) {
   w.keepFor = (fig, options) => {
     if (!fig) return 0
     const h = w.figureHeight(fig, options)
-    return h <= w.bottom() - M.top - 15 ? h * SHRINK : 40
+    const page = w.bottom() - M.top - 15
+    if (h <= page) return h * SHRINK
+    // Troceada: su primer trozo (con bloques, hasta el primer final de bloque que dé un trozo de
+    // MIN_PIECE: una cabecera de sección sola no basta).
+    const kk = h / fig.height
+    const first = fig.blocks?.map((b) => b.bottom * kk).filter((b) => b >= MIN_PIECE).sort((a, b) => a - b)[0]
+    return Math.min(first ?? MIN_PIECE, page)
   }
   // Figura: a la escala que quepa a lo ancho (máx. 1:1), troceada entre páginas si es alta. Los
   // cortes, entre bloques (segmentos del ladder) si la figura los tiene.
@@ -177,9 +185,15 @@ export function pageWriter(measure, [PW, PH] = PAGES.a4) {
       }
       let end = Math.min(fig.height, top + available)
       if (end < fig.height && fig.blocks?.length) {
-        // Corte en el último final de bloque que quepa.
-        const cut = fig.blocks.map((b) => b.bottom).filter((b) => b > top + 10 && b <= end).sort((a, b) => b - a)[0]
+        // Corte en el último final de bloque que quepa y deje un trozo de verdad (no una cabecera
+        // de sección sola al pie). Si no lo hay y la página ya tiene algo, a la siguiente; en una
+        // página vacía, el bloque es más alto que la página: se corta donde llegue.
+        const cut = fig.blocks.map((b) => b.bottom).filter((b) => b > top + 10 && b <= end && (b - top) * kk >= MIN_PIECE).sort((a, b) => b - a)[0]
         if (cut) end = cut
+        else if (w.y > M.top + 0.5) {
+          w.newPage()
+          continue
+        }
       }
       const h = (end - top) * kk
       w.push({ t: 'figure', x: M.left + (w.width() - fig.width * kk) / 2, y: w.y, w: fig.width * kk, h, figure: fig, top, bottom: end, scale })

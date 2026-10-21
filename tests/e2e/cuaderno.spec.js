@@ -45,6 +45,15 @@ test('entregar varias prácticas: cuaderno con portada, índice, resumen, orden 
   await dialog.getByRole('checkbox', { name: 'Juntar las secciones (menos páginas)' }).check()
   await expect.poll(() => pages.count()).toBe(together)
 
+  // Sin el resumen: el índice ya no lo lista.
+  const front = dialog.getByRole('group', { name: 'Al principio del cuaderno' })
+  await front.getByRole('checkbox', { name: /^Resumen/ }).uncheck()
+  await expect(pages.nth(1)).toContainText('Índice')
+  await expect(pages.nth(1)).not.toContainText('Resumen')
+  await expect(pages.nth(2)).toContainText('PRÁCTICA Nº 1')
+  await front.getByRole('checkbox', { name: /^Resumen/ }).check()
+  await expect(pages.nth(2)).toContainText('Resumen')
+
   // Elegir las secciones: sin la verificación en ninguna práctica.
   await expect(preview).toContainText(/\d\.\d+\. Verificación IEC 60848/)
   await dialog.getByRole('group', { name: 'Secciones de cada práctica' }).getByRole('checkbox', { name: 'Verificación IEC 60848' }).uncheck()

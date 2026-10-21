@@ -24,6 +24,7 @@ export function sortByNumber(list, titleOf) {
 }
 
 // content: { today, page: 'a4' | 'a3', compact (las secciones siguen en la misma página si caben),
+//   toc / summary (false: sin índice / sin resumen),
 //   sections (las que salen en todas las prácticas, como las de DOSSIER_SECTIONS; sin ellas, las
 //   del dossier de cada una),
 //   cover: {campos de COVER_FIELDS},
@@ -49,27 +50,41 @@ export function buildNotebook(content, measure) {
   }
   text('Generado con Grafcet Editor', cover.w / 2, cover.h - 25, 8, 'normal', { align: 'center', color: MUTED })
 
-  // Índice (se rellena al final, con la página de cada práctica) y resumen.
-  const tocPage = w.newPage()
-  w.newPage()
-  text('Resumen', M.left, w.y + 6, 16, 'bold')
-  w.rule(w.y + 9)
-  w.y += 15
-  w.table(
-    [
-      { label: 'Nº', width: 0.08 },
-      { label: 'Práctica', width: 0.5 },
-      { label: 'Autocorrección', width: 0.2 },
-      { label: 'Verificación IEC 60848', width: 0.22 },
-    ],
-    practices.map((p, i) => {
-      const s = p.summary ?? {}
-      const verification = !s.errors && !s.warnings ? 'Conforme' : [s.errors ? `${s.errors} ${s.errors === 1 ? 'error' : 'errores'}` : '', s.warnings ? `${s.warnings} ${s.warnings === 1 ? 'aviso' : 'avisos'}` : ''].filter(Boolean).join(', ')
-      return [String(i + 1), notebookTitle(p.title), s.total ? `${s.passed} de ${s.total}` : '—', verification]
-    }),
-  )
-  w.y += 2
-  w.paragraph([{ text: 'Autocorrección: criterios del ejercicio que se cumplen al generar el cuaderno («—»: la práctica no es un ejercicio con autocorrección). Cada práctica va dentro de este PDF como archivo adjunto: se abre en el editor de Grafcet (Abrir > Abrir archivo).' }], 9)
+  // Índice (se rellena al final, con la página de cada práctica) y resumen, si se quieren.
+  const tocPage = content.toc !== false ? w.newPage() : null
+  let summaryPage = null
+  if (content.summary !== false) {
+    w.newPage()
+    summaryPage = pages.length
+    text('Resumen', M.left, w.y + 6, 16, 'bold')
+    w.rule(w.y + 9)
+    w.y += 15
+    w.table(
+      [
+        { label: 'Nº', width: 0.08 },
+        { label: 'Práctica', width: 0.5 },
+        { label: 'Autocorrección', width: 0.2 },
+        { label: 'Verificación IEC 60848', width: 0.22 },
+      ],
+      practices.map((p, i) => {
+        const s = p.summary ?? {}
+        const verification =
+          !s.errors && !s.warnings
+            ? 'Conforme'
+            : [s.errors ? `${s.errors} ${s.errors === 1 ? 'error' : 'errores'}` : '', s.warnings ? `${s.warnings} ${s.warnings === 1 ? 'aviso' : 'avisos'}` : ''].filter(Boolean).join(', ')
+        return [String(i + 1), notebookTitle(p.title), s.total ? `${s.passed} de ${s.total}` : '—', verification]
+      }),
+    )
+    w.y += 2
+    w.paragraph(
+      [
+        {
+          text: 'Autocorrección: criterios del ejercicio que se cumplen al generar el cuaderno («—»: la práctica no es un ejercicio con autocorrección). Cada práctica va dentro de este PDF como archivo adjunto: se abre en el editor de Grafcet (Abrir > Abrir archivo).',
+        },
+      ],
+      9,
+    )
+  }
 
   // Prácticas
   const starts = []
@@ -111,17 +126,19 @@ export function buildNotebook(content, measure) {
   })
 
   // Índice
-  const items = tocPage.items
-  items.push({ t: 'text', x: M.left, y: M.top + 6, text: 'Índice', size: 16, style: 'bold', font: 'helvetica', color: INK })
-  items.push({ t: 'line', x1: M.left, y1: M.top + 9, x2: tocPage.w - M.right, y2: M.top + 9, width: 0.4, color: INK })
-  const entries = [{ title: 'Resumen', page: 3 }, ...practices.map((p, i) => ({ title: `Práctica nº ${i + 1}. ${notebookTitle(p.title)}`, page: starts[i] }))]
-  entries.forEach((e, i) => {
-    const y = M.top + 22 + i * 8
-    const label = fit(e.title, tocPage.w - M.left - M.right - 20, 11, 'normal', measure)
-    items.push({ t: 'text', x: M.left, y, text: label, size: 11, style: 'normal', font: 'helvetica', color: INK })
-    items.push({ t: 'text', x: tocPage.w - M.right, y, text: String(e.page), size: 11, style: 'normal', font: 'helvetica', color: INK, align: 'right' })
-    items.push({ t: 'line', x1: M.left + measure(label, 11, 'normal', 'helvetica') + 2, y1: y, x2: tocPage.w - M.right - 8, y2: y, width: 0.15, color: RULE, dash: true })
-  })
+  if (tocPage) {
+    const items = tocPage.items
+    items.push({ t: 'text', x: M.left, y: M.top + 6, text: 'Índice', size: 16, style: 'bold', font: 'helvetica', color: INK })
+    items.push({ t: 'line', x1: M.left, y1: M.top + 9, x2: tocPage.w - M.right, y2: M.top + 9, width: 0.4, color: INK })
+    const entries = [...(summaryPage ? [{ title: 'Resumen', page: summaryPage }] : []), ...practices.map((p, i) => ({ title: `Práctica nº ${i + 1}. ${notebookTitle(p.title)}`, page: starts[i] }))]
+    entries.forEach((e, i) => {
+      const y = M.top + 22 + i * 8
+      const label = fit(e.title, tocPage.w - M.left - M.right - 20, 11, 'normal', measure)
+      items.push({ t: 'text', x: M.left, y, text: label, size: 11, style: 'normal', font: 'helvetica', color: INK })
+      items.push({ t: 'text', x: tocPage.w - M.right, y, text: String(e.page), size: 11, style: 'normal', font: 'helvetica', color: INK, align: 'right' })
+      items.push({ t: 'line', x1: M.left + measure(label, 11, 'normal', 'helvetica') + 2, y1: y, x2: tocPage.w - M.right - 8, y2: y, width: 0.15, color: RULE, dash: true })
+    })
+  }
 
   w.footer(
     ['Cuaderno de prácticas', content.cover.student].filter((v) => v?.trim()).join(' · '),

@@ -50,13 +50,15 @@ export default function NotebookDialog({ getProject, onClose }) {
   const [compact, setCompact] = useState(() => saved().compact ?? true)
   // Secciones de todas las prácticas (como en el dossier, sin portada ni índice: los pone el cuaderno).
   const [sections, setSections] = useState(() => ({ ...DEFAULT_DOSSIER.sections, ...saved().sections }))
+  // Páginas del principio: el índice y el resumen (la portada, siempre).
+  const [front, setFront] = useState(() => ({ toc: true, summary: true, ...saved().front }))
   useEffect(() => {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({ cover: Object.fromEntries(REMEMBERED.filter((k) => cover[k]).map((k) => [k, cover[k]])), compact, sections }))
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ cover: Object.fromEntries(REMEMBERED.filter((k) => cover[k]).map((k) => [k, cover[k]])), compact, sections, front }))
     } catch {
       // sin almacenamiento: no se recuerdan la portada ni las opciones
     }
-  }, [cover, compact, sections])
+  }, [cover, compact, sections, front])
   // Portada: lo escrito aquí y, si no, lo de la portada del dossier de la primera práctica.
   const coverValue = (id) => cover[id] ?? (id === 'student' ? firstCover.student || firstAuthor : firstCover[id]) ?? ''
 
@@ -134,8 +136,8 @@ export default function NotebookDialog({ getProject, onClose }) {
   const notebook = useMemo(() => {
     if (!ready) return null
     const entries = practices.map((p) => practiceEntry(p.project, { grafcet: grafcets[p.id], figures: prepared[p.id], file: p.file, today }))
-    return buildNotebook({ today, compact, sections, cover: JSON.parse(coverKey), practices: entries.map((e, i) => ({ ...e, title: practices[i].title })) }, measure)
-  }, [ready, practices, grafcets, prepared, today, compact, sections, coverKey, measure])
+    return buildNotebook({ today, compact, sections, toc: front.toc, summary: front.summary, cover: JSON.parse(coverKey), practices: entries.map((e, i) => ({ ...e, title: practices[i].title })) }, measure)
+  }, [ready, practices, grafcets, prepared, today, compact, sections, front, coverKey, measure])
 
   const [zoom, setZoom] = useState(0.5)
   const [saving, setSaving] = useState(false)
@@ -265,6 +267,18 @@ export default function NotebookDialog({ getProject, onClose }) {
                 <label key={f.id} className="flex items-center gap-2">
                   <span className="w-20 shrink-0 text-xs text-slate-500">{t(f.label)}</span>
                   <input value={coverValue(f.id)} onChange={(e) => setCover((c) => ({ ...c, [f.id]: e.target.value }))} placeholder={f.id === 'date' ? today : ''} className={field} />
+                </label>
+              ))}
+            </fieldset>
+            <fieldset className="space-y-1">
+              <legend className="text-xs font-medium uppercase tracking-wide text-slate-500">{t('Al principio del cuaderno')}</legend>
+              {[
+                ['toc', t('Índice')],
+                ['summary', t('Resumen (autocorrección y verificación de cada práctica)')],
+              ].map(([id, label]) => (
+                <label key={id} className="flex items-center gap-2">
+                  <input type="checkbox" checked={front[id]} onChange={(e) => setFront((f) => ({ ...f, [id]: e.target.checked }))} />
+                  {label}
                 </label>
               ))}
             </fieldset>
