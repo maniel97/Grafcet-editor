@@ -6,6 +6,8 @@
 //     cilindros sin tubo la dan a la atmósfera. Presión y escape en la misma red: fuga (escape).
 //  3. Un cilindro de doble efecto sale con presión en A y escape en B (y entra al revés); con aire
 //     atrapado en el otro lado no se mueve. El de simple efecto vuelve con su muelle.
+//     Un antirretorno solo une sus dos lados si su entrada (1) tiene presión; una boquilla da
+//     salida al aire sin contar como fuga (con presión sopla; sin ella, deja la red a escape).
 //  4. La velocidad: la carrera en `time` segundos, frenada por los reguladores de caudal que haya
 //     en las redes del cilindro (el más cerrado manda).
 // Las válvulas se mueven con sus bobinas (sol14 / sol12: el identificador de la electroválvula del
@@ -15,12 +17,20 @@ import { cylinderSignals, terminalsOf } from './catalog'
 import { t as tr } from '../i18n'
 
 const key = (c, t) => `${c}:${t}`
+const PNEU_TYPES = new Set(['airsource', 'frl', 'pvalve', 'pcylinder', 'throttle', 'pconditioner', 'pregulator', 'pcheck', 'pswitch', 'pgauge', 'poutlet'])
 const END = 0.02
+
+// Conexiones de cada válvula, y las de escape.
+const valvePorts = (c) => (c.ways === '2/2' ? ['1', '2'] : c.ways === '3/2' ? ['1', '2', '3'] : ['1', '2', '3', '4', '5'])
+const valveVents = (c) => valvePorts(c).filter((p) => p === '3' || p === '5')
+// Señal de un presostato: la suya o su identificador en minúsculas (PS1 -> ps1).
+export const switchSignal = (c) => c.signal || String(c.tag ?? '').toLowerCase()
 
 // Pasos de una válvula en cada posición ('12' reposo, '14' pilotada, '0' centro).
 export function valvePaths(c, position) {
-  if (c.ways === '3/2') {
+  if (c.ways === '2/2' || c.ways === '3/2') {
     const open = c.normally === 'NO' ? position !== '14' : position === '14'
+    if (c.ways === '2/2') return open ? [['1', '2']] : []
     return open ? [['1', '2']] : [['2', '3']]
   }
   if (position === '14') return [['1', '4'], ['2', '3']]
@@ -29,7 +39,7 @@ export function valvePaths(c, position) {
 }
 // Conexiones que una válvula deja cerradas en esa posición (para dibujarlas con su tapón).
 export function valveBlocked(c, position) {
-  const ports = c.ways === '3/2' ? ['1', '2', '3'] : ['1', '2', '3', '4', '5']
+  const ports = valvePorts(c)
   const used = new Set(valvePaths(c, position).flat())
   return ports.filter((p) => !used.has(p))
 }
@@ -54,7 +64,7 @@ export const pneuInit = () => ({ pos: {}, valves: {} })
 // Devuelve { state, view: { ports, valves, cylinders, leaks }, signals: { a0: 1, a1: 0… } }.
 export function pneuStep(schematic, state, { solenoids = new Set(), manual = () => false, opened = {}, setting = (c) => Number(c.setting ?? 0.5), faults = {} } = {}, dt = 0) {
   const s = { ...pneuInit(), ...(state ?? {}) }
-  const list = (schematic?.components ?? []).filter((c) => ['airsource', 'frl', 'pvalve', 'pcylinder', 'throttle'].includes(c.type))
+  const list = (schematic?.components ?? []).filter((c) => PNEU_TYPES.has(c.type))
   if (!list.length) return { state: s, view: null, signals: {} }
   const ids = new Set(list.map((c) => c.id))
   const parent = new Map()
@@ -75,6 +85,7 @@ export function pneuStep(schematic, state, { solenoids = new Set(), manual = () 
   const valves = {}
   const pressure = []
   const vents = []
+  const outlets = []
   for (const c of list) {
     switch (c.type) {
       case 'airsource':
@@ -86,6 +97,13 @@ export function pneuStep(schematic, state, { solenoids = new Set(), manual = () 
       case 'throttle':
         if (faults[c.id] !== 'open') union(key(c.id, '1'), key(c.id, '2'))
         break
+      case 'pconditioner':
+      case 'pregulator':
+        union(key(c.id, '1'), key(c.id, '2'))
+        break
+      case 'poutlet':
+        outlets.push(key(c.id, '1'))
+        break
       case 'pvalve': {
         const on14 = Boolean((c.sol14 && solenoids.has(c.sol14)) || manual(c))
         const on12 = Boolean(c.sol12 && solenoids.has(c.sol12))
@@ -93,7 +111,7 @@ export function pneuStep(schematic, state, { solenoids = new Set(), manual = () 
         valves[c.id] = position
         for (const [a, b] of valvePaths(c, position)) union(key(c.id, a), key(c.id, b))
         // Los escapes de la válvula salen a la atmósfera (con su silenciador).
-        for (const p of c.ways === '3/2' ? ['3'] : ['3', '5']) vents.push(key(c.id, p))
+        for (const p of valveVents(c)) vents.push(key(c.id, p))
         break
       }
       case 'pcylinder':
@@ -103,7 +121,24 @@ export function pneuStep(schematic, state, { solenoids = new Set(), manual = () 
         break
     }
   }
+  // Antirretornos: se abren (unen 1 y 2) cuando su entrada tiene presión; al abrir uno, la presión
+  // puede llegar a la entrada de otro, así que se repite hasta que no se abra ninguno más.
+  const checks = list.filter((c) => c.type === 'pcheck')
+  for (let changed = true; changed; ) {
+    changed = false
+    const live = new Set(pressure.map(find))
+    for (const c of checks) {
+      const a = key(c.id, '1')
+      const b = key(c.id, '2')
+      if (live.has(find(a)) && find(a) !== find(b)) {
+        union(a, b)
+        changed = true
+      }
+    }
+  }
   const pressed = new Set(pressure.map(find))
+  // Una boquilla sin presión deja su red a escape; con presión, sopla (no es una fuga).
+  for (const o of outlets) if (!pressed.has(find(o))) vents.push(o)
   const vented = new Set(vents.map(find))
   const leaks = [...pressed].filter((r) => vented.has(r))
   // Estado de una conexión: 'P' (presión), 'R' (escape, también si fuga) o null (cerrada).
@@ -159,5 +194,7 @@ export function pneuStep(schematic, state, { solenoids = new Set(), manual = () 
       signals[s1] = next >= 1 - END ? 1 : 0
     }
   }
+  // Presostatos: su señal, con presión en su conexión (no con la red a escape o cerrada).
+  for (const c of list) if (c.type === 'pswitch' && switchSignal(c)) signals[switchSignal(c)] = ports[key(c.id, '1')] === 'P' ? 1 : 0
   return { state: { pos, valves }, view: { ports, valves, cylinders, leaks: leaks.length > 0 }, signals }
 }

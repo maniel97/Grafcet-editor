@@ -2,6 +2,7 @@ import { Handle, Position } from '@xyflow/react'
 import { ElecSymbol } from './ElecSymbols'
 import { INK, POTENTIAL_COLORS } from './elecColors'
 import { ELEC_TYPES, POTENTIALS, isMotor, isPneumatic, showTag, sizeOf, terminalsOf } from '../../lib/elec/catalog'
+import { switchSignal } from '../../lib/elec/pneumatic'
 import { N_, t as tr } from '../../lib/i18n'
 
 // Lo que se acciona con el ratón al simular (modo Usar).
@@ -60,7 +61,7 @@ export default function ElecNode({ data }) {
     : undefined
   // Números de borne junto a cada borne (los de los contactos auxiliares, calculados).
   const boxed = ['psu', 'phasemonitor', 'vfd', 'softstarter', 'safetyrelay'].includes(c.type)
-  const termLabel = (t, i) => (c.type === 'contact' ? numbers?.[i] : rail || c.type === 'plc' || c.type === 'terminal' || boxed || ['pcylinder', 'hcylinder', 'airsource', 'hgauge', 'htank'].includes(c.type) ? null : t.id)
+  const termLabel = (t, i) => (c.type === 'contact' ? numbers?.[i] : rail || c.type === 'plc' || c.type === 'terminal' || boxed || ['pcylinder', 'hcylinder', 'airsource', 'hgauge', 'htank', 'pgauge', 'poutlet', 'pswitch', 'pregulator'].includes(c.type) ? null : t.id)
 
   // Potenciómetro (modo Usar): la rueda lo gira 1 % (con Mayús, 0,1 %; con Ctrl, 10 %) en vez de
   // hacer zoom (nowheel: React Flow no la usa para el zoom).
@@ -153,7 +154,9 @@ export default function ElecNode({ data }) {
           {c.type === 'brake' && view && <div className={view.loads?.[c.id] ? 'text-green-700' : 'text-red-700'}>{view.loads?.[c.id] ? tr('Suelto') : tr('Frenado')}</div>}
           {c.type === 'pcylinder' && <div className="text-slate-600">{c.acting === 'single' ? tr('Simple efecto') : tr('Doble efecto')}</div>}
           {cyl?.note && <div className="text-amber-700">{cyl.note}</div>}
-          {c.type === 'pvalve' && <div className="text-slate-600">{`${c.ways ?? '5/2'} ${c.ways === '5/3' ? ({ closed: tr('centro cerrado'), exhaust: tr('centro a escape'), pressure: tr('centro a presión') }[c.center] ?? tr('centro cerrado')) : c.sol12 ? tr('biestable') : c.ways === '3/2' && c.normally === 'NO' ? tr('NA') : tr('monoestable')}`}</div>}
+          {c.type === 'pvalve' && <div className="text-slate-600">{`${c.ways ?? '5/2'} ${c.ways === '5/3' ? ({ closed: tr('centro cerrado'), exhaust: tr('centro a escape'), pressure: tr('centro a presión') }[c.center] ?? tr('centro cerrado')) : c.sol12 ? tr('biestable') : (c.ways === '3/2' || c.ways === '2/2') && c.normally === 'NO' ? tr('NA') : c.ways === '2/2' ? tr('NC') : tr('monoestable')}`}</div>}
+          {(c.type === 'pregulator' || c.type === 'pswitch') && c.setting && <div className="text-slate-600">{c.setting}</div>}
+          {c.type === 'pswitch' && switchSignal(c) && <div className="font-mono text-blue-700">{switchSignal(c)}</div>}
           {c.type === 'throttle' && <div className="text-slate-600">{tr('Abierto {n} %', { n: Math.round((view?.knob?.[c.id] ?? Number(c.setting ?? 0.5)) * 100) })}</div>}
           {c.type === 'hthrottle' && <div className="text-slate-600">{tr('Abierto {n} %', { n: Math.round((view?.knob?.[c.id] ?? Number(c.setting ?? 0.5)) * 100) })}</div>}
           {c.type === 'hvalve' && <div className="text-slate-600">{c.ways === '4/2' ? `4/2 ${c.sol12 ? tr('biestable') : tr('monoestable')}` : `4/3 ${{ closed: tr('centro cerrado'), tandem: tr('centro en tándem'), open: tr('centro abierto'), float: tr('centro flotante') }[c.center] ?? tr('centro cerrado')}`}</div>}

@@ -438,6 +438,7 @@ export const ELEC_TYPES = {
     size: (c) => ({ w: VALVE_SIDE * 2 + VALVE_SQUARE * valveSquares(c), h: 80 }),
     terminals: (c) => {
       const x0 = VALVE_SIDE + VALVE_SQUARE * restSquare(c)
+      if (c.ways === '2/2') return [pneu('2', x0 + 20, 0, 'top'), pneu('1', x0 + 20, 80, 'bottom')]
       return c.ways === '3/2'
         ? [pneu('2', x0 + 20, 0, 'top'), pneu('1', x0 + 20, 80, 'bottom'), pneu('3', x0 + 60, 80, 'bottom')]
         : [pneu('4', x0 + 20, 0, 'top'), pneu('2', x0 + 60, 0, 'top'), pneu('5', x0 + 20, 80, 'bottom'), pneu('1', x0 + 40, 80, 'bottom'), pneu('3', x0 + 60, 80, 'bottom')]
@@ -453,6 +454,30 @@ export const ELEC_TYPES = {
     terminals: (c) => (c.acting === 'single' ? [pneu('A', 20, 60, 'bottom')] : [pneu('A', 20, 60, 'bottom'), pneu('B', 140, 60, 'bottom')]),
   },
   throttle: { label: N_('Regulador de caudal'), group: N_('Neumática'), prefix: '1V', defaults: { setting: 0.5, text: '' }, size: () => ({ w: 40, h: 80 }), terminals: () => [pneu('2', 20, 0, 'top'), pneu('1', 20, 80, 'bottom')] },
+  // Tratamiento y regulación del aire, en vertical como el resto (el aire sube de 1 a 2): los
+  // símbolos de ISO 1219-1, girados 90°, con la purga a la derecha.
+  //  kind: 'separator' (separador de agua), 'filter' (filtro), 'coalescing' (filtro coalescente,
+  //  quita el aceite), 'dryer' (secador); drain: 'manual' | 'auto' | 'none'.
+  pconditioner: {
+    label: N_('Tratamiento de aire'),
+    group: N_('Neumática'),
+    prefix: '0Z',
+    defaults: { kind: 'filter', drain: 'manual', text: '' },
+    size: () => ({ w: 60, h: 80 }),
+    terminals: () => [pneu('2', 20, 0, 'top'), pneu('1', 20, 80, 'bottom')],
+  },
+  // Regulador de presión (reductora) con su manómetro: setting es la presión a la que se ajusta,
+  // como texto (p. ej. «0,3–0,5 bar»): la simulación no calcula presiones.
+  pregulator: { label: N_('Regulador de presión'), group: N_('Neumática'), prefix: '0V', defaults: { setting: '', gauge: true, text: '' }, size: () => ({ w: 100, h: 80 }), terminals: () => [pneu('2', 40, 0, 'top'), pneu('1', 40, 80, 'bottom')] },
+  // Antirretorno: el aire pasa libre de 1 a 2 y no vuelve.
+  pcheck: { label: N_('Antirretorno'), group: N_('Neumática'), prefix: '1V', defaults: { text: '' }, size: () => ({ w: 40, h: 80 }), terminals: () => [pneu('2', 20, 0, 'top'), pneu('1', 20, 80, 'bottom')] },
+  // Presostato: con presión en 1 da su señal (signal, o su identificador en minúsculas), que
+  // acciona los contactos de presostato del esquema enlazados con ella.
+  pswitch: { label: N_('Presostato'), group: N_('Neumática'), prefix: '1S', defaults: { signal: '', setting: '', text: '' }, size: () => ({ w: 80, h: 60 }), terminals: () => [pneu('1', 20, 60, 'bottom')] },
+  pgauge: { label: N_('Manómetro'), group: N_('Neumática'), prefix: '0Z', defaults: { text: '' }, size: () => ({ w: 40, h: 50 }), terminals: () => [pneu('1', 20, 50, 'bottom')] },
+  // Salida libre a la atmósfera (boquilla, soplado): el aire sale por ella; sin presión, la red
+  // queda a escape.
+  poutlet: { label: N_('Boquilla (salida de aire)'), group: N_('Neumática'), prefix: '1Z', defaults: { text: '' }, size: () => ({ w: 40, h: 40 }), terminals: () => [pneu('1', 20, 40, 'bottom')] },
   // Hidráulica (ISO 1219-1; conexiones P presión, T retorno al depósito, A y B utilización). Como la
   // neumática, sin caudales: lib/elec/hydraulic.js. El grupo hidráulico lleva el motor, la bomba y
   // el depósito; con motor (identificador de un motor del esquema, -M1) solo bombea si gira.

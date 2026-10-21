@@ -6,6 +6,7 @@ import WireEdge from './WireEdge'
 import { ElecSymbol } from './ElecSymbols'
 import { potentialColor } from './elecColors'
 import { ELEC_TYPES, GRID, LOWER_RAILS, POTENTIALS, contactNumbers, cylinderSignals, isMotor, isPneumatic, newTag, nextTag, showTag, sizeOf, terminalsOf } from '../../lib/elec/catalog'
+import { switchSignal } from '../../lib/elec/pneumatic'
 import { COLUMN_WIDTH, FRAME_HEIGHT, FRAME_TOP, crossReferenceMap, elecSheetsOf, frameColumns, sheetOfComponent } from '../../lib/elec/sheet'
 import SheetTabs from '../SheetTabs'
 import { ElecFrameNode } from './ElecFrame'
@@ -88,6 +89,16 @@ const PALETTE = [
       { key: 'pcylinder', type: 'pcylinder', label: N_('Cilindro de doble efecto'), preset: { acting: 'double' } },
       { key: 'pcylinder:1', type: 'pcylinder', label: N_('Cilindro de simple efecto'), preset: { acting: 'single' } },
       { key: 'throttle', type: 'throttle', label: N_('Regulador de caudal'), preset: {} },
+      { key: 'pvalve:22', type: 'pvalve', label: N_('Válvula 2/2 NC (bobina y muelle)'), preset: { ways: '2/2' } },
+      { key: 'pconditioner:separator', type: 'pconditioner', label: N_('Separador de agua (purga manual)'), preset: { kind: 'separator', drain: 'manual' } },
+      { key: 'pconditioner:filter', type: 'pconditioner', label: N_('Filtro (purga manual)'), preset: { kind: 'filter', drain: 'manual' } },
+      { key: 'pconditioner:coalescing', type: 'pconditioner', label: N_('Filtro coalescente (quita el aceite)'), preset: { kind: 'coalescing', drain: 'auto' } },
+      { key: 'pconditioner:dryer', type: 'pconditioner', label: N_('Secador'), preset: { kind: 'dryer', drain: 'manual' } },
+      { key: 'pregulator', type: 'pregulator', label: N_('Regulador de presión con manómetro'), preset: {} },
+      { key: 'pcheck', type: 'pcheck', label: N_('Antirretorno'), preset: {} },
+      { key: 'pswitch', type: 'pswitch', label: N_('Presostato'), preset: {} },
+      { key: 'pgauge', type: 'pgauge', label: N_('Manómetro'), preset: {} },
+      { key: 'poutlet', type: 'poutlet', label: N_('Boquilla (salida de aire)'), preset: {} },
     ],
   },
   {
@@ -178,6 +189,12 @@ const HINTS = {
   pvalve: N_('Válvula distribuidora: la bobina 14 es una electroválvula del esquema (-Y1); sin bobina 12, vuelve con su muelle (monoestable); con las dos, se queda donde está (biestable, memoria).'),
   pcylinder: N_('Cilindro: sale con presión en A y escape en B. Sus detectores (a0 dentro, a1 fuera) accionan los finales de carrera del esquema enlazados con esa señal.'),
   throttle: N_('Regulador de caudal unidireccional: frena el cilindro (mejor en el escape). Al simular, un clic lo abre más.'),
+  pconditioner: N_('Tratamiento de aire: separador de agua, filtro, filtro coalescente (aceite) o secador, con purga manual o automática. Al simular, el aire lo atraviesa.'),
+  pregulator: N_('Regulador de presión con manómetro: baja la presión de la red a la de su ajuste. La simulación no calcula presiones: su ajuste es un rótulo.'),
+  pcheck: N_('Antirretorno: el aire pasa de 1 a 2 y no vuelve. Evita, por ejemplo, que una rama se descargue por el escape de otra.'),
+  pswitch: N_('Presostato: con presión en su conexión da su señal (la que le pongas, o su identificador en minúsculas), que acciona los contactos de presostato del esquema enlazados con ella.'),
+  pgauge: N_('Manómetro: al simular, la aguja sube si hay presión.'),
+  poutlet: N_('Boquilla (salida libre de aire): con presión sopla; sin ella, deja la red a escape.'),
   hpump: N_('Grupo hidráulico: motor, bomba y depósito. La bomba da caudal: si el aceite no tiene salida, la presión sube hasta la limitadora. Con un motor asignado (-M1), solo bombea si ese motor gira.'),
   hrelief: N_('Limitadora de presión: abre y devuelve el aceite al depósito cuando la presión llega a su tarado. Sin ella, la presión subiría hasta romper algo.'),
   hgauge: N_('Manómetro: al simular marca la presión: baja al mover, la del tarado al llegar al tope o con el aceite parado, 0 si la bomba descarga.'),
@@ -237,6 +254,12 @@ const NORMS = {
   pvalve: N_('ISO 1219-1 · conexiones ISO 5599: 1 presión, 2 y 4 utilización, 3 y 5 escape; pilotajes 14 (abre 1→4) y 12 (abre 1→2) · 1V1.'),
   pcylinder: N_('ISO 1219-1 · ISO 1219-2 lo identifica 1A1; aquí, con letra (A, B…) para escribir las secuencias A+ B+ A− B−.'),
   throttle: N_('ISO 1219-1: estrangulación regulable con antirretorno en paralelo · 1V2.'),
+  pconditioner: N_('ISO 1219-1 (girado 90°: la purga, a la derecha) · 0Z1 · 1 entrada, 2 salida.'),
+  pregulator: N_('ISO 1219-1: reductora regulable con realimentación desde la salida y manómetro · 0V1.'),
+  pcheck: N_('ISO 1219-1: antirretorno simplificado con muelle · 1V1 · paso libre de 1 a 2.'),
+  pswitch: N_('ISO 1219-1: presostato (presión a señal eléctrica) regulable · su contacto, con el símbolo de presostato de IEC 60617.'),
+  pgauge: N_('ISO 1219-1 · 0Z1.'),
+  poutlet: N_('ISO 1219-1: salida a la atmósfera.'),
   hpump: N_('ISO 1219-1 (triángulo relleno: hidráulica) · 0P1 · P presión, T depósito.'),
   hrelief: N_('ISO 1219-1: válvula normalmente cerrada con muelle regulable y pilotaje desde la entrada · 0V1.'),
   hgauge: N_('ISO 1219-1 · 0Z1.'),
@@ -1316,8 +1339,12 @@ function Properties({ c, components, variables, onChange, onDelete }) {
       </select>
     </label>
   )
-  // Los contactos también pueden accionarlos los detectores de los cilindros neumáticos (a0, a1…).
-  const cylSignals = isContact && c.type !== 'transmitter' ? components.filter((x) => x.type === 'pcylinder' || x.type === 'hcylinder').flatMap((x) => cylinderSignals(x.tag)) : []
+  // Los contactos también pueden accionarlos los detectores de los cilindros neumáticos (a0, a1…)
+  // y los presostatos (su señal).
+  const cylSignals =
+    isContact && c.type !== 'transmitter'
+      ? components.flatMap((x) => (x.type === 'pcylinder' || x.type === 'hcylinder' ? cylinderSignals(x.tag) : x.type === 'pswitch' && switchSignal(x) ? [switchSignal(x)] : []))
+      : []
   const signalSelect = (key, label) =>
     select(key, label, [
       ['', tr('(sin enlazar)')],
@@ -1394,9 +1421,10 @@ function Properties({ c, components, variables, onChange, onDelete }) {
           {select('ways', tr('Vías / posiciones'), [
             ['5/2', '5/2'],
             ['3/2', '3/2'],
+            ['2/2', '2/2'],
             ['5/3', '5/3'],
           ])}
-          {c.ways === '3/2' &&
+          {(c.ways === '3/2' || c.ways === '2/2') &&
             select('normally', tr('En reposo'), [
               ['NC', tr('Cerrada (NC)')],
               ['NO', tr('Abierta (NA)')],
@@ -1431,6 +1459,36 @@ function Properties({ c, components, variables, onChange, onDelete }) {
         </>
       )}
       {c.type === 'throttle' && text('setting', tr('Apertura (0,05 a 1)'), { type: 'number', min: 0.05, max: 1, step: 0.05 })}
+      {c.type === 'pconditioner' && (
+        <>
+          {select('kind', tr('Aparato'), [
+            ['separator', tr('Separador de agua')],
+            ['filter', tr('Filtro')],
+            ['coalescing', tr('Filtro coalescente (aceite)')],
+            ['dryer', tr('Secador')],
+          ])}
+          {select('drain', tr('Purga'), [
+            ['manual', tr('Manual')],
+            ['auto', tr('Automática')],
+            ['none', tr('Sin purga')],
+          ])}
+        </>
+      )}
+      {c.type === 'pregulator' && (
+        <>
+          {text('setting', tr('Ajuste (rótulo, p. ej. 2 bar)'))}
+          {select('gauge', tr('Manómetro'), [
+            ['true', tr('Con manómetro')],
+            ['false', tr('Sin manómetro')],
+          ])}
+        </>
+      )}
+      {c.type === 'pswitch' && (
+        <>
+          {text('signal', tr('Señal (sin ella, su identificador en minúsculas)'))}
+          {text('setting', tr('Ajuste (rótulo, p. ej. 1 bar)'))}
+        </>
+      )}
       {c.type === 'hvalve' && (
         <>
           {select('ways', tr('Vías / posiciones'), [

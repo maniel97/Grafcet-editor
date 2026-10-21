@@ -11,13 +11,15 @@ export default function ElecFrame({ cols, info = {} }) {
   const top = -FRAME_TOP
   const bottom = FRAME_HEIGHT
   const tb = { x: w - TITLE_BLOCK.w, y: bottom - TITLE_BLOCK.h }
+  // Un texto largo se achica hasta caber en su casilla (unos 0,56 em por letra).
+  const fit = (cw, value, base) => Math.max(6, Math.min(base, (cw - 8) / (0.56 * Math.max(1, String(value ?? '').length))))
   const cell = (x, y, cw, label, value, strong) => (
     <g key={`${x}-${y}`}>
       <rect x={x} y={y} width={cw} height={TITLE_BLOCK.h / 2} fill="white" stroke={INK} strokeWidth="1" />
       <text x={x + 4} y={y + 10} fontSize="7" fill="#64748b">
         {label}
       </text>
-      <text x={x + 4} y={y + 27} fontSize={strong ? 12 : 10} fontWeight={strong ? 700 : 400} fill={INK}>
+      <text x={x + 4} y={y + 27} fontSize={fit(cw, value, strong ? 12 : 10)} fontWeight={strong ? 700 : 400} fill={INK}>
         {value}
       </text>
     </g>

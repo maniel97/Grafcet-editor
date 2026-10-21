@@ -103,6 +103,7 @@ export default function ElecStatic({ schematic, sheetId, info = {} }) {
             : [
                 [c.type === 'terminal' ? `${showTag(tag)}:${c.n ?? 1}` : isPneumatic(c.type) ? tag : showTag(tag), 11, 700],
                 ...lines(c.text).map((t) => [t, 9.5, 400]),
+                ...((c.type === 'pregulator' || c.type === 'pswitch') && c.setting ? [[c.setting, 9.5, 400]] : []),
                 ...(xref.byTag[c.tag]?.length ? [[xref.byTag[c.tag].map((x) => `${x.numbers.join('-')} ${x.where}`).join(' · '), 7.5, 400]] : []),
                 ...(xref.ownerOf[c.id] ? [[xref.ownerOf[c.id], 7.5, 400]] : []),
               ]
@@ -110,7 +111,7 @@ export default function ElecStatic({ schematic, sheetId, info = {} }) {
           <g key={c.id} transform={`translate(${c.x} ${c.y})`}>
             <ElecSymbol c={{ ...c, timed: false }} view={null} />
             {!BOXED.has(c.type) &&
-              !['rail', 'plc', 'terminal', 'pcylinder', 'hcylinder', 'airsource', 'hgauge', 'htank'].includes(c.type) &&
+              !['rail', 'plc', 'terminal', 'pcylinder', 'hcylinder', 'airsource', 'hgauge', 'htank', 'pgauge', 'poutlet', 'pswitch', 'pregulator'].includes(c.type) &&
               terms.map((t, i) => {
                 const text = c.type === 'contact' ? numbers[c.id]?.[i] : t.id
                 return text ? (

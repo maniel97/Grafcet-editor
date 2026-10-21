@@ -21,7 +21,7 @@ export function Arrow({ x1, y1, x2, y2 }) {
 
 // Columna de cada conexión dentro de una casilla, y si está arriba o abajo.
 const portSpot = (c, p) =>
-  c.ways === '3/2' ? { 1: [20, 'b'], 2: [20, 't'], 3: [60, 'b'] }[p] : { 1: [40, 'b'], 2: [60, 't'], 3: [60, 'b'], 4: [20, 't'], 5: [20, 'b'] }[p]
+  c.ways === '2/2' ? { 1: [20, 'b'], 2: [20, 't'] }[p] : c.ways === '3/2' ? { 1: [20, 'b'], 2: [20, 't'], 3: [60, 'b'] }[p] : { 1: [40, 'b'], 2: [60, 't'], 3: [60, 'b'], 4: [20, 't'], 5: [20, 'b'] }[p]
 
 export function Spring({ x, dir }) {
   // Muelle en zigzag hacia fuera de la válvula (dir: -1 izquierda, 1 derecha).
@@ -142,6 +142,111 @@ export function Cylinder({ c, view, fluid = 'pneu', color = AIR }) {
   )
 }
 
+// Rombo de los aparatos de tratamiento (ISO 1219-1), girado: el aire sube de 1 (abajo) a 2 (arriba)
+// y la purga queda a la derecha. Centro (20, 40), semidiagonal 14.
+function Conditioner({ c }) {
+  const kind = c.kind ?? 'filter'
+  const drain = c.drain ?? 'manual'
+  const filter = kind === 'filter' || kind === 'coalescing'
+  return (
+    <g fill="none" stroke={INK} strokeWidth="2">
+      <line x1="20" y1="0" x2="20" y2="26" />
+      <line x1="20" y1="54" x2="20" y2="80" />
+      <path d="M 20 26 L 34 40 L 20 54 L 6 40 Z" fill="white" strokeWidth="1.6" />
+      {/* Separador o filtro con purga: la raya junto a la purga; secador: dos rayas. */}
+      {(kind === 'dryer' || kind === 'separator' || drain !== 'none') && <line x1="27" y1="33" x2="27" y2="47" strokeWidth="1.4" />}
+      {kind === 'dryer' && <line x1="13" y1="33" x2="13" y2="47" strokeWidth="1.4" />}
+      {filter && <line x1="6" y1="40" x2={drain !== 'none' ? 27 : 34} y2="40" strokeWidth="1.2" strokeDasharray="3 2" />}
+      {kind === 'coalescing' && <line x1="20" y1="30" x2="20" y2="50" strokeWidth="1.2" strokeDasharray="3 2" />}
+      {drain === 'auto' && <path d="M 28 35 L 33 40 L 28 45" strokeWidth="1.3" />}
+      {drain !== 'none' && <line x1="34" y1="40" x2="42" y2="40" strokeWidth="1.6" />}
+    </g>
+  )
+}
+
+// Regulador de presión (reductora), girado: entrada abajo, salida arriba; muelle regulable a la
+// izquierda, realimentación (a trazos) desde la salida y manómetro a la derecha.
+function Regulator({ c, view }) {
+  const on = view?.pneu?.ports?.[`${c.id}:2`] === 'P'
+  return (
+    <g fill="none" stroke={INK} strokeWidth="2">
+      <line x1="40" y1="0" x2="40" y2="26" />
+      <line x1="40" y1="54" x2="40" y2="80" />
+      <rect x="26" y="26" width="28" height="28" fill="white" />
+      <Arrow x1={44} y1={52} x2={44} y2={29} />
+      <polyline points="26 40 23 34 20 46 17 34 14 46 11 34 8 40" strokeWidth="1.3" />
+      <path d="M 9 49 L 23 29" strokeWidth="1.1" />
+      <path d="M 23 29 L 18 31 M 23 29 L 22 34" strokeWidth="1.1" />
+      <path d="M 40 18 L 62 18 L 62 40 L 54 40" strokeWidth="1.2" strokeDasharray="3 2" />
+      {String(c.gauge) !== 'false' && (
+        <g>
+          <line x1="40" y1="8" x2="73" y2="8" strokeWidth="1.6" />
+          <circle cx="83" cy="8" r="9" fill="white" strokeWidth="1.6" />
+          <Arrow x1={78} y1={14} x2={88} y2={2} />
+          {on && <circle cx="83" cy="8" r="2" fill="#2563eb" stroke="none" />}
+          <circle cx="40" cy="8" r="2.5" fill={INK} stroke="none" />
+          <circle cx="40" cy="18" r="2.5" fill={INK} stroke="none" />
+        </g>
+      )}
+    </g>
+  )
+}
+
+function PneuExtraSymbol({ c, view }) {
+  const ports = view?.pneu?.ports ?? {}
+  switch (c.type) {
+    case 'pconditioner':
+      return <Conditioner c={c} />
+    case 'pregulator':
+      return <Regulator c={c} view={view} />
+    case 'pcheck':
+      // Antirretorno simplificado: el aire entra por el vértice del asiento (abajo) y levanta la bola.
+      return (
+        <g fill="none" stroke={INK} strokeWidth="2">
+          <line x1="20" y1="0" x2="20" y2="24" />
+          <polyline points="20 24 14 27 26 31 14 35 26 39 20 40" strokeWidth="1.3" />
+          <circle cx="20" cy="46" r="6" fill="white" strokeWidth="1.6" />
+          <path d="M 11 46 L 20 58 L 29 46" strokeWidth="1.6" />
+          <line x1="20" y1="58" x2="20" y2="80" />
+        </g>
+      )
+    case 'pswitch': {
+      const on = ports[`${c.id}:1`] === 'P'
+      return (
+        <g fill="none" stroke={INK} strokeWidth="2">
+          <path d="M 20 60 L 20 28 L 30 28" strokeWidth="1.2" strokeDasharray="3 2" />
+          <path d="M 30 24 L 36 28 L 30 32 Z" fill="white" strokeWidth="1.2" />
+          <rect x="36" y="16" width="24" height="24" fill={on ? '#bbf7d0' : 'white'} strokeWidth="1.6" />
+          <line x1="36" y1="40" x2="60" y2="16" strokeWidth="1.2" />
+          <path d="M 51 20 L 51 27 M 51 33 L 51 37 M 51 33 L 56 27" strokeWidth="1.3" />
+          <polyline points="60 28 63 22 66 34 69 22 72 34 75 22 78 28" strokeWidth="1.3" />
+          <path d="M 62 38 L 76 18 M 76 18 L 71 20 M 76 18 L 75 23" strokeWidth="1.1" />
+        </g>
+      )
+    }
+    case 'pgauge': {
+      const on = ports[`${c.id}:1`] === 'P'
+      return (
+        <g fill="none" stroke={INK} strokeWidth="2">
+          <line x1="20" y1="34" x2="20" y2="50" />
+          <circle cx="20" cy="20" r="14" fill="white" />
+          <Arrow x1={on ? 12 : 11} y1={on ? 28 : 25} x2={on ? 29 : 20} y2={on ? 11 : 9} />
+        </g>
+      )
+    }
+    case 'poutlet':
+      // Salida a la atmósfera (triángulo blanco), como el escape de las válvulas.
+      return (
+        <g fill="none" stroke={INK} strokeWidth="2">
+          <line x1="20" y1="40" x2="20" y2="20" />
+          <path d="M 13 20 L 27 20 L 20 10 Z" fill={ports[`${c.id}:1`] === 'P' ? AIR : 'white'} strokeWidth="1.4" />
+        </g>
+      )
+    default:
+      return null
+  }
+}
+
 export function PneuSymbol({ c, view }) {
   switch (c.type) {
     case 'airsource':
@@ -184,6 +289,13 @@ export function PneuSymbol({ c, view }) {
       return <Valve c={c} view={view} />
     case 'pcylinder':
       return <Cylinder c={c} view={view} />
+    case 'pconditioner':
+    case 'pregulator':
+    case 'pcheck':
+    case 'pswitch':
+    case 'pgauge':
+    case 'poutlet':
+      return <PneuExtraSymbol c={c} view={view} />
     default:
       return <HydroSymbol c={c} view={view} />
   }
