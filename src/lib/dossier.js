@@ -132,30 +132,34 @@ export function buildDossier(content, options, measure) {
 }
 
 // Las secciones de una práctica (del enunciado a las notas), cada una con heading(título,
-// { landscape }), que abre su página. La usan el dossier y el cuaderno de varias prácticas
+// { landscape, keep }), que abre su página. keep: lo que necesita lo que va justo debajo del
+// título (mm), para que quien pone las secciones seguidas no deje el título solo al pie. La usan el dossier y el cuaderno de varias prácticas
 // (lib/notebook.js).
+const TEXT_KEEP = 20 // unas líneas de texto
+const TABLE_KEEP = 30 // la cabecera de una tabla y unas filas
+
 export function dossierBody(w, content, options, measure, heading) {
   const { text, paragraph, richText, figure, table } = w
   const S = options.sections
   if (S.statement && content.statement?.trim()) {
-    heading('Enunciado')
+    heading('Enunciado', { keep: TEXT_KEEP })
     richText(content.statement)
   }
   if (S.theory && content.theory?.trim()) {
-    heading('Contenido teórico')
+    heading('Contenido teórico', { keep: TEXT_KEEP })
     richText(content.theory)
   }
   if (S.grafcet && content.figures.grafcet?.length) {
     const sheets = content.figures.grafcet
     sheets.forEach((fig, i) => {
       const wide = fig.width > fig.height * 1.25
-      if (i === 0) heading('Grafcet', { landscape: wide })
+      if (i === 0) heading('Grafcet', { landscape: wide, keep: w.keepFor(fig) + (sheets.length > 1 ? 7 : 0) })
       else w.newPage(wide)
       figure(fig, { caption: sheets.length > 1 ? `Hoja: ${fig.name ?? i + 1}` : null })
     })
   }
   if (S.variables && (content.tables.steps.length || content.tables.variables.length)) {
-    heading('Tabla de variables')
+    heading('Tabla de variables', { keep: TABLE_KEEP })
     if (content.tables.variables.length) {
       table(
         [
@@ -181,7 +185,7 @@ export function dossierBody(w, content, options, measure, heading) {
     }
   }
   if (S.verification) {
-    heading('Verificación IEC 60848')
+    heading('Verificación IEC 60848', { keep: TEXT_KEEP })
     const problems = content.issues.filter((i) => i.severity === 'error' || i.severity === 'warning')
     if (!problems.length) paragraph([{ text: 'El grafcet es conforme: la verificación no ha encontrado errores ni avisos.', bold: true }])
     else {
@@ -197,7 +201,7 @@ export function dossierBody(w, content, options, measure, heading) {
     }
   }
   if (S.ladder && content.figures.ladder) {
-    heading('Ladder')
+    heading('Ladder', { keep: w.keepFor(content.figures.ladder) })
     figure(content.figures.ladder)
     if (content.listing?.lines?.length) {
       w.ensure(10)
@@ -213,7 +217,7 @@ export function dossierBody(w, content, options, measure, heading) {
     }
   }
   if (S.plant && content.figures.plant) {
-    heading('Planta virtual')
+    heading('Planta virtual', { keep: w.keepFor(content.figures.plant) })
     figure(content.figures.plant)
     if (content.tables.plantIO.length) {
       table(
@@ -229,11 +233,11 @@ export function dossierBody(w, content, options, measure, heading) {
     }
   }
   if (S.electrical && content.figures.electrical?.length) {
-    heading('Esquema eléctrico')
+    heading('Esquema eléctrico', { keep: w.keepFor(content.figures.electrical[0]) + (content.figures.electrical.length > 1 ? 7 : 0) })
     for (const fig of content.figures.electrical) figure(fig, { caption: content.figures.electrical.length > 1 ? fig.name : undefined })
   }
   if (S.chronogram && content.figures.chronogram) {
-    heading('Cronograma')
+    heading('Cronograma', { keep: w.keepFor(content.figures.chronogram) + 8 })
     if (content.figures.chronogram.name) paragraph([{ text: `Escenario: ${content.figures.chronogram.name}` }], 10)
     w.y += 2
     figure(content.figures.chronogram)
@@ -241,22 +245,22 @@ export function dossierBody(w, content, options, measure, heading) {
   // Diagrama espacio-fase: el esperado (la secuencia del proyecto) y el de la planta con el
   // escenario, con el resultado de compararlos.
   if (S.spacePhase && content.figures.spacePhase?.length) {
-    heading('Diagrama espacio-fase')
+    heading('Diagrama espacio-fase', { keep: w.keepFor(content.figures.spacePhase[0]) + 7 })
     for (const fig of content.figures.spacePhase) figure(fig, { caption: fig.name })
     if (content.figures.spacePhaseResult) paragraph([{ text: content.figures.spacePhaseResult }], 10)
   }
   if (S.improvements && content.improvements?.trim()) {
-    heading('Mejoras y aportaciones')
+    heading('Mejoras y aportaciones', { keep: TEXT_KEEP })
     richText(content.improvements)
   }
   if (S.problems && content.problems?.trim()) {
-    heading('Problemas encontrados y cómo se resolvieron')
+    heading('Problemas encontrados y cómo se resolvieron', { keep: TEXT_KEEP })
     richText(content.problems)
   }
   // Datos del proceso de un ejercicio que los pide: siempre a la vista, en su propia página.
   if (content.process) {
     const p = content.process
-    heading('Datos del proceso')
+    heading('Datos del proceso', { keep: TABLE_KEEP + 10 })
     paragraph([{ text: 'El ejercicio pedía anotar estos datos (solo totales, nunca lo que se hace en cada momento). Los ha anotado el editor mientras se hacía el ejercicio.' }], 10)
     w.y += 2
     table(
@@ -275,7 +279,7 @@ export function dossierBody(w, content, options, measure, heading) {
     )
   }
   if (S.notes && content.notes?.length) {
-    heading('Notas del lienzo')
+    heading('Notas del lienzo', { keep: TEXT_KEEP })
     content.notes.forEach((n, i) => {
       if (i) {
         w.ensure(6)

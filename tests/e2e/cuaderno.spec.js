@@ -45,6 +45,12 @@ test('entregar varias prácticas: cuaderno con portada, índice, resumen, orden 
   await dialog.getByRole('checkbox', { name: 'Juntar las secciones (menos páginas)' }).check()
   await expect.poll(() => pages.count()).toBe(together)
 
+  // Elegir las secciones: sin la verificación en ninguna práctica.
+  await expect(preview).toContainText(/\d\.\d+\. Verificación IEC 60848/)
+  await dialog.getByRole('group', { name: 'Secciones de cada práctica' }).getByRole('checkbox', { name: 'Verificación IEC 60848' }).uncheck()
+  await expect(preview).not.toContainText(/\d\.\d+\. Verificación IEC 60848/)
+  await dialog.getByRole('group', { name: 'Secciones de cada práctica' }).getByRole('checkbox', { name: 'Verificación IEC 60848' }).check()
+
   // Reordenar: la segunda sube a la primera posición.
   const second = await list.getByRole('listitem').nth(1).getByRole('textbox').inputValue()
   await list.getByRole('listitem').nth(1).getByRole('button', { name: 'Subir' }).click()

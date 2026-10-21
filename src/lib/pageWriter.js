@@ -17,6 +17,8 @@ export const MUTED = [100, 116, 139]
 export const RULE = [203, 213, 225]
 const LINE = 1.35 // interlineado (× tamaño en mm)
 export const PT = 0.3528 // 1 pt en mm
+// Lo más que se reduce una figura para caber en lo que queda de página (en vez de saltar).
+export const SHRINK = 0.75
 
 // Texto con formato (spans: [{ text, bold, code }]) en líneas de un ancho máximo.
 export function wrapSpans(spans, maxWidth, size, measure) {
@@ -134,6 +136,14 @@ export function pageWriter(measure, [PW, PH] = PAGES.a4) {
   }
   // Alto (mm) con que saldrá una figura.
   w.figureHeight = (fig, options) => fig.height * PX_TO_MM * figureScale(fig, options)
+  // Lo mínimo que una figura necesita donde está para no saltar de página (sus títulos lo usan
+  // para no quedarse solos): la figura reducida hasta SHRINK si cabe en una página; si es más alta
+  // que una página se trocea, y basta con un trozo.
+  w.keepFor = (fig, options) => {
+    if (!fig) return 0
+    const h = w.figureHeight(fig, options)
+    return h <= w.bottom() - M.top - 15 ? h * SHRINK : 40
+  }
   // Figura: a la escala que quepa a lo ancho (máx. 1:1), troceada entre páginas si es alta. Los
   // cortes, entre bloques (segmentos del ladder) si la figura los tiene.
   w.figure = (fig, { minScale = 0.45, caption, maxHeight, maxScale } = {}) => {
@@ -145,10 +155,19 @@ export function pageWriter(measure, [PW, PH] = PAGES.a4) {
     }
     // Escala: 1:1 como máximo y a lo ancho de la página; si así no cabe en una página (o en
     // maxHeight), se reduce hasta caber (sin bajar de minScale: más pequeño no se lee y se trocea).
-    const scale = figureScale(fig, { minScale, maxHeight, maxScale })
-    const kk = scale * PX_TO_MM
-    // Si cabe entera en una página pero no en lo que queda de esta, a la siguiente.
-    if (fig.height * kk <= w.bottom() - M.top - 15 && w.y + fig.height * kk > w.bottom()) w.newPage()
+    let scale = figureScale(fig, { minScale, maxHeight, maxScale })
+    let kk = scale * PX_TO_MM
+    // Si cabe entera en una página pero no en lo que queda de esta: un poco más pequeña si así cabe
+    // (hasta SHRINK, sin bajar de minScale), para no dejar media página en blanco; si no, a la
+    // siguiente.
+    const whole = fig.height * kk
+    const room = w.bottom() - w.y
+    if (whole <= w.bottom() - M.top - 15 && whole > room) {
+      if (room >= whole * SHRINK && (scale * room) / whole >= minScale) {
+        scale = (scale * room) / whole
+        kk = scale * PX_TO_MM
+      } else w.newPage()
+    }
     let top = 0
     while (top < fig.height - 0.5) {
       let available = (w.bottom() - w.y) / kk

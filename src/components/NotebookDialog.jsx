@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowDown, ArrowUp, BookCopy, Download, FilePlus2, GripVertical, History, ListOrdered, Loader2, Minus, Plus, SquarePen, Trash2, X } from 'lucide-react'
 import DossierPreview from './DossierPreview'
 import OffscreenGrafcet from './OffscreenGrafcet'
-import { COVER_FIELDS, dossierOptions } from '../lib/dossier'
+import { COVER_FIELDS, DEFAULT_DOSSIER, DOSSIER_SECTIONS, dossierOptions } from '../lib/dossier'
 import { buildNotebook, notebookTitle, sortByNumber } from '../lib/notebook'
 import { notebookProject, practiceAttachment, practiceEntry, practiceFigures, practiceTitleOf, withNotebookCover } from '../lib/notebookContent'
 import { loadPdf, makeMeasure, renderDossierPdf } from '../lib/dossierPdf'
@@ -48,13 +48,15 @@ export default function NotebookDialog({ getProject, onClose }) {
   const firstAuthor = practices[0]?.project.plc.titleBlock?.author ?? ''
   const [cover, setCover] = useState(() => saved().cover ?? {})
   const [compact, setCompact] = useState(() => saved().compact ?? true)
+  // Secciones de todas las prácticas (como en el dossier, sin portada ni índice: los pone el cuaderno).
+  const [sections, setSections] = useState(() => ({ ...DEFAULT_DOSSIER.sections, ...saved().sections }))
   useEffect(() => {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({ cover: Object.fromEntries(REMEMBERED.filter((k) => cover[k]).map((k) => [k, cover[k]])), compact }))
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ cover: Object.fromEntries(REMEMBERED.filter((k) => cover[k]).map((k) => [k, cover[k]])), compact, sections }))
     } catch {
       // sin almacenamiento: no se recuerdan la portada ni las opciones
     }
-  }, [cover, compact])
+  }, [cover, compact, sections])
   // Portada: lo escrito aquí y, si no, lo de la portada del dossier de la primera práctica.
   const coverValue = (id) => cover[id] ?? (id === 'student' ? firstCover.student || firstAuthor : firstCover[id]) ?? ''
 
@@ -132,8 +134,8 @@ export default function NotebookDialog({ getProject, onClose }) {
   const notebook = useMemo(() => {
     if (!ready) return null
     const entries = practices.map((p) => practiceEntry(p.project, { grafcet: grafcets[p.id], figures: prepared[p.id], file: p.file, today }))
-    return buildNotebook({ today, compact, cover: JSON.parse(coverKey), practices: entries.map((e, i) => ({ ...e, title: practices[i].title })) }, measure)
-  }, [ready, practices, grafcets, prepared, today, compact, coverKey, measure])
+    return buildNotebook({ today, compact, sections, cover: JSON.parse(coverKey), practices: entries.map((e, i) => ({ ...e, title: practices[i].title })) }, measure)
+  }, [ready, practices, grafcets, prepared, today, compact, sections, coverKey, measure])
 
   const [zoom, setZoom] = useState(0.5)
   const [saving, setSaving] = useState(false)
@@ -266,12 +268,22 @@ export default function NotebookDialog({ getProject, onClose }) {
                 </label>
               ))}
             </fieldset>
+            <fieldset className="space-y-1">
+              <legend className="text-xs font-medium uppercase tracking-wide text-slate-500">{t('Secciones de cada práctica')}</legend>
+              {DOSSIER_SECTIONS.filter((s) => s.id !== 'cover' && s.id !== 'toc').map((s) => (
+                <label key={s.id} className="flex items-center gap-2">
+                  <input type="checkbox" checked={Boolean(sections[s.id])} onChange={(e) => setSections((m) => ({ ...m, [s.id]: e.target.checked }))} />
+                  {t(s.label)}
+                </label>
+              ))}
+              <p className="text-[11px] text-slate-500">{t('Sale lo que cada práctica tenga: una sin planta no lleva la sección de la planta.')}</p>
+            </fieldset>
             <div className="space-y-1">
               <label className="flex items-center gap-2">
                 <input type="checkbox" checked={compact} onChange={(e) => setCompact(e.target.checked)} />
                 {t('Juntar las secciones (menos páginas)')}
               </label>
-              <p className="text-[11px] text-slate-500">{t('Cada práctica sale con las secciones y los textos de su dossier (Exportar > Dossier de la práctica, con ella abierta).')}</p>
+              <p className="text-[11px] text-slate-500">{t('Los textos de cada práctica (enunciado, mejoras, problemas…) salen de su dossier (Exportar > Dossier de la práctica, con ella abierta).')}</p>
             </div>
           </aside>
           <div className="flex min-w-0 flex-1 flex-col bg-slate-100">

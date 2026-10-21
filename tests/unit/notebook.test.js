@@ -3,6 +3,7 @@ import { dossierOptions } from '../../src/lib/dossier'
 import { buildNotebook, notebookTitle, practiceNumber, sortByNumber } from '../../src/lib/notebook'
 import { pickSubmissions } from '../../src/lib/classReview'
 import { withNotebookCover } from '../../src/lib/notebookContent'
+import { pageWriter } from '../../src/lib/pageWriter'
 
 const measure = (text, size) => String(text).length * size * 0.18
 const texts = (page) => page.items.filter((i) => i.t === 'text').map((i) => i.text)
@@ -93,5 +94,50 @@ describe('cuaderno de prácticas: corrección', () => {
     const project = { nodes: [], edges: [], plc: { dossier: { cover: { group: '1º A' } } } }
     const out = withNotebookCover(project, { student: 'Ana', group: '2º B', course: '' })
     expect(out.plc.dossier.cover).toEqual({ group: '1º A', student: 'Ana' })
+  })
+})
+
+describe('cuaderno de prácticas: títulos y secciones', () => {
+  const pageOf = (pages, pred) => pages.findIndex((p) => p.items.some(pred))
+  const tall = (heightPx) => ({ dataUrl: '', width: 600, height: heightPx, scene: null })
+  const withLadder = (rows, heightPx) => {
+    const p = practice('Práctica 1. Prensa', '')
+    p.content.tables.variables = Array.from({ length: rows }, (_, i) => [`V${i}`, 'Entrada', `I${i}.0`, ''])
+    p.content.figures.ladder = tall(heightPx)
+    return p
+  }
+
+  it('el título nunca queda solo al pie: va a la página de su dibujo', () => {
+    for (const rows of [10, 20, 28, 34]) {
+      for (const h of [300, 600, 800, 1500]) {
+        const { pages } = buildNotebook({ today: '', compact: true, cover: {}, practices: [withLadder(rows, h)] }, measure)
+        const head = pageOf(pages, (i) => i.t === 'text' && /^1\.\d+\. Ladder$/.test(i.text))
+        const fig = pageOf(pages, (i) => i.t === 'figure')
+        expect(head, `${rows} filas, ${h} px`).toBe(fig)
+      }
+    }
+  })
+
+  it('un dibujo que casi cabe se reduce un poco en vez de saltar de página', () => {
+    const place = (room) => {
+      const w = pageWriter(measure)
+      w.newPage()
+      w.y = w.bottom() - room
+      w.figure(tall(760)) // unos 201 mm de alto a 1:1
+      return { pages: w.pages.length, fig: w.pages.flatMap((p) => p.items).find((i) => i.t === 'figure') }
+    }
+    const near = place(180) // cabe al 90 %: se reduce y se queda
+    expect(near.pages).toBe(1)
+    expect(near.fig.scale).toBeCloseTo(180 / 201.1, 1)
+    const far = place(120) // haría falta reducirla al 60 %: a la página siguiente, entera
+    expect(far.pages).toBe(2)
+    expect(far.fig.scale).toBe(1)
+  })
+
+  it('las secciones elegidas valen para todas las prácticas', () => {
+    const content = { today: '', compact: true, cover: {}, practices: [practice('Práctica 1. A', 'Uno.'), practice('Práctica 2. B', 'Dos.')] }
+    const all = buildNotebook({ ...content, sections: { ...dossierOptions().sections, verification: false } }, measure).pages.flatMap(texts)
+    expect(all.some((s) => /Verificación IEC 60848$/.test(s) && /^\d+\.\d+\./.test(s))).toBe(false)
+    expect(all).toEqual(expect.arrayContaining(['1.1. Enunciado', '2.2. Tabla de variables']))
   })
 })

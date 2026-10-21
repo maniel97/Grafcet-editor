@@ -24,6 +24,8 @@ export function sortByNumber(list, titleOf) {
 }
 
 // content: { today, page: 'a4' | 'a3', compact (las secciones siguen en la misma página si caben),
+//   sections (las que salen en todas las prácticas, como las de DOSSIER_SECTIONS; sin ellas, las
+//   del dossier de cada una),
 //   cover: {campos de COVER_FIELDS},
 //   practices: [{ title, content (el del dossier), options (las del dossier), summary: { passed,
 //   total (autocorrección; total 0 si no es un ejercicio), errors, warnings } }] }
@@ -73,29 +75,39 @@ export function buildNotebook(content, measure) {
   const starts = []
   practices.forEach((p, i) => {
     const n = i + 1
+    const practiceTitle = () => {
+      text(`PRÁCTICA Nº ${n}`, M.left, w.y + 5, 12, 'bold', { color: MUTED })
+      text(fit(notebookTitle(p.title), w.width(), 16, 'bold', measure), M.left, w.y + 13, 16, 'bold')
+      w.rule(w.y + 16)
+      w.y += 22
+    }
     w.newPage()
     starts.push(pages.length)
-    text(`PRÁCTICA Nº ${n}`, M.left, w.y + 5, 12, 'bold', { color: MUTED })
-    text(fit(notebookTitle(p.title), w.width(), 16, 'bold', measure), M.left, w.y + 13, 16, 'bold')
-    w.rule(w.y + 16)
-    w.y += 22
-    // La primera sección empieza en la página del título; las demás, cada una en la suya (o,
-    // juntas, a continuación si cabe el título con algo debajo). Las apaisadas, siempre aparte.
+    practiceTitle()
+    // La primera sección empieza bajo el título de la práctica; las demás, cada una en su página
+    // o, juntas, a continuación. Un título nunca se queda solo al pie: si lo que va debajo (keep)
+    // no cabe, pasa a la página siguiente con ello (el de la práctica también). Las apaisadas,
+    // siempre en su página.
     let fresh = true
     let k = 0
-    const heading = (title, { landscape = false } = {}) => {
-      if (landscape || (!fresh && !content.compact)) w.newPage(landscape)
-      else if (!fresh) {
-        w.y += 6
-        w.ensure(50)
-      }
+    const heading = (title, { landscape = false, keep = 0 } = {}) => {
+      const need = 14 + keep
+      if (fresh) {
+        if (landscape || w.y + need > w.bottom()) {
+          pages.pop() // la página solo tenía el título de la práctica: va con su primera sección
+          w.newPage(landscape)
+          practiceTitle()
+        }
+      } else if (landscape || !content.compact) w.newPage(landscape)
+      else if (w.y + 6 + need > w.bottom()) w.newPage()
+      else w.y += 6
       fresh = false
       k++
       text(`${n}.${k}. ${title}`, M.left, w.y + 6, 14, 'bold')
       w.rule(w.y + 9, 0.3)
       w.y += 14
     }
-    dossierBody(w, p.content, p.options, measure, heading)
+    dossierBody(w, p.content, content.sections ? { ...p.options, sections: content.sections } : p.options, measure, heading)
   })
 
   // Índice
