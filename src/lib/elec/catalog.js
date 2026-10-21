@@ -238,6 +238,9 @@ export const ELEC_TYPES = {
     size: () => ({ w: 40, h: 80 }),
     terminals: () => two('A1', 'A2'),
   },
+  // Diodo de rueda libre, en paralelo con una bobina de continua (cátodo K arriba, hacia L+): al
+  // cortar, descarga la bobina sin chispa. En la simulación no conduce (está en inverso).
+  diode: { label: N_('Diodo (rueda libre)'), group: N_('Mando'), prefix: 'V', defaults: { text: '' }, size: () => ({ w: 40, h: 80 }), terminals: () => two('K', 'A') },
   valve: { label: N_('Electroválvula'), group: N_('Mando'), prefix: 'Y', defaults: { signal: '', text: '' }, size: () => ({ w: 40, h: 80 }), terminals: () => two('A1', 'A2') },
   lamp: { label: N_('Piloto'), group: N_('Mando'), prefix: 'H', defaults: { color: 'green', signal: '', text: '' }, size: () => ({ w: 40, h: 80 }), terminals: () => two('X1', 'X2') },
   // Fusible (con seccionador portafusibles: se abre a mano y, fundido, se repone).

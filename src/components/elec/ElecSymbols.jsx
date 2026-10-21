@@ -603,6 +603,16 @@ export function ElecSymbol({ c, view }) {
       return <Coil kind={c.kind} on={view?.loads?.[c.id]} />
     case 'valve':
       return <Coil kind="valve" on={view?.loads?.[c.id]} />
+    case 'diode':
+      // IEC 60617: triángulo hacia el cátodo (arriba) y raya.
+      return (
+        <g fill="none" stroke={INK} strokeWidth="2">
+          <line x1="20" y1="0" x2="20" y2="30" />
+          <line x1="20" y1="48" x2="20" y2="80" />
+          <path d="M 10 48 L 30 48 L 20 31 Z" fill="white" strokeWidth="1.8" />
+          <line x1="10" y1="30" x2="30" y2="30" strokeWidth="2" />
+        </g>
+      )
     case 'lamp':
       return <Lamp color={c.color} on={view?.loads?.[c.id]} />
     case 'breaker':

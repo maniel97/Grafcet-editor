@@ -112,3 +112,17 @@ describe('neumática: soplado de dos presiones', () => {
     expect(s.view.loads.H1).toBeTruthy()
   })
 })
+
+describe('diodo de rueda libre', () => {
+  it('en paralelo con la bobina (cátodo a L+) no la puentea', () => {
+    const sch = {
+      components: [c('Lp', 'rail', { potential: 'L+' }), c('M', 'rail', { potential: 'M' }), c('S1', 'switch', { tag: 'S1' }), c('Y1', 'valve', { tag: 'Y1' }), c('V1', 'diode', { tag: 'V1' })],
+      wires: [w('Lp', 't0', 'S1', '13'), w('S1', '14', 'Y1', 'A1'), w('Y1', 'A2', 'M', 't0'), w('V1', 'K', 'Y1', 'A1'), w('V1', 'A', 'Y1', 'A2')],
+    }
+    expect(terminalsOf({ type: 'diode' }).map((t) => t.id)).toEqual(['K', 'A'])
+    let s = elecInit()
+    s = { ...s, latched: { S1: true } }
+    for (let i = 0; i < 3; i++) s = elecStep(sch, s, {}, 0.05).state
+    expect(s.view.loads.Y1).toBeTruthy()
+  })
+})
