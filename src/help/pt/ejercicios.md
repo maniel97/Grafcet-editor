@@ -11,6 +11,7 @@ Um **exercício** traz um enunciado e o que o professor dá já feito (a planta,
 3. Desenhe o grafcet. Pode simulá-lo e verificá-lo como sempre.
 4. Clique em **Comprovar** quantas vezes quiser. Cada verificação aparece a verde ou a vermelho, com o que falha. Se ficar bloqueado, abra uma **pista** (se o professor as oferecer): aparecem uma a uma e ficam contadas; se houver nota, cada uma pode descontar.
 5. Para entregar, Exportar > **Dossier do trabalho prático**: o PDF leva o seu projeto dentro (abre-se no editor) e tem secções para o conteúdo teórico, as melhorias e os problemas encontrados.
+6. Se lhe pedirem para entregar várias práticas juntas (por exemplo, da 1 à 6), Exportar > **Entregar várias práticas**. Adicione o projeto aberto, os seus ficheiros (.json ou os dossiers em PDF) ou os seus trabalhos anteriores, ordene-os (arrastando, com as setas ou com **Ordenar por número**) e guarde um só PDF. Sai com uma capa, um índice e um resumo com o resultado da verificação de cada uma, e cada prática sai com as secções e os textos do seu dossier. Cada projeto vai dentro do PDF.
 
 > **Atenção:** o que o professor dá bloqueado (por exemplo, a tabela de variáveis) não se pode alterar: use esses nomes no grafcet. Se escrever um que não está, a verificação assinala-o como possível gralha.
 
@@ -37,6 +38,8 @@ Um **exercício** traz um enunciado e o que o professor dá já feito (a planta,
 ## Corrigir entregas
 
 Com o seu exercício aberto (o que tem a sua solução), Abrir > **Corrigir entregas** e adicione os dossiers em PDF da turma (levam o projeto dentro) ou os seus .json.
+
+Se a turma lhe entregar um **caderno de práticas** (várias práticas num PDF), abra o exercício da prática que quer corrigir e adicione os cadernos: de cada um corrige-se só essa prática. Para corrigir outra, abra o seu exercício e volte a adicioná-los.
 
 - Cada entrega é corrigida de novo com as **suas** verificações, não com as que traz o ficheiro.
 - A tabela mostra cada critério, as pistas vistas, a nota (se a pedir) e os dados do processo (se os pedir).

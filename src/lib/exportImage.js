@@ -43,8 +43,9 @@ export function drawnBounds(viewportEl, viewport) {
 
 // Dibuja el diagrama completo (no solo la parte visible) a escala 1:1 con margen alrededor de
 // todo lo dibujado. Devuelve { dataUrl, width, height } (tamaño en px CSS) o null si está vacío.
-export async function renderDiagram(format, viewport, maxPixelRatio) {
-  const viewportEl = document.querySelector('.react-flow__viewport')
+// viewportEl: el lienzo a capturar (por defecto, el del editor; el cuaderno de prácticas dibuja
+// cada práctica en otro, fuera de la pantalla).
+export async function renderDiagram(format, viewport, maxPixelRatio, viewportEl = document.querySelector('.react-flow__viewport')) {
   if (!viewportEl) return null
   const bounds = drawnBounds(viewportEl, viewport)
   if (!bounds) return null
@@ -80,8 +81,8 @@ export function download(href, filename) {
 }
 
 // Para el PDF: la imagen (vista previa y PDF de imagen) y la escena vectorial, capturadas a la vez.
-export async function capturePdf(viewport) {
-  const image = await renderDiagram('png', viewport, 3)
+export async function capturePdf(viewport, viewportEl) {
+  const image = await renderDiagram('png', viewport, 3, viewportEl)
   if (!image) return null
   const scene = captureScene(image.viewportEl, viewport, image.bounds, MARGIN, EDITOR_ONLY_SELECTOR)
   return { dataUrl: image.dataUrl, width: image.width, height: image.height, scene }

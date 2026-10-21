@@ -1,5 +1,5 @@
 import { N_ } from '../lib/i18n'
-import { Download, FileCode, FileText, Image, BookText, Link2, GraduationCap, BookOpenCheck, MonitorPlay } from 'lucide-react'
+import { Download, FileCode, FileText, Image, BookText, BookCopy, Link2, GraduationCap, BookOpenCheck, MonitorPlay } from 'lucide-react'
 import ToolbarDropdown from './ToolbarDropdown'
 
 // Botón "Exportar" con los formatos: cada uno abre el diálogo de exportación con vista previa.
@@ -17,6 +17,7 @@ export default function ExportMenu({ onExport, labelClass, education = false }) 
         { id: 'svg', label: N_('SVG'), hint: N_('Vectorial: se amplía sin perder calidad'), icon: FileCode, onSelect: () => onExport('svg') },
         { id: 'pdf', label: N_('PDF'), hint: N_('Para imprimir: tamaño, orientación y páginas'), icon: FileText, onSelect: () => onExport('pdf') },
         { id: 'dossier', label: N_('Dossier de la práctica'), hint: N_('Documento para entregar: portada, enunciado, grafcet, variables, ladder, planta y cronograma'), icon: BookText, onSelect: () => onExport('dossier') },
+        { id: 'notebook', label: N_('Entregar varias prácticas'), hint: N_('Varias prácticas en un solo documento, cada una como su dossier, con portada, índice y resumen'), icon: BookCopy, onSelect: () => onExport('notebook') },
         { id: 'pcsimu', label: N_('Planta para PC_SIMU (.sim)'), hint: N_('El panel de la planta (pulsadores y pilotos) y el programa .awl para el simulador PC_SIMU'), icon: MonitorPlay, onSelect: () => onExport('pcsimu') },
         ...(education ? [{ id: 'exercise', label: N_('Ejercicio para el alumnado'), hint: N_('Preparar este proyecto como ejercicio con autocorrección (tu solución no se reparte)'), icon: GraduationCap, onSelect: () => onExport('exercise') },
         { id: 'guide', label: N_('Guion de prácticas'), hint: N_('Varias prácticas en un solo documento, con normas generales y cada ejercicio dentro'), icon: BookOpenCheck, onSelect: () => onExport('guide') }] : []),

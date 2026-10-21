@@ -14,6 +14,7 @@ const ExportDialog = lazy(() => import('./ExportDialog'))
 const DossierDialog = lazy(() => import('./DossierDialog'))
 const ShareDialog = lazy(() => import('./ShareDialog'))
 const GuideDialog = lazy(() => import('./GuideDialog'))
+const NotebookDialog = lazy(() => import('./NotebookDialog'))
 const ExerciseDialog = lazy(() => import('./ExerciseDialog'))
 const PcSimuDialog = lazy(() => import('./PcSimuDialog'))
 
@@ -94,7 +95,7 @@ export function ProjectDialogs({
   )
 }
 
-// Los de Exportar, según format: 'dossier', 'share', 'guide', 'exercise', 'pcsimu' o un formato de imagen o
+// Los de Exportar, según format: 'dossier', 'notebook', 'share', 'guide', 'exercise', 'pcsimu' o un formato de imagen o
 // PDF ('svg', 'png', 'pdf'…, con su vista previa).
 export function ExportDialogs({
   format,
@@ -129,6 +130,8 @@ export function ExportDialogs({
           onChange={(dossier) => setPlc((p) => ({ ...p, dossier }))}
           onClose={onClose}
         />
+      ) : format === 'notebook' ? (
+        <NotebookDialog getProject={getProject} onClose={onClose} />
       ) : format === 'share' ? (
         <ShareDialog project={shareProject} onDownload={onDownload} onClose={onClose} />
       ) : format === 'pcsimu' ? (

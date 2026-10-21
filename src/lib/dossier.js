@@ -75,7 +75,7 @@ export const dossierOptions = (saved) => ({
 // figure: { dataUrl, width, height (px), scene, blocks?, name? }
 export function buildDossier(content, options, measure) {
   const w = pageWriter(measure, PAGES[options.page] ?? PAGES.a4)
-  const { pages, text, paragraph, richText, figure, table } = w
+  const { pages, text } = w
   const sectionsAt = [] // { title, page }
 
   let number = 0
@@ -108,6 +108,35 @@ export function buildDossier(content, options, measure) {
   // Índice: una página reservada; se rellena al final.
   let tocPage = null
   if (S.toc) tocPage = w.newPage()
+  dossierBody(w, content, options, measure, heading)
+
+  // Índice
+  if (tocPage) {
+    const items = tocPage.items
+    items.push({ t: 'text', x: M.left, y: M.top + 6, text: 'Índice', size: 16, style: 'bold', font: 'helvetica', color: INK })
+    items.push({ t: 'line', x1: M.left, y1: M.top + 9, x2: tocPage.w - M.right, y2: M.top + 9, width: 0.4, color: INK })
+    sectionsAt.forEach((s, i) => {
+      const yy = M.top + 22 + i * 8
+      items.push({ t: 'text', x: M.left, y: yy, text: s.title, size: 11, style: 'normal', font: 'helvetica', color: INK })
+      items.push({ t: 'text', x: tocPage.w - M.right, y: yy, text: String(s.page), size: 11, style: 'normal', font: 'helvetica', color: INK, align: 'right' })
+      items.push({ t: 'line', x1: M.left + measure(s.title, 11, 'normal', 'helvetica') + 2, y1: yy, x2: tocPage.w - M.right - 8, y2: yy, width: 0.15, color: RULE, dash: true })
+    })
+  }
+  // Pie de página (salvo la portada)
+  w.footer(
+    [content.title, content.cover.student].filter((v) => v?.trim()).join(' · '),
+    (i, total) => `página ${i} de ${total}`,
+    (i) => S.cover && i === 0,
+  )
+  return { pages, sections: sectionsAt }
+}
+
+// Las secciones de una práctica (del enunciado a las notas), cada una con heading(título,
+// { landscape }), que abre su página. La usan el dossier y el cuaderno de varias prácticas
+// (lib/notebook.js).
+export function dossierBody(w, content, options, measure, heading) {
+  const { text, paragraph, richText, figure, table } = w
+  const S = options.sections
   if (S.statement && content.statement?.trim()) {
     heading('Enunciado')
     richText(content.statement)
@@ -256,24 +285,4 @@ export function buildDossier(content, options, measure) {
       richText(n)
     })
   }
-
-  // Índice
-  if (tocPage) {
-    const items = tocPage.items
-    items.push({ t: 'text', x: M.left, y: M.top + 6, text: 'Índice', size: 16, style: 'bold', font: 'helvetica', color: INK })
-    items.push({ t: 'line', x1: M.left, y1: M.top + 9, x2: tocPage.w - M.right, y2: M.top + 9, width: 0.4, color: INK })
-    sectionsAt.forEach((s, i) => {
-      const yy = M.top + 22 + i * 8
-      items.push({ t: 'text', x: M.left, y: yy, text: s.title, size: 11, style: 'normal', font: 'helvetica', color: INK })
-      items.push({ t: 'text', x: tocPage.w - M.right, y: yy, text: String(s.page), size: 11, style: 'normal', font: 'helvetica', color: INK, align: 'right' })
-      items.push({ t: 'line', x1: M.left + measure(s.title, 11, 'normal', 'helvetica') + 2, y1: yy, x2: tocPage.w - M.right - 8, y2: yy, width: 0.15, color: RULE, dash: true })
-    })
-  }
-  // Pie de página (salvo la portada)
-  w.footer(
-    [content.title, content.cover.student].filter((v) => v?.trim()).join(' · '),
-    (i, total) => `página ${i} de ${total}`,
-    (i) => S.cover && i === 0,
-  )
-  return { pages, sections: sectionsAt }
 }

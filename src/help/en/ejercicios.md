@@ -11,6 +11,7 @@ An **exercise** comes with a statement and what the teacher provides already don
 3. Draw the grafcet. You can simulate and verify it as usual.
 4. Click **Check** as many times as you like. Each check shows in green or red, with what fails. If you get stuck, open a **hint** (if the teacher offers them): they appear one at a time and are counted; if there is a grade, each one can subtract.
 5. To hand it in, Export > **Exercise report**: the PDF carries your project inside (it opens in the editor) and has sections for the theory, the improvements and the problems found.
+6. If you are asked to hand in several practicals together (for example, 1 to 6), Export > **Hand in several practicals**. Add the open project, your files (.json or the PDF reports) or your previous work, put them in order (by dragging, with the arrows or with **Sort by number**) and save a single PDF. It comes with a cover, a table of contents and a summary with the result of checking each one, and each practical comes with the sections and texts of its report. Each project travels inside the PDF.
 
 > **Watch out:** what the teacher gives locked (for example, the variables table) cannot be changed: use those names in the grafcet. If you type one that is not there, the check points it out as a possible typo.
 
@@ -37,6 +38,8 @@ An **exercise** comes with a statement and what the teacher provides already don
 ## Mark submissions
 
 With your exercise open (the one with your solution), Open > **Mark submissions** and add the class PDF reports (they carry the project inside) or their .json files.
+
+If the class hands in a **practicals notebook** (several practicals in one PDF), open the exercise of the practical you want to mark and add the notebooks: only that practical is marked from each one. To mark another, open its exercise and add them again.
 
 - Each submission is marked again with **your** checks, not with the ones in the file.
 - The table shows each criterion, the hints seen, the grade (if you ask for it) and the process data (if you ask for them).

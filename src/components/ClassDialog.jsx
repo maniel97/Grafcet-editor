@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { ClipboardCheck, Download, FilePlus2, FolderOpen, TriangleAlert, X } from 'lucide-react'
 import { language, t } from '../lib/i18n'
 import { loadProjects, downloadFile } from '../lib/projectFile'
-import { classCsv, reviewSubmission, similarPairs, teacherSealed } from '../lib/classReview'
+import { classCsv, pickSubmissions, reviewSubmission, similarPairs, teacherSealed } from '../lib/classReview'
 import { fileName } from '../lib/fileNames'
 
 // Corregir las entregas de una clase (Abrir > Corregir entregas): el profesor suelta los PDF de
@@ -29,10 +29,16 @@ export default function ClassDialog({ getProject, onOpen, onClose }) {
     for (const file of files) {
       try {
         const items = await loadProjects(file)
-        // Una entrega trae el proyecto del alumno (en un guion, los ejercicios de alumno que haya).
-        const own = items.filter((i) => i.project.plc?.exercise?.student)
-        if (!own.length) found.push({ file: file.name, name: file.name, error: t('No es la entrega de un ejercicio.') })
-        for (const item of own) found.push({ ...reviewSubmission(item.project, file.name, teacher), project: item.project })
+        // Una entrega trae el proyecto del alumno; un cuaderno de prácticas o un guion, varios: con
+        // el ejercicio abierto, solo el suyo (lib/classReview.js: pickSubmissions).
+        const { items: own, error } = pickSubmissions(items, teacher)
+        const several = items.filter((i) => i.project.plc?.exercise?.student).length > 1
+        if (error) found.push({ file: file.name, name: file.name, error })
+        else if (!own.length) found.push({ file: file.name, name: file.name, error: t('No es la entrega de un ejercicio.') })
+        for (const item of own) {
+          const where = several ? `${file.name} · ${item.file}` : file.name
+          found.push({ ...reviewSubmission(item.project, where, teacher), project: item.project })
+        }
       } catch (err) {
         found.push({ file: file.name, name: file.name, error: err.message })
       }

@@ -11,6 +11,7 @@ Un **ejercicio** trae un enunciado y lo que el profesor da hecho (la planta, la 
 3. Dibuja el grafcet. Puedes simularlo y verificarlo como siempre.
 4. Pulsa **Comprobar** cuantas veces quieras. Cada comprobación sale en verde o en rojo, con lo que falla. Si te atascas, abre una **pista** (si el profesor las ofrece): salen de una en una y quedan contadas; si hay nota, cada una puede restar.
 5. Para entregar, Exportar > **Dossier de la práctica**: el PDF lleva tu proyecto dentro (se abre en el editor) y tiene apartados para el contenido teórico, las mejoras y los problemas encontrados.
+6. Si te piden entregar varias prácticas juntas (por ejemplo, de la 1 a la 6), Exportar > **Entregar varias prácticas**. Añade el proyecto abierto, tus archivos (.json o los dossiers en PDF) o tus trabajos anteriores, ordénalos (arrastrando, con las flechas o con **Ordenar por número**) y guarda un solo PDF. Sale con una portada, un índice y un resumen con lo que da la comprobación de cada una, y cada práctica sale con las secciones y los textos de su dossier. Cada proyecto va dentro del PDF.
 
 > **Ojo:** lo que el profesor da bloqueado (por ejemplo, la tabla de variables) no se puede cambiar: usa esos nombres en el grafcet. Si escribes uno que no está, la comprobación te lo señala como posible errata.
 
@@ -37,6 +38,8 @@ Un **ejercicio** trae un enunciado y lo que el profesor da hecho (la planta, la 
 ## Corregir entregas
 
 Con tu ejercicio abierto (el que tiene tu solución), Abrir > **Corregir entregas** y añade los dossiers en PDF de la clase (llevan el proyecto dentro) o sus .json.
+
+Si la clase te entrega un **cuaderno de prácticas** (varias prácticas en un PDF), abre el ejercicio de la práctica que quieras corregir y añade los cuadernos: de cada uno se corrige solo esa práctica. Para corregir otra, abre su ejercicio y vuelve a añadirlos.
 
 - Cada entrega se corrige de nuevo con **tus** comprobaciones, no con las que trae el archivo.
 - La tabla muestra cada criterio, las pistas vistas, la nota (si la pides) y los datos del proceso (si los pides).

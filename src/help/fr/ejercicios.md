@@ -11,6 +11,7 @@ Un **exercice** contient un énoncé et ce que le professeur fournit déjà fait
 3. Dessinez le grafcet. Vous pouvez le simuler et le vérifier comme d’habitude.
 4. Cliquez sur **Vérifier l’exercice** autant de fois que vous voulez. Chaque vérification s’affiche en vert ou en rouge, avec ce qui ne va pas. Si vous bloquez, ouvrez un **indice** (si le professeur en propose) : ils s’affichent un par un et sont comptés ; s’il y a une note, chacun peut retirer des points.
 5. Pour le rendre, Exporter > **Dossier du TP** : le PDF contient votre projet (il s’ouvre dans l’éditeur) et a des parties pour le contenu théorique, les améliorations et les problèmes rencontrés.
+6. Si l’on vous demande de rendre plusieurs TP ensemble (par exemple, du 1 au 6), Exporter > **Rendre plusieurs TP**. Ajoutez le projet ouvert, vos fichiers (.json ou les dossiers PDF) ou vos travaux précédents, mettez-les dans l’ordre (en les faisant glisser, avec les flèches ou avec **Trier par numéro**) et enregistrez un seul PDF. Il comporte une page de garde, une table des matières et un résumé avec le résultat de la vérification de chacun, et chaque TP reprend les parties et les textes de son dossier. Chaque projet voyage dans le PDF.
 
 > **Attention :** ce que le professeur fournit verrouillé (par exemple la table des variables) ne peut pas être modifié : utilisez ces noms dans le grafcet. Si vous en écrivez un qui n’y est pas, la vérification le signale comme faute de frappe possible.
 
@@ -37,6 +38,8 @@ Un **exercice** contient un énoncé et ce que le professeur fournit déjà fait
 ## Corriger les rendus
 
 Avec votre exercice ouvert (celui qui contient votre solution), Ouvrir > **Corriger les rendus** et ajoutez les dossiers PDF de la classe (ils contiennent le projet) ou leurs .json.
+
+Si la classe rend un **cahier de TP** (plusieurs TP dans un PDF), ouvrez l’exercice du TP que vous voulez corriger et ajoutez les cahiers : seul ce TP est corrigé dans chacun. Pour en corriger un autre, ouvrez son exercice et ajoutez-les de nouveau.
 
 - Chaque rendu est corrigé à nouveau avec **vos** vérifications, pas avec celles du fichier.
 - Le tableau montre chaque critère, les indices vus, la note (si vous la demandez) et les données du processus (si vous les demandez).

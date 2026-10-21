@@ -47,6 +47,20 @@ export function reviewSubmission(project, file, teacher) {
   }
 }
 
+// Lo que se corrige de un archivo: sus ejercicios de alumno. Un cuaderno de prácticas (o un
+// guion) trae varios: con el ejercicio del profesor abierto, solo el suyo (las mismas
+// comprobaciones selladas o el mismo título); si no lo trae, un error con lo que sí lleva.
+// items: lo que da loadProjects -> { items, error }.
+export function pickSubmissions(items, teacher) {
+  const own = items.filter((i) => i.project.plc?.exercise?.student)
+  if (!teacher || own.length <= 1) return { items: own, error: null }
+  const same = (e) => (e.sealed && e.sealed === teacher.sealed) || (e.title && teacher.title && e.title === teacher.title)
+  const matches = own.filter((i) => same(i.project.plc.exercise))
+  if (matches.length) return { items: matches, error: null }
+  const titles = own.map((i) => i.project.plc.exercise.title || i.file).join(', ')
+  return { items: [], error: t('No trae este ejercicio (lleva: {titulos}).', { titulos: titles }) }
+}
+
 // --- Parecidos ----------------------------------------------------------------------------------
 
 const norm = (s) => String(s ?? '').replace(/\s+/g, '').toLowerCase()
