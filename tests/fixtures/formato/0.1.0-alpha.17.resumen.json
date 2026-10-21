@@ -1,0 +1,58 @@
+{
+  "nodes": {
+    "step": 2,
+    "transition": 2,
+    "variables": 1,
+    "note": 1
+  },
+  "edges": 4,
+  "steps": [
+    "0*",
+    "1"
+  ],
+  "actions": [
+    "conditional:M[Seta1 · Seta2]"
+  ],
+  "conditions": [
+    "S1 · Seta1 · Seta2",
+    "S2"
+  ],
+  "variables": [
+    "M:output:Q0.0",
+    "S1:input:I0.0",
+    "S2:input:I0.3",
+    "Seta1:input:I0.1",
+    "Seta2:input:I0.2"
+  ],
+  "plc": [
+    "cpu",
+    "dossier",
+    "electrical",
+    "exercise",
+    "gemma",
+    "guide",
+    "scenarios",
+    "scene",
+    "scheme",
+    "sequence",
+    "sheets",
+    "showAddresses",
+    "stepPrefix",
+    "steps",
+    "titleBlock",
+    "variables"
+  ],
+  "scene": 9,
+  "electrical": [
+    9,
+    16
+  ],
+  "scenarios": [
+    "Una caja con parada de emergencia"
+  ],
+  "exercise": "Práctica 4. Cinta transportadora con setas de emergencia",
+  "sheets": [
+    "h1",
+    "h2"
+  ]
+}
