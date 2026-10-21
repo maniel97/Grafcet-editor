@@ -1,0 +1,752 @@
+{
+  "format": "grafcet-editor",
+  "version": 1,
+  "app": "0.1.0-alpha.16",
+  "savedAt": "2026-10-21T17:28:58.850Z",
+  "name": "Proyecto de referencia del formato",
+  "nodes": [
+    {
+      "id": "s0",
+      "type": "step",
+      "position": {
+        "x": 200,
+        "y": 0
+      },
+      "data": {
+        "label": "0",
+        "actions": [],
+        "initial": true,
+        "sheet": "h1"
+      },
+      "selected": false
+    },
+    {
+      "id": "t1",
+      "type": "transition",
+      "position": {
+        "x": 200,
+        "y": 100
+      },
+      "data": {
+        "condition": "S1 · Seta1 · Seta2",
+        "sheet": "h1"
+      },
+      "selected": false
+    },
+    {
+      "id": "s1",
+      "type": "step",
+      "position": {
+        "x": 200,
+        "y": 170
+      },
+      "data": {
+        "label": "1",
+        "actions": [
+          {
+            "text": "M",
+            "kind": "conditional",
+            "condition": "Seta1 · Seta2"
+          }
+        ],
+        "sheet": "h1"
+      },
+      "selected": false
+    },
+    {
+      "id": "t2",
+      "type": "transition",
+      "position": {
+        "x": 200,
+        "y": 270
+      },
+      "data": {
+        "condition": "S2",
+        "sheet": "h1"
+      },
+      "selected": false
+    },
+    {
+      "id": "variables-table",
+      "type": "variables",
+      "position": {
+        "x": -320,
+        "y": 0
+      },
+      "data": {
+        "showComments": true,
+        "autoPlace": "spread",
+        "sheet": "h1"
+      },
+      "deletable": false,
+      "selected": false
+    },
+    {
+      "id": "nota-1",
+      "type": "note",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "width": 220,
+      "height": 110,
+      "data": {
+        "text": "# Notas\n- Paro de emergencia: `Emergencia`",
+        "color": "yellow",
+        "sheet": "h2"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "s0-t1",
+      "source": "s0",
+      "target": "t1",
+      "type": "grafcet",
+      "selected": false
+    },
+    {
+      "id": "t1-s1",
+      "source": "t1",
+      "target": "s1",
+      "type": "grafcet",
+      "selected": false
+    },
+    {
+      "id": "s1-t2",
+      "source": "s1",
+      "target": "t2",
+      "type": "grafcet",
+      "selected": false
+    },
+    {
+      "id": "t2-s0",
+      "source": "t2",
+      "target": "s0",
+      "type": "grafcet",
+      "selected": false
+    }
+  ],
+  "viewport": {
+    "x": 0,
+    "y": 0,
+    "zoom": 1
+  },
+  "plc": {
+    "scheme": "siemens",
+    "showAddresses": true,
+    "steps": {
+      "s0": {
+        "comment": "Esperando caja",
+        "address": "M0.0"
+      },
+      "s1": {
+        "comment": "Llevar la caja al otro extremo",
+        "address": "M0.1"
+      }
+    },
+    "variables": {
+      "S1": {
+        "comment": "Sensor capacitivo: caja en el extremo de entrada",
+        "type": "input",
+        "address": "I0.0"
+      },
+      "S2": {
+        "comment": "Sensor capacitivo: caja en el extremo de salida",
+        "type": "input",
+        "address": "I0.3"
+      },
+      "Seta1": {
+        "comment": "Seta de emergencia 1 (NC)",
+        "type": "input",
+        "address": "I0.1"
+      },
+      "Seta2": {
+        "comment": "Seta de emergencia 2 (NC)",
+        "type": "input",
+        "address": "I0.2"
+      },
+      "M": {
+        "comment": "Motor de la cinta",
+        "type": "output",
+        "address": "Q0.0"
+      }
+    },
+    "scene": {
+      "gravity": true,
+      "elements": [
+        {
+          "id": "cinta",
+          "type": "conveyor",
+          "x": 40,
+          "y": 300,
+          "rot": 0,
+          "motor": "M",
+          "reverse": "",
+          "length": 420,
+          "time": 5,
+          "text": "Cinta"
+        },
+        {
+          "id": "caja",
+          "type": "feeder",
+          "x": 80,
+          "y": 200,
+          "rot": 0,
+          "trigger": "Caja",
+          "auto": false,
+          "spacing": 0,
+          "sizes": "large",
+          "material": "plastic",
+          "color": "amber"
+        },
+        {
+          "id": "s1",
+          "type": "sensor",
+          "x": 80,
+          "y": 345,
+          "rot": 270,
+          "variable": "S1",
+          "contact": "NO",
+          "range": 70,
+          "kind": "capacitive",
+          "color": "amber"
+        },
+        {
+          "id": "s2",
+          "type": "sensor",
+          "x": 440,
+          "y": 380,
+          "rot": 0,
+          "variable": "S2",
+          "contact": "NO",
+          "range": 80,
+          "kind": "capacitive",
+          "color": "amber"
+        },
+        {
+          "id": "salida",
+          "type": "sink",
+          "x": 500,
+          "y": 450,
+          "rot": 0,
+          "text": "Salida"
+        },
+        {
+          "id": "caja",
+          "type": "button",
+          "x": 0,
+          "y": 0,
+          "rot": 0,
+          "variable": "Caja",
+          "text": "Dejar caja",
+          "place": "desk",
+          "contact": "NO",
+          "color": "yellow"
+        },
+        {
+          "id": "seta1",
+          "type": "emergency",
+          "x": 0,
+          "y": 0,
+          "rot": 0,
+          "variable": "Seta1",
+          "text": "Seta 1",
+          "place": "desk"
+        },
+        {
+          "id": "seta2",
+          "type": "emergency",
+          "x": 0,
+          "y": 0,
+          "rot": 0,
+          "variable": "Seta2",
+          "text": "Seta 2",
+          "place": "desk"
+        },
+        {
+          "id": "m",
+          "type": "lamp",
+          "x": 0,
+          "y": 0,
+          "rot": 0,
+          "variable": "M",
+          "text": "Cinta en marcha",
+          "place": "desk",
+          "color": "green"
+        }
+      ]
+    },
+    "electrical": {
+      "enabled": true,
+      "components": [
+        {
+          "id": "plc-mvidzd9c",
+          "type": "plc",
+          "inputs": 14,
+          "outputs": 10,
+          "x": 100,
+          "y": 260,
+          "tag": "A1",
+          "text": "Autómata"
+        },
+        {
+          "id": "rail-plc-mvidzd9c-10",
+          "type": "rail",
+          "x": 40,
+          "y": 0,
+          "potential": "L+",
+          "length": 960
+        },
+        {
+          "id": "rail-plc-mvidzd9c-11",
+          "type": "rail",
+          "x": 40,
+          "y": 20,
+          "potential": "M",
+          "length": 960,
+          "wires": "down"
+        },
+        {
+          "id": "rail-plc-mvidzd9c-12",
+          "type": "rail",
+          "x": 40,
+          "y": 560,
+          "potential": "M",
+          "length": 960
+        },
+        {
+          "id": "in-plc-mvidzd9c-1",
+          "type": "sensor3",
+          "x": 200,
+          "y": 80,
+          "signal": "S1",
+          "text": "Sensor capacitivo: caja en el extremo de entrada",
+          "kind": "capacitive",
+          "output": "PNP",
+          "tag": "B1"
+        },
+        {
+          "id": "in-plc-mvidzd9c-3",
+          "type": "emergency",
+          "x": 420,
+          "y": 80,
+          "signal": "Seta1",
+          "text": "Seta de emergencia 1 (NC)",
+          "tag": "S1"
+        },
+        {
+          "id": "in-plc-mvidzd9c-5",
+          "type": "emergency",
+          "x": 600,
+          "y": 80,
+          "signal": "Seta2",
+          "text": "Seta de emergencia 2 (NC)",
+          "tag": "S2"
+        },
+        {
+          "id": "in-plc-mvidzd9c-7",
+          "type": "sensor3",
+          "x": 780,
+          "y": 80,
+          "signal": "S2",
+          "text": "Sensor capacitivo: caja en el extremo de salida",
+          "kind": "capacitive",
+          "output": "PNP",
+          "tag": "B2"
+        },
+        {
+          "id": "out-plc-mvidzd9c-9",
+          "type": "coil",
+          "x": 140,
+          "y": 420,
+          "signal": "M",
+          "text": "Motor de la cinta",
+          "kind": "contactor",
+          "tag": "KM1"
+        }
+      ],
+      "wires": [
+        {
+          "id": "w-plc-mvidzd9c-13",
+          "from": {
+            "c": "rail-plc-mvidzd9c-10",
+            "t": "t4"
+          },
+          "to": {
+            "c": "plc-mvidzd9c",
+            "t": "L+"
+          }
+        },
+        {
+          "id": "w-plc-mvidzd9c-14",
+          "from": {
+            "c": "rail-plc-mvidzd9c-11",
+            "t": "t6"
+          },
+          "to": {
+            "c": "plc-mvidzd9c",
+            "t": "M"
+          }
+        },
+        {
+          "id": "w-plc-mvidzd9c-15",
+          "from": {
+            "c": "rail-plc-mvidzd9c-11",
+            "t": "t8"
+          },
+          "to": {
+            "c": "plc-mvidzd9c",
+            "t": "1M"
+          }
+        },
+        {
+          "id": "w-plc-mvidzd9c-16",
+          "from": {
+            "c": "plc-mvidzd9c",
+            "t": "L+"
+          },
+          "to": {
+            "c": "plc-mvidzd9c",
+            "t": "1L"
+          },
+          "bendX": -40
+        },
+        {
+          "id": "w-plc-mvidzd9c-17",
+          "from": {
+            "c": "rail-plc-mvidzd9c-10",
+            "t": "t9"
+          },
+          "to": {
+            "c": "in-plc-mvidzd9c-1",
+            "t": "BN"
+          }
+        },
+        {
+          "id": "w-plc-mvidzd9c-18",
+          "from": {
+            "c": "rail-plc-mvidzd9c-11",
+            "t": "t11"
+          },
+          "to": {
+            "c": "in-plc-mvidzd9c-1",
+            "t": "BU"
+          }
+        },
+        {
+          "id": "w-plc-mvidzd9c-19",
+          "from": {
+            "c": "in-plc-mvidzd9c-1",
+            "t": "BK"
+          },
+          "to": {
+            "c": "plc-mvidzd9c",
+            "t": "I0.0"
+          },
+          "bend": 20
+        },
+        {
+          "id": "w-plc-mvidzd9c-20",
+          "from": {
+            "c": "rail-plc-mvidzd9c-10",
+            "t": "t20"
+          },
+          "to": {
+            "c": "in-plc-mvidzd9c-3",
+            "t": "11"
+          }
+        },
+        {
+          "id": "w-plc-mvidzd9c-21",
+          "from": {
+            "c": "in-plc-mvidzd9c-3",
+            "t": "12"
+          },
+          "to": {
+            "c": "plc-mvidzd9c",
+            "t": "I0.1"
+          },
+          "bend": 40
+        },
+        {
+          "id": "w-plc-mvidzd9c-22",
+          "from": {
+            "c": "rail-plc-mvidzd9c-10",
+            "t": "t29"
+          },
+          "to": {
+            "c": "in-plc-mvidzd9c-5",
+            "t": "11"
+          }
+        },
+        {
+          "id": "w-plc-mvidzd9c-23",
+          "from": {
+            "c": "in-plc-mvidzd9c-5",
+            "t": "12"
+          },
+          "to": {
+            "c": "plc-mvidzd9c",
+            "t": "I0.2"
+          },
+          "bend": 60
+        },
+        {
+          "id": "w-plc-mvidzd9c-24",
+          "from": {
+            "c": "rail-plc-mvidzd9c-10",
+            "t": "t38"
+          },
+          "to": {
+            "c": "in-plc-mvidzd9c-7",
+            "t": "BN"
+          }
+        },
+        {
+          "id": "w-plc-mvidzd9c-25",
+          "from": {
+            "c": "rail-plc-mvidzd9c-11",
+            "t": "t40"
+          },
+          "to": {
+            "c": "in-plc-mvidzd9c-7",
+            "t": "BU"
+          }
+        },
+        {
+          "id": "w-plc-mvidzd9c-26",
+          "from": {
+            "c": "in-plc-mvidzd9c-7",
+            "t": "BK"
+          },
+          "to": {
+            "c": "plc-mvidzd9c",
+            "t": "I0.3"
+          },
+          "bend": 80
+        },
+        {
+          "id": "w-plc-mvidzd9c-27",
+          "from": {
+            "c": "plc-mvidzd9c",
+            "t": "Q0.0"
+          },
+          "to": {
+            "c": "out-plc-mvidzd9c-9",
+            "t": "A1"
+          },
+          "bend": 20
+        },
+        {
+          "id": "w-plc-mvidzd9c-28",
+          "from": {
+            "c": "out-plc-mvidzd9c-9",
+            "t": "A2"
+          },
+          "to": {
+            "c": "rail-plc-mvidzd9c-12",
+            "t": "t6"
+          }
+        }
+      ]
+    },
+    "scenarios": [
+      {
+        "id": "caja",
+        "name": "Una caja con parada de emergencia",
+        "duration": 12,
+        "events": [
+          {
+            "t": 0.5,
+            "name": "Caja",
+            "value": 1
+          },
+          {
+            "t": 0.8,
+            "name": "Caja",
+            "value": 0
+          },
+          {
+            "t": 3,
+            "name": "Seta1",
+            "value": 0
+          },
+          {
+            "t": 4,
+            "name": "Seta1",
+            "value": 1
+          }
+        ]
+      }
+    ],
+    "exercise": {
+      "title": "Práctica 4. Cinta transportadora con setas de emergencia",
+      "statement": "Una cinta transportadora se pone en marcha cuando un sensor capacitivo (**S1**) detecta una caja colocada a mano en un extremo. La cinta lleva la caja hasta el otro extremo, por donde cae, y se para cuando la detecta otro sensor capacitivo (**S2**).\n\n- En cada extremo hay una seta de emergencia normalmente cerrada (**Seta1**, **Seta2**). Si se pulsa cualquiera, la cinta se para al momento y no sigue hasta que la seta vuelve a su posición de reposo.\n\na) Haz el programa con el método que prefieras e indica la tabla de símbolos, el GRAFCET, el diagrama de contactos y las anotaciones que consideres necesarias.",
+      "parts": {
+        "plant": "locked",
+        "variables": "locked",
+        "electrical": "given"
+      },
+      "checks": {
+        "warnings": false,
+        "sequence": "",
+        "scenario": "",
+        "behaviour": {
+          "scenarios": [
+            "caja"
+          ],
+          "outputs": [],
+          "tolerance": 0.5,
+          "counts": true
+        },
+        "requirements": [
+          {
+            "id": "conditional"
+          }
+        ]
+      },
+      "hints": {
+        "enabled": true,
+        "items": [
+          "Una etapa de espera y otra con la cinta en marcha.",
+          "Para que las setas paren al momento sin cambiar de etapa, la cinta es una acción condicionada: `M` si `Seta1 · Seta2`."
+        ]
+      },
+      "grade": {
+        "enabled": false,
+        "max": 10,
+        "hintPenalty": 0
+      },
+      "processData": false,
+      "sheet": {
+        "subject": "",
+        "course": "",
+        "cycle": "",
+        "center": "",
+        "teacher": ""
+      }
+    },
+    "stepPrefix": "M",
+    "sequence": "A+ A-",
+    "sheets": [
+      {
+        "id": "h1",
+        "name": "Hoja 1"
+      },
+      {
+        "id": "h2",
+        "name": "Notas"
+      }
+    ],
+    "titleBlock": {
+      "company": "IES de prueba",
+      "project": "Cinta",
+      "author": "Profesorado",
+      "revision": "A",
+      "date": "2026-10-12",
+      "drawing": "P-01"
+    },
+    "dossier": {
+      "page": "a4",
+      "sections": {
+        "cover": true,
+        "toc": true,
+        "statement": true,
+        "theory": true,
+        "improvements": true,
+        "problems": true,
+        "grafcet": true,
+        "variables": true,
+        "verification": true,
+        "ladder": true,
+        "plant": true,
+        "electrical": true,
+        "chronogram": true,
+        "spacePhase": true,
+        "notes": false
+      },
+      "cover": {
+        "student": "Alumno",
+        "group": "1º"
+      },
+      "statement": "Enunciado.",
+      "theory": "",
+      "improvements": "",
+      "problems": "",
+      "ladderListing": "",
+      "scenario": ""
+    },
+    "guide": {
+      "title": "Guion de prueba",
+      "sheet": {
+        "subject": "Automatismos",
+        "course": "",
+        "cycle": "",
+        "center": "",
+        "teacher": ""
+      },
+      "rules": "Normas.",
+      "practices": [
+        {
+          "id": "current"
+        }
+      ],
+      "currentGuided": false
+    },
+    "gemma": {
+      "production": "G1",
+      "states": {
+        "A1": "",
+        "F1": "",
+        "A2": "",
+        "D1": "EMPTY",
+        "A5": "EMPTY",
+        "A6": "INIT"
+      },
+      "transitions": [
+        {
+          "from": "A1",
+          "to": "F1",
+          "condition": "Marcha"
+        },
+        {
+          "from": "F1",
+          "to": "A2",
+          "condition": "Paro"
+        },
+        {
+          "from": "A2",
+          "to": "A1",
+          "condition": "Fin_ciclo"
+        },
+        {
+          "from": "F1",
+          "to": "D1",
+          "condition": "Emergencia"
+        },
+        {
+          "from": "D1",
+          "to": "A5",
+          "condition": "!Emergencia"
+        },
+        {
+          "from": "A5",
+          "to": "A6",
+          "condition": "Rearme"
+        },
+        {
+          "from": "A6",
+          "to": "A1",
+          "condition": "Inicio_ok"
+        }
+      ]
+    },
+    "cpu": {
+      "enabled": false,
+      "source": "generated",
+      "text": "",
+      "name": ""
+    }
+  }
+}
