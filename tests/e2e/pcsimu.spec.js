@@ -1,12 +1,11 @@
 import { readFile } from 'node:fs/promises'
 import { expect, test } from '@playwright/test'
-import { download, expectNoErrors, openEditor, openExample } from './helpers'
+import { download, expectNoErrors, exportFromMore, openEditor, openExample } from './helpers'
 
 test('exportar a PC_SIMU: el panel en .sim y el programa en .awl, con el motor de la planta', async ({ page }) => {
   const errors = await openEditor(page)
   await openExample(page, /Marcha y paro de un motor/)
-  await page.getByRole('button', { name: /Exportar/ }).click()
-  await page.getByRole('menuitem', { name: /Planta para PC_SIMU/ }).click()
+  await exportFromMore(page, /Planta para PC_SIMU/)
   const dialog = page.getByRole('dialog', { name: 'Planta para PC_SIMU' })
   await expect(dialog.locator('[data-pcsimu-count]')).toHaveText('4 elementos en el panel.') // marcha, paro, piloto y el motor
   await expect(dialog).not.toContainText('Todavía no pasan')
@@ -27,8 +26,7 @@ test('exportar a PC_SIMU: el panel en .sim y el programa en .awl, con el motor d
 test('exportar a PC_SIMU: los cilindros con vuelta por muelle llevan su salida de recoger en el .awl', async ({ page }) => {
   const errors = await openEditor(page)
   await openExample(page, /Estación de elevación/)
-  await page.getByRole('button', { name: /Exportar/ }).click()
-  await page.getByRole('menuitem', { name: /Planta para PC_SIMU/ }).click()
+  await exportFromMore(page, /Planta para PC_SIMU/)
   const dialog = page.getByRole('dialog', { name: 'Planta para PC_SIMU' })
   await expect(dialog).toContainText('el .awl pone Q0.6 = NOT Q0.3')
   const awl = await download(page, () => dialog.getByRole('button', { name: 'Programa .awl' }).click())
@@ -41,8 +39,7 @@ test('exportar a PC_SIMU: los cilindros con vuelta por muelle llevan su salida d
 test('importar de PC_SIMU: al abrir un .sim, su panel y su planta pasan a la planta virtual, con sus variables', async ({ page }) => {
   const errors = await openEditor(page)
   await openExample(page, /Marcha y paro de un motor/)
-  await page.getByRole('button', { name: /Exportar/ }).click()
-  await page.getByRole('menuitem', { name: /Planta para PC_SIMU/ }).click()
+  await exportFromMore(page, /Planta para PC_SIMU/)
   const dialog = page.getByRole('dialog', { name: 'Planta para PC_SIMU' })
   const sim = await download(page, () => dialog.getByRole('button', { name: 'Panel .sim' }).click())
   const bytes = await readFile(await sim.path())

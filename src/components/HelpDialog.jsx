@@ -85,7 +85,7 @@ const FAQ = [
   [N_('¿Cómo pruebo el grafcet sin autómata?'), N_('Pulsa Simular: activa las entradas con un clic o con las teclas 1–9 y mira las etapas activas. Si algo no avanza, pasa el ratón por la transición. En los ejemplos con planta virtual, la máquina se mueve con tus salidas.')],
   [N_('¿Cómo doy direcciones del autómata a las variables?'), N_('Abre la tabla de variables y pulsa «Rellenar vacías»: asigna direcciones según el formato elegido (S7-200, S7-300/1200 o IEC 61131-3). Puedes cambiar cualquiera a mano.')],
   [N_('¿Cómo paso el programa al autómata?'), N_('Botón Ladder: ladder, ST, SCL (TIA Portal) y AWL/STL. Para el S7-200, descarga el .awl y, en Micro/WIN, Archivo > Importar; la tabla de símbolos se copia y se pega.')],
-  [N_('¿Dónde se guarda mi trabajo?'), N_('Mientras trabajas se guarda solo en este navegador, y lo anterior queda en Abrir > Trabajos anteriores. Para llevártelo, «Guardar» descarga un archivo .json; también puedes compartirlo por enlace (Exportar > Compartir por enlace).')],
+  [N_('¿Dónde se guarda mi trabajo?'), N_('Mientras trabajas se guarda solo en este navegador, y lo anterior queda en Abrir > Trabajos anteriores. Para llevártelo, «Guardar» descarga un archivo .json; también puedes compartirlo por enlace (Exportar > Más formatos > Compartir por enlace).')],
   [N_('¿Cómo cambio el nombre de una variable en todo el diagrama?'), N_('En la tabla de variables (la del lienzo o la del diálogo), clic en su nombre y escribe el nuevo: cambia en receptividades, acciones, la planta y el esquema, y conserva su dirección y su comentario.')],
   [N_('¿Cómo cambio el idioma, el tema o el tamaño de letra?'), N_('Botón Opciones (el engranaje de la barra).')],
 ]

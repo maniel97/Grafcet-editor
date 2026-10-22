@@ -7,7 +7,7 @@ import { downloadFile } from '../lib/projectFile'
 import { fileName, getProjectName } from '../lib/fileNames'
 import { t } from '../lib/i18n'
 
-// Exportar > Planta para PC_SIMU (lib/pcsimu.js): el panel de mando de la planta virtual en un .sim,
+// Exportar > Más formatos > Planta para PC_SIMU (lib/pcsimu.js): el panel de mando de la planta virtual en un .sim,
 // y al lado el programa del S7-200 (.awl) para cargarlo en el mismo PC_SIMU.
 export default function PcSimuDialog({ nodes, edges, plc, onClose }) {
   const dialogRef = useRef(null)

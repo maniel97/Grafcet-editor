@@ -415,9 +415,9 @@ export const TUTORIALS = [
         target: 'Exportar',
         free: true,
         title: N_('Prepara el ejercicio'),
-        text: N_('Abre Exportar > «Ejercicio para el alumnado». Ahí se dice todo lo que tendrá el ejercicio.'),
+        text: N_('Abre Exportar > «Más formatos…» > «Ejercicio para el alumnado». Ahí se dice todo lo que tendrá el ejercicio.'),
         waitFor: exerciseDialogOpen,
-        hint: N_('Exportar > Ejercicio para el alumnado.'),
+        hint: N_('Exportar > Más formatos… > Ejercicio para el alumnado.'),
       },
       {
         target: firstOf(() => one('[data-tour="pruebas-comportamiento"]'), () => one('#exercise-title-input')),

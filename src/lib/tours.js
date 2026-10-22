@@ -76,7 +76,7 @@ export const FIRST_TOUR = {
     {
       target: 'Exportar',
       title: N_('Exportar'),
-      text: N_('Imagen (PNG, SVG), PDF para imprimir y el dossier de la práctica, listo para entregar.'),
+      text: N_('Imagen (PNG), PDF para imprimir y el dossier de la práctica, listo para entregar. En «Más formatos…», SVG, entregas, PC_SIMU y compartir por enlace.'),
     },
     {
       target: 'Ayuda',

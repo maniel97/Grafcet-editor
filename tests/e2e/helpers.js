@@ -82,6 +82,17 @@ export async function openExport(page, format) {
   return page.getByRole('dialog', { name: 'Exportar', exact: true })
 }
 
+// Exportar > Más formatos…: abre el desplegable y elige la tarjeta con ese nombre (SVG, entregas,
+// PC_SIMU, enlace, guion o ejercicio). El diálogo que se abre lo busca quien llama.
+export async function exportFromMore(page, name) {
+  await page.getByRole('button', { name: /Exportar/ }).click()
+  await page.getByRole('menuitem', { name: /Más formatos/ }).click()
+  const dialog = page.getByRole('dialog', { name: 'Más formatos' })
+  // El diálogo se carga bajo demanda: se espera a que sus tarjetas estén.
+  await expect(dialog).toBeVisible()
+  await dialog.getByRole('button', { name }).click()
+}
+
 // Abre la tabla de variables y devuelve el diálogo.
 export async function openVariables(page) {
   await page.getByTitle(/Tabla de variables: direcciones/).click()

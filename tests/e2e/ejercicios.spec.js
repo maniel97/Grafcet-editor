@@ -1,6 +1,6 @@
 import { readFileSync } from 'fs'
 import { expect, test } from '@playwright/test'
-import { download, expectNoErrors, loadProject, openEditor, openExample } from './helpers'
+import { download, expectNoErrors, exportFromMore, loadProject, openEditor, openExample } from './helpers'
 
 const step = (page, label) => page.locator('.react-flow__node-step').filter({ has: page.locator('.diagram-step-label', { hasText: new RegExp(`^${label}$`) }) })
 const receptivity = async (page, node, text) => {
@@ -91,8 +91,7 @@ test('ejercicio del alumno: enunciado, Comprobar, piezas bloqueadas y resuelto',
 test('ejercicio del profesor: preparar, probar con su solución y descargar sin solución', async ({ page }) => {
   const errors = await openEditor(page, undefined, { education: true })
   await openExample(page, /^Cilindros A\+ B\+/)
-  await page.getByRole('button', { name: /Exportar/ }).click()
-  await page.getByRole('menuitem', { name: /Ejercicio para el alumnado/ }).click()
+  await exportFromMore(page, /Ejercicio para el alumnado/)
   const dialog = page.getByRole('dialog', { name: 'Ejercicio para el alumnado' })
   await dialog.getByLabel('Título').fill('Mis cilindros')
   await dialog.getByLabel('Enunciado').fill('Haz **A+ B+ A− B−** al pulsar Marcha.')
@@ -146,8 +145,7 @@ test('editor de escenarios: dibujar un pulso y ver la respuesta del grafcet', as
 test('hoja de prácticas en PDF: se imprime como una hoja y el editor abre el ejercicio de dentro', async ({ page }) => {
   const errors = await openEditor(page, undefined, { education: true })
   await openExample(page, /^Cilindros A\+ B\+/)
-  await page.getByRole('button', { name: /Exportar/ }).click()
-  await page.getByRole('menuitem', { name: /Ejercicio para el alumnado/ }).click()
+  await exportFromMore(page, /Ejercicio para el alumnado/)
   const dialog = page.getByRole('dialog', { name: 'Ejercicio para el alumnado' })
   await dialog.getByLabel('Título').fill('Mis cilindros')
   await dialog.getByLabel('Asignatura').fill('Automatismos industriales')
@@ -194,8 +192,7 @@ test('guion de prácticas: varias prácticas en un PDF y elegir cuál abrir', as
   await page.getByRole('menuitem', { name: /Ejercicios/ }).click()
   await page.getByRole('button', { name: /Abrir resuelta: Práctica 1/ }).click()
   await expect(page.locator('.react-flow__node-step')).toHaveCount(8) // la solución, en el lienzo
-  await page.getByRole('button', { name: /Exportar/ }).click()
-  await page.getByRole('menuitem', { name: /^Guion de prácticas/ }).click()
+  await exportFromMore(page, /^Guion de prácticas/)
   const dialog = page.getByRole('dialog', { name: 'Guion de prácticas' })
   await dialog.getByRole('button', { name: 'Usar el guion de ejemplo' }).click()
   await expect(dialog.locator('[data-practice]')).toHaveCount(7)
@@ -250,8 +247,7 @@ test('pistas, requisitos y nota del ejercicio', async ({ page }) => {
 test('el profesor quita las pistas y pide nota', async ({ page }) => {
   const errors = await openEditor(page, undefined, { education: true })
   await openExample(page, /^Marcha y paro de un motor/)
-  await page.getByRole('button', { name: /Exportar/ }).click()
-  await page.getByRole('menuitem', { name: /Ejercicio para el alumnado/ }).click()
+  await exportFromMore(page, /Ejercicio para el alumnado/)
   const dialog = page.getByRole('dialog', { name: 'Ejercicio para el alumnado' })
   await dialog.getByLabel('Título').fill('Marcha y paro')
   await dialog.getByRole('group', { name: 'Requisitos' }).getByLabel('Usa un flanco (↑ o ↓)').check()
@@ -276,8 +272,7 @@ test('datos del proceso y corregir las entregas de la clase', async ({ page }) =
   const errors = await openEditor(page, undefined, { education: true })
   // El profesor prepara el ejercicio y guarda su proyecto (con la solución).
   await openExample(page, /^Marcha y paro de un motor/)
-  await page.getByRole('button', { name: /Exportar/ }).click()
-  await page.getByRole('menuitem', { name: /Ejercicio para el alumnado/ }).click()
+  await exportFromMore(page, /Ejercicio para el alumnado/)
   const dialog = page.getByRole('dialog', { name: 'Ejercicio para el alumnado' })
   await dialog.getByLabel('Título').fill('Marcha y paro')
   await dialog.getByLabel('Anotar datos del proceso del alumnado (solo totales)').check()

@@ -1,11 +1,10 @@
 import { expect, test } from '@playwright/test'
-import { expectNoErrors, openEditor, openExample } from './helpers'
+import { expectNoErrors, exportFromMore, openEditor, openExample } from './helpers'
 
 test('compartir por enlace: enlace con QR y abrirlo en otro navegador', async ({ page, browser }) => {
   const errors = await openEditor(page)
   await openExample(page, /Clasificadora por material/)
-  await page.getByRole('button', { name: /Exportar/ }).click()
-  await page.getByRole('menuitem', { name: /Compartir por enlace/ }).click()
+  await exportFromMore(page, /Compartir por enlace/)
   const dialog = page.getByRole('dialog', { name: 'Compartir por enlace' })
   const input = dialog.getByLabel('Enlace para compartir')
   await expect(input).toHaveValue(/#p=[A-Za-z0-9_-]+$/)

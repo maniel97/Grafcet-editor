@@ -313,7 +313,8 @@ test('tutorial «Prepara tu primer ejercicio» (profesorado) de principio a fin'
 
   await tut.title('Prepara el ejercicio')
   await page.getByRole('button', { name: /Exportar/ }).click()
-  await page.getByRole('menuitem', { name: /Ejercicio para el alumnado/ }).click()
+  await page.getByRole('menuitem', { name: /Más formatos/ }).click()
+  await page.getByRole('dialog', { name: 'Más formatos' }).getByRole('button', { name: /Ejercicio para el alumnado/ }).click()
   const dialog = page.getByRole('dialog', { name: 'Ejercicio para el alumnado' })
 
   // La visita se ve encima del diálogo.

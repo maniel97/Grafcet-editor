@@ -27,22 +27,27 @@ for (const width of [1500, 1280, 1100]) {
     const exportBtn = page.getByRole('button', { name: /Exportar/ })
     const menu = page.getByRole('menu', { name: 'Formatos de exportación' })
     await exportBtn.click()
-    await expect(menu.getByRole('menuitem')).toHaveCount(7) // PNG, SVG, PDF, dossier, varias prácticas, PC_SIMU y compartir (sin el modo educativo)
+    await expect(menu.getByRole('menuitem')).toHaveCount(4) // PNG, PDF, dossier y «Más formatos…»
     await page.keyboard.press('Escape')
     await expect(menu).toHaveCount(0)
     await exportBtn.click()
-    await page.keyboard.press('ArrowDown')
-    await page.keyboard.press('Enter') // SVG: abre el diálogo con vista previa
+    await page.keyboard.press('Enter') // PNG (el primero): abre el diálogo con vista previa
     await expect(page.getByLabel('Vista previa de la imagen')).toBeVisible()
-    expect((await saveFromDialog(page, 'svg')).suggestedFilename()).toBe('grafcet.svg')
-    await exportBtn.click()
-    await menu.getByRole('menuitem', { name: /PNG/ }).click()
     expect((await saveFromDialog(page, 'png')).suggestedFilename()).toBe('grafcet.png')
     // PDF abre su diálogo (probado aparte en pdf.spec.js).
     await exportBtn.click()
     await menu.getByRole('menuitem', { name: /PDF/ }).click()
     await expect(page.getByRole('dialog', { name: 'Exportar', exact: true })).toBeVisible()
     await page.keyboard.press('Escape')
+    // El resto de formatos van en «Más formatos…» (SVG aquí, para probar el camino).
+    await exportBtn.click()
+    await menu.getByRole('menuitem', { name: /Más formatos/ }).click()
+    const more = page.getByRole('dialog', { name: 'Más formatos' })
+    await expect(more).toBeVisible() // se carga bajo demanda
+    await expect(more.getByRole('button')).toHaveCount(5) // SVG, entregas, PC_SIMU, compartir y el de cerrar (sin el modo educativo)
+    await more.getByRole('button', { name: /^SVG/ }).click()
+    await expect(page.getByLabel('Vista previa de la imagen')).toBeVisible()
+    expect((await saveFromDialog(page, 'svg')).suggestedFilename()).toBe('grafcet.svg')
     expectNoErrors(errors)
   })
 }
@@ -127,6 +132,13 @@ test('modo educativo: menús sencillos por defecto y herramientas de clase al ac
   menu = await openMenu(/^Exportar/)
   await expect(menu.getByRole('menuitem', { name: /Ejercicio para el alumnado|Guion de prácticas/ })).toHaveCount(0)
   await page.keyboard.press('Escape')
+  // Tampoco en «Más formatos…».
+  await page.getByRole('button', { name: /Exportar/ }).click()
+  await page.getByRole('menuitem', { name: /Más formatos/ }).click()
+  const more = page.getByRole('dialog', { name: 'Más formatos' })
+  await expect(more).toBeVisible() // se carga bajo demanda
+  await expect(more.getByRole('button', { name: /Ejercicio para el alumnado|Guion de prácticas/ })).toHaveCount(0)
+  await page.keyboard.press('Escape')
 
   // Un ejercicio que te dan se abre y se hace igual (su panel depende del archivo).
   await page.locator('input[type=file]').first().setInputFiles(fixture('ejercicio-alumno.json'))
@@ -141,12 +153,19 @@ test('modo educativo: menús sencillos por defecto y herramientas de clase al ac
   await expect(menu.getByRole('menuitem', { name: /Corregir entregas/ })).toHaveCount(1)
   await page.keyboard.press('Escape')
   menu = await openMenu(/^Exportar/)
-  await expect(menu.getByRole('menuitem')).toHaveCount(9)
+  await expect(menu.getByRole('menuitem')).toHaveCount(4) // el menú no cambia; lo de clase va en «Más formatos…»
+  await page.keyboard.press('Escape')
   // Se recuerda al volver a entrar.
   await page.reload()
   await page.waitForSelector('.react-flow__node')
   menu = await openMenu(/^Exportar/)
-  await expect(menu.getByRole('menuitem', { name: /Guion de prácticas/ })).toHaveCount(1)
+  await expect(menu.getByRole('menuitem')).toHaveCount(4)
+  await page.keyboard.press('Escape')
+  await page.getByRole('button', { name: /Exportar/ }).click()
+  await page.getByRole('menuitem', { name: /Más formatos/ }).click()
+  const moreTrasRecargar = page.getByRole('dialog', { name: 'Más formatos' })
+  await expect(moreTrasRecargar).toBeVisible()
+  await expect(moreTrasRecargar.getByRole('button', { name: /Guion de prácticas/ })).toHaveCount(1)
   expectNoErrors(errors)
 })
 

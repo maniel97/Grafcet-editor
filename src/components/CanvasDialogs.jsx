@@ -11,6 +11,7 @@ const ClassDialog = lazy(() => import('./ClassDialog'))
 const NewProjectDialog = lazy(() => import('./NewProjectDialog'))
 const PneumaticDialog = lazy(() => import('./PneumaticDialog'))
 const ExportDialog = lazy(() => import('./ExportDialog'))
+const MoreExportsDialog = lazy(() => import('./MoreExportsDialog'))
 const DossierDialog = lazy(() => import('./DossierDialog'))
 const ShareDialog = lazy(() => import('./ShareDialog'))
 const GuideDialog = lazy(() => import('./GuideDialog'))
@@ -95,8 +96,9 @@ export function ProjectDialogs({
   )
 }
 
-// Los de Exportar, según format: 'dossier', 'notebook', 'share', 'guide', 'exercise', 'pcsimu' o un formato de imagen o
-// PDF ('svg', 'png', 'pdf'…, con su vista previa).
+// Los de Exportar, según format: 'dossier', 'notebook', 'share', 'guide', 'exercise', 'pcsimu',
+// 'more' (el diálogo con el resto de formatos, que elige uno con onPick) o un formato de imagen
+// o PDF ('svg', 'png', 'pdf'…, con su vista previa).
 export function ExportDialogs({
   format,
   onClose,
@@ -115,6 +117,8 @@ export function ExportDialogs({
   onExportStudent,
   onExportSheet,
   titleBlockProps,
+  education,
+  onPick,
 }) {
   if (!format) return null
   return (
@@ -140,6 +144,8 @@ export function ExportDialogs({
         <GuideDialog plc={plc} onChange={(guide) => setPlc((p) => ({ ...p, guide }))} onGenerate={onGenerateGuide} onClose={onClose} />
       ) : format === 'exercise' ? (
         <ExerciseDialog plc={plc} getProject={getProject} onSave={onSaveExercise} onExportStudent={onExportStudent} onExportSheet={onExportSheet} onClose={onClose} />
+      ) : format === 'more' ? (
+        <MoreExportsDialog education={education} onPick={onPick} onClose={onClose} />
       ) : (
         <ExportDialog source={source} initialFormat={format} fileName={(ext) => fileName(ext)} {...titleBlockProps} onClose={onClose} />
       )}

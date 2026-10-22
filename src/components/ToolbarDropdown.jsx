@@ -77,25 +77,29 @@ export default function ToolbarDropdown({ icon: Icon, label, title, menuLabel, i
           style={{ top: pos.top, left: pos.left, width: pos.width }}
           className="fixed z-50 rounded-lg border border-slate-200 bg-white py-1 text-sm shadow-xl"
         >
-          {items.map((f) => (
-            <button
-              key={f.id}
-              type="button"
-              role="menuitem"
-              disabled={f.disabled}
-              onClick={() => {
-                setOpen(false)
-                f.onSelect()
-              }}
-              className="flex w-full items-start gap-3 px-3 py-2 text-left pointer-coarse:py-3 outline-none hover:bg-slate-100 focus:bg-slate-100 disabled:opacity-40"
-            >
-              <f.icon size={18} className="mt-0.5 shrink-0 text-slate-500" />
-              <span>
-                <span className="block font-medium text-slate-800">{t(f.label)}</span>
-                <span className="block text-xs text-slate-500">{t(f.hint)}</span>
-              </span>
-            </button>
-          ))}
+          {items.map((f) =>
+            f.separator ? (
+              <div key={f.id} role="separator" className="my-1 border-t border-slate-200" />
+            ) : (
+              <button
+                key={f.id}
+                type="button"
+                role="menuitem"
+                disabled={f.disabled}
+                onClick={() => {
+                  setOpen(false)
+                  f.onSelect()
+                }}
+                className="flex w-full items-start gap-3 px-3 py-2 text-left pointer-coarse:py-3 outline-none hover:bg-slate-100 focus:bg-slate-100 disabled:opacity-40"
+              >
+                <f.icon size={18} className="mt-0.5 shrink-0 text-slate-500" />
+                <span>
+                  <span className="block font-medium text-slate-800">{t(f.label)}</span>
+                  <span className="block text-xs text-slate-500">{t(f.hint)}</span>
+                </span>
+              </button>
+            ),
+          )}
         </div>
       )}
     </>

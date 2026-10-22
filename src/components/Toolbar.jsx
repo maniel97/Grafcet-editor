@@ -206,7 +206,7 @@ export default function Toolbar({
 
       <Separator />
 
-      <ExportMenu onExport={onExport} labelClass={labelClass(true)} education={education} />
+      <ExportMenu onExport={onExport} labelClass={labelClass(true)} />
 
       <Separator />
 

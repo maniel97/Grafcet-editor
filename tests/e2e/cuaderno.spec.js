@@ -1,13 +1,12 @@
 import { readFileSync } from 'node:fs'
 import { expect, test } from '@playwright/test'
-import { download, expectNoErrors, fixture, openEditor, openExample } from './helpers'
+import { download, expectNoErrors, exportFromMore, fixture, openEditor, openExample } from './helpers'
 import { attachmentsOf } from '../../src/lib/pdfAttach'
 
 test('entregar varias prácticas: cuaderno con portada, índice, resumen, orden y cada proyecto dentro', async ({ page }) => {
   const errors = await openEditor(page)
   await openExample(page, /Taladradora/)
-  await page.getByRole('button', { name: /Exportar/ }).click()
-  await page.getByRole('menuitem', { name: /Entregar varias prácticas/ }).click()
+  await exportFromMore(page, /Entregar varias prácticas/)
   const dialog = page.getByRole('dialog', { name: 'Entregar varias prácticas' })
 
   // El proyecto abierto y dos archivos (uno de ellos, un ejercicio del alumnado).

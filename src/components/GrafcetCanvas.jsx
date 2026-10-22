@@ -718,7 +718,7 @@ export default function GrafcetCanvas() {
     [replaceProject],
   )
   // Ejercicios (lib/exercise.js): panel con el enunciado y «Comprobar»; el alumnado lo tiene
-  // abierto en cuanto abre un ejercicio. El profesor lo prepara en Exportar > Ejercicio.
+  // abierto en cuanto abre un ejercicio. El profesor lo prepara en Exportar > Más formatos > Ejercicio.
   const [exerciseOpen, setExerciseOpen] = useState(false)
   const student = isStudent(plc)
   useEffect(() => {
@@ -1023,7 +1023,9 @@ export default function GrafcetCanvas() {
         />
         <ExportDialogs
           format={exportFormat}
-          onClose={() => setExportFormat(null)}
+          // Al elegir en «Más formatos» se abre el diálogo de destino; el «close» que dispara el
+          // navegador al desmontar el diálogo intermedio no debe cerrarlo (por eso la guarda).
+          onClose={exportFormat === 'more' ? () => setExportFormat((f) => (f === 'more' ? null : f)) : () => setExportFormat(null)}
           nodes={nodes}
           edges={edges}
           plc={plc}
@@ -1042,6 +1044,8 @@ export default function GrafcetCanvas() {
           onExportStudent={exportStudent}
           onExportSheet={exportSheet}
           titleBlockProps={titleBlockProps}
+          education={Boolean(settings.education)}
+          onPick={onExport}
         />
         {editingScenario && (
           <Suspense fallback={<Loading />}>

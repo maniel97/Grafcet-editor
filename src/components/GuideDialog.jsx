@@ -23,7 +23,7 @@ const SHEET_FIELDS = [
   ['teacher', N_('Profesor/a')],
 ]
 
-// Guion de prácticas (Exportar > Guion de prácticas): varias prácticas en un único PDF, con
+// Guion de prácticas (Exportar > Más formatos > Guion de prácticas): varias prácticas en un único PDF, con
 // normas generales, cabecera y pie en cada página y cada práctica adjunta (lib/exerciseSheetPdf.js).
 // El guion se guarda en el proyecto abierto (plc.guide; no viaja al alumnado).
 // onGenerate(guide) -> promesa (genera y descarga el PDF).
@@ -61,7 +61,7 @@ export default function GuideDialog({ plc, onChange, onGenerate, onClose }) {
       }
     }
     set({ practices: [...guide.practices, ...added] })
-    setNotice(skipped ? t('Se han añadido {n} prácticas; {m} archivos no eran ejercicios (prepáralos antes en Exportar > Ejercicio para el alumnado).', { n: added.length, m: skipped }) : '')
+    setNotice(skipped ? t('Se han añadido {n} prácticas; {m} archivos no eran ejercicios (prepáralos antes en Exportar > Más formatos > Ejercicio para el alumnado).', { n: added.length, m: skipped }) : '')
   }
   // El guion de ejemplo: sus datos, normas y prácticas (la guiada, si es el proyecto abierto).
   const useExample = () => {
@@ -139,7 +139,7 @@ export default function GuideDialog({ plc, onChange, onGenerate, onClose }) {
               }}
             />
           </div>
-          {!currentConfig && <p className="text-xs text-slate-500">{t('El proyecto abierto no está preparado como ejercicio: no entra en el guion (Exportar > Ejercicio para el alumnado).')}</p>}
+          {!currentConfig && <p className="text-xs text-slate-500">{t('El proyecto abierto no está preparado como ejercicio: no entra en el guion (Exportar > Más formatos > Ejercicio para el alumnado).')}</p>}
           {notice && <p className="rounded bg-amber-50 px-2 py-1.5 text-xs text-amber-900">{notice}</p>}
           {practices.length === 0 && <p className="text-xs text-slate-500">{t('Añade las prácticas: archivos de ejercicios (.json) u hojas de prácticas en PDF.')}</p>}
           <ol className="space-y-1">

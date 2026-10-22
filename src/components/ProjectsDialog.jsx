@@ -99,7 +99,7 @@ export default function ProjectsDialog({ initialTab = 'examples', onOpenExample,
         ) : tab === 'exercises' ? (
           <div className="space-y-3">
             <p className="text-sm text-slate-600">
-              {t('Se abre el enunciado con lo que se da hecho (planta, tabla de variables…). Dibuja el grafcet y pulsa «Comprobar» cuantas veces quieras. Cada profesor puede preparar los suyos en Exportar > Ejercicio para el alumnado.')}
+              {t('Se abre el enunciado con lo que se da hecho (planta, tabla de variables…). Dibuja el grafcet y pulsa «Comprobar» cuantas veces quieras. Cada profesor puede preparar los suyos en Exportar > Más formatos > Ejercicio para el alumnado.')}
             </p>
             <ul className="grid gap-3 sm:grid-cols-2">
               {EXERCISES.map((ex) => (
@@ -157,7 +157,7 @@ export default function ProjectsDialog({ initialTab = 'examples', onOpenExample,
                             </button>
                           )}
                         </span>
-                        {i === 0 && p.guided && <span className="text-xs text-slate-500">{t('Ábrela resuelta y usa Exportar > Guion de prácticas > «Usar el guion de ejemplo» para sacar el guion completo en PDF.')}</span>}
+                        {i === 0 && p.guided && <span className="text-xs text-slate-500">{t('Ábrela resuelta y usa Exportar > Más formatos > Guion de prácticas > «Usar el guion de ejemplo» para sacar el guion completo en PDF.')}</span>}
                       </li>
                     )
                   })}
