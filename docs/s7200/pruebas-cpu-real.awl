@@ -83,6 +83,14 @@ Network 22 // P10 EU de un bit que ya esta a 1 en el primer ciclo: M11.5 (simula
 LD     SM0.0
 EU
 S      M11.5, 1
+Network 23 // P11 SM1.0 tras DIV con cociente 0 y resto 5: M11.6 (simulada: 1, mira el cociente)
+LD     SM0.1
+MOVW   +10, VW530
+MOVW   +5, VW534
+DIV    VW530, VD532
+LD     SM0.1
+A      SM1.0
+S      M11.6, 1
 END_ORGANIZATION_BLOCK
 SUBROUTINE_BLOCK SBR_0:SBR0
 TITLE=

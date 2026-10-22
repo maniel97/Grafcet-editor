@@ -4,7 +4,7 @@
 // Comportamiento según el «S7-200 Programmable Controller System Manual» (Siemens, 08/2008); la
 // auditoría instrucción por instrucción y lo que no se puede imitar está en docs/s7200-auditoria.md.
 //
-//   Bits:       LD LDN A AN O ON NOT EU ED ALD OLD LPS LRD LPP LDS AENO, = S R (también T y C),
+//   Bits:       LD LDN A AN O ON NOT EU ED ALD OLD LPS LRD LPP LDS AENO, = S R SR RS (también T y C),
 //               variantes inmediatas (LDI, =I, SI…) iguales que las normales
 //   Comparar:   LDB AB OB (sin signo), LDW AW OW, LDD AD OD, LDR AR OR  con = <> < > <= >=
 //   Tiempos:    TON TONR TOF; la resolución la da el número (1, 10 o 100 ms, tabla 6-72)
@@ -13,7 +13,8 @@
 //   Cálculo:    +I −I *I /I +D −D *D /D +R −R *R /R MUL DIV INCB/W/D DECB/W/D SQRT LN EXP SIN COS TAN
 //   Lógica:     INVB/W/D ANDB/W/D ORB/W/D XORB/W/D, SLB SRB SLW SRW SLD SRD RLB RRB RLW RRW RLD RRD SHRB
 //   Convertir:  BTI ITB ITD DTI DTR ROUND TRUNC BCDI IBCD SEG
-//   Programa:   CALL (sin parámetros) RET CRET END MEND STOP WDR NOP JMP LBL FOR NEXT
+//   Programa:   CALL (sin parámetros) CRET (RET cuenta como CRET, el manual solo trae CRET) END MEND
+//               STOP WDR NOP JMP LBL FOR NEXT (END y MEND solo en OB1, como Micro/WIN)
 //               LSCR SCRT SCRE CSCRE; bloques OB1, SBR e INT (las interrupciones no se ejecutan)
 //   Memoria:    I Q M V SM S por bytes (VB100 y VW100 comparten bytes, el byte alto primero), AIW AQW,
 //               AC0–AC3 (32 bits), T y C (bit con instrucciones de bit, valor actual con las de palabra)
@@ -54,9 +55,9 @@ const SIZE = { B: 1, W: 2, D: 4 }
 const isOperand = (up, raw) => BIT.test(up) || MEM.test(up) || ANALOG.test(up) || AC.test(up) || TC.test(up) || INT.test(raw) || HEX.test(up) || BIN.test(up) || REAL.test(raw) || SBR.test(up)
 
 // Instrucciones que entiende (para avisar al leer el programa, con su línea).
-const ALIASES = { LDI: 'LD', LDNI: 'LDN', AI: 'A', ANI: 'AN', OI: 'O', ONI: 'ON', '=I': '=', SI: 'S', RI: 'R', CEND: 'END' }
+const ALIASES = { LDI: 'LD', LDNI: 'LDN', AI: 'A', ANI: 'AN', OI: 'O', ONI: 'ON', '=I': '=', SI: 'S', RI: 'R', RET: 'CRET', CEND: 'END' }
 const KNOWN = new Set(
-  `NETWORK LD LDN A AN O ON NOT EU ED ALD OLD LPS LRD LPP LDS AENO = S R TON TONR TOF CTU CTD CTUD
+  `NETWORK LD LDN A AN O ON NOT EU ED ALD OLD LPS LRD LPP LDS AENO = S R SR RS TON TONR TOF CTU CTD CTUD
    MOVB MOVW MOVD MOVR BMB BMW BMD SWAP FILL +I -I *I /I +D -D *D /D +R -R *R /R MUL DIV INCB INCW INCD DECB DECW DECD
    SQRT LN EXP SIN COS TAN INVB INVW INVD ANDB ANDW ANDD ORB ORW ORD XORB XORW XORD SLB SRB SLW SRW SLD SRD
    RLB RRB RLW RRW RLD RRD SHRB BTI ITB ITD DTI DTR ROUND TRUNC BCDI IBCD SEG CALL RET CRET END MEND STOP WDR NOP
@@ -69,10 +70,26 @@ const opName = (raw) => ALIASES[raw] ?? raw
 export function parseProgram(text, resolve = (s) => s) {
   const blocks = {}
   let current = null
+  let inComment = false // comentario (* *) de varias líneas
   const errors = []
   text.split(/\r?\n/).forEach((raw, i) => {
     const line = i + 1
-    const code = raw.replace(/\/\/.*$/, '').trim()
+    let code = raw.replace(/\/\/.*$/, '').trim()
+    if (inComment) {
+      const end = code.indexOf('*)')
+      if (end < 0) return
+      code = code.slice(end + 2).trim()
+      inComment = false
+    }
+    const open = code.indexOf('(*')
+    if (open >= 0) {
+      const end = code.indexOf('*)', open + 2)
+      if (end < 0) {
+        inComment = true
+        return
+      }
+      code = (code.slice(0, open) + ' ' + code.slice(end + 2)).trim()
+    }
     if (!code) return
     let m
     if ((m = /^(ORGANIZATION_BLOCK|SUBROUTINE_BLOCK|INTERRUPT_BLOCK)\s+([^\s:]+)(?::\s*(\S+))?/i.exec(code))) {
@@ -82,7 +99,7 @@ export function parseProgram(text, resolve = (s) => s) {
       blocks[current] = []
       return
     }
-    if (/^(END_\w+|BEGIN|TITLE\s*=|VAR\b|END_VAR|\(\*)/i.test(code) || /^Network\b/i.test(code)) {
+    if (/^(END_\w+|BEGIN|TITLE\s*=|VAR\b|END_VAR)/i.test(code) || /^Network\b/i.test(code)) {
       if (/^Network\b/i.test(code) && current) blocks[current].push({ op: 'NETWORK', args: [], line })
       return
     }
@@ -109,8 +126,18 @@ export function parseProgram(text, resolve = (s) => s) {
       : []
     const name = opName(op)
     if (!KNOWN.has(name) && !COMPARE.test(name)) errors.push(new PlcError(`la instrucción «${op}» no está en la CPU simulada.`, line))
+    if ((name === 'END' || name === 'MEND') && current !== 'OB1')
+      errors.push(new PlcError(`«${op}» solo puede ir en el programa principal (OB1), no en ${current}.`, line))
     blocks[current].push({ op, args, line })
   })
+  for (const [name, code] of Object.entries(blocks)) {
+    const seen = new Set()
+    for (const ins of code) {
+      if (opName(ins.op) !== 'LBL') continue
+      if (seen.has(ins.args[0])) errors.push(new PlcError(`LBL ${ins.args[0]} repetido en ${name}.`, ins.line))
+      seen.add(ins.args[0])
+    }
+  }
   if (!blocks.OB1) errors.push(new PlcError('No hay programa principal (OB1).'))
   return { blocks, errors }
 }
@@ -144,9 +171,10 @@ export function createCpu(program) {
     else if ((m = ANALOG.exec(text))) o = { k: 'mem', area: m[1], size: 2, off: Number(m[2]) }
     else if ((m = AC.exec(text))) o = { k: 'ac', n: Number(m[1]) }
     else if ((m = TC.exec(text))) o = { k: m[1], n: Number(m[2]), id: text }
-    else if ((m = HEX.exec(text))) o = { k: 'const', v: parseInt(m[1], 16) }
-    else if ((m = BIN.exec(text))) o = { k: 'const', v: parseInt(m[1], 2) }
-    else if (INT.test(text) || REAL.test(text)) o = { k: 'const', v: Number(text) }
+    else if ((m = HEX.exec(text))) o = { k: 'const', v: parseInt(m[1], 16), form: 'hex', real: false }
+    else if ((m = BIN.exec(text))) o = { k: 'const', v: parseInt(m[1], 2), form: 'bin', real: false }
+    else if (INT.test(text)) o = { k: 'const', v: Number(text), form: 'dec', real: false }
+    else if (REAL.test(text)) o = { k: 'const', v: Number(text), form: 'dec', real: true }
     else throw new PlcError(`«${text}» no es un operando válido.`, line)
     if (o.area && (o.byte ?? o.off) + (o.size ?? 1) > SIZES[o.area]) throw new PlcError(`«${text}» está fuera de la memoria de la CPU.`, line)
     if (o.k === 'T' && o.n > 255) throw new PlcError(`«${text}»: los temporizadores van de T0 a T255.`, line)
@@ -189,8 +217,18 @@ export function createCpu(program) {
   const read = (a, type, line) => {
     const o = decode(a, line)
     switch (o.k) {
-      case 'const':
+      case 'const': {
+        // Como Micro/WIN: una constante que no cabe en el tipo es un error, no un envoltorio.
+        // En hexadecimal o binario se admite hasta el ancho completo (16#FFFF es una palabra válida).
+        if (o.real && type !== 'R') throw new PlcError(`«${a}» es una constante real y esta instrucción espera un entero.`, line)
+        if (!o.real && type !== 'R') {
+          const bits = type === 'B' ? 8 : type === 'D' ? 32 : 16
+          const max = 2 ** bits
+          const fits = o.form === 'dec' ? (type === 'B' ? o.v >= 0 && o.v < max : o.v >= -max / 2 && o.v < max / 2) : o.v >= 0 && o.v < max
+          if (!fits) throw new PlcError(`la constante «${a}» no cabe en ${bits} bits.`, line)
+        }
         return type === 'R' ? Math.fround(o.v) : type === 'B' ? o.v & 0xff : type === 'D' ? o.v | 0 : (o.v << 16) >> 16
+      }
       case 'ac':
         return type === 'R' ? acc.getFloat32(o.n * 4) : type === 'B' ? acc.getUint8(o.n * 4 + 3) : type === 'D' ? acc.getInt32(o.n * 4) : acc.getInt16(o.n * 4 + 2)
       case 'T':
@@ -442,6 +480,7 @@ export function createCpu(program) {
         case 'R': {
           if (!top()) break
           const n = args[1] === undefined ? 1 : read(args[1], 'B', line)
+          if (n < 1 || n > 255) throw new PlcError(`${op} de ${n} puntos: el número va de 1 a 255.`, line)
           const o = decode(args[0], line)
           if (o.k === 'T' || o.k === 'C') {
             // Reset de un temporizador o contador: bit a 0 y valor actual a 0 (S solo pone el bit).
@@ -456,6 +495,24 @@ export function createCpu(program) {
             let index = o.byte * 8 + o.bit
             for (let k = 0; k < n; k++, index++) setBit(`${o.area}${Math.floor(index / 8)}.${index % 8}`, op === 'S', line)
           } else throw new PlcError(`«${args[0]}» no es un bit.`, line)
+          break
+        }
+        case 'SR':
+        case 'RS': {
+          // Set/Reset Dominant (manual, p. 77): como en CTU, la entrada de abajo de la caja queda
+          // arriba de la pila (LD S1 / LD R en SR; LD S / LD R1 en RS). Manda el set en SR y el
+          // reset en RS; con las dos a 0 el bit se queda como estaba. La caja se ejecuta sin
+          // depender del flujo de corriente (como CTU).
+          if (stack.length < 2) throw new PlcError(`${op} necesita dos niveles en la pila lógica (un LD por entrada).`, line)
+          const reset = top()
+          const set = stack[stack.length - 2]
+          if (op === 'SR') {
+            if (set) setBit(args[0], true, line)
+            else if (reset) setBit(args[0], false, line)
+          } else {
+            if (reset) setBit(args[0], false, line)
+            else if (set) setBit(args[0], true, line)
+          }
           break
         }
         case 'TON':
@@ -701,7 +758,7 @@ export function createCpu(program) {
             break
           }
           write(args[1], to, v, line)
-          if (op === 'ITB') setSM(1, 1, false)
+          if (['ITB', 'DTI', 'ROUND', 'TRUNC'].includes(op)) setSM(1, 1, false)
           break
         }
         case 'BCDI':
@@ -729,7 +786,6 @@ export function createCpu(program) {
           stack = saved
           break
         }
-        case 'RET':
         case 'MEND':
           return
         case 'CRET':
@@ -774,6 +830,8 @@ export function createCpu(program) {
           break
         }
         case 'LSCR': {
+          if (scr) throw new PlcError('LSCR dentro de otro segmento SCR: los segmentos no se anidan.', line)
+          if (!/^S\d+\.\d$/.test(args[0])) throw new PlcError(`LSCR solo admite bits S (S0.0…S31.7), no «${args[0]}».`, line)
           const active = getBit(args[0], line)
           scr = { bit: args[0], active }
           stack = [active]
@@ -781,6 +839,7 @@ export function createCpu(program) {
         }
         case 'SCRT':
           if (!scr) throw new PlcError('SCRT fuera de un segmento SCR (falta LSCR).', line)
+          if (!/^S\d+\.\d$/.test(args[0])) throw new PlcError(`SCRT solo admite bits S (S0.0…S31.7), no «${args[0]}».`, line)
           if (top()) {
             setBit(scr.bit, false, line)
             setBit(args[0], true, line)

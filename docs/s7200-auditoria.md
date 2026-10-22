@@ -61,6 +61,65 @@ de byte (sin signo) y de doble entero, `+D −D *D /D MUL DIV`, `INCB/D DECB/D`,
   comunicaciones (NETR, XMT…), PID, tablas, reloj, punteros (`*VD`, `&VB`), memoria L y subrutinas con
   parámetros, y retentividad. Si un programa las usa, se avisa con su línea.
 
+## Segunda pasada (2026-10-22)
+
+Repaso del juego de instrucciones completo contra el capítulo 6 y el apéndice G, y de los
+comportamientos que la primera pasada dejó sin contrastar.
+
+### Corregido
+
+| # | Qué hacía mal | Según el manual | Efecto en clase |
+|---|---|---|---|
+| 16 | SR y RS (Set/Reset Dominant, Micro/WIN 4.0) no existían | Instrucciones reales (p. 77): manda S1 en SR y R1 en RS; con las dos entradas a 0 el bit se queda | Un programa con SR/RS daba «no está en la CPU simulada» |
+| 17 | END y MEND se aceptaban en subrutinas | Solo en OB1 (p. 167, 204); Micro/WIN lo rechaza | — |
+| 18 | RET era un retorno incondicional | El manual solo trae CRET (condicional, p. 204); ahora RET cuenta como CRET | Un RET escrito «a lo S7-300» ya no corta la subrutina siempre |
+| 19 | Las constantes fuera de rango se envolvían en silencio (MOVB 300 escribía 44) | Micro/WIN da error de compilación | Un programa que en el autómata real no carga, aquí funcionaba |
+| 20 | S/R admitía cualquier número de puntos | De 1 a 255 (p. 74) | — |
+| 21 | LSCR/SCRT admitían cualquier bit y SCR anidados | Solo bits S (tabla 6-68) y sin anidar | — |
+| 22 | LBL repetidos: se usaba el último | Micro/WIN lo rechaza | — |
+| 23 | SM1.1 quedaba sucio tras DTI/ROUND/TRUNC con éxito | Queda a 0 al completarse, como ya hacía ITB | Un AENO o una lectura de SM1.1 veía un desbordamiento que no era |
+| 24 | Comentarios `(* *)` de varias líneas: la segunda línea se interpretaba como código | Formato de Micro/WIN | Un programa con un comentario así no cargaba |
+
+Lo de las constantes (19) tiene su matiz: en hexadecimal o binario se admite el ancho completo
+(`16#FFFF` es una palabra válida, `MOVW 65535` no; en Micro/WIN pasa igual).
+
+### Lo que no está (lista completa)
+
+Antes se citaban «tablas», «reloj»…; ahora, una a una, con su página. Todas avisan con su línea
+al cargar el programa. No están:
+
+- **Temporizadores de intervalo:** BITIM, CITIM (p. 203)
+- **Reloj:** TODR, TODW, TODRX, TODWX (p. 78)
+- **LED de diagnóstico:** DLED (p. 178)
+- **E/S inmediatas de byte:** BIR, BIW (p. 165). Las de bit (LDI, =I…) sí, como las normales.
+- **Cadenas:** SLEN, SCAT, SCPY, SSCPY, CFND, SFND (p. 184); las comparaciones
+  LDS=/LDS<>, AS=/AS<>, OS=/OS<> (p. 98); las conversiones ITS/DTS/RTS y STI/STD/STR (p. 107–111)
+- **ASCII:** ATH, HTA, ITA, DTA, RTA (p. 103)
+- **Codificar/decodificar:** DECO, ENCO (p. 112)
+- **Tablas:** ATT, LIFO, FIFO, FND=, FND<>, FND<, FND> (p. 189–193)
+- **Interrupciones:** ATCH, DTCH, ENI, DISI, CRETI (p. 153–160)
+- **Comunicaciones:** XMT, RCV, NETR, NETW, GPA, SPA (p. 81–95)
+- **Rápidas:** HDEF, HSC (p. 118), PLS (p. 133), PID (p. 145)
+- **Memoria L, punteros (&VB, *VD), subrutinas con parámetros y retentividad**
+
+### Variantes IEC
+
+Los contadores IEC (p. 116) se paran al llegar a PV (o a 0), el CTUD IEC tiene entrada LD y salidas
+QU/QD separadas, y los temporizadores IEC añaden TP (p. 201). Los mnemónicos son los mismos; la
+CPU simulada implementa la variante SIMATIC, que es la que usa el editor.
+
+### Pruebas nuevas
+
+- `tests/unit/s7200gold.test.js`, bloque «segunda pasada»: SR/RS, RET=CRET, constantes fuera de
+  rango, S/R 1–255, restricciones de SCR, LBL repetidos, comentarios `(* *)`, +D −D *D /D,
+  SQRT LN EXP SIN COS TAN, lógica de byte y doble, los doce desplazamientos y rotaciones,
+  FILL BMB BMW BMD SWAP, BTI ITB ITD, comparaciones LDB/AB/OB, LDD/AD/OD y LDR/AR/OR, las
+  inmediatas, la pila de 9 niveles, el límite de 8 subrutinas anidadas, BCDI inválido y
+  comparación con NaN.
+- P11 en `docs/s7200/pruebas-cpu-real.awl`: ¿SM1.0 tras un DIV con cociente 0 y resto 5 mira el
+  cociente o la doble palabra completa? Simulada: mira el cociente (M11.6 = 1). A confirmar en
+  una CPU real junto con P1–P10.
+
 ## A confirmar en una CPU real
 
 El manual no deja claros estos puntos, o se contradice en ellos. Se han simulado como se indica, y
@@ -83,6 +142,7 @@ el programa `docs/s7200/pruebas-cpu-real.awl` los comprueba todos de una vez.
 | P8 TON de 100 ms dos veces por ciclo | T40 = T41 | sí | El manual avisa de que se descuadra, pero no dice cuánto (p. 199). |
 | P9 CTD con carga y cuenta a la vez | C20 | 5 | ¿Manda la carga? |
 | P10 EU en el primer ciclo | M11.5 | 0 | Confirmar la regla de la p. 67. |
+| P11 SM1.0 tras DIV con cociente 0 y resto 5 | M11.6 | 1 | ¿El cero mira el cociente o la doble palabra completa (con el resto)? |
 
 Si alguna difiere, se cambia la CPU simulada y su prueba en `s7200gold.test.js`, que comprueba que la
 simulada da exactamente la columna «Simulada».

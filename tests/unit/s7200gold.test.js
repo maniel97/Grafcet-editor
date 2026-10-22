@@ -600,6 +600,346 @@ SCRE`)
   })
 })
 
+describe('S7-200 gold: segunda pasada (2026-10): instrucciones que faltaban por probar', () => {
+  it('SR/RS (Set/Reset Dominant, p. 77): manda S1 en SR y R1 en RS; con las dos a 0 el bit se queda', () => {
+    const cpu = cpuOf(`LD I0.0
+LD I0.1
+SR Q0.0
+LD I0.2
+LD I0.3
+RS Q0.1`)
+    cpu.bits.set('Q0.1', true)
+    run(cpu, 10) // todo a 0: se quedan como estaban
+    expect([bit(cpu, 'Q0.0'), bit(cpu, 'Q0.1')]).toEqual([false, true])
+    run(cpu, 10, { 'I0.0': true, 'I0.1': true }) // SR con las dos: manda el set
+    expect(bit(cpu, 'Q0.0')).toBe(true)
+    run(cpu, 10, { 'I0.0': false, 'I0.1': true })
+    expect(bit(cpu, 'Q0.0')).toBe(false)
+    run(cpu, 10, { 'I0.2': true, 'I0.3': true }) // RS con las dos: manda el reset
+    expect(bit(cpu, 'Q0.1')).toBe(false)
+    run(cpu, 10, { 'I0.2': false, 'I0.3': false })
+    expect(bit(cpu, 'Q0.1')).toBe(false)
+    run(cpu, 10, { 'I0.2': true })
+    expect(bit(cpu, 'Q0.1')).toBe(true)
+  })
+
+  it('RET cuenta como CRET: el retorno de subrutina es condicional (apéndice G, solo CRET)', () => {
+    const cpu = cpuOf(`ORGANIZATION_BLOCK MAIN:OB1
+BEGIN
+LD I0.0
+CALL SBR_0
+= Q0.1
+END_ORGANIZATION_BLOCK
+SUBROUTINE_BLOCK SBR_0:SBR0
+BEGIN
+LD I0.1
+RET
+LD SM0.0
+= Q0.0
+END_SUBROUTINE_BLOCK`)
+    run(cpu, 10, { 'I0.0': true, 'I0.1': true })
+    expect([bit(cpu, 'Q0.0'), bit(cpu, 'Q0.1')]).toEqual([false, true]) // RET con flujo: vuelve antes
+    cpu.bits.set('Q0.1', false)
+    run(cpu, 10, { 'I0.0': true, 'I0.1': false })
+    expect([bit(cpu, 'Q0.0'), bit(cpu, 'Q0.1')]).toEqual([true, true]) // sin flujo: la bobina se ejecuta
+  })
+
+  it('END y MEND solo en el programa principal (p. 167, 204)', () => {
+    const sbr = `ORGANIZATION_BLOCK MAIN:OB1
+BEGIN
+LD I0.0
+END_ORGANIZATION_BLOCK
+SUBROUTINE_BLOCK SBR_0:SBR0
+BEGIN
+%INS%
+END_SUBROUTINE_BLOCK`
+    for (const ins of ['END', 'MEND']) {
+      const { errors } = parseProgram(sbr.replace('%INS%', ins))
+      expect(errors.map((e) => e.message).join(' ')).toContain(`«${ins}» solo puede ir en el programa principal (OB1), no en SBR0.`)
+    }
+  })
+
+  it('las constantes fuera de rango dan error con su línea, como al compilar en Micro/WIN', () => {
+    expect(() => run(cpuOf('LD SM0.0\nMOVB 300, VB0'), 10)).toThrow('no cabe en 8 bits')
+    expect(() => run(cpuOf('LD SM0.0\nMOVB -1, VB0'), 10)).toThrow('no cabe en 8 bits')
+    expect(() => run(cpuOf('LD SM0.0\nMOVW 40000, VW0'), 10)).toThrow('no cabe en 16 bits')
+    expect(() => run(cpuOf('LD SM0.0\nMOVW 16#10000, VW0'), 10)).toThrow('no cabe en 16 bits')
+    expect(() => run(cpuOf('LD SM0.0\nMOVW 1.5, VW0'), 10)).toThrow('constante real')
+    // En hexadecimal o binario se admite el ancho completo: 16#FFFF es una palabra válida.
+    const cpu = cpuOf('LD SM0.0\nMOVW 16#FFFF, VW0\nMOVD 16#FFFFFFFF, VD4\nMOVB 16#FF, VB10\nMOVW 2#1111111111111111, VW2')
+    run(cpu, 10)
+    expect([cpu.words.get('VW0'), cpu.words.get('VD4'), cpu.words.get('VB10'), cpu.words.get('VW2')]).toEqual([-1, -1, 255, -1])
+  })
+
+  it('S/R de 1 a 255 puntos (p. 74): fuera de eso da error', () => {
+    expect(() => run(cpuOf('LD SM0.0\nS Q0.0, 0'), 10)).toThrow('va de 1 a 255')
+    expect(() => run(cpuOf('LD SM0.0\nS Q0.0, 256'), 10)).toThrow('no cabe en 8 bits')
+  })
+
+  it('LSCR y SCRT solo con bits S (tabla 6-68) y los segmentos no se anidan', () => {
+    expect(() => run(cpuOf('LD SM0.1\nLSCR M0.0\nSCRE'), 10)).toThrow('solo admite bits S')
+    expect(() => run(cpuOf('LD SM0.1\nLSCR S0.0\nLD SM0.0\nSCRT M0.1\nSCRE'), 10)).toThrow('solo admite bits S')
+    expect(() => run(cpuOf('LD SM0.1\nLSCR S0.0\nLSCR S0.1\nSCRE\nSCRE'), 10)).toThrow('no se anidan')
+  })
+
+  it('LBL repetido: error al cargar el programa', () => {
+    const { errors } = parseProgram('LD I0.0\nJMP 4\nLBL 4\nLBL 4')
+    expect(errors.map((e) => e.message).join(' ')).toContain('LBL 4 repetido en OB1.')
+  })
+
+  it('comentarios (* *) de varias líneas', () => {
+    const { blocks, errors } = parseProgram(`(* esto es
+un comentario
+de varias líneas *)
+LD I0.0
+= Q0.0`)
+    expect(errors).toEqual([])
+    expect(blocks.OB1.map((i) => i.op)).toEqual(['LD', '='])
+  })
+
+  it('doble entero: +D, -D, *D, /D con truncamiento, desbordamiento y división por cero (p. 141)', () => {
+    const cpu = cpuOf('LD SM0.0\n+D VD4, VD0\n-D VD8, VD0\n*D VD12, VD0\n/D VD16, VD0')
+    cpu.words.set('VD0', 100)
+    cpu.words.set('VD4', 50)
+    cpu.words.set('VD8', 30)
+    cpu.words.set('VD12', 2)
+    cpu.words.set('VD16', 7)
+    run(cpu, 10)
+    expect(cpu.words.get('VD0')).toBe(34) // 100+50=150, −30=120, ×2=240, /7=34
+    const cpu2 = cpuOf('LD SM0.0\n+D VD4, VD0') // el desbordamiento, solo con la +D
+    cpu2.words.set('VD0', 1)
+    cpu2.words.set('VD4', 2147483647)
+    run(cpu2, 10)
+    expect([cpu2.words.get('VD0'), sm(cpu2, 1)]).toEqual([1, true]) // +D desborda: no cambia
+    cpu.words.set('VD4', 0)
+    cpu.words.set('VD8', 0)
+    cpu.words.set('VD12', 1)
+    cpu.words.set('VD16', 0)
+    run(cpu, 10)
+    expect([cpu.words.get('VD0'), sm(cpu, 3)]).toEqual([34, true]) // /D entre 0: no cambia
+  })
+
+  it('funciones numéricas SQRT, LN, EXP, SIN, COS, TAN (p. 143)', () => {
+    const cpu = cpuOf(`LD SM0.0
+SQRT VD0, VD4
+LN VD0, VD8
+EXP VD12, VD16
+SIN VD20, VD24
+COS VD20, VD28
+TAN VD20, VD32
+SQRT VD36, VD40`)
+    cpu.write('VD0', 'R', 4)
+    cpu.write('VD12', 'R', 0)
+    cpu.write('VD20', 'R', 0)
+    cpu.write('VD36', 'R', -4)
+    run(cpu, 10)
+    expect(cpu.read('VD4', 'R')).toBe(2)
+    expect(cpu.read('VD8', 'R')).toBeCloseTo(1.386294, 5)
+    expect(cpu.read('VD16', 'R')).toBe(1)
+    expect([cpu.read('VD24', 'R'), cpu.read('VD28', 'R'), cpu.read('VD32', 'R')]).toEqual([0, 1, 0])
+    expect(sm(cpu, 1)).toBe(true) // SQRT de −4: desbordamiento
+  })
+
+  it('lógica de byte y doble: INV, AND, OR, XOR con SM1.0 (p. 161–163)', () => {
+    const cpu = cpuOf(`LD SM0.0
+INVB VB0
+INVD VD4
+ANDB 16#0F, VB10
+ORB 16#F0, VB12
+XORB 16#FF, VB14
+ANDD 16#FFFF0000, VD20
+ORD 16#0000FFFF, VD24
+XORD 16#FFFFFFFF, VD28
+XORW VW50, VW50`)
+    cpu.words.set('VB0', 0x0f)
+    cpu.words.set('VD4', 0)
+    cpu.words.set('VB10', 0x3c)
+    cpu.words.set('VB12', 0x01)
+    cpu.words.set('VB14', 0x55)
+    cpu.words.set('VD20', 0x12345678)
+    cpu.words.set('VD24', 0x11110000)
+    cpu.words.set('VD28', 0)
+    run(cpu, 10)
+    expect(cpu.words.get('VB0')).toBe(0xf0)
+    expect(cpu.words.get('VD4')).toBe(-1)
+    expect([cpu.words.get('VB10'), cpu.words.get('VB12'), cpu.words.get('VB14')]).toEqual([0x0c, 0xf1, 0xaa])
+    expect([cpu.words.get('VD20'), cpu.words.get('VD24'), cpu.words.get('VD28')]).toEqual([0x12340000, 0x1111ffff, -1])
+    expect(sm(cpu, 0)).toBe(true) // XORW de una palabra consigo misma: cero
+  })
+
+  it('desplazamientos y rotaciones: SM1.1 con el último bit que sale (p. 179–180)', () => {
+    const cpu = cpuOf(`LD SM0.0
+SLB VB0, 2
+SRB VB2, 1
+RLB VB4, 1
+RRB VB6, 1
+SLW VW10, 1
+SRW VW12, 1
+RLW VW14, 1
+RRW VW16, 1
+SLD VD20, 1
+SRD VD24, 1
+RLD VD28, 1
+RRD VD32, 1`)
+    cpu.words.set('VB0', 0xc1)
+    cpu.words.set('VB2', 0x81)
+    cpu.words.set('VB4', 0x81)
+    cpu.words.set('VB6', 0x81)
+    cpu.words.set('VW10', 0x4001)
+    cpu.words.set('VW12', 0x8001)
+    cpu.words.set('VW14', 0x8001)
+    cpu.words.set('VW16', 0x8001)
+    cpu.words.set('VD20', 0x80000001)
+    cpu.words.set('VD24', 0x80000001)
+    cpu.words.set('VD28', 0x80000001)
+    cpu.words.set('VD32', 0x80000001)
+    run(cpu, 10)
+    expect([cpu.words.get('VB0'), cpu.words.get('VB2'), cpu.words.get('VB4'), cpu.words.get('VB6')]).toEqual([0x04, 0x40, 0x03, 0xc0])
+    expect([cpu.words.get('VW10') & 0xffff, cpu.words.get('VW12') & 0xffff, cpu.words.get('VW14') & 0xffff, cpu.words.get('VW16') & 0xffff]).toEqual([0x8002, 0x4000, 0x0003, 0xc000])
+    expect([cpu.words.get('VD20'), cpu.words.get('VD24'), cpu.words.get('VD28'), cpu.words.get('VD32')]).toEqual([2, 0x40000000, 3, -1073741824])
+    expect(sm(cpu, 1)).toBe(true) // el último en salir (RRD de 16#80000001) es un 1
+  })
+
+  it('FILL, BMB, BMW, BMD y SWAP (p. 146–147 y 183)', () => {
+    const cpu = cpuOf(`LD SM0.0
+FILL +10, VW100, 3
+BMB VB0, VB10, 3
+BMW VW30, VW44, 2
+BMD VD60, VD70, 1
+SWAP VW50`)
+    cpu.words.set('VB0', 1)
+    cpu.words.set('VB1', 2)
+    cpu.words.set('VB2', 3)
+    cpu.words.set('VW30', 0x1111)
+    cpu.words.set('VW32', 0x2222)
+    cpu.words.set('VD60', 0x12345678)
+    cpu.words.set('VW50', 0x1234)
+    run(cpu, 10)
+    expect([cpu.words.get('VW100'), cpu.words.get('VW102'), cpu.words.get('VW104')]).toEqual([10, 10, 10])
+    expect([cpu.words.get('VB10'), cpu.words.get('VB11'), cpu.words.get('VB12')]).toEqual([1, 2, 3])
+    expect([cpu.words.get('VW44'), cpu.words.get('VW46')]).toEqual([0x1111, 0x2222])
+    expect(cpu.words.get('VD70')).toBe(0x12345678)
+    expect(cpu.words.get('VW50')).toBe(0x3412)
+  })
+
+  it('BTI sin signo, ITD con signo e ITB que desborda sin tocar la salida; ROUND aclara SM1.1 (p. 99–100)', () => {
+    const cpu = cpuOf('LD SM0.0\nBTI VB0, VW0\nITD VW2, VD10\nITB VW4, VB20')
+    cpu.words.set('VB0', 0xff)
+    cpu.words.set('VW2', -5)
+    cpu.words.set('VW4', 300)
+    cpu.words.set('VB20', 7)
+    run(cpu, 10)
+    expect(cpu.words.get('VW0')).toBe(255)
+    expect(cpu.words.get('VD10')).toBe(-5)
+    expect([cpu.words.get('VB20'), sm(cpu, 1)]).toEqual([7, true]) // ITB: desborda y no toca
+    const cpu2 = cpuOf('LD SM0.0\nROUND VD30, VD34')
+    cpu2.write('VD30', 'R', 2.5)
+    run(cpu2, 10)
+    expect([cpu2.words.get('VD34'), sm(cpu2, 1)]).toEqual([3, false]) // con éxito, SM1.1 queda a 0
+  })
+
+  it('comparaciones: byte sin signo, doble entero y real, en LD/A/O (p. 96–97)', () => {
+    const cpu = cpuOf(`LD I0.0
+LDB= VB20, 16#FF
+AB= VB21, 16#01
+= Q0.0
+LD I0.0
+OB= VB22, 16#01
+= Q0.1
+LD SM0.0
+LDD= VD30, 16#FFFFFFFF
+AD= VD34, 100
+= Q0.2
+LD SM0.0
+LDR= VD40, 3.5
+AR= VD44, -2.25
+= Q0.3
+LD I0.7
+OR= VD48, 1.0
+= Q0.4`)
+    cpu.words.set('VB20', 255) // byte sin signo: 255 = 16#FF
+    cpu.words.set('VB21', 1)
+    cpu.words.set('VB22', 2)
+    cpu.words.set('VD30', -1) // doble: −1 = 16#FFFFFFFF
+    cpu.words.set('VD34', 100)
+    cpu.write('VD40', 'R', 3.5)
+    cpu.write('VD44', 'R', -2.25)
+    cpu.write('VD48', 'R', 2.0)
+    run(cpu, 10, { 'I0.0': true })
+    expect([bit(cpu, 'Q0.0'), bit(cpu, 'Q0.1'), bit(cpu, 'Q0.2'), bit(cpu, 'Q0.3'), bit(cpu, 'Q0.4')]).toEqual([true, true, true, true, false])
+  })
+
+  it('comparación con un real no válido (NaN): la CPU pasaría a STOP', () => {
+    const cpu = cpuOf('LD SM0.0\nLDR= VD0, 0.0')
+    cpu.write('VD0', 'R', NaN)
+    expect(() => run(cpu, 10)).toThrow('real no válido')
+  })
+
+  it('inmediatas LDI, AI, =I, SI y RI se ejecutan como las normales (sin módulo físico)', () => {
+    const cpu = cpuOf(`LDI I0.0
+AI I0.1
+=I Q0.0
+LD I0.2
+SI Q0.1, 2
+LD I0.3
+RI Q0.1, 2`)
+    run(cpu, 10, { 'I0.0': true, 'I0.1': true })
+    expect(bit(cpu, 'Q0.0')).toBe(true)
+    run(cpu, 10, { 'I0.2': true })
+    expect([bit(cpu, 'Q0.1'), bit(cpu, 'Q0.2')]).toEqual([true, true])
+    run(cpu, 10, { 'I0.3': true })
+    expect(bit(cpu, 'Q0.1')).toBe(false)
+  })
+
+  it('la pila tiene 9 niveles: al cargar el décimo se pierde el de abajo (p. 67)', () => {
+    const cpu = cpuOf(`LD I0.0
+LD I0.1
+LD I0.1
+LD I0.1
+LD I0.1
+LD I0.1
+LD I0.1
+LD I0.1
+LD I0.1
+LD I1.0
+OLD
+OLD
+OLD
+OLD
+OLD
+OLD
+OLD
+OLD
+= Q0.0`)
+    run(cpu, 10, { 'I0.0': true }) // I0.0 era el fondo: se perdió al cargar I1.0
+    expect(bit(cpu, 'Q0.0')).toBe(false)
+    run(cpu, 10, { 'I1.0': true })
+    expect(bit(cpu, 'Q0.0')).toBe(true)
+    run(cpu, 10, { 'I1.0': false, 'I0.1': true })
+    expect(bit(cpu, 'Q0.0')).toBe(true)
+  })
+
+  it('subrutinas anidadas: máximo 8 niveles (p. 204)', () => {
+    const blocks = Array.from({ length: 10 }, (_, i) => i)
+    const text = blocks
+      .map((i) => {
+        const head = i === 0 ? 'ORGANIZATION_BLOCK MAIN:OB1\nBEGIN\n' : `SUBROUTINE_BLOCK SBR_${i - 1}:SBR${i - 1}\nBEGIN\n`
+        const call = i < 9 ? `LD SM0.0\nCALL SBR_${i}\n` : '= M0.0\n'
+        const foot = i === 0 ? 'END_ORGANIZATION_BLOCK' : `END_SUBROUTINE_BLOCK`
+        return `${head}${call}${foot}`
+      })
+      .join('\n')
+    const cpu = cpuOf(text)
+    expect(() => run(cpu, 10)).toThrow('Demasiadas subrutinas anidadas')
+  })
+
+  it('BCDI con un dígito no BCD: SM1.6 y el valor no cambia (p. 100)', () => {
+    const cpu = cpuOf('LD SM0.0\nMOVW 16#123A, VW0\nBCDI VW0')
+    run(cpu, 10)
+    expect([cpu.words.get('VW0'), sm(cpu, 6)]).toEqual([0x123a, true])
+  })
+})
+
 // Programa para comparar con un S7-200 real (docs/s7200/pruebas-cpu-real.awl): lo que da la CPU
 // simulada en cada prueba, el mismo valor que pone su comentario.
 describe('S7-200: pruebas para una CPU real (docs/s7200/pruebas-cpu-real.awl)', () => {
@@ -622,6 +962,7 @@ describe('S7-200: pruebas para una CPU real (docs/s7200/pruebas-cpu-real.awl)', 
       P8: cpu.words.get('T40') === cpu.words.get('T41'),
       P9: cpu.words.get('C20'),
       P10: b('M11.5'),
-    }).toEqual({ P1: [0, 1, 1], P2: [32767, 1], P3: [255, 1, 0], P4: 1, P5: [0, 0], P6: -3, P7: 0x12340000, P8: true, P9: 5, P10: 0 })
+      P11: b('M11.6'),
+    }).toEqual({ P1: [0, 1, 1], P2: [32767, 1], P3: [255, 1, 0], P4: 1, P5: [0, 0], P6: -3, P7: 0x12340000, P8: true, P9: 5, P10: 0, P11: 1 })
   })
 })
