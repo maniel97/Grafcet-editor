@@ -244,7 +244,7 @@ export default function GrafcetCanvas() {
     const { compiled, sim } = simulationRef.current
     return compiled && sim ? explainTransition(compiled, sim, id) : null
   }, [])
-  const { fitDrawn, fitWhenReady } = useFitDrawn(wrapperRef)
+  const { fitDrawn, fitWhenReady, refit } = useFitDrawn(wrapperRef)
 
   // Ejemplos (data.autoPlace = 'spread' en su tabla de variables): primero se separan las columnas
   // si algún texto pisa lo que tiene a su derecha (depende de la letra y el tamaño; lib/spread).
@@ -1400,6 +1400,7 @@ export default function GrafcetCanvas() {
                       if (!simulating) startSimulation()
                       setPendingReplay(scenario)
                     }}
+                    onShown={refit}
                     onClose={() => setExerciseOpen(false)}
                   />
                 </Suspense>

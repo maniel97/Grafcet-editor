@@ -87,6 +87,25 @@ test('ejercicio del alumno: enunciado, Comprobar, piezas bloqueadas y resuelto',
   expectNoErrors(errors)
 })
 
+// Al abrir un ejercicio se abre su panel y el lienzo se estrecha: la tabla de variables se
+// encuadra en el sitio que queda, no debajo del panel (la de la práctica 9 es ancha).
+test('ejercicio: la tabla de variables no queda debajo del panel del ejercicio', async ({ page }) => {
+  await page.setViewportSize({ width: 1600, height: 900 })
+  const errors = await openEditor(page, undefined, { education: true })
+  await page.getByRole('button', { name: /^Abrir/ }).click()
+  await page.getByRole('menuitem', { name: /Ejercicios/ }).click()
+  await page.locator('li', { hasText: 'Práctica 9.' }).getByRole('button', { name: 'Hacer la práctica' }).click()
+  const panel = page.getByRole('complementary', { name: 'Ejercicio' })
+  await expect(panel).toBeVisible()
+  const table = page.locator('.react-flow__node-variables')
+  await expect(async () => {
+    const t = await table.boundingBox()
+    const p = await panel.boundingBox()
+    expect(t.x + t.width).toBeLessThanOrEqual(p.x)
+  }).toPass()
+  expectNoErrors(errors)
+})
+
 // El profesor: prepara un ejemplo como ejercicio, lo prueba y descarga la versión del alumnado.
 test('ejercicio del profesor: preparar, probar con su solución y descargar sin solución', async ({ page }) => {
   const errors = await openEditor(page, undefined, { education: true })

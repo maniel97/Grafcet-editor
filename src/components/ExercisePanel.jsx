@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { CircleCheck, CircleDashed, CircleX, Download, GraduationCap, Lightbulb, Pencil, X } from 'lucide-react'
 import { language, t } from '../lib/i18n'
 import { exerciseConfig, exerciseStale, hintsOf, isStudent, runChecks } from '../lib/exercise'
@@ -12,7 +12,10 @@ import Markdown from '../help/Markdown'
 // onReplay(escenario): reproducirlo en la simulación (pruebas de comportamiento en rojo).
 // onHintShown(): el alumno ha abierto una pista más (se guarda en su proyecto: exercise.hintsShown).
 // onChecked(resultados): tras cada comprobación (para los datos del proceso, si el ejercicio los pide).
-export default function ExercisePanel({ plc, getProject, onEdit, onExportStudent, onReplay, onHintShown, onChecked, onClose }) {
+// onShown(): el panel ya ocupa su sitio (para reencuadrar el lienzo, que se ha estrechado).
+export default function ExercisePanel({ plc, getProject, onEdit, onExportStudent, onReplay, onHintShown, onChecked, onShown, onClose }) {
+  const shownRef = useRef(onShown)
+  useEffect(() => shownRef.current?.(), [])
   const config = exerciseConfig(plc)
   const student = isStudent(plc)
   const [results, setResults] = useState(null)

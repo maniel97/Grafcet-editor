@@ -68,5 +68,13 @@ export function useFitDrawn(wrapperRef) {
     [fitDrawn, getNodes],
   )
 
-  return { fitDrawn, fitWhenReady }
+  // El sitio del lienzo ha cambiado (p. ej. se abre el panel del ejercicio al abrir el proyecto):
+  // si hay un encuadre pendiente ya usará el tamaño nuevo; si no, se reencuadra. Sin esto la tabla
+  // de variables quedaba debajo del panel, encuadrada con el ancho de antes.
+  const refit = useCallback(() => {
+    if (pending.current !== null) return
+    requestAnimationFrame(() => fitDrawn(0))
+  }, [fitDrawn])
+
+  return { fitDrawn, fitWhenReady, refit }
 }
