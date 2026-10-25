@@ -408,17 +408,17 @@ function manualClassifier() {
     trans('t2', '0.5s/X1 · SI', 80, 270),
     trans('t3', '0.5s/X1 · !SI', 320, 270),
     step('s2', '2', 80, 340, ['A+']),
-    step('s4', '4', 320, 340, ['B+']),
+    step('s3', '3', 320, 340, ['B+']),
     // La pieza sale de los dos haces a la vez: se espera a los dos para volver al reposo (si no,
     // SC aún la ve y el grafcet haría un ciclo fantasma instantáneo).
     trans('t4', '!SI · !SC', 80, 440),
     trans('t5', '!SC', 320, 440),
-    step('s5', '5', 320, 510, ['B-']),
+    step('s4', '4', 320, 510, ['B-']),
     trans('t6', 'b0', 320, 610),
   ]
   const edges = links([
-    ['s0', 't1'], ['t1', 's1'], ['s1', 't2'], ['s1', 't3'], ['t2', 's2'], ['t3', 's4'],
-    ['s2', 't4'], ['s4', 't5'], ['t4', 's0'], ['t5', 's5'], ['s5', 't6'], ['t6', 's0'],
+    ['s0', 't1'], ['t1', 's1'], ['s1', 't2'], ['s1', 't3'], ['t2', 's2'], ['t3', 's3'],
+    ['s2', 't4'], ['s3', 't5'], ['t4', 's0'], ['t5', 's4'], ['s4', 't6'], ['t6', 's0'],
   ])
   // Vista de frente, con gravedad: la pieza cae del almacén a la plataforma y el cilindro la
   // empuja por el borde hasta su recogida. Medidas comprobadas en la simulación
@@ -454,15 +454,16 @@ function manualClassifier() {
       'A+': 'Electroválvula monoestable: sacar A (el muelle lo devuelve)',
       'B+': 'Electroválvula biestable: sacar B', 'B-': 'Electroválvula biestable: meter B',
       b0: 'Final de carrera: B dentro', b1: 'Final de carrera: B fuera',
+      '0.5s/X1': 'Espera a que la pieza se asiente',
     },
-    steps: { 0: 'Esperando pieza', 1: 'La pieza se asienta', 2: 'A empuja el metal', 4: 'B empuja el plástico', 5: 'B vuelve' },
+    steps: { 0: 'Esperando pieza', 1: 'La pieza se asienta', 2: 'A empuja el metal', 3: 'B empuja el plástico', 4: 'B vuelve' },
     scenarios: [
       scenario('metal', 'Una pieza de metal', 6, [[0.5, 'Sacar_AM', 1], [0.8, 'Sacar_AM', 0]]),
       scenario('plastico', 'Una pieza de plástico', 6, [[0.5, 'Sacar_AP', 1], [0.8, 'Sacar_AP', 0]]),
     ],
     exercise: {
       title: 'Práctica 9. Clasificación manual de piezas',
-      statement: `Una estación clasifica piezas a mano: al sacar una pieza del almacén de metal (**Sacar de AM**) o del de plástico (**Sacar de AP**), la pieza cae a la plataforma de clasificación.\n\n- Dos detectores miran la plataforma: uno **inductivo (SI)** y otro **capacitivo (SC)**.\n- La pieza de metal la empuja el cilindro **A** (monoestable, salida **A+**) hasta la recogida de **Metal**; la de plástico, el cilindro **B** (biestable, salidas **B+** y **B−**, finales de carrera **b0**, **b1**) hasta la de **Plástico**.\n- Ojo: el detector capacitivo también ve el metal.${TASK}`,
+      statement: `Una estación clasifica piezas a mano: al sacar una pieza del almacén de metal (**Sacar de AM**) o del de plástico (**Sacar de AP**), la pieza cae a la plataforma de clasificación.\n\n- Antes de mirar el material se espera **0,5 s** a que la pieza se asiente en la plataforma.\n- Dos detectores miran la plataforma: uno **inductivo (SI)** y otro **capacitivo (SC)**.\n- La pieza de metal la empuja el cilindro **A** (monoestable, salida **A+**) hasta la recogida de **Metal**; la de plástico, el cilindro **B** (biestable, salidas **B+** y **B−**, finales de carrera **b0**, **b1**) hasta la de **Plástico**.\n- Ojo: el detector capacitivo también ve el metal.${TASK}`,
       parts: { plant: 'locked', variables: 'locked', electrical: 'given' },
       checks: { warnings: false, sequence: '', scenario: '', behaviour: { scenarios: ['metal', 'plastico'], outputs: [], tolerance: 1, counts: true }, requirements: [{ id: 'or' }] },
       hints: { enabled: true, items: [
