@@ -430,11 +430,13 @@ function manualClassifier() {
   const scene = {
     gravity: true,
     elements: [
-      { id: 'almacen_am', type: 'feeder', x: 300, y: 130, rot: 0, trigger: 'AM', auto: false, spacing: 0, sizes: 'large', material: 'metal', color: 'metal', text: 'AM' },
-      { id: 'almacen_ap', type: 'feeder', x: 250, y: 130, rot: 0, trigger: 'AP', auto: false, spacing: 0, sizes: 'large', material: 'plastic', color: 'amber', text: 'AP' },
+      { id: 'almacen_am', type: 'feeder', x: 308, y: 130, rot: 0, trigger: 'AM', auto: false, spacing: 0, sizes: 'large', material: 'metal', color: 'metal', text: 'AM' },
+      { id: 'almacen_ap', type: 'feeder', x: 262, y: 130, rot: 0, trigger: 'AP', auto: false, spacing: 0, sizes: 'large', material: 'plastic', color: 'amber', text: 'AP' },
       // SI, a la derecha de la caída y mirando hacia ella, como en el guion.
       { id: 'si', type: 'sensor', x: 345, y: 200, rot: 180, variable: 'SI', contact: 'NO', kind: 'inductive', range: 100 },
-      { id: 'plataforma', type: 'platform', x: 230, y: 300, rot: 0, length: 100, text: '' },
+      // 12 px de holgura con la placa de A recogido (220–228 px): con menos, en PC_SIMU la pieza de metal
+      // que empuja B no cae por el hueco.
+      { id: 'plataforma', type: 'platform', x: 240, y: 300, rot: 0, length: 90, text: '' },
       { id: 'sc', type: 'sensor', x: 220, y: 268, rot: 0, variable: 'SC', contact: 'NO', kind: 'capacitive', range: 100 },
       // A 1 px del paso de 24: con el tope de la placa a 275 px la pieza NO se sube a la placa
       // (25 px de subida) y el haz de SC queda por encima de ella (los detectores ven las placas).

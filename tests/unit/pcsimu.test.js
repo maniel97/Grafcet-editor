@@ -218,6 +218,10 @@ describe('PC_SIMU (.sim)', () => {
       expect(overlap([x1, y2, x2, sc[3]], si), 'cae por delante de SI').toBe(true)
       expect(overlap([x1, y2, x2, sc[3]], sc), 'y llega a SC').toBe(true)
     }
+    // Y entre A recogido y la plataforma queda hueco para que caiga la pieza que empuja B (con 2 px no caía).
+    const perfil = p9.find((o) => o.type === 19 && o.name.startsWith('Perfil') && o.fields[9] === 1)
+    const [cilA] = p9.filter((o) => o.type === 19 && o.name.startsWith('Actuador')).sort((a, b) => a.rect[0] - b.rect[0])
+    expect(perfil.rect[0] - cilA.rect[2]).toBeGreaterThanOrEqual(10)
     // El elevador (160 px de recorrido): gráfico 1 (el que empuja y sube piezas en PC_SIMU), con el cuerpo de
     // 160 · 19 / 11 = 276 px y 28 de ancho (el de la placa del editor).
     const estacion = example(/Estación de elevación/)
