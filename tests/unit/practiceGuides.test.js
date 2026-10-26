@@ -89,14 +89,15 @@ describe('guion de prácticas de ejemplo', () => {
     expect(paro.at(-1).values.X0).toBe(1)
   })
 
-  it('práctica 8: secuencia continua; la seta para al final del ciclo y al soltarla sigue sola', () => {
+  it('práctica 8: secuencia continua; la seta para al final del ciclo y al soltarla no arranca sola', () => {
     const project = teacher('p8')
     // Tres ciclos de ~4,2 s: A+ arranca en 0,55, 4,75 y 8,95.
     near(edgesOf(run(project, 'marcha').samples, 'A+').times, [0.55, 1.6, 4.75, 5.8, 8.95, 10])
     const seta = run(project, 'seta').samples
-    near(edgesOf(seta, 'A+').times, [0.55, 1.6, 6.55, 7.6, 10.75, 11.8])
-    // Entre la parada al final de la secuencia (4,75 s) y la suelta de la seta (6,5 s), todo en reposo.
-    for (const s of seta.filter((s) => s.t >= 5 && s.t <= 6.4)) {
+    near(edgesOf(seta, 'A+').times, [0.55, 1.6, 8.05, 9.1, 12.25, 13.3])
+    // Desde la parada al final de la secuencia (4,75 s), todo en reposo: también tras soltar la
+    // seta (6,5 s), hasta volver a pulsar PM (8 s).
+    for (const s of seta.filter((s) => s.t >= 5 && s.t <= 7.9)) {
       expect(s.values.X0).toBe(1)
       for (const o of ['A+', 'A-', 'B+', 'B-']) expect(s.values[o]).toBe(0)
     }
@@ -105,19 +106,26 @@ describe('guion de prácticas de ejemplo', () => {
     near(edgesOf(antes, 'A+').times, [4.05, 5.1, 8.25])
   })
 
-  it('práctica 9: el inductivo solo ve el metal; cada cilindro empuja hacia su recogida', () => {
+  it('práctica 9: el metal pasa por SI al caer y lo empuja B a Metal; el plástico, A a Plástico', () => {
     const project = teacher('p9')
     const metal = run(project, 'metal')
-    near(edgesOf(metal.samples, 'A+').times, [1.6, 2.4])
-    expect(edgesOf(metal.samples, 'B+').times).toHaveLength(0) // el plástico no se toca
+    near(edgesOf(metal.samples, 'SI').times, [0.9, 1.05]) // lo ve al caer, antes de llegar a SC
+    near(edgesOf(metal.samples, 'B+').times, [1.1, 2.4])
+    near(edgesOf(metal.samples, 'B-').times, [2.4, 3.45])
+    expect(edgesOf(metal.samples, 'A+').times).toHaveLength(0)
     expect(metal.counts.metal).toBe(1)
     expect(metal.counts.plastico).toBe(0)
     const plastico = run(project, 'plastico')
-    near(edgesOf(plastico.samples, 'B+').times, [1.6, 2.6])
-    near(edgesOf(plastico.samples, 'B-').times, [2.6, 3.45])
-    expect(edgesOf(plastico.samples, 'A+').times).toHaveLength(0)
+    expect(edgesOf(plastico.samples, 'SI').times).toHaveLength(0)
+    near(edgesOf(plastico.samples, 'A+').times, [1.1, 2.4]) // hasta a1
+    expect(edgesOf(plastico.samples, 'B+').times).toHaveLength(0)
     expect(plastico.counts.metal).toBe(0)
     expect(plastico.counts.plastico).toBe(1)
+    // Los dos ciclos acaban en reposo, con los cilindros dentro.
+    for (const r of [metal, plastico]) {
+      const end = r.samples.at(-1).values
+      expect([end.X0, end.a0, end.b0]).toEqual([1, 1, 1])
+    }
   })
 })
 

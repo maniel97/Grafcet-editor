@@ -338,10 +338,10 @@ function ledSequence() {
 function sequenceSeta() {
   const nodes = [
     step('s0', '0', 200, 0, [], { initial: true }),
-    // La memoria M recuerda que la marcha está pedida: la seta para al final de la secuencia y,
-    // al soltarla, esta sigue sola, sin volver a pulsar PM.
-    trans('t1', '(↑PM + M) · SE', 200, 100),
-    step('s1', '1', 200, 170, ['A+', { text: 'M:=1', kind: 'stored-on' }]),
+    // Arranca con los dos cilindros dentro y la seta sin pulsar. Al rearmar la seta no arranca
+    // sola: hay que volver a pulsar PM (EN 60204-1, ISO 13850).
+    trans('t1', '↑PM · SE · a0 · b0', 200, 100),
+    step('s1', '1', 200, 170, ['A+']),
     trans('t2', 'a1', 200, 270),
     step('s2', '2', 200, 340, ['B+']),
     trans('t3', 'b1', 200, 440),
@@ -369,78 +369,81 @@ function sequenceSeta() {
     nodes,
     edges,
     scene,
-    variables: { M: { type: 'memory' } },
     comments: {
       PM: 'Pulsador de marcha (NA)', SE: 'Seta de emergencia (NC)',
       'A+': 'Electroválvula 4/2 biestable: sacar A', 'A-': 'Electroválvula 4/2 biestable: meter A',
       'B+': 'Electroválvula 4/2 biestable: sacar B', 'B-': 'Electroválvula 4/2 biestable: meter B',
       a0: 'Final de carrera: A dentro', a1: 'Final de carrera: A fuera',
       b0: 'Final de carrera: B dentro', b1: 'Final de carrera: B fuera',
-      M: 'Marcha pedida (memoria)',
     },
-    steps: { 0: 'Reposo', 1: 'A sale (y recuerda la marcha)', 2: 'B sale', 3: 'B entra', 4: 'A entra' },
+    steps: { 0: 'Reposo', 1: 'A sale', 2: 'B sale', 3: 'B entra', 4: 'A entra' },
     scenarios: [
       scenario('marcha', 'Marcha y varios ciclos', 10, [[0.5, 'PM', 1], [0.8, 'PM', 0]]),
-      scenario('seta', 'Seta a mitad de ciclo', 12, [[0.5, 'PM', 1], [0.8, 'PM', 0], [2.5, 'SE', 0], [6.5, 'SE', 1]]),
+      scenario('seta', 'Seta a mitad de ciclo', 14, [[0.5, 'PM', 1], [0.8, 'PM', 0], [2.5, 'SE', 0], [6.5, 'SE', 1], [8, 'PM', 1], [8.3, 'PM', 0]]),
       scenario('seta-antes', 'Seta antes de la marcha', 9, [[0.3, 'SE', 0], [1, 'PM', 1], [1.3, 'PM', 0], [3, 'SE', 1], [4, 'PM', 1], [4.3, 'PM', 0]]),
     ],
     exercise: {
       title: 'Práctica 8. Secuencia A+B+B−A− con seta de emergencia',
-      statement: `Al pulsar la marcha (**PM**), dos cilindros de doble efecto hacen la secuencia **A+ B+ B− A−** de forma continua (salidas **A+**, **B+**, **B-**, **A-**; finales de carrera **a0**, **a1**, **b0**, **b1**).\n\n- Si se pulsa la seta de emergencia (**SE**, normalmente cerrada), los cilindros se paran **al terminar la secuencia en curso**, en reposo.\n- Al soltar la seta, la secuencia se reanuda sola, sin volver a pulsar la marcha.\n- Con la seta pulsada no funciona, ni siquiera pulsando la marcha.${TASK}`,
+      statement: `Al pulsar la marcha (**PM**), dos cilindros de doble efecto hacen la secuencia **A+ B+ B− A−** de forma continua (salidas **A+**, **B+**, **B-**, **A-**; finales de carrera **a0**, **a1**, **b0**, **b1**).\n\n- Si se pulsa la seta de emergencia (**SE**, normalmente cerrada), los cilindros se paran **al terminar la secuencia en curso**, en reposo.\n- Con la seta pulsada no funciona, ni siquiera pulsando la marcha. Al soltarla no arranca solo: hay que volver a pulsar **PM**.${TASK}`,
       parts: { plant: 'locked', variables: 'locked', electrical: 'given' },
       checks: { warnings: false, sequence: '', scenario: '', behaviour: behaviour('marcha', 'seta', 'seta-antes'), requirements: [{ id: 'or' }, { id: 'edge' }] },
       hints: { enabled: true, items: [
         'Una etapa por movimiento (A+, B+, B−, A−) y la inicial de reposo; al llegar a a0, la última etapa vuelve a la primera.',
         'Para la parada al final del ciclo: desde la última etapa, dos salidas excluyentes — `a0 · SE` sigue y `a0 · !SE` va al reposo.',
-        'Para reanudar sola al soltar la seta, recuerda que la marcha ya se había pedido: una acción memorizada `M:=1` y el arranque `(↑PM + M) · SE`.',
+        'Para que no arranque con la seta pulsada, ni solo al soltarla: el arranque es el flanco de la marcha con la seta sin pulsar y los cilindros dentro, `↑PM · SE · a0 · b0`.',
       ] },
     },
   })
 }
 
 // --- Práctica 9: clasificación manual de piezas de metal y plástico -------------------------------
+// Como en el guion: el inductivo SI está en la caída, por encima de la plataforma, y la pieza de
+// metal pasa por delante de él antes de llegar al capacitivo SC; Metal queda a la izquierda (la
+// empuja B, desde la derecha) y Plástico a la derecha (la empuja A, desde la izquierda).
 function manualClassifier() {
   const nodes = [
     step('s0', '0', 200, 0, [], { initial: true }),
-    trans('t1', 'SC', 200, 100),
-    // Espera corta a que la pieza se asiente antes de mirar el material.
-    step('s1', '1', 200, 170),
-    trans('t2', '0.5s/X1 · SI', 80, 270),
-    trans('t3', '0.5s/X1 · !SI', 320, 270),
-    step('s2', '2', 80, 340, ['A+']),
-    step('s3', '3', 320, 340, ['B+']),
-    // La pieza sale de los dos haces a la vez: se espera a los dos para volver al reposo (si no,
-    // SC aún la ve y el grafcet haría un ciclo fantasma instantáneo).
-    trans('t4', '!SI · !SC', 80, 440),
-    trans('t5', '!SC', 320, 440),
-    step('s4', '4', 320, 510, ['B-']),
-    trans('t6', 'b0', 320, 610),
+    // El metal pasa antes por SI: la pieza que llega a SC sin haber pasado por él es de plástico.
+    trans('t1', 'SI', 80, 100),
+    trans('t2', 'SC · !SI', 320, 100),
+    step('s1', '1', 80, 170),
+    trans('t3', 'SC', 80, 270),
+    step('s2', '2', 80, 340, ['B+']),
+    trans('t4', 'b1', 80, 440),
+    step('s3', '3', 80, 510, ['B-']),
+    trans('t5', 'b0', 80, 610),
+    step('s4', '4', 320, 170, ['A+']),
+    trans('t6', 'a1', 320, 270),
+    // A es monoestable: sin A+, el muelle lo devuelve; se espera a que llegue a a0.
+    step('s5', '5', 320, 340),
+    trans('t7', 'a0', 320, 440),
   ]
   const edges = links([
-    ['s0', 't1'], ['t1', 's1'], ['s1', 't2'], ['s1', 't3'], ['t2', 's2'], ['t3', 's3'],
-    ['s2', 't4'], ['s3', 't5'], ['t4', 's0'], ['t5', 's4'], ['s4', 't6'], ['t6', 's0'],
+    ['s0', 't1'], ['s0', 't2'], ['t1', 's1'], ['s1', 't3'], ['t3', 's2'], ['s2', 't4'], ['t4', 's3'], ['s3', 't5'], ['t5', 's0'],
+    ['t2', 's4'], ['s4', 't6'], ['t6', 's5'], ['s5', 't7'], ['t7', 's0'],
   ])
-  // Vista de frente, con gravedad: la pieza cae del almacén a la plataforma y el cilindro la
-  // empuja por el borde hasta su recogida. Medidas comprobadas en la simulación
-  // (tests/unit/practiceGuides.test.js): los haces (250–274 px) quedan por encima de las placas
-  // de los vástagos (275–303 px) — los detectores ven las placas — y la pieza no se sube a la
-  // placa (25 px de subida, un px más que el paso que la física permite).
+  // Vista de frente, con gravedad: la pieza cae del almacén, pasa por delante de SI y se para en
+  // la plataforma, delante de SC; el cilindro la empuja por el borde hasta su recogida. Medidas
+  // comprobadas en la simulación (tests/unit/practiceGuides.test.js): el haz de SC (262–274 px)
+  // queda por encima de las placas de los vástagos (275–303 px) — los detectores ven las placas —
+  // y la pieza no se sube a la placa (25 px de subida, un px más que el paso que la física permite).
   const scene = {
     gravity: true,
     elements: [
-      { id: 'almacen_am', type: 'feeder', x: 300, y: 130, rot: 0, trigger: 'Sacar_AM', auto: false, spacing: 0, sizes: 'large', material: 'metal', color: 'metal', text: 'AM' },
-      { id: 'almacen_ap', type: 'feeder', x: 250, y: 130, rot: 0, trigger: 'Sacar_AP', auto: false, spacing: 0, sizes: 'large', material: 'plastic', color: 'amber', text: 'AP' },
+      { id: 'almacen_am', type: 'feeder', x: 300, y: 130, rot: 0, trigger: 'AM', auto: false, spacing: 0, sizes: 'large', material: 'metal', color: 'metal', text: 'AM' },
+      { id: 'almacen_ap', type: 'feeder', x: 250, y: 130, rot: 0, trigger: 'AP', auto: false, spacing: 0, sizes: 'large', material: 'plastic', color: 'amber', text: 'AP' },
+      // SI, a la derecha de la caída y mirando hacia ella, como en el guion.
+      { id: 'si', type: 'sensor', x: 345, y: 200, rot: 180, variable: 'SI', contact: 'NO', kind: 'inductive', range: 100 },
       { id: 'plataforma', type: 'platform', x: 230, y: 300, rot: 0, length: 100, text: '' },
-      { id: 'si', type: 'sensor', x: 220, y: 256, rot: 0, variable: 'SI', contact: 'NO', kind: 'inductive', range: 100 },
       { id: 'sc', type: 'sensor', x: 220, y: 268, rot: 0, variable: 'SC', contact: 'NO', kind: 'capacitive', range: 100 },
       // A 1 px del paso de 24: con el tope de la placa a 275 px la pieza NO se sube a la placa
-      // (25 px de subida) y los haces quedan por encima de ella (los detectores ven las placas).
-      { id: 'cila', type: 'cylinder', x: 140, y: 289, rot: 0, extend: 'A+', retract: '', stroke: 140, time: 1, text: 'A' },
+      // (25 px de subida) y el haz de SC queda por encima de ella (los detectores ven las placas).
+      { id: 'cila', type: 'cylinder', x: 140, y: 289, rot: 0, extend: 'A+', retract: '', retracted: 'a0', extended: 'a1', stroke: 140, time: 1, text: 'A' },
       { id: 'cilb', type: 'cylinder', x: 460, y: 289, rot: 180, extend: 'B+', retract: 'B-', retracted: 'b0', extended: 'b1', stroke: 160, time: 1, text: 'B' },
-      { id: 'metal', type: 'sink', x: 360, y: 450, rot: 0, text: 'Metal' },
-      { id: 'plastico', type: 'sink', x: 210, y: 450, rot: 0, text: 'Plástico' },
-      desk('button', 'Sacar_AM', 'Sacar de AM', { contact: 'NO', color: 'gray' }),
-      desk('button', 'Sacar_AP', 'Sacar de AP', { contact: 'NO', color: 'blue' }),
+      { id: 'metal', type: 'sink', x: 210, y: 450, rot: 0, text: 'Metal' },
+      { id: 'plastico', type: 'sink', x: 360, y: 450, rot: 0, text: 'Plástico' },
+      desk('button', 'AM', 'Sacar de AM', { contact: 'NO', color: 'gray' }),
+      desk('button', 'AP', 'Sacar de AP', { contact: 'NO', color: 'blue' }),
     ],
   }
   return practice({
@@ -449,27 +452,27 @@ function manualClassifier() {
     edges,
     scene,
     comments: {
-      Sacar_AM: 'Botón: sacar una pieza del almacén de metal', Sacar_AP: 'Botón: sacar una pieza del almacén de plástico',
-      SI: 'Detector inductivo: ve el metal', SC: 'Detector capacitivo: ve metal y plástico',
+      AM: 'Botón: sacar una pieza del almacén de metal', AP: 'Botón: sacar una pieza del almacén de plástico',
+      SI: 'Detector inductivo en la caída: ve el metal', SC: 'Detector capacitivo en la plataforma: ve metal y plástico',
       'A+': 'Electroválvula monoestable: sacar A (el muelle lo devuelve)',
+      a0: 'Final de carrera: A dentro', a1: 'Final de carrera: A fuera',
       'B+': 'Electroválvula biestable: sacar B', 'B-': 'Electroválvula biestable: meter B',
       b0: 'Final de carrera: B dentro', b1: 'Final de carrera: B fuera',
-      '0.5s/X1': 'Espera a que la pieza se asiente',
     },
-    steps: { 0: 'Esperando pieza', 1: 'La pieza se asienta', 2: 'A empuja el metal', 3: 'B empuja el plástico', 4: 'B vuelve' },
+    steps: { 0: 'Esperando pieza', 1: 'Ha pasado metal', 2: 'B empuja el metal', 3: 'B vuelve', 4: 'A empuja el plástico', 5: 'A vuelve' },
     scenarios: [
-      scenario('metal', 'Una pieza de metal', 6, [[0.5, 'Sacar_AM', 1], [0.8, 'Sacar_AM', 0]]),
-      scenario('plastico', 'Una pieza de plástico', 6, [[0.5, 'Sacar_AP', 1], [0.8, 'Sacar_AP', 0]]),
+      scenario('metal', 'Una pieza de metal', 6, [[0.5, 'AM', 1], [0.8, 'AM', 0]]),
+      scenario('plastico', 'Una pieza de plástico', 6, [[0.5, 'AP', 1], [0.8, 'AP', 0]]),
     ],
     exercise: {
       title: 'Práctica 9. Clasificación manual de piezas',
-      statement: `Una estación clasifica piezas a mano: al sacar una pieza del almacén de metal (**Sacar de AM**) o del de plástico (**Sacar de AP**), la pieza cae a la plataforma de clasificación.\n\n- Antes de mirar el material se espera **0,5 s** a que la pieza se asiente en la plataforma.\n- Dos detectores miran la plataforma: uno **inductivo (SI)** y otro **capacitivo (SC)**.\n- La pieza de metal la empuja el cilindro **A** (monoestable, salida **A+**) hasta la recogida de **Metal**; la de plástico, el cilindro **B** (biestable, salidas **B+** y **B−**, finales de carrera **b0**, **b1**) hasta la de **Plástico**.\n- Ojo: el detector capacitivo también ve el metal.${TASK}`,
+      statement: `Al sacar a mano una pieza de metal del almacén **AM** o una de plástico del almacén **AP**, el cilindro **A** o el **B** la desplaza hacia el lado adecuado para que quede clasificada en **Metal** o en **Plástico**.\n- Para distinguirlas hay un detector **inductivo (SI)**, en la caída de la pieza, y uno **capacitivo (SC)**, en la plataforma.\n- **A** es monoestable (salida **A+**, finales de carrera **a0**, **a1**) y **B** biestable (salidas **B+** y **B-**, finales de carrera **b0**, **b1**).\n- Fíjate en la planta: Metal queda a la izquierda y Plástico a la derecha.${TASK}`,
       parts: { plant: 'locked', variables: 'locked', electrical: 'given' },
       checks: { warnings: false, sequence: '', scenario: '', behaviour: { scenarios: ['metal', 'plastico'], outputs: [], tolerance: 1, counts: true }, requirements: [{ id: 'or' }] },
       hints: { enabled: true, items: [
-        'El inductivo (SI) solo ve el metal; fíjate en qué ve el capacitivo (SC): con él solo no puedes distinguir el material.',
-        'A es monoestable: la salida **A+** solo mientras empuja; al quitarse, el muelle lo devuelve. B es biestable: **B+** lo saca y **B−** lo mete (espera su final de carrera `b0`).',
-        'Cuando la pieza sale de los haces: con A, espera a que dejen de verla; con B, `!SC`, y después B− hasta `b0`.',
+        'El inductivo (SI) solo ve el metal, y lo ve al caer, antes de que la pieza llegue a la plataforma. El capacitivo (SC) ve las dos: él solo no distingue el material.',
+        'Desde el reposo, dos salidas excluyentes: `SI` (ha pasado metal; espera a `SC`) y `SC · !SI` (ha llegado una pieza sin pasar por SI: es de plástico).',
+        'B empuja hacia Metal: **B+** hasta `b1` y **B-** hasta `b0`. A empuja hacia Plástico: **A+** hasta `a1`; al quitarla, el muelle lo devuelve: espera a `a0`.',
       ] },
     },
   })
