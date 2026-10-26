@@ -203,6 +203,21 @@ describe('PC_SIMU (.sim)', () => {
     const cinta = clasif.find((o) => o.type === 20)
     const pieza = clasif.find((o) => o.type === 25)
     expect(cinta.rect[1] - (pieza.rect[3] + 28)).toBe(1)
+    // Práctica 9: el inductivo de la caída sí tiene que ver caer la pieza de metal (y el capacitivo de la
+    // plataforma la ve también apoyada): los almacenes quedan por encima de SI, como en el editor.
+    const p9 = parsePcSimu(exportPcSimu(practice('p9')).text)
+    const named = (text) => {
+      const label = p9.find((o) => o.type === 1008 && o.text === text)
+      return p9.filter((o) => o.type === 7).sort((a, b) => Math.hypot(a.rect[0] - label.rect[0], a.rect[1] - label.rect[1]) - Math.hypot(b.rect[0] - label.rect[0], b.rect[1] - label.rect[1]))[0]
+    }
+    const si = zone(named('SI'))
+    const sc = zone(named('SC'))
+    for (const almacen of p9.filter((o) => o.type === 25)) {
+      const [x1, , x2, y2] = almacen.rect
+      expect(y2, 'la pieza sale por encima de SI').toBeLessThanOrEqual(si[1])
+      expect(overlap([x1, y2, x2, sc[3]], si), 'cae por delante de SI').toBe(true)
+      expect(overlap([x1, y2, x2, sc[3]], sc), 'y llega a SC').toBe(true)
+    }
     // El elevador (160 px de recorrido): gráfico 1 (el que empuja y sube piezas en PC_SIMU), con el cuerpo de
     // 160 · 19 / 11 = 276 px y 28 de ancho (el de la placa del editor).
     const estacion = example(/Estación de elevación/)

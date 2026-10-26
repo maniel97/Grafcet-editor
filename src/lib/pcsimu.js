@@ -886,7 +886,10 @@ export function exportPcSimu(project, { reserved = [], addressOf } = {}) {
   }
   // Dónde aparece cada pieza. PC_SIMU da por vista una pieza en cuanto roza la franja de un detector (el
   // editor mira su centro): si al caer fuera a cruzar la de uno que mira de lado, aparece ya apoyada en la
-  // superficie de debajo (si no, un detector de altura vería alta toda pieza que cae).
+  // superficie de debajo (si no, un detector de altura vería alta toda pieza que cae). Solo por los que miran
+  // justo encima de esa superficie y no alcanzan a la pieza apoyada: si la ve también apoyada (el capacitivo
+  // de la plataforma de la práctica 9), da igual que la vea al caer; y uno más alto está para verla caer (el
+  // inductivo de la caída de la práctica 9).
   const surfaces = machine.filter((m) => m.object === 'conveyor' || (m.object === 'profile' && m.support)).map((m) => m.rect)
   const sideZones = machine.filter((m) => m.object === 'detector' && m.orientation <= 1).map((m) => {
     const r = m.rect
@@ -899,7 +902,10 @@ export function exportPcSimu(project, { reserved = [], addressOf } = {}) {
     if (m.restOn != null) top = m.restOn - h - 1
     else if (below.length) {
       const floor = Math.min(...below)
-      if (sideZones.some((z) => overlapsRect(z, [x - w / 2, y, x + w / 2, floor]))) top = floor - h - 1
+      const reach = floor - PIECE_SIZES.large[1] - 10
+      const resting = [x - w / 2, floor - h - 1, x + w / 2, floor - 1]
+      const fooled = (z) => z[3] > reach && overlapsRect(z, [x - w / 2, y, x + w / 2, floor]) && !overlapsRect(z, resting)
+      if (sideZones.some(fooled)) top = floor - h - 1
     }
     m.rect = [x - w / 2, top - h, x + w / 2, top]
   }
