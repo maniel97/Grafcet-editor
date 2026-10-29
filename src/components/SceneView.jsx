@@ -216,9 +216,12 @@ function DrawingShape({ e }) {
   if (e.kind === 'ellipse') return <ellipse cx={w / 2} cy={h / 2} rx={Math.abs(w / 2)} ry={Math.abs(h / 2)} fill={fill} stroke={stroke} strokeWidth="1.5" />
   return <rect x={Math.min(0, w)} y={Math.min(0, h)} width={Math.abs(w)} height={Math.abs(h)} fill={fill} stroke={stroke} strokeWidth="1.5" />
 }
-function ConveyorShape({ e, running, t }) {
+// `dir`: 1 hacia delante, -1 marcha atrás (con las dos salidas manda la marcha atrás, como en la
+// física de lib/sim/scene.js), 0 parada. Las rayas y la flecha siguen el sentido.
+function ConveyorShape({ e, dir, t }) {
   const length = Number(e.length) || 240
-  const offset = running ? (t * 40) % 20 : 0
+  const running = dir !== 0
+  const offset = running ? (((dir * t * 40) % 20) + 20) % 20 : 0
   return (
     <g>
       <rect x="0" y="-15" width={length} height="30" rx="15" fill="#cbd5e1" stroke={running ? ON : INK} strokeWidth="1.5" />
@@ -227,7 +230,7 @@ function ConveyorShape({ e, running, t }) {
       ))}
       <circle cx="15" cy="0" r="11" fill="none" stroke={INK} />
       <circle cx={length - 15} cy="0" r="11" fill="none" stroke={INK} />
-      <path d={`M ${length / 2 - 6} -5 L ${length / 2 + 4} 0 L ${length / 2 - 6} 5`} fill="none" stroke={running ? ON : '#64748b'} strokeWidth="2" />
+      <path d={dir < 0 ? `M ${length / 2 + 6} -5 L ${length / 2 - 4} 0 L ${length / 2 + 6} 5` : `M ${length / 2 - 6} -5 L ${length / 2 + 4} 0 L ${length / 2 - 6} 5`} fill="none" stroke={running ? ON : '#64748b'} strokeWidth="2" data-dir={dir} />
     </g>
   )
 }
@@ -2015,7 +2018,7 @@ function ModulePreview({ item }) {
     lamp: <LampShape e={e} lit />,
     cylinder: <CylinderShape e={{ ...e, ...demo, retracted: 'a0', extended: 'a1' }} pos={0.6} values={values} />,
     rotary: <RotaryShape e={{ ...e, arm: 40, vacuum: 'V' }} pos={0.5} values={values} />,
-    conveyor: <ConveyorShape e={{ ...e, length: 160 }} running t={0} />,
+    conveyor: <ConveyorShape e={{ ...e, length: 160 }} dir={1} t={0} />,
     limit: <LimitShape active />,
     sensor: <SensorShape e={e} active />,
     feeder: <FeederShape />,
@@ -2145,7 +2148,7 @@ function drawElement(e, { scene, state, values, time, signals, iso = false }) {
     case 'rotary':
       return <RotaryShape e={e} pos={pos} values={values} />
     case 'conveyor':
-      return <ConveyorShape e={e} running={isOn(values, e.motor)} t={time} />
+      return <ConveyorShape e={e} dir={isOn(values, e.reverse) ? -1 : isOn(values, e.motor) ? 1 : 0} t={time} />
     case 'limit':
       return <LimitShape active={signals[e.id]} />
     case 'sensor':

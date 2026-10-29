@@ -1332,3 +1332,32 @@ test('marcas y contadores: objetivo del contador y valor fijado a mano (#8)', as
   await expect.poll(() => activeSteps(page)).toBe('s3')
   expectNoErrors(errors)
 })
+
+// Con solo la salida de marcha atrás, la cinta también se ve en marcha: rayas moviéndose hacia la
+// izquierda y flecha hacia la izquierda (antes solo miraba la salida de marcha adelante).
+test('planta: la cinta reversible se anima también hacia atrás', async ({ page }) => {
+  const errors = await openEditor(page)
+  await openExample(page, /Cinta reversible/)
+  await page.getByRole('button', { name: /Simular/ }).click()
+  const view = page.getByRole('region', { name: 'Escena de la planta' })
+  const belt = view.locator('[data-element="conveyor"]')
+  const arrow = belt.locator('path[data-dir]')
+  await expect(arrow).toHaveAttribute('data-dir', '0')
+  const press = async (name) => {
+    const b = await view.locator(`[aria-label="Pulsador ${name}"]`).boundingBox()
+    await page.mouse.move(b.x + b.width / 2, b.y + b.height / 3)
+    await page.mouse.down()
+    await page.waitForTimeout(200)
+    await page.mouse.up()
+  }
+  const stripe = () => belt.locator('line').first().getAttribute('x1').then(Number)
+  await press('Izquierda')
+  await expect(arrow).toHaveAttribute('data-dir', '-1')
+  // Las rayas van hacia la izquierda: de un fotograma a otro, x1 baja (o da la vuelta de 20 px).
+  const a = await stripe()
+  await page.waitForTimeout(120)
+  const b = await stripe()
+  expect(((a - b + 20) % 20)).toBeGreaterThan(0)
+  expect(((a - b + 20) % 20)).toBeLessThan(10)
+  expectNoErrors(errors)
+})
