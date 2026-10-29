@@ -53,6 +53,29 @@ describe('trazado de enlaces', () => {
   it('bucles anidados en carriles distintos (el exterior más a la izquierda)', () => {
     expect(r.loop0.route.laneX).toBeLessThan(r.loop1.route.laneX)
   })
+  // Divergencia en Y con una vuelta atrás en cada rama: la de la izquierda por la izquierda y la
+  // de la derecha por la derecha, sin cruzar la otra rama (práctica 10 del guion).
+  it('bucles en las dos ramas de una divergencia en Y: cada uno por su lado', () => {
+    const r = routes(
+      [
+        internal('a0', 'transition', 420, 100),
+        internal('a1', 'step', 200, 240),
+        internal('a2', 'transition', 200, 340),
+        internal('b1', 'step', 640, 240),
+        internal('b2', 'transition', 640, 340),
+      ],
+      [
+        ['d1', 'a0', 'a1'],
+        ['d2', 'a0', 'b1'],
+        ['e1', 'a1', 'a2'],
+        ['e2', 'b1', 'b2'],
+        ['loopA', 'a2', 'a1'],
+        ['loopB', 'b2', 'b1'],
+      ],
+    )
+    expect(r.loopA.route.laneX).toBeLessThan(200)
+    expect(r.loopB.route.laneX).toBeGreaterThan(640 + 56)
+  })
   it('salto de etapas: rodea por la derecha sin flecha', () => {
     expect(r.skip.route.kind).toBe('skip')
     expect(r.skip.route.laneX).toBeGreaterThan(228)

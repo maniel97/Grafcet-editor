@@ -99,7 +99,20 @@ export function computeRoute(state, { id, source, target, sourceX, sourceY, targ
       const inside = loop.top >= myTop && loop.bottom <= myBottom
       if (inside && (loop.top !== myTop || loop.bottom !== myBottom)) depth++
     }
-    let minX = Math.min(sourceX, src.internals.positionAbsolute.x, tgt.internals.positionAbsolute.x)
+    const own = Math.min(sourceX, src.internals.positionAbsolute.x, tgt.internals.positionAbsolute.x)
+    // Por la derecha solo si por la izquierda cruzaría otra columna de su grafcet (la rama de la
+    // izquierda de una divergencia en Y) y por la derecha no hay nada: la vuelta de la rama derecha
+    // no atraviesa la otra rama (IEC 60848 no fija el lado; pide que se lea sin ambigüedad).
+    const ownBoxes = index.boxes.filter((b) => b.id === source || b.id === target)
+    const ownRight = Math.max(...ownBoxes.map((b) => b.right))
+    const crossesLeft = inSpan.some((b) => b.right <= own)
+    const clearRight = !inSpan.some((b) => b.x >= ownRight)
+    if (crossesLeft && clearRight) {
+      let maxRight = ownRight
+      for (const b of inSpan) maxRight = Math.max(maxRight, b.right)
+      return { kind: 'loop', bendAtSource: false, laneX: maxRight + LANE_GAP + depth * LANE_STEP }
+    }
+    let minX = own
     for (const b of inSpan) minX = Math.min(minX, b.x)
     return { kind: 'loop', bendAtSource: false, laneX: minX - LANE_GAP - depth * LANE_STEP }
   }

@@ -480,11 +480,149 @@ function manualClassifier() {
   })
 }
 
+// --- Práctica 10: A sale y entra 3 veces y B 5 veces, cada uno a su aire ---------------------------
+// Movimientos independientes: divergencia en Y con un contador en cada rama; cada rama acaba en una
+// etapa de espera y la convergencia en Y vuelve al reposo cuando han terminado las dos.
+function twoCounters() {
+  const nodes = [
+    step('s0', '0', 420, 0, [{ text: 'CA:=0', kind: 'stored-on' }, { text: 'CB:=0', kind: 'stored-on' }], { initial: true }),
+    trans('t1', '↑PM1 · a0 · b0', 420, 100),
+    // Las vueltas atrás de cada rama, por fuera (A a la izquierda y B a la derecha), para que no se
+    // crucen ni parezca que vuelven a la divergencia.
+    step('s1', '1', 200, 240, ['A+']),
+    trans('t2', 'a1', 200, 340),
+    step('s2', '2', 200, 410, ['A-', { text: 'CA:=CA+1', kind: 'stored-on' }]),
+    trans('t3', 'a0 · CA < 3', 80, 510),
+    trans('t4', 'a0 · CA >= 3', 320, 510),
+    step('s3', '3', 320, 580),
+    step('s4', '4', 640, 240, ['B+']),
+    trans('t5', 'b1', 640, 340),
+    step('s5', '5', 640, 410, ['B-', { text: 'CB:=CB+1', kind: 'stored-on' }]),
+    trans('t6', 'b0 · CB < 5', 880, 510),
+    trans('t7', 'b0 · CB >= 5', 520, 510),
+    step('s6', '6', 520, 580),
+    trans('t8', '1', 420, 680),
+  ]
+  const edges = links([
+    ['s0', 't1'], ['t1', 's1'], ['t1', 's4'],
+    ['s1', 't2'], ['t2', 's2'], ['s2', 't3'], ['s2', 't4'], ['t3', 's1'], ['t4', 's3'],
+    ['s4', 't5'], ['t5', 's5'], ['s5', 't6'], ['s5', 't7'], ['t6', 's4'], ['t7', 's6'],
+    ['s3', 't8'], ['s6', 't8'], ['t8', 's0'],
+  ])
+  const scene = {
+    elements: [
+      desk('button', 'PM1', 'Marcha (PM1)', { contact: 'NO', color: 'green' }),
+      desk('display', 'CA', 'Ciclos de A'),
+      desk('display', 'CB', 'Ciclos de B'),
+      { id: 'cila', type: 'cylinder', x: 120, y: 100, rot: 0, extend: 'A+', retract: 'A-', retracted: 'a0', extended: 'a1', stroke: 120, time: 1, text: 'A' },
+      { id: 'cilb', type: 'cylinder', x: 120, y: 220, rot: 0, extend: 'B+', retract: 'B-', retracted: 'b0', extended: 'b1', stroke: 160, time: 1, text: 'B' },
+    ],
+  }
+  return practice({
+    name: 'A tres veces y B cinco veces',
+    nodes,
+    edges,
+    scene,
+    comments: {
+      PM1: 'Pulsador de marcha (NA)',
+      'A+': 'Electroválvula 4/2 biestable: sacar A', 'A-': 'Electroválvula 4/2 biestable: meter A',
+      'B+': 'Electroválvula 4/2 biestable: sacar B', 'B-': 'Electroválvula 4/2 biestable: meter B',
+      a0: 'Final de carrera: A dentro', a1: 'Final de carrera: A fuera',
+      b0: 'Final de carrera: B dentro', b1: 'Final de carrera: B fuera',
+      CA: 'Contador de ciclos de A', CB: 'Contador de ciclos de B',
+    },
+    steps: { 0: 'Reposo', 1: 'A sale', 2: 'A entra y cuenta', 3: 'A ha terminado', 4: 'B sale', 5: 'B entra y cuenta', 6: 'B ha terminado' },
+    scenarios: [
+      scenario('marcha', 'Una marcha', 14, [[0.5, 'PM1', 1], [0.8, 'PM1', 0]]),
+      // Pulsar a mitad no hace nada; al terminar, otra marcha vuelve a empezar desde cero.
+      scenario('otra', 'Pulsar a mitad y otra marcha al acabar', 26, [[0.5, 'PM1', 1], [0.8, 'PM1', 0], [4, 'PM1', 1], [4.3, 'PM1', 0], [13, 'PM1', 1], [13.3, 'PM1', 0]]),
+    ],
+    exercise: {
+      title: 'Práctica 10. A sale y entra 3 veces y B 5 veces',
+      statement: `Al pulsar la marcha (**PM1**), el cilindro **A** sale y entra **3 veces** y el cilindro **B** sale y entra **5 veces**. El movimiento de cada cilindro es **independiente** del otro.\n\n- Los dos son de doble efecto con electroválvula 4/2 biestable (salidas **A+**, **A-**, **B+**, **B-**; finales de carrera **a0**, **a1**, **b0**, **b1**).${TASK}`,
+      parts: { plant: 'locked', variables: 'locked', electrical: 'given' },
+      checks: { warnings: false, sequence: '', scenario: '', behaviour: behaviour('marcha', 'otra'), requirements: [{ id: 'and' }, { id: 'counter' }, { id: 'edge' }] },
+      hints: { enabled: true, items: [
+        'Si cada cilindro va a su aire, son dos secuencias a la vez: divergencia en Y al pulsar la marcha.',
+        'Un contador por cilindro: `CA:=CA+1` al entrar A y `CB:=CB+1` al entrar B; los dos a 0 en la etapa inicial.',
+        'Al volver dentro, cada rama sigue si no ha llegado a sus ciclos (`a0 · CA < 3`) o pasa a una etapa de espera (`a0 · CA >= 3`). Cuando las dos esperan, la convergencia en Y vuelve al reposo.',
+      ] },
+    },
+  })
+}
+
+// --- Práctica 11: cinta de ida y vuelta entre dos sensores; un segundo pulsador la para a la derecha
+function shuttleConveyor() {
+  const nodes = [
+    step('s0', '0', 200, 0, [], { initial: true }),
+    trans('t1', '↑PV', 200, 100),
+    step('s1', '1', 200, 170, ['MD']),
+    // Al llegar a la derecha: vuelve si no se ha pedido el paro; si se ha pedido, se para.
+    trans('t2', 'S2 · !X11', 200, 270),
+    trans('t3', 'S2 · X11', 440, 270),
+    step('s2', '2', 200, 340, ['MI']),
+    trans('t4', 'S1', 80, 440),
+    // Grafcet parcial: recuerda el segundo pulsador, en cualquier momento, hasta volver al reposo.
+    // Con !X0, el pulsador que pone la cinta en marcha no cuenta como paro.
+    step('s10', '10', 700, 0, [], { initial: true }),
+    trans('t10', '↑PV · !X0', 700, 100),
+    step('s11', '11', 700, 170),
+    trans('t11', 'X0', 700, 270),
+  ]
+  const edges = links([
+    ['s0', 't1'], ['t1', 's1'], ['s1', 't2'], ['s1', 't3'], ['t2', 's2'], ['t3', 's0'], ['s2', 't4'], ['t4', 's1'],
+    ['s10', 't10'], ['t10', 's11'], ['s11', 't11'], ['t11', 's10'],
+  ])
+  // Vista de frente, con gravedad, como la práctica 4: la caja se deja a mano entre los dos
+  // sensores, que la ven desde arriba. Medidas comprobadas en la simulación
+  // (tests/unit/practiceGuides.test.js): la caja da la vuelta sin llegar a caer por los extremos.
+  const scene = {
+    gravity: true,
+    elements: [
+      { id: 'cinta', type: 'conveyor', x: 40, y: 300, rot: 0, motor: 'MD', reverse: 'MI', length: 420, time: 5, text: 'Cinta' },
+      { id: 'caja', type: 'feeder', x: 200, y: 200, rot: 0, trigger: 'Caja', auto: false, spacing: 0, sizes: 'large', material: 'plastic', color: 'amber' },
+      { id: 's1', type: 'sensor', x: 100, y: 230, rot: 90, variable: 'S1', contact: 'NO', range: 60, kind: 'optical', color: 'amber' },
+      { id: 's2', type: 'sensor', x: 400, y: 230, rot: 90, variable: 'S2', contact: 'NO', range: 60, kind: 'optical', color: 'amber' },
+      desk('button', 'PV', 'Verde (PV)', { contact: 'NO', color: 'green' }),
+      desk('button', 'Caja', 'Dejar caja', { contact: 'NO', color: 'yellow' }),
+    ],
+  }
+  return practice({
+    name: 'Cinta de ida y vuelta',
+    nodes,
+    edges,
+    scene,
+    comments: {
+      PV: 'Pulsador verde (NA): marcha y, otra vez, paro a la derecha',
+      S1: 'Sensor: caja en el extremo izquierdo', S2: 'Sensor: caja en el extremo derecho',
+      MD: 'Motor de la cinta hacia la derecha', MI: 'Motor de la cinta hacia la izquierda',
+    },
+    steps: { 0: 'Reposo', 1: 'Hacia la derecha', 2: 'Hacia la izquierda', 10: 'Sin orden de paro', 11: 'Paro pedido' },
+    scenarios: [
+      // Paro pedido yendo a la derecha: no se para al momento, sino al llegar a S2.
+      scenario('ida-vuelta', 'Marcha y paro yendo a la derecha', 13, [[0.3, 'Caja', 1], [0.6, 'Caja', 0], [2, 'PV', 1], [2.3, 'PV', 0], [8, 'PV', 1], [8.3, 'PV', 0]]),
+      // Paro pedido yendo a la izquierda: no se para en S1; da la vuelta y se para en S2.
+      scenario('volviendo', 'Paro yendo a la izquierda', 13, [[0.3, 'Caja', 1], [0.6, 'Caja', 0], [2, 'PV', 1], [2.3, 'PV', 0], [5, 'PV', 1], [5.3, 'PV', 0]]),
+    ],
+    exercise: {
+      title: 'Práctica 11. Cinta de ida y vuelta',
+      statement: `Una vez depositada a mano una caja en la cinta, al accionar el pulsador verde (**PV**) la caja se desplaza sobre la cinta hacia la derecha. Cuando llega al sensor (**S2**), se desplaza hacia el lado contrario hasta el otro sensor (**S1**), y así sucesivamente.\n\n- Si se vuelve a accionar el pulsador, **en cualquier momento**, la cinta se para al llegar la caja al sensor derecho.\n- Salidas: **MD** (cinta hacia la derecha) y **MI** (hacia la izquierda). Para dejar la caja, usa el botón **Dejar caja** de la planta.${TASK}`,
+      parts: { plant: 'locked', variables: 'locked', electrical: 'given' },
+      checks: { warnings: false, sequence: '', scenario: '', behaviour: { scenarios: ['ida-vuelta', 'volviendo'], outputs: [], tolerance: 1, counts: true }, requirements: [{ id: 'edge' }, { id: 'or' }] },
+      hints: { enabled: true, items: [
+        'Dos etapas de movimiento: hacia la derecha (MD) hasta `S2` y hacia la izquierda (MI) hasta `S1`, que vuelve a la primera.',
+        'Una pulsación corta en cualquier momento hay que recordarla: un grafcet parcial de dos etapas que pasa a la segunda con `↑PV · !X0` (el pulsador que arranca no cuenta) y vuelve con `X0`.',
+        'Al llegar a `S2`, dos salidas excluyentes: `S2 · !X11` da la vuelta y `S2 · X11` va al reposo.',
+      ] },
+    },
+  })
+}
+
 export const PRACTICE_GUIDES = [
   {
     id: 'guion-automatas',
     title: 'Prácticas de programación de autómatas',
-    description: 'Un guion completo: normas generales, una práctica guiada con su solución y ocho prácticas con autocorrección.',
+    description: 'Un guion completo: normas generales, una práctica guiada con su solución y diez prácticas con autocorrección.',
     sheet: { subject: 'Integración de Sistemas', course: 'Curso 2026-2027', cycle: 'Mecatrónica Industrial', center: '', teacher: '' },
     rules:
       'A continuación tienes una serie de prácticas obligatorias de programación de autómatas. El primer paso es **adaptar el enunciado a un caso real** del mundo industrial con una dificultad parecida.\n\n- Las prácticas se simulan en el editor (planta virtual) y, si se puede, en el autómata real.\n- Cada práctica es **individual**, aunque durante el aprendizaje hayas tenido ayuda del profesor o de los compañeros. Los archivos copiados se consideran no presentados.\n- La entrega fuera de plazo se penaliza progresivamente.\n- Se valoran la ejecución y la presentación (formato, ortografía, limpieza): **30 %** la entrega y **70 %** la calidad.\n- Se entregan en **un único PDF con portada**: Exportar > Dossier lo genera con tu proyecto dentro.\n\n# Cada práctica debe incluir\n- Enunciado\n- Breve contenido teórico, si procede\n- GRAFCET\n- Conexionado de los elementos\n- Programa (ladder y AWL)\n- Tabla de variables\n- Simulación\n- Posibles mejoras o aportaciones, si procede\n- Problemas encontrados y cómo se han resuelto, si procede',
@@ -498,6 +636,8 @@ export const PRACTICE_GUIDES = [
       { id: 'p7', teacher: ledSequence },
       { id: 'p8', teacher: sequenceSeta },
       { id: 'p9', teacher: manualClassifier },
+      { id: 'p10', teacher: twoCounters },
+      { id: 'p11', teacher: shuttleConveyor },
     ],
   },
 ]

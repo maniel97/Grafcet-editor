@@ -127,6 +127,34 @@ describe('guion de prácticas de ejemplo', () => {
       expect([end.X0, end.a0, end.b0]).toEqual([1, 1, 1])
     }
   })
+
+  it('práctica 10: A sale y entra 3 veces y B 5, cada uno a su paso; pulsar a mitad no hace nada', () => {
+    const project = teacher('p10')
+    const marcha = run(project, 'marcha').samples
+    expect(edgesOf(marcha, 'A+').times).toHaveLength(6)
+    expect(edgesOf(marcha, 'B+').times).toHaveLength(10)
+    // B no espera a A: los dos salen a la vez y B sigue cuando A ya ha terminado (6,85 s).
+    near(edgesOf(marcha, 'A-').times.slice(-1), [6.85])
+    near(edgesOf(marcha, 'B-').times.slice(-1), [11.05])
+    expect(marcha.at(-1).values.X0).toBe(1)
+    const otra = run(project, 'otra').samples
+    // La pulsación de los 4 s no cuenta; la de los 13 s vuelve a hacer 3 y 5 ciclos.
+    expect(edgesOf(otra, 'A+').times).toHaveLength(12)
+    expect(edgesOf(otra, 'B+').times).toHaveLength(20)
+    near(edgesOf(otra, 'X0').times, [0.55, 11.05, 13, 23.5])
+  })
+
+  it('práctica 11: la caja va y vuelve entre S1 y S2; con otra pulsación, se para a la derecha', () => {
+    const project = teacher('p11')
+    for (const id of ['ida-vuelta', 'volviendo']) {
+      const r = run(project, id).samples
+      near(edgesOf(r, 'MD').times, [2, 4.1, 7.15, 10.2])
+      near(edgesOf(r, 'MI').times, [4.1, 7.15])
+      // Se queda en reposo con la caja delante de S2 (no se ha caído por el extremo).
+      const end = r.at(-1).values
+      expect([end.X0, end.S2, end.MD, end.MI]).toEqual([1, 1, 0, 0])
+    }
+  })
 })
 
 describe('mandos de la planta en los escenarios', () => {
