@@ -214,7 +214,7 @@ test('guion de prácticas: varias prácticas en un PDF y elegir cuál abrir', as
   await exportFromMore(page, /^Guion de prácticas/)
   const dialog = page.getByRole('dialog', { name: 'Guion de prácticas' })
   await dialog.getByRole('button', { name: 'Usar el guion de ejemplo' }).click()
-  await expect(dialog.locator('[data-practice]')).toHaveCount(11)
+  await expect(dialog.locator('[data-practice]')).toHaveCount(13)
   await expect(dialog.locator('[data-practice="1"]')).toContainText('El proyecto abierto')
   await expect(dialog.getByLabel('Guiada')).toBeChecked()
   if (process.env.GUIDE_SHOT) await page.screenshot({ path: process.env.GUIDE_SHOT })
@@ -222,14 +222,14 @@ test('guion de prácticas: varias prácticas en un PDF y elegir cuál abrir', as
   const pdf = readFileSync(await file.path())
   if (process.env.GUIDE_OUT) (await import('fs')).writeFileSync(process.env.GUIDE_OUT, pdf)
   const text = pdf.toString('latin1')
-  // Nueve ejercicios y la solución de la guiada, adjuntos.
-  expect(text.match(/\/Type \/Filespec/g)).toHaveLength(12)
+  // Los ejercicios y la solución de la guiada, adjuntos.
+  expect(text.match(/\/Type \/Filespec/g)).toHaveLength(14)
   await dialog.getByRole('button', { name: 'Cerrar' }).last().click()
 
   // Abrir el guion: se elige la práctica.
   await page.locator('input[type=file]').first().setInputFiles({ name: 'guion.pdf', mimeType: 'application/pdf', buffer: pdf })
   const chooser = page.getByRole('dialog', { name: '¿Qué práctica abres?' })
-  await expect(chooser.getByRole('button')).toHaveCount(13) // 12 archivos + cerrar
+  await expect(chooser.getByRole('button')).toHaveCount(15) // 14 archivos + cerrar
   await chooser.getByRole('button', { name: /Cinta transportadora/ }).click()
   const panel = page.getByRole('complementary', { name: 'Ejercicio' })
   await expect(panel).toContainText('setas de emergencia')

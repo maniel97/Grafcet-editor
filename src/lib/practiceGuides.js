@@ -444,7 +444,7 @@ function manualClassifier() {
       { id: 'cilb', type: 'cylinder', x: 460, y: 289, rot: 180, extend: 'B+', retract: 'B-', retracted: 'b0', extended: 'b1', stroke: 160, time: 1, text: 'B' },
       { id: 'metal', type: 'sink', x: 210, y: 450, rot: 0, text: 'Metal' },
       { id: 'plastico', type: 'sink', x: 360, y: 450, rot: 0, text: 'Plástico' },
-      desk('button', 'AM', 'Sacar de AM', { contact: 'NO', color: 'gray' }),
+      desk('button', 'AM', 'Sacar de AM', { contact: 'NO', color: 'white' }),
       desk('button', 'AP', 'Sacar de AP', { contact: 'NO', color: 'blue' }),
     ],
   }
@@ -618,11 +618,159 @@ function shuttleConveyor() {
   })
 }
 
+// --- Práctica 12: cajas rojas a la izquierda y azules a la derecha, alternando, por dos cintas ----
+// Como en el guion: una cinta arriba, reversible, y una abajo a cada lado; los sensores, al final de
+// las de abajo, ven caer la caja. Las cajas las suelta el autómata (CR, CA: el alimentador cae con
+// el flanco de subida de su salida).
+function alternateBoxes() {
+  const nodes = [
+    step('s0', '0', 200, 0, [], { initial: true }),
+    trans('t1', '↑PV', 200, 100),
+    step('s1', '1', 200, 170, ['CR', 'MSI', 'MI']),
+    trans('t2', 'SI', 200, 270),
+    // Con la roja ya fuera, la siguiente es la azul. Pulsar mientras se mueve una caja no hace nada.
+    step('s2', '2', 200, 340),
+    trans('t3', '↑PV', 200, 440),
+    step('s3', '3', 200, 510, ['CA', 'MSD', 'MD']),
+    trans('t4', 'SD', 200, 610),
+  ]
+  const edges = links([['s0', 't1'], ['t1', 's1'], ['s1', 't2'], ['t2', 's2'], ['s2', 't3'], ['t3', 's3'], ['s3', 't4'], ['t4', 's0']])
+  // Vista de frente, con gravedad. Medidas comprobadas en la simulación
+  // (tests/unit/practiceGuides.test.js): la caja pasa de la cinta de arriba a la de abajo y cae por
+  // delante del sensor de su lado.
+  const scene = {
+    gravity: true,
+    elements: [
+      { id: 'roja', type: 'feeder', x: 240, y: 150, rot: 0, trigger: 'CR', auto: false, spacing: 0, sizes: 'large', material: 'plastic', color: 'red', text: 'CR' },
+      { id: 'azul', type: 'feeder', x: 360, y: 150, rot: 0, trigger: 'CA', auto: false, spacing: 0, sizes: 'large', material: 'plastic', color: 'blue', text: 'CA' },
+      { id: 'arriba', type: 'conveyor', x: 160, y: 250, rot: 0, motor: 'MSD', reverse: 'MSI', length: 280, time: 4, text: 'Cinta de arriba' },
+      // La de la izquierda, girada: su marcha la lleva hacia la izquierda.
+      { id: 'izq', type: 'conveyor', x: 200, y: 340, rot: 180, motor: 'MI', reverse: '', length: 140, time: 2, text: 'Cinta izquierda' },
+      { id: 'der', type: 'conveyor', x: 400, y: 340, rot: 0, motor: 'MD', reverse: '', length: 140, time: 2, text: 'Cinta derecha' },
+      { id: 'si', type: 'sensor', x: 10, y: 400, rot: 0, variable: 'SI', contact: 'NO', range: 60, kind: 'optical', color: 'amber' },
+      { id: 'sd', type: 'sensor', x: 590, y: 400, rot: 180, variable: 'SD', contact: 'NO', range: 60, kind: 'optical', color: 'amber' },
+      { id: 'recogida_izq', type: 'sink', x: 40, y: 520, rot: 0, text: 'Rojas' },
+      { id: 'recogida_der', type: 'sink', x: 560, y: 520, rot: 0, text: 'Azules' },
+      desk('button', 'PV', 'Verde (PV)', { contact: 'NO', color: 'green' }),
+    ],
+  }
+  return practice({
+    name: 'Cajas rojas y azules alternas',
+    nodes,
+    edges,
+    scene,
+    comments: {
+      PV: 'Pulsador verde (NA)',
+      CR: 'Soltar una caja roja', CA: 'Soltar una caja azul',
+      MSI: 'Cinta de arriba hacia la izquierda', MSD: 'Cinta de arriba hacia la derecha',
+      MI: 'Cinta de abajo izquierda (hacia la izquierda)', MD: 'Cinta de abajo derecha (hacia la derecha)',
+      SI: 'Sensor del extremo izquierdo', SD: 'Sensor del extremo derecho',
+    },
+    steps: { 0: 'Toca caja roja', 1: 'La roja va a la izquierda', 2: 'Toca caja azul', 3: 'La azul va a la derecha' },
+    scenarios: [
+      // La pulsación de los 2 s llega con la roja en marcha: no suelta otra caja.
+      scenario('alternar', 'Roja, azul y roja; pulsar con una caja en marcha', 19, [[0.5, 'PV', 1], [0.8, 'PV', 0], [2, 'PV', 1], [2.3, 'PV', 0], [7, 'PV', 1], [7.3, 'PV', 0], [13, 'PV', 1], [13.3, 'PV', 0]]),
+    ],
+    exercise: {
+      title: 'Práctica 12. Cajas rojas y azules alternas',
+      statement: `Al accionar el pulsador verde (**PV**) cae una caja roja y se desplaza por las dos cintas hacia el lado izquierdo hasta que llega al sensor izquierdo (**SI**); entonces se paran las cintas. Si se vuelve a accionar el pulsador, cae una caja azul que se desplaza hacia el lado derecho hasta el sensor de ese lado (**SD**), y así se siguen alternando las cajas de colores.\n\n- **No puede haber dos cajas al mismo tiempo sobre las cintas.**\n- Salidas: **CR** y **CA** sueltan una caja roja o azul; **MSI** y **MSD** mueven la cinta de arriba hacia la izquierda o hacia la derecha; **MI** y **MD**, las cintas de abajo de cada lado.${TASK}`,
+      parts: { plant: 'locked', variables: 'locked', electrical: 'given' },
+      checks: { warnings: false, sequence: '', scenario: '', behaviour: { scenarios: ['alternar'], outputs: [], tolerance: 1, counts: true }, requirements: [{ id: 'edge' }] },
+      hints: { enabled: true, items: [
+        'Una secuencia lineal de cuatro etapas: toca roja, la roja viaja, toca azul, la azul viaja. Así se alternan solas.',
+        'En la etapa en que viaja una caja, a la vez: soltarla (**CR** o **CA**), la cinta de arriba hacia su lado y la de abajo de ese lado, hasta su sensor.',
+        'Arranca con el flanco `↑PV`: solo se mira el pulsador en las etapas de espera, así que pulsar con una caja en marcha no suelta otra.',
+      ] },
+    },
+  })
+}
+
+// --- Práctica 13: identificar una pieza de metal o de plástico en un soporte y expulsarla ---------
+// S1 es inductivo (solo ve el metal) y S2 capacitivo (ve las dos): con S2 sin pieza no hay nada.
+function identifyPiece() {
+  const nodes = [
+    step('s0', '0', 320, 0, [], { initial: true }),
+    // Tres salidas excluyentes, según lo que ven los dos sensores al pulsar el verde.
+    trans('t1', '↑PV · S1 · S2', 80, 100),
+    trans('t2', '↑PV · !S1 · S2', 320, 100),
+    trans('t3', '↑PV · !S2', 560, 100),
+    step('s1', '1', 80, 170, ['LV']),
+    step('s2', '2', 320, 170, ['LA']),
+    step('s3', '3', 560, 170, ['LV', 'LA']),
+    trans('t4', 'PR', 80, 270),
+    trans('t5', 'PR', 320, 270),
+    // Sin pieza, el rojo apaga las luces y el cilindro no se mueve.
+    trans('t6', 'PR', 560, 270),
+    step('s4', '4', 200, 340, ['A+']),
+    trans('t7', 'a1', 200, 440),
+    // A es monoestable: sin A+, el muelle lo devuelve; se espera a que llegue a a0.
+    step('s5', '5', 200, 510),
+    trans('t8', 'a0', 200, 610),
+  ]
+  const edges = links([
+    ['s0', 't1'], ['s0', 't2'], ['s0', 't3'], ['t1', 's1'], ['t2', 's2'], ['t3', 's3'],
+    ['s1', 't4'], ['s2', 't5'], ['s3', 't6'], ['t4', 's4'], ['t5', 's4'], ['t6', 's0'],
+    ['s4', 't7'], ['t7', 's5'], ['s5', 't8'], ['t8', 's0'],
+  ])
+  // Vista de frente, con gravedad: la pieza cae de su almacén al soporte; S1 y S2 la miran desde la
+  // derecha y A la empuja por el borde a la recogida. Medidas comprobadas en la simulación
+  // (tests/unit/practiceGuides.test.js).
+  const scene = {
+    gravity: true,
+    elements: [
+      { id: 'almacen_m', type: 'feeder', x: 262, y: 130, rot: 0, trigger: 'M', auto: false, spacing: 0, sizes: 'large', material: 'metal', color: 'metal', text: 'M' },
+      { id: 'almacen_p', type: 'feeder', x: 320, y: 130, rot: 0, trigger: 'P', auto: false, spacing: 0, sizes: 'large', material: 'plastic', color: 'amber', text: 'P' },
+      { id: 'soporte', type: 'platform', x: 236, y: 300, rot: 0, length: 110, text: 'Soporte' },
+      { id: 's1', type: 'sensor', x: 420, y: 264, rot: 180, variable: 'S1', contact: 'NO', kind: 'inductive', range: 170 },
+      { id: 's2', type: 'sensor', x: 420, y: 286, rot: 180, variable: 'S2', contact: 'NO', kind: 'capacitive', range: 170 },
+      { id: 'cila', type: 'cylinder', x: 140, y: 289, rot: 0, extend: 'A+', retract: '', retracted: 'a0', extended: 'a1', stroke: 140, time: 1, text: 'A' },
+      { id: 'recogida', type: 'sink', x: 350, y: 450, rot: 0, text: 'Recogida' },
+      desk('button', 'M', 'Metal (M)', { contact: 'NO', color: 'white' }),
+      desk('button', 'P', 'Plástico (P)', { contact: 'NO', color: 'blue' }),
+      desk('button', 'PV', 'Verde (PV)', { contact: 'NO', color: 'green' }),
+      desk('button', 'PR', 'Rojo (PR)', { contact: 'NO', color: 'red' }),
+      desk('lamp', 'LV', 'Luz verde', { color: 'green' }),
+      desk('lamp', 'LA', 'Luz azul', { color: 'blue' }),
+    ],
+  }
+  return practice({
+    name: 'Identificar metal o plástico',
+    nodes,
+    edges,
+    scene,
+    comments: {
+      PV: 'Pulsador verde (NA): identificar', PR: 'Pulsador rojo (NA): expulsar',
+      M: 'Botón: poner una pieza de metal en el soporte', P: 'Botón: poner una pieza de plástico en el soporte',
+      S1: 'Detector inductivo: ve el metal', S2: 'Detector capacitivo: ve metal y plástico',
+      LV: 'Luz verde: metal', LA: 'Luz azul: plástico',
+      'A+': 'Electroválvula monoestable: sacar A (el muelle lo devuelve)',
+      a0: 'Final de carrera: A dentro', a1: 'Final de carrera: A fuera',
+    },
+    steps: { 0: 'Esperando', 1: 'Es metal', 2: 'Es plástico', 3: 'No hay pieza', 4: 'A expulsa la pieza', 5: 'A vuelve' },
+    scenarios: [
+      scenario('metal', 'Una pieza de metal', 7, [[0.3, 'M', 1], [0.5, 'M', 0], [1.5, 'PV', 1], [1.8, 'PV', 0], [3, 'PR', 1], [3.3, 'PR', 0]]),
+      scenario('plastico', 'Una pieza de plástico', 7, [[0.3, 'P', 1], [0.5, 'P', 0], [1.5, 'PV', 1], [1.8, 'PV', 0], [3, 'PR', 1], [3.3, 'PR', 0]]),
+      scenario('vacio', 'Sin pieza', 5, [[0.5, 'PV', 1], [0.8, 'PV', 0], [2.5, 'PR', 1], [2.8, 'PR', 0]]),
+    ],
+    exercise: {
+      title: 'Práctica 13. Identificar metal o plástico',
+      statement: `Se coloca a mano una pieza de metal o de plástico en el soporte (botones **M** y **P** de la planta). Al accionar el pulsador verde (**PV**) se enciende la luz verde (**LV**) si la pieza es de metal o la azul (**LA**) si es de plástico. Al accionar el pulsador rojo (**PR**), el cilindro **A** expulsa la pieza.\n\n- Los sensores **S1** (inductivo) y **S2** (capacitivo) sirven para distinguir las piezas de metal de las de plástico.\n- Si no hay ninguna pieza, al accionar el pulsador verde se encienden las dos luces y el cilindro no se mueve al accionar el rojo.\n- **A** es de simple efecto (salida **A+**, finales de carrera **a0**, **a1**).${TASK}`,
+      parts: { plant: 'locked', variables: 'locked', electrical: 'given' },
+      checks: { warnings: false, sequence: '', scenario: '', behaviour: { scenarios: ['metal', 'plastico', 'vacio'], outputs: [], tolerance: 1, counts: true }, requirements: [{ id: 'or' }, { id: 'edge' }] },
+      hints: { enabled: true, items: [
+        'El inductivo (S1) solo ve el metal; el capacitivo (S2) ve metal y plástico. Si S2 no ve nada, no hay pieza.',
+        'Desde el reposo, tres salidas excluyentes al pulsar el verde: `↑PV · S1 · S2` (metal), `↑PV · !S1 · S2` (plástico) y `↑PV · !S2` (sin pieza).',
+        'Con pieza, el rojo lleva a la expulsión: **A+** hasta `a1` y, sin ella, el muelle lo devuelve hasta `a0`. Sin pieza, el rojo vuelve al reposo sin mover el cilindro.',
+      ] },
+    },
+  })
+}
+
 export const PRACTICE_GUIDES = [
   {
     id: 'guion-automatas',
     title: 'Prácticas de programación de autómatas',
-    description: 'Un guion completo: normas generales, una práctica guiada con su solución y diez prácticas con autocorrección.',
+    description: 'Un guion completo: normas generales, una práctica guiada con su solución y doce prácticas con autocorrección.',
     sheet: { subject: 'Integración de Sistemas', course: 'Curso 2026-2027', cycle: 'Mecatrónica Industrial', center: '', teacher: '' },
     rules:
       'A continuación tienes una serie de prácticas obligatorias de programación de autómatas. El primer paso es **adaptar el enunciado a un caso real** del mundo industrial con una dificultad parecida.\n\n- Las prácticas se simulan en el editor (planta virtual) y, si se puede, en el autómata real.\n- Cada práctica es **individual**, aunque durante el aprendizaje hayas tenido ayuda del profesor o de los compañeros. Los archivos copiados se consideran no presentados.\n- La entrega fuera de plazo se penaliza progresivamente.\n- Se valoran la ejecución y la presentación (formato, ortografía, limpieza): **30 %** la entrega y **70 %** la calidad.\n- Se entregan en **un único PDF con portada**: Exportar > Dossier lo genera con tu proyecto dentro.\n\n# Cada práctica debe incluir\n- Enunciado\n- Breve contenido teórico, si procede\n- GRAFCET\n- Conexionado de los elementos\n- Programa (ladder y AWL)\n- Tabla de variables\n- Simulación\n- Posibles mejoras o aportaciones, si procede\n- Problemas encontrados y cómo se han resuelto, si procede',
@@ -638,6 +786,8 @@ export const PRACTICE_GUIDES = [
       { id: 'p9', teacher: manualClassifier },
       { id: 'p10', teacher: twoCounters },
       { id: 'p11', teacher: shuttleConveyor },
+      { id: 'p12', teacher: alternateBoxes },
+      { id: 'p13', teacher: identifyPiece },
     ],
   },
 ]

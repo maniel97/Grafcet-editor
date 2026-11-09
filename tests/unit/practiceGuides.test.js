@@ -155,6 +155,40 @@ describe('guion de prácticas de ejemplo', () => {
       expect([end.X0, end.S2, end.MD, end.MI]).toEqual([1, 1, 0, 0])
     }
   })
+
+  it('práctica 12: roja a la izquierda, azul a la derecha y otra roja; pulsar con una caja en marcha no suelta otra', () => {
+    const r = run(teacher('p12'), 'alternar')
+    const s = r.samples
+    // Cada caja sale con su pulsación (0,5 s, 7 s y 13 s); la de los 2 s no hace nada.
+    near(edgesOf(s, 'CR').times, [0.55, 3.9, 13, 16.35])
+    near(edgesOf(s, 'CA').times, [7.05, 10.4])
+    // Las dos cintas de su lado, a la vez, hasta que su sensor ve caer la caja.
+    near(edgesOf(s, 'MSI').times, edgesOf(s, 'MI').times)
+    near(edgesOf(s, 'MSD').times, edgesOf(s, 'MD').times)
+    near(edgesOf(s, 'SI').times, [3.9, 4.05, 16.35, 16.5])
+    near(edgesOf(s, 'SD').times, [10.4, 10.55])
+    expect(r.counts).toEqual({ recogida_izq: 2, recogida_der: 1 })
+  })
+
+  it('práctica 13: verde si es metal, azul si es plástico, las dos sin pieza; el rojo la expulsa (sin pieza, A no se mueve)', () => {
+    const project = teacher('p13')
+    const metal = run(project, 'metal')
+    near(edgesOf(metal.samples, 'LV').times, [1.5, 3.05])
+    expect(edgesOf(metal.samples, 'LA').times).toHaveLength(0)
+    near(edgesOf(metal.samples, 'A+').times, [3.05, 4.35])
+    const plastico = run(project, 'plastico')
+    near(edgesOf(plastico.samples, 'LA').times, [1.5, 3.05])
+    expect(edgesOf(plastico.samples, 'LV').times).toHaveLength(0)
+    expect(edgesOf(plastico.samples, 'S1').times).toHaveLength(0) // el inductivo no ve el plástico
+    for (const r of [metal, plastico]) {
+      expect(r.counts.recogida).toBe(1)
+      expect([r.samples.at(-1).values.X0, r.samples.at(-1).values.a0]).toEqual([1, 1])
+    }
+    const vacio = run(project, 'vacio').samples
+    near(edgesOf(vacio, 'LV').times, [0.55, 2.55])
+    near(edgesOf(vacio, 'LA').times, [0.55, 2.55])
+    expect(edgesOf(vacio, 'A+').times).toHaveLength(0)
+  })
 })
 
 describe('mandos de la planta en los escenarios', () => {
