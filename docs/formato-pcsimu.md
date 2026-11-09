@@ -203,6 +203,7 @@ la vez, no se mueve.
 | `f9` | 1: suelta piezas sin señal |
 | `f14` | lado por el que sale la pieza: 0 derecha, 1 izquierda, 2 arriba, 3 abajo |
 | `f16` | pieza: 0 caja, 1 bolsa, 2 áridos, 3 botella, 4 bote, 5 metálica, 6 plástica, 7 de color, 8 persona, 9 vehículo, 11 imagen propia |
+| `f15` | con `f16` = 7, el color (diálogo «Color objeto»): 0 negro, 1 azul, 2 verde, 3 cian, 4 rojo, 5 magenta, 6 amarillo, 7 blanco |
 | `f17` | pasos entre pieza y pieza mientras sigue activo |
 
 La pieza tiene el tamaño del rectángulo del objeto y aparece pegada a él. Suelta una en cuanto se activa

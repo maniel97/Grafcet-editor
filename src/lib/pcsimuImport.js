@@ -6,6 +6,8 @@ import { MOTOR_LOOKS, SCENE_VARS, TOOL_LOOKS, rotate } from './sim/scene'
 
 const f = (o, k) => o.fields[k - 4] ?? 0
 const COLOR_OF = { 0: 'green', 1: 'black', 2: 'blue', 3: 'blue', 4: 'red', 5: 'red', 6: 'yellow', 7: 'white' }
+// Pieza de color del alimentador (f16 = 7, el color en f15: el orden del diálogo «Color objeto»).
+const PIECE_COLOR_OF = { 0: 'black', 1: 'blue', 2: 'green', 4: 'red' }
 // Orientación de PC_SIMU (0 derecha, 1 izquierda, 2 arriba, 3 abajo) -> giro del editor.
 const ROT = { 0: 0, 1: 180, 2: 270, 3: 90 }
 // Lado por el que se acciona un final de carrera -> giro del editor.
@@ -181,7 +183,7 @@ export function importPcSimu(text, images = {}) {
       }
       case 25: {
         const trigger = f(o, 10) === 1 ? (f(o, 4) === 1 ? output(o, f(o, 5), f(o, 7)) : input(o, f(o, 5), f(o, 7))) : ''
-        add(o, 'feeder', { ...at(o), trigger, auto: f(o, 9) === 1, sizes: W >= 40 ? 'large' : 'small', material: f(o, 16) === 5 ? 'metal' : 'plastic' })
+        add(o, 'feeder', { ...at(o), trigger, auto: f(o, 9) === 1, sizes: W >= 40 ? 'large' : 'small', material: f(o, 16) === 5 ? 'metal' : 'plastic', ...(f(o, 16) === 7 && PIECE_COLOR_OF[f(o, 15)] ? { color: PIECE_COLOR_OF[f(o, 15)] } : {}) })
         break
       }
       case 21:

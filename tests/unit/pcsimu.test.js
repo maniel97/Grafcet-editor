@@ -222,6 +222,11 @@ describe('PC_SIMU (.sim)', () => {
     const perfil = p9.find((o) => o.type === 19 && o.name.startsWith('Perfil') && o.fields[9] === 1)
     const [cilA] = p9.filter((o) => o.type === 19 && o.name.startsWith('Actuador')).sort((a, b) => a.rect[0] - b.rect[0])
     expect(perfil.rect[0] - cilA.rect[2]).toBeGreaterThanOrEqual(10)
+    // Práctica 12: cajas rojas y azules como piezas de color (f16 = 7) con el suyo en f15 (4 rojo, 1 azul).
+    const p12 = parsePcSimu(exportPcSimu(practice('p12')).text).filter((o) => o.type === 25).sort((a, b) => a.rect[0] - b.rect[0])
+    expect(p12.map((o) => [o.fields[12], o.fields[11]])).toEqual([[7, 4], [7, 1]])
+    // El de metal sigue siendo metálica y el ámbar, plástica.
+    expect(p9.filter((o) => o.type === 25).map((o) => o.fields[12]).sort()).toEqual([5, 6])
     // El elevador (160 px de recorrido): gráfico 1 (el que empuja y sube piezas en PC_SIMU), con el cuerpo de
     // 160 · 19 / 11 = 276 px y 28 de ancho (el de la placa del editor).
     const estacion = example(/Estación de elevación/)

@@ -156,13 +156,14 @@ const OBJECTS = {
   },
   // Objeto (alimentador): suelta una pieza del tamaño de su rectángulo, pegada a él por el lado de f14
   // (3: por debajo), al activarse f5.f7 (f10 = 1; f4: 0 una entrada, 1 una salida) y otra cada f17 pasos
-  // mientras siga activo; f9 = 1: suelta sin orden. f16: tipo de pieza (5 metálica, 6 plástica).
+  // mientras siga activo; f9 = 1: suelta sin orden. f16: tipo de pieza (5 metálica, 6 plástica, 7 de color:
+  // la del diálogo «Color objeto», en f15, PIECE_COLORS_PCSIMU).
   feeder: {
     type: 25,
     name: 'Objeto',
     area: 'I',
     // Con orden, f17 muy alto: una sola pieza por activación (como el flanco del editor).
-    fields: ({ trigger, area, auto, material }) => [area === 'Q' ? 1 : 0, trigger?.byte ?? 0, 0, trigger?.bit ?? 0, 0, auto ? 1 : 0, trigger ? 1 : 0, 0, 0, 0, 3, 0, material, trigger ? ONE_PIECE : FEED_PERIOD],
+    fields: ({ trigger, area, auto, material, color }) => [area === 'Q' ? 1 : 0, trigger?.byte ?? 0, 0, trigger?.bit ?? 0, 0, auto ? 1 : 0, trigger ? 1 : 0, 0, 0, 0, 3, color ?? 0, material, trigger ? ONE_PIECE : FEED_PERIOD],
   },
   // Perfil de aluminio: f15 50 horizontal / 51 vertical (gris claro); f13 = 1 «detener objeto» (las piezas se
   // apoyan encima); f14 = 1 «destruir objeto» (las que lo tocan desaparecen: una recogida).
@@ -292,6 +293,9 @@ const OBJECTS = {
 }
 const CYLINDER_SPEED = 50 // la de los ejemplos de PC_SIMU
 const TANK_CAPACITY = 1000 // la de los ejemplos de PC_SIMU
+// Pieza de color (f16 = 7): su color en f15, en el orden del diálogo «Color objeto» de PC_SIMU (0 negro,
+// 1 azul, 2 verde, 3 cian, 4 rojo, 5 magenta, 6 amarillo, 7 blanco). La ámbar del editor sale como plástica.
+const PIECE_COLORS_PCSIMU = { black: 0, blue: 1, green: 2, red: 4 }
 const FEED_PERIOD = 40 // pasos entre pieza y pieza de un alimentador automático
 const ONE_PIECE = 30000 // tantos pasos que, con orden, suelta una sola pieza aunque la orden dure
 // Velocidades: se supone un paso de simulación de PC_SIMU cada 50 ms (con ella, la velocidad 50 de sus
@@ -323,6 +327,13 @@ const label = (text, cx, y) => ({ type: PCSIMU_TYPES.text, rect: [cx - 4 * text.
 
 // project -> { text, bytes (Windows-1252), warnings, count }. Arriba las salidas, en medio los mandos y
 // abajo los detectores, cada uno con el nombre de su variable debajo.
+// Tipo de pieza del alimentador: metálica, de color (con el suyo) o plástica.
+function feederPiece(e) {
+  if (e.material === 'metal') return { material: 5 }
+  const color = e.material === 'mixed' ? undefined : PIECE_COLORS_PCSIMU[e.color]
+  return color === undefined ? { material: 6 } : { material: 7, color }
+}
+
 export function exportPcSimu(project, { reserved = [], addressOf } = {}) {
   const plc = project.plc ?? {}
   const elements = plc.scene?.elements ?? []
@@ -421,7 +432,7 @@ export function exportPcSimu(project, { reserved = [], addressOf } = {}) {
       // La pieza sale por debajo del alimentador, donde la deja el editor (se ajusta después del bucle).
       // (desde arriba, la pieza está sobre la cinta: en PC_SIMU, apoyada en ella)
       const restOn = front ? null : beltUnder([e.x - 1, e.y - 1, e.x + 1, e.y + 1])[1]
-      machine.push({ object: 'feeder', name: '', piece: { x: e.x, y: e.y - h / 2, w, h }, restOn, trigger, area: q ? 'Q' : 'I', auto: !t && e.auto !== false, material: e.material === 'metal' ? 5 : 6 })
+      machine.push({ object: 'feeder', name: '', piece: { x: e.x, y: e.y - h / 2, w, h }, restOn, trigger, area: q ? 'Q' : 'I', auto: !t && e.auto !== false, ...feederPiece(e) })
       continue
     }
     if (onMachine && e.type === 'platform') {

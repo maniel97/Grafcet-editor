@@ -27,6 +27,16 @@ describe('Importar de PC_SIMU (.sim)', () => {
     }
   })
 
+  it('las piezas de color (práctica 12, cajas rojas y azules) vuelven con su color', async () => {
+    const { PRACTICE_GUIDES } = await import('../../src/lib/practiceGuides')
+    const p = PRACTICE_GUIDES[0].practices.find((x) => x.id === 'p12').teacher()
+    const a = exportPcSimu(p)
+    const imp = importPcSimu(a.text)
+    const feeders = imp.project.plc.scene.elements.filter((e) => e.type === 'feeder').sort((x, y) => x.x - y.x)
+    expect(feeders.map((e) => e.color)).toEqual(['red', 'blue'])
+    expect(signature(exportPcSimu(imp.project).text)).toEqual(signature(a.text))
+  })
+
   it('lo que no tiene equivalente, contado aparte (para el aviso)', () => {
     const unknown = { type: 99, rect: [0, 0, 40, 40], fields: [] }
     const { skipped } = importPcSimu(pcsimuText([unknown, unknown]))
