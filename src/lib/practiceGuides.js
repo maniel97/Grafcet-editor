@@ -822,10 +822,7 @@ function bagsInBox() {
       // B1 mira hacia abajo: ve llegar el frente de la caja. B2, de lado, el paso de cada bolsa.
       { id: 'b1', type: 'sensor', x: 330, y: 250, rot: 90, variable: 'B1', contact: 'NO', range: 80, kind: 'optical' },
       { id: 'b2', type: 'sensor', x: 215, y: 235, rot: 0, variable: 'B2', contact: 'NO', range: 65, kind: 'optical' },
-      // Al final de la cinta, a la altura de la caja: en PC_SIMU las piezas no caen por el borde (se
-      // quedan en el filo), así que la caja tiene que tocar la recogida (un perfil que la hace
-      // desaparecer) mientras la cinta aún la empuja.
-      { id: 'salida', type: 'sink', x: 430, y: 300, rot: 0, text: 'Cajas llenas' },
+      { id: 'salida', type: 'sink', x: 440, y: 470, rot: 0, text: 'Cajas llenas' },
       desk('button', 'S1', '1 bolsa (S1)', { contact: 'NO', color: 'red' }),
       desk('button', 'S5', '5 bolsas (S5)', { contact: 'NO', color: 'green' }),
       desk('lamp', 'H1', 'Carga 1 (H1)', { color: 'green' }),
