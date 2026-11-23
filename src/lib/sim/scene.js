@@ -309,7 +309,7 @@ export const motorRunning = (e, state, values) => (e.stop ? (state.pos?.[e.id] ?
 const BODY = 80 // largo del cuerpo de un cilindro
 // Cajas y bolsas, como las de PC_SIMU: la caja es abierta por arriba y lo que cae en ella se queda
 // dentro (p.load: cuántas lleva) y viaja con ella; la bolsa es una pieza baja y ancha.
-export const PIECE_SIZES = { small: [28, 28], large: [44, 44], box: [88, 40], bag: [40, 20] }
+export const PIECE_SIZES = { small: [28, 28], large: [44, 44], box: [112, 40], bag: [40, 20] }
 export const PIECE_KINDS = new Set(['box', 'bag'])
 
 // Tipos de detector de presencia: qué ven (piezas y vástagos de los cilindros).

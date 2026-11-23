@@ -607,7 +607,7 @@ describe('vista de frente (gravedad)', () => {
       elements: [box, bag, { id: 'c', type: 'conveyor', x: 20, y: 300, rot: 0, motor: 'M', length: 200, time: 2 }, { id: 'r', type: 'sink', x: 300, y: 500, rot: 0 }],
     }
     let state = run(scene, sceneStep(scene, sceneInit(scene), { Caja: 1 }, 0.05), {}, 1)
-    expect(state.pieces.map((p) => [p.kind, p.w, p.h, p.y + p.h])).toEqual([['box', 88, 40, 285]])
+    expect(state.pieces.map((p) => [p.kind, p.w, p.h, p.y + p.h])).toEqual([['box', 112, 40, 285]])
     for (let i = 0; i < 2; i++) state = run(scene, sceneStep(scene, sceneStep(scene, state, { Bolsa: 0 }, 0.05), { Bolsa: 1 }, 0.05), {}, 1)
     expect(state.pieces).toHaveLength(1) // las dos bolsas, dentro
     expect(state.pieces[0].load).toBe(2)
