@@ -792,7 +792,7 @@ function bagsInBox() {
     step('s5', '5', 440, 680, ['M1']),
     trans('t8', '!B1', 440, 780),
     step('s6', '6', 440, 850, ['M1']),
-    trans('t9', '2s/X6', 440, 950),
+    trans('t9', '4s/X6', 440, 950),
     // Un grafcet parcial por bombilla: H1 o H5 desde que se pide la caja hasta que está llena.
     step('s10', '10', 700, 0, [], { initial: true }),
     trans('t10', 'X1', 700, 100),
@@ -843,7 +843,7 @@ function bagsInBox() {
       CAJA: 'Soltar una caja en la cinta de abajo', BOLSA: 'Soltar una bolsa en la cinta de arriba',
       M1: 'Motor de la cinta de las cajas', M2: 'Motor de la cinta de las bolsas',
       H1: 'Bombilla: cargando 1 bolsa', H5: 'Bombilla: cargando 5 bolsas',
-      C: 'Contador: bolsas que faltan', '2s/X6': 'Tiempo para que la caja caiga del borde',
+      C: 'Contador: bolsas que faltan', '4s/X6': 'Tiempo para que la caja caiga del borde',
     },
     steps: { 0: 'Esperando', 1: 'Caja para 1 bolsa', 2: 'Caja para 5 bolsas', 3: 'Cae una bolsa', 4: 'Cuenta la bolsa', 5: 'La caja sale', 6: 'La caja cae', 10: 'H1 apagada', 11: 'Cargando 1', 20: 'H5 apagada', 21: 'Cargando 5' },
     scenarios: [
@@ -860,7 +860,7 @@ function bagsInBox() {
         'Dos caminos desde el reposo: con `↑S1` la caja será de 1 bolsa y con `↑S5` de 5. Los dos piden la caja (**CAJA** y **M1**) hasta que llega a `B1`.',
         'Un contador para las bolsas que faltan: `C:=1` o `C:=5` al empezar, y `C:=C-1` cada vez que una bolsa cruza `B2`. Mientras falten (`C >= 1`) se suelta otra; si no, la caja sale.',
         'Las bombillas, cada una en un grafcet parcial que sigue al principal: `X1` enciende **H1** y `X2` enciende **H5**; las dos se apagan con la caja llena (`X5`).',
-        'La cinta acaba poco después de `B1`: con la caja llena, **M1** hasta que `B1` deja de verla (`!B1`) y un poco más (`2s/X6`) para que caiga del borde.',
+        'La cinta acaba poco después de `B1`: con la caja llena, **M1** hasta que `B1` deja de verla (`!B1`) y un poco más (`4s/X6`) para que caiga del borde.',
       ] },
     },
   })
