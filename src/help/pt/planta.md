@@ -24,7 +24,7 @@ Enquanto simula, a secção **«Diagrama espaço-fase»** do painel desenha o qu
 
 ## Mais realismo
 
-- **Gravidade**: vista de frente; as peças caem, apoiam-se em plataformas e na haste dos cilindros.
+- **Gravidade**: vista de frente; as peças caem, apoiam-se em plataformas e na haste dos cilindros. Um alimentador pode dar **caixas** (abertas: o que cai dentro fica nelas e viaja com elas; a recolha conta também o que trazem dentro) ou **sacos**, como no PC_SIMU.
 - **Relevo**: desenho com volume, só de apresentação.
 - **Isométrica** (na vista de cima): a instalação assente no chão, em perspetiva, e cada elemento com a sua altura: os tapetes como mesas, as peças como cubos em cima, os detetores num poste. Só muda o desenho: simula-se e edita-se da mesma forma (arrastar, pôr, rodar).
 - **Avarias** (em Usar): um detetor que não dá sinal, um cilindro que encrava… para praticar o diagnóstico.

@@ -24,7 +24,7 @@ While you simulate, the **“Displacement-step diagram”** section of the panel
 
 ## More realism
 
-- **Gravity**: front view; parts fall, rest on platforms and on cylinder rods.
+- **Gravity**: front view; parts fall, rest on platforms and on cylinder rods. A feeder can give **boxes** (open: whatever falls in stays inside and travels with them; the collector also counts what they bring inside) or **bags**, as in PC_SIMU.
 - **Relief**: a drawing with volume, for presentation only.
 - **Isometric** (in the top view): the plant resting on the floor, in perspective, and each element with its height: conveyors as tables, parts as cubes on top, sensors on a post. Only the drawing changes: you simulate and edit the same way (drag, place, rotate).
 - **Faults** (in Use): a sensor that gives no signal, a cylinder that jams… to practise diagnosis.
