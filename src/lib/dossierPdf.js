@@ -1,7 +1,7 @@
 // PDF del dossier (lib/dossier.js): las páginas tal cual las describe buildDossier, con jsPDF
 // (que se carga solo al usarlo). Texto y tablas vectoriales; las figuras, con su escena vectorial
 // (si la tienen) recortada a su franja, o como imagen.
-import { drawScene, itemSpan, pdfSafe } from './vectorPdf'
+import { ARROW_GLYPHS, drawScene, itemSpan, pdfSafe } from './vectorPdf'
 
 const PX_TO_MM = 25.4 / 96
 
@@ -33,7 +33,8 @@ export function renderDossierPdf(jsPDF, pages) {
         pdf.setTextColor(...(it.color ?? [15, 23, 42]))
         // horizontalScale explícito: el de los textos de una figura vectorial (drawScene) se queda
         // en el estado del PDF y estrecharía o ensancharía todo lo que viene después.
-        pdf.text(pdfSafe(it.text), it.x, it.y, { horizontalScale: 1, ...(it.align ? { align: it.align } : {}) })
+        if ([...String(it.text)].some((ch) => ARROW_GLYPHS[ch])) textWithArrows(pdf, it)
+        else pdf.text(pdfSafe(it.text), it.x, it.y, { horizontalScale: 1, ...(it.align ? { align: it.align } : {}) })
       } else if (it.t === 'line') {
         pdf.setDrawColor(...(it.color ?? [15, 23, 42]))
         pdf.setLineWidth(it.width ?? 0.2)
@@ -53,6 +54,44 @@ export function renderDossierPdf(jsPDF, pages) {
     }
   })
   return pdf
+}
+
+// Texto con flechas de flanco (↑ ↓, que no están en las fuentes estándar del PDF): cada flecha se
+// dibuja con líneas en el hueco que ocupa al medirlo (el de «?», pdfSafe), y el texto a trozos.
+function textWithArrows(pdf, it) {
+  const width = (t) => pdf.getTextWidth(pdfSafe(t))
+  const text = String(it.text)
+  let x = it.x - (it.align === 'center' ? width(text) / 2 : it.align === 'right' ? width(text) : 0)
+  const em = (it.size * 25.4) / 72
+  const color = it.color ?? [15, 23, 42]
+  let run = ''
+  const flush = () => {
+    if (!run) return
+    pdf.text(pdfSafe(run), x, it.y, { horizontalScale: 1 })
+    x += width(run)
+    run = ''
+  }
+  for (const ch of text) {
+    if (!ARROW_GLYPHS[ch]) {
+      run += ch
+      continue
+    }
+    flush()
+    const w = width('?')
+    const cx = x + w / 2
+    const [top, bottom] = [it.y - em * 0.7, it.y]
+    const head = em * 0.18
+    const tip = ARROW_GLYPHS[ch] === 'up' ? top : bottom
+    const dir = ARROW_GLYPHS[ch] === 'up' ? 1 : -1
+    pdf.setDrawColor(...color)
+    pdf.setLineWidth(Math.max(0.1, em * 0.07))
+    pdf.setLineDashPattern([], 0)
+    pdf.line(cx, top, cx, bottom)
+    pdf.line(cx - head, tip + head * dir, cx, tip)
+    pdf.line(cx + head, tip + head * dir, cx, tip)
+    x += w
+  }
+  flush()
 }
 
 function drawFigure(pdf, it, pageIndex) {

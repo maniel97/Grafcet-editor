@@ -183,7 +183,7 @@ export function importPcSimu(text, images = {}) {
       }
       case 25: {
         const trigger = f(o, 10) === 1 ? (f(o, 4) === 1 ? output(o, f(o, 5), f(o, 7)) : input(o, f(o, 5), f(o, 7))) : ''
-        add(o, 'feeder', { ...at(o), trigger, auto: f(o, 9) === 1, sizes: W >= 40 ? 'large' : 'small', material: f(o, 16) === 5 ? 'metal' : 'plastic', ...(f(o, 16) === 7 && PIECE_COLOR_OF[f(o, 15)] ? { color: PIECE_COLOR_OF[f(o, 15)] } : {}) })
+        add(o, 'feeder', { ...at(o), trigger, auto: f(o, 9) === 1, sizes: f(o, 16) === 0 ? 'box' : f(o, 16) === 1 ? 'bag' : W >= 40 ? 'large' : 'small', material: f(o, 16) === 5 ? 'metal' : 'plastic', ...(f(o, 16) === 7 && PIECE_COLOR_OF[f(o, 15)] ? { color: PIECE_COLOR_OF[f(o, 15)] } : {}) })
         break
       }
       case 21:

@@ -307,7 +307,10 @@ export const TOOL_LOOKS = 17
 export const motorRunning = (e, state, values) => (e.stop ? (state.pos?.[e.id] ?? 0) === 1 : Boolean(Number(values?.[e.variable])))
 
 const BODY = 80 // largo del cuerpo de un cilindro
-export const PIECE_SIZES = { small: [28, 28], large: [44, 44] }
+// Cajas y bolsas, como las de PC_SIMU: la caja es abierta por arriba y lo que cae en ella se queda
+// dentro (p.load: cuántas lleva) y viaja con ella; la bolsa es una pieza baja y ancha.
+export const PIECE_SIZES = { small: [28, 28], large: [44, 44], box: [88, 40], bag: [40, 20] }
+export const PIECE_KINDS = new Set(['box', 'bag'])
 
 // Tipos de detector de presencia: qué ven (piezas y vástagos de los cilindros).
 //   óptico y capacitivo: cualquier pieza; inductivo: solo metal; de color: piezas de su color.
@@ -319,7 +322,7 @@ export const SENSOR_KINDS = {
 }
 export const PIECE_COLORS = { amber: N_('Ámbar'), red: N_('Rojo'), blue: N_('Azul'), green: N_('Verde'), black: N_('Negro') }
 // Masa de una pieza (kg), para la báscula: el metal pesa el triple.
-export const pieceMass = (p) => (p.w >= PIECE_SIZES.large[0] ? 2 : 1) * (p.material === 'metal' ? 3 : 1)
+export const pieceMass = (p) => (p.w >= PIECE_SIZES.large[0] ? 2 : 1) * (p.material === 'metal' ? 3 : 1) + (p.load ?? 0)
 
 // --- Geometría -----------------------------------------------------------------------------
 
@@ -360,6 +363,8 @@ export const diverterRect = (e) => worldRect(e, 0, -25, Number(e.length) || 80, 
 export const rampRect = (e) => worldRect(e, 0, -20, Number(e.length) || 120, 40)
 export const conveyorRect = (e) => worldRect(e, 0, -15, Number(e.length) || 240, 30)
 export const sinkRect = (e) => worldRect(e, -30, -30, 60, 60)
+// Clave de state.counts con lo que llega a una recogida dentro de las cajas.
+export const sinkContents = (id) => `${id}:dentro`
 // Plataforma: superficie fija (anclaje: extremo izquierdo de su cara de arriba).
 export const platformRect = (e) => worldRect(e, 0, 0, Number(e.length) || 160, 14)
 // Brazo de una barrera cerrada (al abrirse gira hacia arriba y deja de estorbar).
@@ -471,6 +476,7 @@ function fall(scene, state, held, dt) {
   const fixed = supports(scene, state)
   const walls = obstacles(scene, state)
   const below = []
+  const stored = new Set() // las que han caído dentro de una caja
   for (const p of [...state.pieces].sort((a, b) => b.y + b.h - (a.y + a.h))) {
     if (held.has(p.id)) {
       below.push(p)
@@ -479,8 +485,20 @@ function fall(scene, state, held, dt) {
     const cx = p.x + p.w / 2
     const bottom = p.y + p.h
     let top = SCENE_FLOOR
-    for (const r of [...fixed, ...below]) if (cx >= r.x && cx <= r.x + r.w && r.y >= bottom - STEP_UP && r.y < top) top = r.y
+    let on = null
+    for (const r of [...fixed, ...below]) {
+      if (cx >= r.x && cx <= r.x + r.w && r.y >= bottom - STEP_UP && r.y < top) {
+        top = r.y
+        on = r
+      }
+    }
     const land = () => {
+      // En una caja abierta: entra en ella (deja de ser una pieza suelta).
+      if (on?.kind === 'box' && p.kind !== 'box') {
+        on.load = (on.load ?? 0) + 1 + (p.load ?? 0)
+        stored.add(p.id)
+        return
+      }
       p.y = top - p.h
       p.vy = 0
       p.vx = 0
@@ -498,8 +516,9 @@ function fall(scene, state, held, dt) {
         p.vy = vy
       }
     }
-    below.push(p)
+    if (!stored.has(p.id)) below.push(p)
   }
+  if (stored.size) state.pieces = state.pieces.filter((p) => !stored.has(p.id))
 }
 
 const on = (values, name) => Boolean(name) && Number(values[name] ?? 0) !== 0
@@ -568,7 +587,7 @@ function feed(state, e, gap = 0) {
   const step = e.sizes === 'mixed' ? Math.floor(n / 2) : n
   const material = e.material === 'mixed' ? (step % 2 ? 'metal' : 'plastic') : e.material === 'metal' ? 'metal' : 'plastic'
   const color = material === 'metal' ? 'metal' : (e.color ?? 'amber')
-  const piece = { id: state.nextPiece, x: e.x - w / 2, y: e.y - h / 2, w, h, color, material }
+  const piece = { id: state.nextPiece, x: e.x - w / 2, y: e.y - h / 2, w, h, color, material, ...(PIECE_KINDS.has(e.sizes) ? { kind: e.sizes } : {}) }
   const area = { x: piece.x - gap, y: piece.y - gap, w: piece.w + 2 * gap, h: piece.h + 2 * gap }
   if (state.pieces.some((p) => overlaps(p, area))) return state
   return { ...state, pieces: [...state.pieces, piece], nextPiece: state.nextPiece + 1 }
@@ -786,6 +805,9 @@ export function sceneStep(scene, state, values, dt) {
     const carried = new Set(Object.values(next.held).map((h) => h.id))
     const kept = next.pieces.filter((p) => carried.has(p.id) || !inside(center(p), rect))
     next.counts[e.id] = (next.counts[e.id] ?? 0) + next.pieces.length - kept.length
+    // Y lo que traían dentro las cajas (SINK_CONTENTS), para comprobar que llegan llenas.
+    const load = next.pieces.reduce((n, p) => n + (kept.includes(p) ? 0 : (p.load ?? 0)), 0)
+    if (load) next.counts[sinkContents(e.id)] = (next.counts[sinkContents(e.id)] ?? 0) + load
     next.pieces = kept
   }
   return next

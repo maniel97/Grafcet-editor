@@ -23,6 +23,7 @@ import { buildPlcModel } from './plcModel'
 import { extractSymbols } from './symbols'
 import { parseSequence } from './pneumatic'
 import { compareSpacePhase, theoreticalSpacePhase } from './sim/spacePhase'
+import { sinkContents } from './sim/scene'
 import { runScenarioWorld, scenarioMotion } from './sim/scenarioMotion'
 import { DEFAULT_TOLERANCE, compareBehaviour, expectedFrom } from './behaviour'
 import { checkRequirements } from './requirements'
@@ -106,7 +107,16 @@ function behaviourFrom(project, behaviour) {
   const scenarios = (project.plc.scenarios ?? []).filter((s) => behaviour?.scenarios?.includes(s.id))
   if (!scenarios.length) return []
   const model = buildPlcModel(project.nodes, project.edges, project.plc)
-  const sinks = behaviour.counts ? Object.fromEntries((project.plc.scene?.elements ?? []).filter((e) => e.type === 'sink').map((e) => [e.id, e.text || e.id])) : {}
+  const elements = project.plc.scene?.elements ?? []
+  // Con cajas, también lo que llega dentro de ellas a cada recogida (las bolsas de cada caja).
+  const boxes = elements.some((e) => e.type === 'feeder' && e.sizes === 'box')
+  const sinks = behaviour.counts
+    ? Object.fromEntries(
+        elements
+          .filter((e) => e.type === 'sink')
+          .flatMap((e) => [[e.id, e.text || e.id], ...(boxes ? [[sinkContents(e.id), t('{recogida} (dentro de las cajas)', { recogida: e.text || e.id })]] : [])]),
+      )
+    : {}
   return scenarios.map((scenario) => ({
     scenario,
     tolerance: Number(behaviour.tolerance) || DEFAULT_TOLERANCE,

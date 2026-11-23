@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { compile, evolve, initialState } from '../../src/lib/sim/engine'
 import { buildPlcModel } from '../../src/lib/plcModel'
 import { EMPTY_PLC } from '../../src/lib/addressing'
-import { SCENE_FLOOR, detectScene, measuredDistance, motorRunning, rotaryTip, rotate, sceneAction, sceneFaults, sceneFromPlant, sceneInit, sceneInputNames, sceneInputs, sceneStep, worldRect } from '../../src/lib/sim/scene'
+import { SCENE_FLOOR, detectScene, measuredDistance, motorRunning, rotaryTip, rotate, sceneAction, sceneFaults, sceneFromPlant, sceneInit, sceneInputNames, sceneInputs, sceneStep, sinkContents, worldRect } from '../../src/lib/sim/scene'
 import { normalizeProject } from '../../src/lib/projectFile'
 import { advanceWorld, makeWorld } from '../../src/lib/sim/world'
 import { links, step, transition } from './helpers'
@@ -597,6 +597,23 @@ describe('vista de frente (gravedad)', () => {
     const end = run(scene, resting, { M: 1 }, 4)
     expect(end.pieces).toHaveLength(0)
     expect(end.counts.r).toBe(1)
+  })
+
+  it('lo que cae en una caja se queda dentro y viaja con ella; la recogida cuenta la caja y lo que lleva', () => {
+    const box = { id: 'cj', type: 'feeder', x: 100, y: 200, rot: 0, trigger: 'Caja', auto: false, spacing: 0, sizes: 'box', material: 'plastic' }
+    const bag = { id: 'bl', type: 'feeder', x: 100, y: 60, rot: 0, trigger: 'Bolsa', auto: false, spacing: 0, sizes: 'bag', material: 'plastic' }
+    const scene = {
+      gravity: true,
+      elements: [box, bag, { id: 'c', type: 'conveyor', x: 20, y: 300, rot: 0, motor: 'M', length: 200, time: 2 }, { id: 'r', type: 'sink', x: 300, y: 500, rot: 0 }],
+    }
+    let state = run(scene, sceneStep(scene, sceneInit(scene), { Caja: 1 }, 0.05), {}, 1)
+    expect(state.pieces.map((p) => [p.kind, p.w, p.h, p.y + p.h])).toEqual([['box', 88, 40, 285]])
+    for (let i = 0; i < 2; i++) state = run(scene, sceneStep(scene, sceneStep(scene, state, { Bolsa: 0 }, 0.05), { Bolsa: 1 }, 0.05), {}, 1)
+    expect(state.pieces).toHaveLength(1) // las dos bolsas, dentro
+    expect(state.pieces[0].load).toBe(2)
+    const end = run(scene, state, { M: 1 }, 4)
+    expect(end.pieces).toHaveLength(0)
+    expect(end.counts).toEqual({ r: 1, [sinkContents('r')]: 2 })
   })
 
   it('un cilindro vertical eleva la pieza que tiene encima y, al bajar, la pieza baja con él', () => {

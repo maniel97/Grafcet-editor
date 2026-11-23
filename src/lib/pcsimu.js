@@ -327,8 +327,10 @@ const label = (text, cx, y) => ({ type: PCSIMU_TYPES.text, rect: [cx - 4 * text.
 
 // project -> { text, bytes (Windows-1252), warnings, count }. Arriba las salidas, en medio los mandos y
 // abajo los detectores, cada uno con el nombre de su variable debajo.
-// Tipo de pieza del alimentador: metálica, de color (con el suyo) o plástica.
+// Tipo de pieza del alimentador: caja, bolsa, metálica, de color (con el suyo) o plástica.
 function feederPiece(e) {
+  if (e.sizes === 'box') return { material: 0 }
+  if (e.sizes === 'bag') return { material: 1 }
   if (e.material === 'metal') return { material: 5 }
   const color = e.material === 'mixed' ? undefined : PIECE_COLORS_PCSIMU[e.color]
   return color === undefined ? { material: 6 } : { material: 7, color }

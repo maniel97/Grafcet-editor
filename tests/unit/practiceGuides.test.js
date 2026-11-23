@@ -191,6 +191,29 @@ describe('guion de prácticas de ejemplo', () => {
   })
 })
 
+describe('práctica 14', () => {
+  const near = (got, want) => {
+    expect(got).toHaveLength(want.length)
+    got.forEach((t, i) => expect(Math.abs(t - want[i])).toBeLessThanOrEqual(0.1))
+  }
+  it('con S1 una bolsa y con S5 cinco; pulsar a mitad no hace nada; H1 o H5 durante la carga', () => {
+    const una = run(teacher('p14'), 'una')
+    expect(una.counts).toEqual({ salida: 1, 'salida:dentro': 1 })
+    near(edgesOf(una.samples, 'BOLSA').times, [2.9, 4.8])
+    near(edgesOf(una.samples, 'H1').times, [0.55, 4.85])
+    expect(edgesOf(una.samples, 'H5').times).toHaveLength(0)
+    const cinco = run(teacher('p14'), 'cinco')
+    // Cinco bolsas en la primera caja y una en la segunda (la pulsación de los 6 s no cuenta).
+    expect(cinco.counts).toEqual({ salida: 2, 'salida:dentro': 6 })
+    expect(edgesOf(cinco.samples, 'BOLSA').times).toHaveLength(12)
+    expect(edgesOf(cinco.samples, 'CAJA').times).toHaveLength(4)
+    near(edgesOf(cinco.samples, 'H5').times, [0.55, 12.65])
+    near(edgesOf(cinco.samples, 'H1').times, [21, 25.3])
+    // La cinta de las cajas no vuelve a arrancar hasta que la caja ha caído a la recogida.
+    expect(cinco.samples.at(-1).values.X0).toBe(1)
+  })
+})
+
 describe('mandos de la planta en los escenarios', () => {
   it('grabar: la primera pulsación de una seta (de 1 a 0) se graba', async () => {
     const { recordEvent } = await import('../../src/lib/sim/scenario')

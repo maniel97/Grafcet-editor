@@ -37,6 +37,16 @@ describe('Importar de PC_SIMU (.sim)', () => {
     expect(signature(exportPcSimu(imp.project).text)).toEqual(signature(a.text))
   })
 
+  it('las cajas y las bolsas (práctica 14) vuelven como cajas y bolsas', async () => {
+    const { PRACTICE_GUIDES } = await import('../../src/lib/practiceGuides')
+    const p = PRACTICE_GUIDES[0].practices.find((x) => x.id === 'p14').teacher()
+    const a = exportPcSimu(p)
+    const imp = importPcSimu(a.text)
+    const feeders = imp.project.plc.scene.elements.filter((e) => e.type === 'feeder').sort((x, y) => x.y - y.y)
+    expect(feeders.map((e) => e.sizes)).toEqual(['bag', 'box'])
+    expect(signature(exportPcSimu(imp.project).text)).toEqual(signature(a.text))
+  })
+
   it('lo que no tiene equivalente, contado aparte (para el aviso)', () => {
     const unknown = { type: 99, rect: [0, 0, 40, 40], fields: [] }
     const { skipped } = importPcSimu(pcsimuText([unknown, unknown]))

@@ -225,6 +225,9 @@ describe('PC_SIMU (.sim)', () => {
     // Práctica 12: cajas rojas y azules como piezas de color (f16 = 7) con el suyo en f15 (4 rojo, 1 azul).
     const p12 = parsePcSimu(exportPcSimu(practice('p12')).text).filter((o) => o.type === 25).sort((a, b) => a.rect[0] - b.rect[0])
     expect(p12.map((o) => [o.fields[12], o.fields[11]])).toEqual([[7, 4], [7, 1]])
+    // Práctica 14: la bolsa (f16 = 1) y la caja (f16 = 0), con su tamaño.
+    const p14 = parsePcSimu(exportPcSimu(practice('p14')).text).filter((o) => o.type === 25).sort((a, b) => a.rect[1] - b.rect[1])
+    expect(p14.map((o) => [o.fields[12], o.rect[2] - o.rect[0], o.rect[3] - o.rect[1]])).toEqual([[1, 40, 20], [0, 88, 40]])
     // El de metal sigue siendo metálica y el ámbar, plástica.
     expect(p9.filter((o) => o.type === 25).map((o) => o.fields[12]).sort()).toEqual([5, 6])
     // El elevador (160 px de recorrido): gráfico 1 (el que empuja y sube piezas en PC_SIMU), con el cuerpo de

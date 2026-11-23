@@ -766,11 +766,104 @@ function identifyPiece() {
   })
 }
 
+// --- Práctica 14: llenar una caja con 1 o 5 bolsas -----------------------------------------------
+// Como en el guion: una cinta arriba que trae las bolsas y otra abajo que trae la caja; B1 la para
+// debajo del final de la de arriba y la barrera B2 ve caer cada bolsa en ella. Las cajas son
+// abiertas: lo que cae dentro se queda en ellas (lib/sim/scene.js).
+function bagsInBox() {
+  const nodes = [
+    step('s0', '0', 320, 0, [], { initial: true }),
+    // Cuántas bolsas faltan: C cuenta hacia atrás desde 1 o desde 5.
+    trans('t1', '↑S1 · !S5', 200, 100),
+    trans('t2', '↑S5 · !S1', 440, 100),
+    step('s1', '1', 200, 170, ['CAJA', 'M1', { text: 'C:=1', kind: 'stored-on' }]),
+    step('s2', '2', 440, 170, ['CAJA', 'M1', { text: 'C:=5', kind: 'stored-on' }]),
+    trans('t3', 'B1', 200, 270),
+    trans('t4', 'B1', 440, 270),
+    step('s3', '3', 320, 340, ['BOLSA', 'M2']),
+    trans('t5', 'B2', 320, 440),
+    // La bolsa cruza la barrera al caer en la caja: una menos.
+    step('s4', '4', 320, 510, [{ text: 'C:=C-1', kind: 'stored-on' }]),
+    trans('t6', '!B2 · C >= 1', 200, 610),
+    trans('t7', '!B2 · C < 1', 440, 610),
+    // Llena: la caja sale; hasta que cae del final de la cinta no se puede volver a empezar.
+    step('s5', '5', 440, 680, ['M1']),
+    trans('t8', '3s/X5', 440, 780),
+    // Un grafcet parcial por bombilla: H1 o H5 desde que se pide la caja hasta que está llena.
+    step('s10', '10', 700, 0, [], { initial: true }),
+    trans('t10', 'X1', 700, 100),
+    step('s11', '11', 700, 170, ['H1']),
+    trans('t11', 'X5', 700, 270),
+    step('s20', '20', 900, 0, [], { initial: true }),
+    trans('t20', 'X2', 900, 100),
+    step('s21', '21', 900, 170, ['H5']),
+    trans('t21', 'X5', 900, 270),
+  ]
+  const edges = links([
+    ['s0', 't1'], ['s0', 't2'], ['t1', 's1'], ['t2', 's2'], ['s1', 't3'], ['s2', 't4'], ['t3', 's3'], ['t4', 's3'],
+    ['s3', 't5'], ['t5', 's4'], ['s4', 't6'], ['s4', 't7'], ['t6', 's3'], ['t7', 's5'], ['s5', 't8'], ['t8', 's0'],
+    ['s10', 't10'], ['t10', 's11'], ['s11', 't11'], ['t11', 's10'],
+    ['s20', 't20'], ['t20', 's21'], ['s21', 't21'], ['t21', 's20'],
+  ])
+  // Vista de frente, con gravedad. Medidas comprobadas en la simulación
+  // (tests/unit/practiceGuides.test.js): la caja se para con su centro debajo de donde caen las
+  // bolsas desde el final de la cinta de arriba, y al acabar cae a la recogida.
+  const scene = {
+    gravity: true,
+    elements: [
+      { id: 'bolsas', type: 'feeder', x: 110, y: 150, rot: 0, trigger: 'BOLSA', auto: false, spacing: 0, sizes: 'bag', material: 'plastic', color: 'amber', text: 'BOLSA' },
+      { id: 'arriba', type: 'conveyor', x: 40, y: 180, rot: 0, motor: 'M2', reverse: '', length: 220, time: 2, text: 'Cinta de las bolsas (M2)' },
+      { id: 'cajas', type: 'feeder', x: 90, y: 320, rot: 0, trigger: 'CAJA', auto: false, spacing: 0, sizes: 'box', material: 'plastic', color: 'amber', text: 'CAJA' },
+      { id: 'abajo', type: 'conveyor', x: 40, y: 360, rot: 0, motor: 'M1', reverse: '', length: 520, time: 5, text: 'Cinta de las cajas (M1)' },
+      // B1 mira hacia abajo: ve llegar el frente de la caja. B2, de lado, el paso de cada bolsa.
+      { id: 'b1', type: 'sensor', x: 368, y: 250, rot: 90, variable: 'B1', contact: 'NO', range: 80, kind: 'optical' },
+      { id: 'b2', type: 'sensor', x: 230, y: 235, rot: 0, variable: 'B2', contact: 'NO', range: 90, kind: 'optical' },
+      { id: 'salida', type: 'sink', x: 610, y: 470, rot: 0, text: 'Cajas llenas' },
+      desk('button', 'S1', '1 bolsa (S1)', { contact: 'NO', color: 'red' }),
+      desk('button', 'S5', '5 bolsas (S5)', { contact: 'NO', color: 'green' }),
+      desk('lamp', 'H1', 'Carga 1 (H1)', { color: 'green' }),
+      desk('lamp', 'H5', 'Carga 5 (H5)', { color: 'green' }),
+    ],
+  }
+  return practice({
+    name: 'Llenar cajas con 1 o 5 bolsas',
+    nodes,
+    edges,
+    scene,
+    comments: {
+      S1: 'Pulsador (NA): caja con 1 bolsa', S5: 'Pulsador (NA): caja con 5 bolsas',
+      B1: 'Detector: caja debajo de la cinta de las bolsas', B2: 'Barrera: cae una bolsa en la caja',
+      CAJA: 'Soltar una caja en la cinta de abajo', BOLSA: 'Soltar una bolsa en la cinta de arriba',
+      M1: 'Motor de la cinta de las cajas', M2: 'Motor de la cinta de las bolsas',
+      H1: 'Bombilla: cargando 1 bolsa', H5: 'Bombilla: cargando 5 bolsas',
+      C: 'Contador: bolsas que faltan', '3s/X5': 'Tiempo para que la caja caiga de la cinta',
+    },
+    steps: { 0: 'Esperando', 1: 'Caja para 1 bolsa', 2: 'Caja para 5 bolsas', 3: 'Cae una bolsa', 4: 'Cuenta la bolsa', 5: 'La caja sale', 10: 'H1 apagada', 11: 'Cargando 1', 20: 'H5 apagada', 21: 'Cargando 5' },
+    scenarios: [
+      scenario('una', 'Una caja con 1 bolsa', 11, [[0.5, 'S1', 1], [0.8, 'S1', 0]]),
+      // Pulsar a mitad de la carga no hace nada; al acabar, otra caja.
+      scenario('cinco', 'Una caja con 5 bolsas, pulsar a mitad y otra con 1', 32, [[0.5, 'S5', 1], [0.8, 'S5', 0], [6, 'S1', 1], [6.3, 'S1', 0], [21, 'S1', 1], [21.3, 'S1', 0]]),
+    ],
+    exercise: {
+      title: 'Práctica 14. Llenar cajas con 1 o 5 bolsas',
+      statement: `Al accionar **S1** o **S5** cae una caja sobre la cinta de abajo (**M1**). Cuando llega a **B1**, cae una bolsa sobre la cinta de arriba (**M2**). Al caer en la caja (la barrera **B2** la ve pasar), se siguen metiendo bolsas hasta un total de **5** si se ha accionado **S5**, o solo **1** si se ha accionado **S1**. Una vez llena la caja con la cantidad correcta, avanza hasta el final de la cinta.\n\n- Hasta que la caja no ha salido de la cinta de abajo no se puede volver a poner en marcha.\n- Las bombillas **H1** o **H5** están encendidas durante toda la carga de 1 o 5 bolsas, según corresponda.\n- Salidas: **CAJA** y **BOLSA** sueltan una caja o una bolsa.${TASK}`,
+      parts: { plant: 'locked', variables: 'locked', electrical: 'given' },
+      checks: { warnings: false, sequence: '', scenario: '', behaviour: { scenarios: ['una', 'cinco'], outputs: [], tolerance: 1, counts: true }, requirements: [{ id: 'counter' }, { id: 'edge' }] },
+      hints: { enabled: true, items: [
+        'Dos caminos desde el reposo: con `↑S1` la caja será de 1 bolsa y con `↑S5` de 5. Los dos piden la caja (**CAJA** y **M1**) hasta que llega a `B1`.',
+        'Un contador para las bolsas que faltan: `C:=1` o `C:=5` al empezar, y `C:=C-1` cada vez que una bolsa cruza `B2`. Mientras falten (`C >= 1`) se suelta otra; si no, la caja sale.',
+        'Las bombillas, cada una en un grafcet parcial que sigue al principal: `X1` enciende **H1** y `X2` enciende **H5**; las dos se apagan con la caja llena (`X5`).',
+        'La caja tarda un poco en caer del final de la cinta: una temporización (`3s/X5`) antes de volver al reposo.',
+      ] },
+    },
+  })
+}
+
 export const PRACTICE_GUIDES = [
   {
     id: 'guion-automatas',
     title: 'Prácticas de programación de autómatas',
-    description: 'Un guion completo: normas generales, una práctica guiada con su solución y doce prácticas con autocorrección.',
+    description: 'Un guion completo: normas generales, una práctica guiada con su solución y trece prácticas con autocorrección.',
     sheet: { subject: 'Integración de Sistemas', course: 'Curso 2026-2027', cycle: 'Mecatrónica Industrial', center: '', teacher: '' },
     rules:
       'A continuación tienes una serie de prácticas obligatorias de programación de autómatas. El primer paso es **adaptar el enunciado a un caso real** del mundo industrial con una dificultad parecida.\n\n- Las prácticas se simulan en el editor (planta virtual) y, si se puede, en el autómata real.\n- Cada práctica es **individual**, aunque durante el aprendizaje hayas tenido ayuda del profesor o de los compañeros. Los archivos copiados se consideran no presentados.\n- La entrega fuera de plazo se penaliza progresivamente.\n- Se valoran la ejecución y la presentación (formato, ortografía, limpieza): **30 %** la entrega y **70 %** la calidad.\n- Se entregan en **un único PDF con portada**: Exportar > Dossier lo genera con tu proyecto dentro.\n\n# Cada práctica debe incluir\n- Enunciado\n- Breve contenido teórico, si procede\n- GRAFCET\n- Conexionado de los elementos\n- Programa (ladder y AWL)\n- Tabla de variables\n- Simulación\n- Posibles mejoras o aportaciones, si procede\n- Problemas encontrados y cómo se han resuelto, si procede',
@@ -788,6 +881,7 @@ export const PRACTICE_GUIDES = [
       { id: 'p11', teacher: shuttleConveyor },
       { id: 'p12', teacher: alternateBoxes },
       { id: 'p13', teacher: identifyPiece },
+      { id: 'p14', teacher: bagsInBox },
     ],
   },
 ]

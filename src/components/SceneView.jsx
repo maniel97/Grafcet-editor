@@ -3,12 +3,14 @@ import { closest } from '../lib/autocomplete'
 import { ArrowLeft, ArrowRight, BookmarkPlus, Box, Boxes, Cable, ChevronDown, Copy, Download, Hand, Maximize2, Upload, Tag, Minimize2, Minus, MousePointer2, Plus, RotateCw, Scan, Trash2, WandSparkles, X, ArrowDownToLine } from 'lucide-react'
 import {
   PIECE_SIZES,
+  PIECE_KINDS,
   SCENE_TYPES,
   SCENE_VARS,
   TANK,
   conveyorRect,
   cylinderPlate,
   PIECE_COLORS,
+  sinkContents,
   SENSOR_KINDS,
   detectScene,
   limitZone,
@@ -661,7 +663,39 @@ function ReliefLayer({ scene, state, elements }) {
 // Contorno de un elemento con su volumen (para colocar los rótulos sin pisarlo).
 const withRelief = (b, on) => (on ? { x: b.x, y: b.y - 25, w: b.w + 25, h: b.h + 25 } : b)
 
+// Caja abierta por arriba (de cartón), con lo que lleva dentro asomando y su número.
+function BoxPiece({ p }) {
+  const n = p.load ?? 0
+  // Las bolsas que caben debajo del número (sin pisarlo).
+  const rows = Math.min(n, Math.floor((p.h - 18) / 7))
+  return (
+    <g pointerEvents="none" data-piece={p.id} data-material={p.material ?? 'plastic'} data-kind="box" data-load={n}>
+      <rect x={p.x} y={p.y} width={p.w} height={p.h} fill="#f5e6c8" />
+      {Array.from({ length: rows }, (_, i) => (
+        <rect key={i} x={p.x + 6} y={p.y + p.h - 9 - i * 7} width={p.w - 12} height="6" rx="3" fill={COLORS.amber} stroke={INK} strokeWidth="0.6" />
+      ))}
+      <path d={`M${p.x},${p.y} V${p.y + p.h} H${p.x + p.w} V${p.y}`} fill="none" stroke="#92400e" strokeWidth="3" strokeLinejoin="round" />
+      {n > 0 && (
+        <text x={p.x + p.w / 2} y={p.y + 13} textAnchor="middle" fontSize="11" fontWeight="700" fill={INK}>
+          {n}
+        </text>
+      )}
+    </g>
+  )
+}
+// Bolsa (saco): redondeada y atada por arriba.
+function BagPiece({ p }) {
+  return (
+    <g pointerEvents="none" data-piece={p.id} data-material={p.material ?? 'plastic'} data-kind="bag">
+      <rect x={p.x} y={p.y + 3} width={p.w} height={p.h - 3} rx="7" fill={COLORS[p.color] ?? COLORS.amber} stroke={INK} />
+      <path d={`M${p.x + p.w / 2 - 5},${p.y} L${p.x + p.w / 2},${p.y + 4} L${p.x + p.w / 2 + 5},${p.y}`} fill="none" stroke={INK} strokeWidth="1.5" />
+    </g>
+  )
+}
+
 function PieceShape({ p, relief = false }) {
+  if (p.kind === 'box' && !relief) return <BoxPiece p={p} />
+  if (p.kind === 'bag' && !relief) return <BagPiece p={p} />
   const metal = p.material === 'metal'
   return (
     <g pointerEvents="none" data-piece={p.id} data-material={p.material ?? 'plastic'}>
@@ -708,21 +742,33 @@ function IsoPiece({ p, z }) {
     </g>
   )
 }
-function FeederShape() {
+// El hueco donde sale la pieza, de su tamaño (más ancho y bajo con cajas y bolsas), y la tolva encima.
+function feederOutline(e) {
+  const [w, h] = PIECE_KINDS.has(e?.sizes) ? PIECE_SIZES[e.sizes].map((n) => n + 4) : [48, 48]
+  return { w, h, top: -h / 2, half: Math.max(28, w / 2 + 4) }
+}
+function FeederShape({ e }) {
+  const { w, h, top, half } = feederOutline(e)
   return (
     <g>
-      <polygon points="-28,-56 28,-56 18,-26 -18,-26" fill="#e2e8f0" stroke={INK} />
-      <rect x="-24" y="-24" width="48" height="48" fill="none" stroke="#94a3b8" strokeDasharray="4 3" />
+      <polygon points={`${-half},${top - 32} ${half},${top - 32} ${half - 10},${top - 2} ${-half + 10},${top - 2}`} fill="#e2e8f0" stroke={INK} />
+      <rect x={-w / 2} y={top} width={w} height={h} fill="none" stroke="#94a3b8" strokeDasharray="4 3" />
     </g>
   )
 }
-function SinkShape({ count }) {
+// inside: lo que ha llegado dentro de las cajas (las bolsas), debajo del número de piezas.
+function SinkShape({ count, inside = 0 }) {
   return (
     <g>
       <rect x="-30" y="-30" width="60" height="60" rx="4" fill="#f1f5f9" stroke={INK} strokeDasharray="5 3" />
-      <text y="4" textAnchor="middle" fontSize="13" fontWeight="600" fill={INK}>
+      <text y={inside ? -2 : 4} textAnchor="middle" fontSize="13" fontWeight="600" fill={INK}>
         {count}
       </text>
+      {inside > 0 && (
+        <text y="16" textAnchor="middle" fontSize="10" fill={INK} data-inside={inside}>
+          {tr('{n} dentro', { n: inside })}
+        </text>
+      )}
     </g>
   )
 }
@@ -1060,8 +1106,10 @@ function boundsOf(e, pos = 0) {
       return e.vertical === false ? r(-40, -10, 80, 40) : r(-12, -40, 24, 100)
     case 'heater':
       return r(-40, -24, 80, 48)
-    case 'feeder':
-      return r(-28, -56, 56, 80)
+    case 'feeder': {
+      const { half, top, h } = feederOutline(e)
+      return r(-half, top - 32, 2 * half, h + 32)
+    }
     case 'sink':
       return sinkRect(e)
     case 'tank':
@@ -1859,6 +1907,8 @@ function Properties({ element, variables, onChange, onDelete, onRotate, onCreate
               <option value="small">{tr('Pequeñas')}</option>
               <option value="large">{tr('Grandes')}</option>
               <option value="mixed">{tr('Alternas (pequeña, grande…)')}</option>
+              <option value="box">{tr('Cajas (lo que cae dentro va con ellas)')}</option>
+              <option value="bag">{tr('Bolsas')}</option>
             </select>
           </label>
           <label className="block">
@@ -2154,9 +2204,9 @@ function drawElement(e, { scene, state, values, time, signals, iso = false }) {
     case 'sensor':
       return <SensorShape e={e} active={signals[e.id]} />
     case 'feeder':
-      return <FeederShape />
+      return <FeederShape e={e} />
     case 'sink':
-      return <SinkShape count={state.counts[e.id] ?? 0} />
+      return <SinkShape count={state.counts[e.id] ?? 0} inside={state.counts[sinkContents(e.id)] ?? 0} />
     case 'tank':
       return <TankShape e={e} level={state.level?.[e.id] ?? (Number(e.initial) || 0)} values={values} iso={iso} />
     case 'stepper':
