@@ -786,9 +786,13 @@ function bagsInBox() {
     step('s4', '4', 320, 510, [{ text: 'C:=C-1', kind: 'stored-on' }]),
     trans('t6', '!B2 · C >= 1', 200, 610),
     trans('t7', '!B2 · C < 1', 440, 610),
-    // Llena: la caja sale; hasta que cae del final de la cinta no se puede volver a empezar.
+    // Llena: la caja sale. La cinta acaba poco después de B1: cuando B1 deja de verla, la caja
+    // está en el borde, y un momento después ha caído. Hasta entonces no se puede volver a empezar.
+    // (Con una temporización desde que arranca, en PC_SIMU, más lento, la cinta se paraba antes.)
     step('s5', '5', 440, 680, ['M1']),
-    trans('t8', '7s/X5', 440, 780),
+    trans('t8', '!B1', 440, 780),
+    step('s6', '6', 440, 850, ['M1']),
+    trans('t9', '2s/X6', 440, 950),
     // Un grafcet parcial por bombilla: H1 o H5 desde que se pide la caja hasta que está llena.
     step('s10', '10', 700, 0, [], { initial: true }),
     trans('t10', 'X1', 700, 100),
@@ -801,7 +805,7 @@ function bagsInBox() {
   ]
   const edges = links([
     ['s0', 't1'], ['s0', 't2'], ['t1', 's1'], ['t2', 's2'], ['s1', 't3'], ['s2', 't4'], ['t3', 's3'], ['t4', 's3'],
-    ['s3', 't5'], ['t5', 's4'], ['s4', 't6'], ['s4', 't7'], ['t6', 's3'], ['t7', 's5'], ['s5', 't8'], ['t8', 's0'],
+    ['s3', 't5'], ['t5', 's4'], ['s4', 't6'], ['s4', 't7'], ['t6', 's3'], ['t7', 's5'], ['s5', 't8'], ['t8', 's6'], ['s6', 't9'], ['t9', 's0'],
     ['s10', 't10'], ['t10', 's11'], ['s11', 't11'], ['t11', 's10'],
     ['s20', 't20'], ['t20', 's21'], ['s21', 't21'], ['t21', 's20'],
   ])
@@ -814,11 +818,11 @@ function bagsInBox() {
       { id: 'bolsas', type: 'feeder', x: 110, y: 150, rot: 0, trigger: 'BOLSA', auto: false, spacing: 0, sizes: 'bag', material: 'plastic', color: 'amber', text: 'BOLSA' },
       { id: 'arriba', type: 'conveyor', x: 40, y: 180, rot: 0, motor: 'M2', reverse: '', length: 220, time: 4, text: 'Cinta de las bolsas (M2)' },
       { id: 'cajas', type: 'feeder', x: 90, y: 320, rot: 0, trigger: 'CAJA', auto: false, spacing: 0, sizes: 'box', material: 'plastic', color: 'amber', text: 'CAJA' },
-      { id: 'abajo', type: 'conveyor', x: 40, y: 360, rot: 0, motor: 'M1', reverse: '', length: 520, time: 10, text: 'Cinta de las cajas (M1)' },
+      { id: 'abajo', type: 'conveyor', x: 40, y: 360, rot: 0, motor: 'M1', reverse: '', length: 360, time: 6.9, text: 'Cinta de las cajas (M1)' },
       // B1 mira hacia abajo: ve llegar el frente de la caja. B2, de lado, el paso de cada bolsa.
       { id: 'b1', type: 'sensor', x: 330, y: 250, rot: 90, variable: 'B1', contact: 'NO', range: 80, kind: 'optical' },
       { id: 'b2', type: 'sensor', x: 215, y: 235, rot: 0, variable: 'B2', contact: 'NO', range: 65, kind: 'optical' },
-      { id: 'salida', type: 'sink', x: 610, y: 470, rot: 0, text: 'Cajas llenas' },
+      { id: 'salida', type: 'sink', x: 440, y: 470, rot: 0, text: 'Cajas llenas' },
       desk('button', 'S1', '1 bolsa (S1)', { contact: 'NO', color: 'red' }),
       desk('button', 'S5', '5 bolsas (S5)', { contact: 'NO', color: 'green' }),
       desk('lamp', 'H1', 'Carga 1 (H1)', { color: 'green' }),
@@ -836,9 +840,9 @@ function bagsInBox() {
       CAJA: 'Soltar una caja en la cinta de abajo', BOLSA: 'Soltar una bolsa en la cinta de arriba',
       M1: 'Motor de la cinta de las cajas', M2: 'Motor de la cinta de las bolsas',
       H1: 'Bombilla: cargando 1 bolsa', H5: 'Bombilla: cargando 5 bolsas',
-      C: 'Contador: bolsas que faltan', '7s/X5': 'Tiempo para que la caja caiga de la cinta',
+      C: 'Contador: bolsas que faltan', '2s/X6': 'Tiempo para que la caja caiga del borde',
     },
-    steps: { 0: 'Esperando', 1: 'Caja para 1 bolsa', 2: 'Caja para 5 bolsas', 3: 'Cae una bolsa', 4: 'Cuenta la bolsa', 5: 'La caja sale', 10: 'H1 apagada', 11: 'Cargando 1', 20: 'H5 apagada', 21: 'Cargando 5' },
+    steps: { 0: 'Esperando', 1: 'Caja para 1 bolsa', 2: 'Caja para 5 bolsas', 3: 'Cae una bolsa', 4: 'Cuenta la bolsa', 5: 'La caja sale', 6: 'La caja cae', 10: 'H1 apagada', 11: 'Cargando 1', 20: 'H5 apagada', 21: 'Cargando 5' },
     scenarios: [
       scenario('una', 'Una caja con 1 bolsa', 17, [[0.5, 'S1', 1], [0.8, 'S1', 0]]),
       // Pulsar a mitad de la carga no hace nada; al acabar, otra caja.
@@ -853,7 +857,7 @@ function bagsInBox() {
         'Dos caminos desde el reposo: con `↑S1` la caja será de 1 bolsa y con `↑S5` de 5. Los dos piden la caja (**CAJA** y **M1**) hasta que llega a `B1`.',
         'Un contador para las bolsas que faltan: `C:=1` o `C:=5` al empezar, y `C:=C-1` cada vez que una bolsa cruza `B2`. Mientras falten (`C >= 1`) se suelta otra; si no, la caja sale.',
         'Las bombillas, cada una en un grafcet parcial que sigue al principal: `X1` enciende **H1** y `X2` enciende **H5**; las dos se apagan con la caja llena (`X5`).',
-        'La caja tarda un poco en caer del final de la cinta: una temporización (`7s/X5`) antes de volver al reposo.',
+        'La cinta acaba poco después de `B1`: con la caja llena, **M1** hasta que `B1` deja de verla (`!B1`) y un poco más (`2s/X6`) para que caiga del borde.',
       ] },
     },
   })
